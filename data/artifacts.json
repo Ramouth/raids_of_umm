@@ -1,0 +1,35 @@
+{
+  "artifacts": [
+    {
+      "id": "scarab_of_swiftness",
+      "name": "Scarab of Swiftness",
+      "slot": "neck",
+      "description": "A golden scarab enchanted by Djinn mages. Grants the bearer unnatural speed.",
+      "effects": [
+        { "stat": "speed", "bonus": 2 }
+      ],
+      "cost": { "Gold": 5000, "DjinnEssence": 1 }
+    },
+    {
+      "id": "pharaoh_crown",
+      "name": "Crown of the Fallen Pharaoh",
+      "slot": "head",
+      "description": "The ancient crown of Umm'Natur's first king. Amplifies all death magic.",
+      "effects": [
+        { "stat": "spellpower", "bonus": 3 },
+        { "stat": "knowledge", "bonus": 2 }
+      ],
+      "cost": { "Gold": 12000, "AncientRelic": 3, "BoneDust": 2 }
+    },
+    {
+      "id": "ankh_of_protection",
+      "name": "Ankh of Protection",
+      "slot": "offhand",
+      "description": "An obsidian ankh radiating protective desert magic.",
+      "effects": [
+        { "stat": "defense", "bonus": 4 }
+      ],
+      "cost": { "Gold": 4000, "Amber": 2 }
+    }
+  ]
+}

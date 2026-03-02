@@ -1,0 +1,51 @@
+{
+  "name": "The Sands of Umm'Natur",
+  "description": "A small tutorial map. Recover the Ancient Relic before the rival necromancer does.",
+  "size": { "width": 16, "height": 12 },
+  "hexSize": 1.0,
+  "startDay": 1,
+  "factions": [
+    {
+      "id": "player",
+      "name": "Seeker of Relics",
+      "isHuman": true,
+      "startResources": {
+        "Gold": 2500,
+        "SandCrystal": 5,
+        "BoneDust": 3,
+        "DjinnEssence": 2,
+        "AncientRelic": 1,
+        "MercuryTears": 0,
+        "Amber": 2
+      },
+      "startHero": {
+        "name": "Aset the Wanderer",
+        "position": { "q": 2, "r": 2 }
+      }
+    },
+    {
+      "id": "ai_1",
+      "name": "Servants of the Lich",
+      "isHuman": false,
+      "startResources": {
+        "Gold": 2500,
+        "SandCrystal": 3,
+        "BoneDust": 5,
+        "DjinnEssence": 1,
+        "AncientRelic": 1,
+        "MercuryTears": 0,
+        "Amber": 1
+      },
+      "startHero": {
+        "name": "Kha'Set the Undying",
+        "position": { "q": 13, "r": 9 }
+      }
+    }
+  ],
+  "winConditions": [
+    { "type": "collect_artifact", "artifactId": "pharaoh_crown" }
+  ],
+  "lossConditions": [
+    { "type": "lose_all_heroes" }
+  ]
+}

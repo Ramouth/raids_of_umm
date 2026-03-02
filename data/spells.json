@@ -1,0 +1,70 @@
+{
+  "spells": [
+    {
+      "id": "sandstorm",
+      "name": "Sandstorm",
+      "school": "earth",
+      "level": 2,
+      "manaCost": 9,
+      "targeting": "area",
+      "radius": 2,
+      "description": "Summons a blinding sandstorm that reduces enemy attack and defense by 2 for 3 turns.",
+      "effects": [
+        { "type": "debuff", "stat": "attack",  "amount": -2, "duration": 3 },
+        { "type": "debuff", "stat": "defense", "amount": -2, "duration": 3 }
+      ]
+    },
+    {
+      "id": "raise_skeleton",
+      "name": "Raise Skeleton",
+      "school": "necromancy",
+      "level": 1,
+      "manaCost": 5,
+      "targeting": "corpse",
+      "radius": 0,
+      "description": "Animates fallen enemy soldiers as Skeleton Warriors under your command.",
+      "effects": [
+        { "type": "summon", "unitId": "skeleton_warrior", "count_formula": "spellpower * 2" }
+      ]
+    },
+    {
+      "id": "djinn_blessing",
+      "name": "Djinn Blessing",
+      "school": "air",
+      "level": 3,
+      "manaCost": 12,
+      "targeting": "friendly_unit",
+      "radius": 0,
+      "description": "Blesses a friendly stack, granting them maximum damage rolls for 2 turns.",
+      "effects": [
+        { "type": "buff", "stat": "damage_roll", "mode": "maximize", "duration": 2 }
+      ]
+    },
+    {
+      "id": "curse_of_khepri",
+      "name": "Curse of Khepri",
+      "school": "necromancy",
+      "level": 4,
+      "manaCost": 20,
+      "targeting": "enemy_unit",
+      "radius": 0,
+      "description": "Calls down the curse of the scarab god, dealing (spellpower × 5) direct damage to the target stack.",
+      "effects": [
+        { "type": "damage", "formula": "spellpower * 5" }
+      ]
+    },
+    {
+      "id": "oasis",
+      "name": "Oasis",
+      "school": "earth",
+      "level": 2,
+      "manaCost": 8,
+      "targeting": "friendly_unit",
+      "radius": 0,
+      "description": "Restores (spellpower × 3) hit points to the target friendly stack.",
+      "effects": [
+        { "type": "heal", "formula": "spellpower * 3" }
+      ]
+    }
+  ]
+}
