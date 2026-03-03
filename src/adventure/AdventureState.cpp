@@ -1,4 +1,5 @@
 #include "AdventureState.h"
+#include "castle/CastleState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include <SDL2/SDL.h>
@@ -105,10 +106,12 @@ void AdventureState::moveHero(const HexCoord& dest) {
     m_walkCycle = 0.0f;
     m_isWalking = true;
 
+    // Set pending visit to trigger when movement finishes
+    m_pendingVisit = dest;
+    m_hasPendingVisit = true;
+
     std::cout << "  Hero moved to (" << dest.q << "," << dest.r
               << ")  — " << m_hero.movesLeft << " moves remaining\n";
-
-    onHeroVisit(dest);
 }
 
 void AdventureState::onHeroVisit(const HexCoord& coord) {
@@ -123,7 +126,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 
     switch (obj->type) {
         case ObjType::Town:
-            std::cout << "     (Town screen coming soon)\n";
+            Application::get().pushState(std::make_unique<CastleState>(obj->name));
             break;
         case ObjType::Dungeon:
             std::cout << "     (Combat screen coming soon)\n";
@@ -281,9 +284,11 @@ void AdventureState::update(float dt) {
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.0f, hz };
     } else {
-        // Hero arrived - NO camera follow
-        // glm::vec2 heroXZ = { m_heroRenderPos.x, m_heroRenderPos.z };
-        // m_cam.setPosition(heroXZ);
+        // Hero arrived at final destination
+        if (m_hasPendingVisit) {
+            onHeroVisit(m_pendingVisit);
+            m_hasPendingVisit = false;
+        }
     }
 }
 

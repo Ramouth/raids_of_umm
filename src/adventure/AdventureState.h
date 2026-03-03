@@ -79,6 +79,8 @@ private:
     float                  m_heroFacingAngle = 0.0f;  // radians, 0 = facing right
     float                  m_walkCycle = 0.0f;         // 0-1 progress within current hex step
     bool                   m_isWalking = false;
+    HexCoord               m_pendingVisit;             // tile to visit when movement finishes
+    bool                   m_hasPendingVisit = false;
 
     // Path preview
     std::vector<HexCoord> m_previewPath;

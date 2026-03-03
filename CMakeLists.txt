@@ -42,6 +42,7 @@ set(SOURCES
     src/render/Camera2D.cpp
     src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp
+    src/castle/CastleState.cpp
     src/worldbuilder/WorldBuilderState.cpp
 )
 
