@@ -18,6 +18,7 @@ void WorldBuilderState::onEnter() {
     auto& app = Application::get();
     m_cam = Camera2D(app.width(), app.height());
     m_hexRenderer.init();
+    m_hexRenderer.loadTerrainTextures();
 
     if (m_loadOnEnter) {
         loadMap();
@@ -256,9 +257,10 @@ void WorldBuilderState::render() {
 
 void WorldBuilderState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
-        glm::vec3 color = terrainColor(tile.terrain);
-        float h = terrainHeight(tile.terrain);
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h);
+        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
+        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
+        float h         = terrainHeight(tile.terrain);
+        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex);
     }
     // Always-on grid lines — drawn at the tile boundary (scale = HEX_SIZE),
     // not inset (0.97×), so lines appear between tiles rather than inside them.

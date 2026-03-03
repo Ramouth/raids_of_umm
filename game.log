@@ -1,0 +1,29 @@
+[GL] Renderer : llvmpipe (LLVM 20.1.2, 256 bits)
+[GL] Version  : 4.5 (Core Profile) Mesa 25.0.7-0ubuntu0.24.04.2
+[Texture] Loaded assets/textures/terrain/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune.png (64x64 ch=4)
+[Texture] Cannot open: assets/textures/terrain/rock.png
+[Texture] Cannot open: assets/textures/terrain/oasis.png
+[Texture] Cannot open: assets/textures/terrain/ruins.png
+[Texture] Cannot open: assets/textures/terrain/obsidian.png
+[Texture] Loaded assets/textures/terrain/mountain.png (64x64 ch=4)
+[Texture] Cannot open: assets/textures/terrain/river.png
+[Texture] Cannot open: assets/textures/terrain/wall.png
+[Texture] Cannot open: assets/textures/terrain/battle.png
+[WorldBuilder] New procedural map, radius 12  (469 tiles)
+  [HUD] tool=PaintTile  terrain=Sand  objType=Town
+[WorldBuilder] Ready.
+  Tab=cycle tool  1-6=terrain  O=obj type
+  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit
+  [HUD] tool=PaintTile  terrain=Sand  objType=Town
+[WorldBuilder] Launching test-play...
+[Texture] Loaded assets/textures/terrain/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune.png (64x64 ch=4)
+[Texture] Cannot open: assets/textures/terrain/rock.png
+[Texture] Cannot open: assets/textures/terrain/oasis.png
+[Texture] Cannot open: assets/textures/terrain/ruins.png
+[Texture] Cannot open: assets/textures/terrain/obsidian.png
+[Texture] Loaded assets/textures/terrain/mountain.png (64x64 ch=4)
+[Texture] Cannot open: assets/textures/terrain/river.png
+[Texture] Cannot open: assets/textures/terrain/wall.png
+[Texture] Cannot open: assets/textures/terrain/battle.png

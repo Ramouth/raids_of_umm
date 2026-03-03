@@ -1,9 +1,12 @@
 #include "HexRenderer.h"
+#include "render/Texture.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <array>
+#include <string>
 
 // Flat-top hex: vertices at angles 0, 60, 120, 180, 240, 300 degrees
 static constexpr float PI = 3.14159265358979f;
@@ -63,6 +66,8 @@ HexRenderer::~HexRenderer() {
     if (m_lineVbo) glDeleteBuffers(1, &m_lineVbo);
     if (m_lineVao) glDeleteVertexArrays(1, &m_lineVao);
     if (m_whiteTex) glDeleteTextures(1, &m_whiteTex);
+    for (GLuint& t : m_terrainTex)
+        if (t) { glDeleteTextures(1, &t); t = 0; }
 }
 
 void HexRenderer::init() {
@@ -115,6 +120,22 @@ void HexRenderer::buildMesh() {
     glBindVertexArray(0);
 }
 
+void HexRenderer::loadTerrainTextures(const std::string& assetRoot) {
+    for (int i = 0; i < TERRAIN_COUNT; ++i) {
+        Terrain t = static_cast<Terrain>(i);
+        std::string name(terrainName(t));
+        std::transform(name.begin(), name.end(), name.begin(),
+                       [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+        std::string path = assetRoot + "/textures/terrain/" + name + ".png";
+        GLuint id = loadTexturePNG(path);
+        m_terrainTex[i] = id;  // 0 if file not found — that's fine
+    }
+}
+
+GLuint HexRenderer::terrainTex(Terrain t) const {
+    return m_terrainTex[static_cast<int>(t)];
+}
+
 void HexRenderer::buildWhiteTexture() {
     unsigned char white[4] = { 255, 255, 255, 255 };
     glGenTextures(1, &m_whiteTex);
@@ -148,7 +169,8 @@ void HexRenderer::beginFrame(const glm::mat4& viewProj,
 void HexRenderer::drawTile(const HexCoord& coord,
                             const glm::vec3& color,
                             float visualScale,
-                            float height) {
+                            float height,
+                            GLuint texId) {
     // Always use the world hex size for positioning so tokens land on the correct tile
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz);
@@ -159,6 +181,9 @@ void HexRenderer::drawTile(const HexCoord& coord,
     // Tiles are always flat on XZ — normal is always up; identity normal matrix is correct.
     glm::mat3 norm  = glm::mat3(1.0f);
 
+    if (texId != 0)
+        glBindTexture(GL_TEXTURE_2D, texId);
+
     m_shader.setMat4 ("u_MVP",          mvp);
     m_shader.setMat4 ("u_Model",        model);
     m_shader.setMat3 ("u_NormalMatrix", norm);
@@ -166,6 +191,9 @@ void HexRenderer::drawTile(const HexCoord& coord,
     m_shader.setFloat("u_Height",       0.0f);
 
     glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_SHORT, nullptr);
+
+    if (texId != 0)
+        glBindTexture(GL_TEXTURE_2D, m_whiteTex);
 }
 
 void HexRenderer::drawOutline(const HexCoord& coord,

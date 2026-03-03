@@ -23,8 +23,11 @@ void AdventureState::onEnter() {
     m_cam = Camera2D(app.width(), app.height());
 
     m_hexRenderer.init();
+    m_hexRenderer.loadTerrainTextures();
     m_spriteRenderer.init();
-    m_spriteRenderer.loadSprite("assets/textures/units/rider_lance.png");
+    m_spriteRenderer.loadSprite("assets/textures/units/armoured_warrior.png");
+    m_enemySpriteRenderer.init();
+    m_enemySpriteRenderer.loadSprite("assets/textures/units/enemy_scout.png");
     m_hud.init();
 
     if (!m_externalMap)
@@ -34,6 +37,12 @@ void AdventureState::onEnter() {
     m_hero.pos = {0, 0};
     if (MapTile* t = m_map.tileAt(m_hero.pos))
         t->passable = true;
+
+    // Always place a test enemy scout 2 hexes east so combat can be tested immediately.
+    HexCoord scoutPos{2, 0};
+    if (MapTile* t = m_map.tileAt(scoutPos))
+        t->passable = true;
+    m_map.placeObject({ scoutPos, ObjType::Dungeon, "Enemy Scout" });
 
     // Centre camera on hero.
     float hx, hz;
@@ -134,7 +143,8 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             Application::get().pushState(std::make_unique<CastleState>(obj->name));
             break;
         case ObjType::Dungeon:
-            std::cout << "     (Combat screen coming soon)\n";
+            std::cout << "     Entering combat!\n";
+            Application::get().pushState(std::make_unique<CombatState>());
             break;
         case ObjType::GoldMine:
             std::cout << "     +500 Gold per turn secured!\n";
@@ -340,6 +350,7 @@ void AdventureState::render() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
+    renderEnemySprites();
     renderHero();
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -352,9 +363,10 @@ void AdventureState::render() {
 
 void AdventureState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
-        glm::vec3 color = terrainColor(tile.terrain);
-        float h = terrainHeight(tile.terrain);
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h);
+        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
+        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
+        float h         = terrainHeight(tile.terrain);
+        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex);
     }
 
     // Hover outline (yellow).
@@ -379,10 +391,23 @@ void AdventureState::renderPathPreview() {
 
 void AdventureState::renderObjects() {
     for (const auto& obj : m_map.objects()) {
+        if (obj.type == ObjType::Dungeon) continue;  // rendered as sprite in renderEnemySprites()
         glm::vec3 col = objTypeColor(obj.type);
         bool visited  = m_visitedObjects.count(obj.pos) > 0;
         if (visited) col *= 0.55f;
         m_hexRenderer.drawTile(obj.pos, col, HEX_SIZE * 0.55f, 0.25f);
+    }
+}
+
+void AdventureState::renderEnemySprites() {
+    for (const auto& obj : m_map.objects()) {
+        if (obj.type != ObjType::Dungeon) continue;
+        if (m_visitedObjects.count(obj.pos)) continue;  // defeated — don't render
+
+        float wx, wz;
+        obj.pos.toWorld(HEX_SIZE, wx, wz);
+        m_enemySpriteRenderer.draw({wx, 0.0f, wz}, HEX_SIZE,
+                                   m_cam.viewMatrix(), m_cam.projMatrix());
     }
 }
 
