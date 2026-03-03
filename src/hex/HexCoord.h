@@ -42,7 +42,7 @@ struct HexCoord {
 
     HexCoord neighbor(int dir) const {
         auto dirs = directions();
-        return *this + dirs[dir & 5];
+        return *this + dirs[((dir % 6) + 6) % 6];  // correct wrap for any int
     }
 
     // Convert axial → world XZ position (flat-top, size = hex_radius)
@@ -79,9 +79,12 @@ namespace std {
     template<>
     struct hash<HexCoord> {
         size_t operator()(const HexCoord& h) const noexcept {
-            size_t hq = std::hash<int>{}(h.q);
-            size_t hr = std::hash<int>{}(h.r);
-            return hq ^ (hr * 2654435761u);
+            // boost::hash_combine style — non-symmetric, low collision rate
+            size_t seed = static_cast<size_t>(h.q);
+            seed ^= static_cast<size_t>(h.r)
+                    + 0x9e3779b97f4a7c15ull
+                    + (seed << 6) + (seed >> 2);
+            return seed;
         }
     };
 }

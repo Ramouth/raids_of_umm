@@ -39,7 +39,10 @@ set(SOURCES
     src/render/HexRenderer.cpp
     src/render/Texture.cpp
     src/render/SpriteRenderer.cpp
+    src/render/Camera2D.cpp
+    src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp
+    src/worldbuilder/WorldBuilderState.cpp
 )
 
 add_executable(raids_of_umm ${SOURCES})
@@ -69,6 +72,41 @@ endif()
 
 # ── Compiler warnings ─────────────────────────────────────────────────────────
 target_compile_options(raids_of_umm PRIVATE
+    -Wall -Wextra -Wpedantic
+    $<$<CONFIG:Debug>:-g -O0>
+    $<$<CONFIG:Release>:-O2 -DNDEBUG>
+)
+
+# ── Unit tests (no SDL / no OpenGL — pure logic only) ────────────────────────
+# Run with: ./build/raids_tests
+#
+# Stub test files (test_worldmap.cpp, test_camera.cpp) compile but contain no
+# active suites until their modules exist and the WORLDMAP_IMPL / CAMERA2D_IMPL
+# defines are added here.
+add_executable(raids_tests
+    tests/main.cpp
+    tests/test_hex.cpp
+    tests/test_resources.cpp
+    tests/test_worldmap.cpp
+    tests/test_camera.cpp
+    src/hex/HexGrid.cpp
+    src/world/WorldMap.cpp
+    src/render/Camera2D.cpp
+)
+
+target_include_directories(raids_tests PRIVATE
+    src/
+    tests/
+    "${GLM_INCLUDE_DIR}"
+    "${NLOHMANN_INCLUDE_DIR}"
+)
+
+target_compile_definitions(raids_tests PRIVATE
+    WORLDMAP_IMPL               # WorldMap is built — activate its test suites
+    CAMERA2D_IMPL               # Camera2D is built — activate its test suites
+)
+
+target_compile_options(raids_tests PRIVATE
     -Wall -Wextra -Wpedantic
     $<$<CONFIG:Debug>:-g -O0>
     $<$<CONFIG:Release>:-O2 -DNDEBUG>

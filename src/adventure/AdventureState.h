@@ -1,79 +1,41 @@
 #pragma once
 #include "core/StateMachine.h"
+#include "world/WorldMap.h"
+#include "hero/Hero.h"
 #include "render/HexRenderer.h"
 #include "render/SpriteRenderer.h"
-#include "hex/HexGrid.h"
+#include "render/Camera2D.h"
+#include "hex/HexCoord.h"
 #include <glm/glm.hpp>
+#include <unordered_set>
 #include <vector>
-#include <string>
 
-// ── Terrain ───────────────────────────────────────────────────────────────────
-
-enum class Terrain : uint8_t {
-    Sand, Dune, Rock, Oasis, Ruins, Obsidian,
-};
-
-struct MapTile {
-    Terrain terrain  = Terrain::Sand;
-    bool    passable = true;
-};
-
-inline glm::vec3 terrainColor(Terrain t) {
-    switch (t) {
-        case Terrain::Sand:     return { 0.87f, 0.74f, 0.42f };
-        case Terrain::Dune:     return { 0.72f, 0.55f, 0.25f };
-        case Terrain::Rock:     return { 0.55f, 0.48f, 0.38f };
-        case Terrain::Oasis:    return { 0.30f, 0.58f, 0.42f };
-        case Terrain::Ruins:    return { 0.70f, 0.63f, 0.50f };
-        case Terrain::Obsidian: return { 0.18f, 0.16f, 0.20f };
-    }
-    return { 1, 0, 1 };
-}
-
-// ── Map objects ───────────────────────────────────────────────────────────────
-
-enum class ObjType { Town, Dungeon, GoldMine, CrystalMine, Artifact };
-
-struct MapObject {
-    HexCoord    pos;
-    ObjType     type;
-    std::string name;
-    bool        visited = false;
-
-    glm::vec3 color() const {
-        switch (type) {
-            case ObjType::Town:        return { 0.20f, 0.80f, 0.90f }; // cyan
-            case ObjType::Dungeon:     return { 0.75f, 0.12f, 0.12f }; // red
-            case ObjType::GoldMine:    return { 0.95f, 0.70f, 0.10f }; // gold
-            case ObjType::CrystalMine: return { 0.50f, 0.80f, 0.95f }; // light blue
-            case ObjType::Artifact:    return { 1.00f, 1.00f, 1.00f }; // white
-        }
-        return { 1, 0, 1 };
-    }
-    const char* typeName() const {
-        switch (type) {
-            case ObjType::Town:        return "Town";
-            case ObjType::Dungeon:     return "Dungeon";
-            case ObjType::GoldMine:    return "Gold Mine";
-            case ObjType::CrystalMine: return "Crystal Mine";
-            case ObjType::Artifact:    return "Artifact";
-        }
-        return "?";
-    }
-};
-
-// ── Hero ─────────────────────────────────────────────────────────────────────
-
-struct Hero {
-    HexCoord pos       { 0, 0 };
-    int      movesMax  { 8 };
-    int      movesLeft { 8 };
-};
-
-// ── State ─────────────────────────────────────────────────────────────────────
-
+/*
+ * AdventureState — the main overworld game state.
+ *
+ * Owns:
+ *   WorldMap        : static map data (terrain + object definitions)
+ *   Hero            : the player character
+ *   Camera2D        : viewport
+ *   m_visitedObjects: per-session visited flags (game state, NOT map data)
+ *
+ * Constructed either procedurally (default) or from an existing WorldMap
+ * (e.g. handed in by WorldBuilderState for test-play).
+ *
+ * This state must not mutate the WorldMap's terrain or object definitions —
+ * session state is tracked separately. If future gameplay needs to alter
+ * tiles (e.g. building a road), that goes through a dedicated command object
+ * that can be serialised and replayed.
+ */
 class AdventureState final : public GameState {
 public:
+    // Default: generate a procedural map at startup.
+    AdventureState() = default;
+
+    // Accept an externally built map (from WorldBuilderState test-play,
+    // or a loaded save file). The map is moved in — no copying.
+    explicit AdventureState(WorldMap map);
+
     void onEnter() override;
     void onExit()  override;
     void update(float dt) override;
@@ -81,50 +43,58 @@ public:
     bool handleEvent(void* sdlEvent) override;
 
 private:
-    void buildMap();
-    void placeObjects();
+    // ── Initialisation ───────────────────────────────────────────────────────
+    void initMap();     // only called when no external map was provided
+
+    // ── Game logic ───────────────────────────────────────────────────────────
     void moveHero(const HexCoord& dest);
     void endTurn();
     void onHeroVisit(const HexCoord& coord);
 
-    glm::mat4 viewMatrix()     const;
-    glm::mat4 projMatrix()     const;
-    glm::mat4 viewProjMatrix() const;
-    glm::vec2 screenToWorld(int px, int py) const; // returns world XZ
+    // ── Rendering helpers ────────────────────────────────────────────────────
+    void renderTerrain();
+    void renderObjects();
+    void renderHero();
+    void renderPathPreview();
 
-    HexRenderer          m_hexRenderer;
-    SpriteRenderer       m_spriteRenderer;
-    HexGrid<MapTile>     m_grid;
-    std::vector<MapObject> m_objects;
+    // ── Members ──────────────────────────────────────────────────────────────
 
-    Hero       m_hero;
-    bool       m_heroSelected = false;
+    WorldMap       m_map;
+    Hero           m_hero;
+    Camera2D       m_cam;
 
-    // Smooth movement animation
-    glm::vec3  m_heroRenderPos { 0.0f, 0.0f, 0.0f }; // current drawn position
-    glm::vec3  m_heroTargetPos { 0.0f, 0.0f, 0.0f }; // destination world position
+    HexRenderer    m_hexRenderer;
+    SpriteRenderer m_spriteRenderer;
 
-    // Path preview (A* result from hero to hovered tile)
+    // Session state — visited flags live here, NOT in WorldMap.
+    std::unordered_set<HexCoord> m_visitedObjects;
+
+    // Smooth movement — render pos chases waypoints along the actual hex path
+    glm::vec3              m_heroRenderPos { 0.0f };
+    glm::vec3              m_heroTargetPos { 0.0f };
+    std::vector<HexCoord>  m_moveQueue;      // waypoints still to traverse
+    int                    m_moveQueueIdx = 0;
+
+    // Path preview
     std::vector<HexCoord> m_previewPath;
 
-    // Camera
-    glm::vec2  m_camPos { 0.0f, 0.0f };
-    float      m_zoom   { 8.0f };
-    float      m_hexSize{ 1.0f };
-    int        m_vpW    = 1280;
-    int        m_vpH    = 720;
-
-    // Hovered tile
+    // Hover
     HexCoord   m_hovered;
     bool       m_hasHovered = false;
 
-    // Key states
+    // Hero selection
+    bool       m_heroSelected = false;
+
+    // Key states for camera pan
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
 
-    int  m_day = 1;
+    int m_day = 1;
 
-    static constexpr int   MAP_RADIUS      = 12;
+    // Whether this state owns a procedurally generated map or a provided one.
+    bool m_externalMap = false;
+
+    static constexpr float HEX_SIZE        = 1.0f;
     static constexpr float CAM_SPEED       = 8.0f;
-    static constexpr float ZOOM_STEP       = 1.5f;
-    static constexpr float HERO_MOVE_SPEED = 5.0f; // world units per second
+    static constexpr float HERO_MOVE_SPEED = 8.0f;
+    static constexpr float CAM_FOLLOW_SPEED = 6.0f;  // camera lerp rate while hero moves
 };

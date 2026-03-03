@@ -80,8 +80,8 @@ void Application::initGL() {
     glFrontFace(GL_CCW);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    // Desert sand clear colour
-    glClearColor(0.76f, 0.65f, 0.42f, 1.0f);
+    // Dark void — makes the hex-map boundary clearly visible against the background.
+    glClearColor(0.04f, 0.04f, 0.06f, 1.0f);
 }
 
 void Application::shutdown() {
