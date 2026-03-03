@@ -59,9 +59,8 @@ void StateMachine::update(float dt) {
 }
 
 void StateMachine::render() {
-    for (auto& state : m_stack) {
-        state->render();
-    }
+    if (!m_stack.empty())
+        m_stack.back()->render();
 }
 
 void StateMachine::applyPending() {

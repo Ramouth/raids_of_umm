@@ -174,6 +174,7 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE: Application::get().popState(); return true;
             case SDLK_SPACE:  endTurn(); return true;
+            case SDLK_h:      m_showHUD = !m_showHUD; return true;
             case SDLK_w:      wait(); return true;
             case SDLK_p: {
                 float now = SDL_GetTicks() / 1000.0f;
@@ -343,9 +344,10 @@ void AdventureState::render() {
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 
-    m_hud.render(app.width(), app.height(), m_day, m_hero.movesLeft, m_hero.movesMax, 
-                 static_cast<int>(m_visitedObjects.size()),
-                 m_hero.pos.q, m_hero.pos.r, m_infiniteMoves);
+    if (m_showHUD)
+        m_hud.render(app.width(), app.height(), m_day, m_hero.movesLeft, m_hero.movesMax,
+                     static_cast<int>(m_visitedObjects.size()),
+                     m_hero.pos.q, m_hero.pos.r, m_infiniteMoves);
 }
 
 void AdventureState::renderTerrain() {

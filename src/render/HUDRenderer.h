@@ -9,13 +9,25 @@ public:
     ~HUDRenderer();
 
     void init();
-    void render(int screenW, int screenH, int day, int movesLeft, int movesMax, int visitedCount, 
+    void render(int screenW, int screenH, int day, int movesLeft, int movesMax, int visitedCount,
                 int heroQ, int heroR, bool infiniteMoves = false);
 
 private:
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
+    void drawText(float x, float y, float scale, const char* text, const glm::vec4& color);
 
+    Shader m_shader;
+
+    // Rect rendering  (4 verts, GL_TRIANGLE_FAN, 2-float positions)
     GLuint m_vao = 0;
     GLuint m_vbo = 0;
-    Shader m_shader;
+
+    // Text rendering  (stb_easy_font quads → indexed triangles)
+    GLuint m_textVao = 0;
+    GLuint m_textVbo = 0;
+    GLuint m_textIbo = 0;
+
+    // Current screen size, set at the start of render() for use in drawText()
+    int m_sw = 0;
+    int m_sh = 0;
 };

@@ -260,10 +260,11 @@ void WorldBuilderState::renderTerrain() {
         float h = terrainHeight(tile.terrain);
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h);
     }
-    // Always-on grid lines — makes individual hex cells visible when painting.
+    // Always-on grid lines — drawn at the tile boundary (scale = HEX_SIZE),
+    // not inset (0.97×), so lines appear between tiles rather than inside them.
     for (const auto& [coord, tile] : m_map) {
         float h = terrainHeight(tile.terrain);
-        m_hexRenderer.drawOutline(coord, {0.05f, 0.04f, 0.03f}, HEX_SIZE * 0.97f, h);
+        m_hexRenderer.drawOutline(coord, {0.05f, 0.04f, 0.03f}, HEX_SIZE, h);
     }
 }
 

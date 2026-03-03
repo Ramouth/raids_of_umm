@@ -100,6 +100,9 @@ private:
 
     int m_day = 1;
 
+    // Toggle the dev HUD — set false here (or press H) to hide it
+    bool m_showHUD = true;
+
     // Debug mode: double-tap P for infinite movement
     bool m_infiniteMoves = false;
     float m_lastPTime = 0.0f;
