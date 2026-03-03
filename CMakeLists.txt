@@ -43,6 +43,8 @@ set(SOURCES
     src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp
     src/castle/CastleState.cpp
+    src/combat/CombatState.cpp
+    src/render/HUDRenderer.cpp
     src/worldbuilder/WorldBuilderState.cpp
 )
 

@@ -22,6 +22,10 @@ enum class Terrain : uint8_t {
     Oasis    = 3,
     Ruins    = 4,
     Obsidian = 5,
+    Mountain = 6,  // tall, high movement cost
+    River    = 7,  // blocks unless bridged
+    Wall     = 8,  // completely impassable
+    Battle   = 9,  // combat encounter
 
     COUNT  // must remain last — used for iteration and bounds checks
 };
@@ -44,6 +48,10 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
         case Terrain::Oasis:    return "Oasis";
         case Terrain::Ruins:    return "Ruins";
         case Terrain::Obsidian: return "Obsidian";
+        case Terrain::Mountain:  return "Mountain";
+        case Terrain::River:     return "River";
+        case Terrain::Wall:     return "Wall";
+        case Terrain::Battle:   return "Battle";
         default:                return "Unknown";
     }
 }
@@ -51,16 +59,20 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
 // Default passability for a freshly generated tile of this terrain type.
 // Editor can override per-tile.
 constexpr bool terrainDefaultPassable(Terrain t) noexcept {
-    return t != Terrain::Obsidian;
+    return t != Terrain::Obsidian && t != Terrain::Wall;
 }
 
 // Default movement cost for a terrain type.
 constexpr float terrainDefaultMoveCost(Terrain t) noexcept {
     switch (t) {
         case Terrain::Dune:     return 1.5f;  // costs 1.5 moves to cross
-        case Terrain::Rock:     return 1.25f;
+        case Terrain::Rock:      return 1.25f;
         case Terrain::Ruins:    return 1.25f;
-        case Terrain::Obsidian: return 0.0f;  // impassable — cost unused
+        case Terrain::Mountain:  return 2.0f;  // very hard to cross
+        case Terrain::River:    return 0.0f;  // impassable without bridge
+        case Terrain::Wall:     return 0.0f;  // impassable
+        case Terrain::Battle:   return 1.0f;  // triggers combat
+        case Terrain::Obsidian: return 0.0f;  // impassable
         default:                return 1.0f;
     }
 }

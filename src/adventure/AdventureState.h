@@ -4,6 +4,7 @@
 #include "hero/Hero.h"
 #include "render/HexRenderer.h"
 #include "render/SpriteRenderer.h"
+#include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
@@ -49,6 +50,7 @@ private:
     // ── Game logic ───────────────────────────────────────────────────────────
     void moveHero(const HexCoord& dest);
     void endTurn();
+    void wait();
     void onHeroVisit(const HexCoord& coord);
 
     // ── Rendering helpers ────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ private:
 
     HexRenderer    m_hexRenderer;
     SpriteRenderer m_spriteRenderer;
+    HUDRenderer    m_hud;
 
     // Session state — visited flags live here, NOT in WorldMap.
     std::unordered_set<HexCoord> m_visitedObjects;
@@ -96,6 +99,10 @@ private:
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
 
     int m_day = 1;
+
+    // Debug mode: double-tap P for infinite movement
+    bool m_infiniteMoves = false;
+    float m_lastPTime = 0.0f;
 
     // Whether this state owns a procedurally generated map or a provided one.
     bool m_externalMap = false;

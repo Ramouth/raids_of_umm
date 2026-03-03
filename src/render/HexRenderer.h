@@ -44,7 +44,8 @@ public:
                   float height      = 0.0f);
 
     // Draw a wireframe outline.  scale multiplies the unit hex outline.
-    void drawOutline(const HexCoord& coord, const glm::vec3& color, float scale = 1.0f);
+    // height should match the tile's terrainHeight() so the outline sits on the tile face.
+    void drawOutline(const HexCoord& coord, const glm::vec3& color, float scale = 1.0f, float height = 0.0f);
 
     void endFrame();
 

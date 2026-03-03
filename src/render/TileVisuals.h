@@ -23,6 +23,10 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
         case Terrain::Oasis:    return { 0.30f, 0.58f, 0.42f };
         case Terrain::Ruins:    return { 0.70f, 0.63f, 0.50f };
         case Terrain::Obsidian: return { 0.18f, 0.16f, 0.20f };
+        case Terrain::Mountain: return { 0.40f, 0.35f, 0.30f };
+        case Terrain::River:    return { 0.20f, 0.40f, 0.70f };
+        case Terrain::Wall:     return { 0.50f, 0.50f, 0.50f };
+        case Terrain::Battle:   return { 0.60f, 0.10f, 0.10f };
         default:                return { 1.00f, 0.00f, 1.00f }; // magenta = unknown
     }
 }
@@ -33,6 +37,8 @@ inline float terrainHeight(Terrain t) noexcept {
         case Terrain::Dune:     return 0.05f;
         case Terrain::Rock:     return 0.12f;
         case Terrain::Ruins:    return 0.04f;
+        case Terrain::Mountain: return 0.25f;  // tall mountains
+        case Terrain::Wall:     return 0.15f;  // walls are tall
         default:                return 0.00f;
     }
 }

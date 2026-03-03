@@ -1,5 +1,6 @@
 #include "AdventureState.h"
 #include "castle/CastleState.h"
+#include "combat/CombatState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include <SDL2/SDL.h>
@@ -24,6 +25,7 @@ void AdventureState::onEnter() {
     m_hexRenderer.init();
     m_spriteRenderer.init();
     m_spriteRenderer.loadSprite("assets/textures/units/rider_lance.png");
+    m_hud.init();
 
     if (!m_externalMap)
         initMap();
@@ -84,14 +86,16 @@ void AdventureState::moveHero(const HexCoord& dest) {
     }
 
     int steps = static_cast<int>(path.size()) - 1;
-    if (!m_hero.canReach(steps)) {
+    if (!m_infiniteMoves && !m_hero.canReach(steps)) {
         std::cout << "  [!] Not enough movement ("
                   << m_hero.movesLeft << " left, need " << steps << ").\n";
         return;
     }
 
     m_hero.pos       = dest;
-    m_hero.movesLeft -= steps;
+    if (!m_infiniteMoves) {
+        m_hero.movesLeft -= steps;
+    }
 
     // Queue every waypoint so the render position follows the path hex by hex.
     m_moveQueue    = path;
@@ -110,8 +114,9 @@ void AdventureState::moveHero(const HexCoord& dest) {
     m_pendingVisit = dest;
     m_hasPendingVisit = true;
 
-    std::cout << "  Hero moved to (" << dest.q << "," << dest.r
-              << ")  — " << m_hero.movesLeft << " moves remaining\n";
+    std::cout << "  [Day " << m_day << "] Hero moved to (" << dest.q << "," << dest.r
+              << ") — Moves: " << m_hero.movesLeft << "/" << m_hero.movesMax 
+              << " | Visited: " << m_visitedObjects.size() << "\n";
 }
 
 void AdventureState::onHeroVisit(const HexCoord& coord) {
@@ -153,6 +158,13 @@ void AdventureState::endTurn() {
     std::cout << "[Adventure] Day " << m_day << " begins. Moves restored.\n";
 }
 
+void AdventureState::wait() {
+    m_hero.resetMoves();
+    m_heroSelected = false;
+    m_previewPath.clear();
+    std::cout << "[Adventure] Waited. Moves restored.\n";
+}
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 
 bool AdventureState::handleEvent(void* sdlEvent) {
@@ -162,21 +174,31 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE: Application::get().popState(); return true;
             case SDLK_SPACE:  endTurn(); return true;
+            case SDLK_w:      wait(); return true;
+            case SDLK_p: {
+                float now = SDL_GetTicks() / 1000.0f;
+                if (now - m_lastPTime < 0.5f) {
+                    m_infiniteMoves = !m_infiniteMoves;
+                    std::cout << "  [DEBUG] Infinite moves: " << (m_infiniteMoves ? "ON" : "OFF") << "\n";
+                }
+                m_lastPTime = now;
+                return true;
+            }
             case SDLK_r:
                 Application::get().replaceState(std::make_unique<AdventureState>(std::move(m_map)));
                 return true;
-            case SDLK_w: case SDLK_UP:    m_keyW = true; return true;
-            case SDLK_s: case SDLK_DOWN:  m_keyS = true; return true;
-            case SDLK_a: case SDLK_LEFT:  m_keyA = true; return true;
-            case SDLK_d: case SDLK_RIGHT: m_keyD = true; return true;
+            case SDLK_UP:    m_keyW = true; return true;
+            case SDLK_DOWN:  m_keyS = true; return true;
+            case SDLK_LEFT:  m_keyA = true; return true;
+            case SDLK_RIGHT: m_keyD = true; return true;
         }
     }
     if (e->type == SDL_KEYUP) {
         switch (e->key.keysym.sym) {
-            case SDLK_w: case SDLK_UP:    m_keyW = false; return true;
-            case SDLK_s: case SDLK_DOWN:  m_keyS = false; return true;
-            case SDLK_a: case SDLK_LEFT:  m_keyA = false; return true;
-            case SDLK_d: case SDLK_RIGHT: m_keyD = false; return true;
+            case SDLK_UP:    m_keyW = false; return true;
+            case SDLK_DOWN:  m_keyS = false; return true;
+            case SDLK_LEFT:  m_keyA = false; return true;
+            case SDLK_RIGHT: m_keyD = false; return true;
         }
     }
 
@@ -289,12 +311,21 @@ void AdventureState::update(float dt) {
             onHeroVisit(m_pendingVisit);
             m_hasPendingVisit = false;
         }
+        
+        // Check for battle terrain
+        MapTile* currentTile = m_map.tileAt(m_hero.pos);
+        if (currentTile && currentTile->terrain == Terrain::Battle) {
+            Application::get().pushState(std::make_unique<CombatState>());
+        }
     }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
 
 void AdventureState::render() {
+    auto& app = Application::get();
+    m_cam.resize(app.width(), app.height());
+    
     glm::mat4 view = m_cam.viewMatrix();
     glm::mat4 proj = m_cam.projMatrix();
     glm::mat4 vp   = m_cam.viewProjMatrix();
@@ -312,7 +343,9 @@ void AdventureState::render() {
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 
-    (void)view; (void)proj; // used via camera
+    m_hud.render(app.width(), app.height(), m_day, m_hero.movesLeft, m_hero.movesMax, 
+                 static_cast<int>(m_visitedObjects.size()),
+                 m_hero.pos.q, m_hero.pos.r, m_infiniteMoves);
 }
 
 void AdventureState::renderTerrain() {
@@ -323,17 +356,22 @@ void AdventureState::renderTerrain() {
     }
 
     // Hover outline (yellow).
-    if (m_hasHovered)
-        m_hexRenderer.drawOutline(m_hovered, {1.0f, 0.9f, 0.3f}, HEX_SIZE * 0.95f);
+    if (m_hasHovered) {
+        float h = 0.0f;
+        if (const MapTile* t = m_map.tileAt(m_hovered)) h = terrainHeight(t->terrain);
+        m_hexRenderer.drawOutline(m_hovered, {1.0f, 0.9f, 0.3f}, HEX_SIZE * 0.95f, h);
+    }
 }
 
 void AdventureState::renderPathPreview() {
     for (size_t i = 1; i < m_previewPath.size(); ++i) {
+        float h = 0.0f;
+        if (const MapTile* t = m_map.tileAt(m_previewPath[i])) h = terrainHeight(t->terrain);
         bool reachable = (static_cast<int>(i) <= m_hero.movesLeft);
         glm::vec3 col  = reachable
             ? glm::vec3{0.3f, 0.7f, 1.0f}
             : glm::vec3{0.9f, 0.2f, 0.2f};
-        m_hexRenderer.drawOutline(m_previewPath[i], col, HEX_SIZE * 0.95f);
+        m_hexRenderer.drawOutline(m_previewPath[i], col, HEX_SIZE * 0.95f, h);
     }
 }
 

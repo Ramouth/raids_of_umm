@@ -170,12 +170,13 @@ void HexRenderer::drawTile(const HexCoord& coord,
 
 void HexRenderer::drawOutline(const HexCoord& coord,
                                const glm::vec3& color,
-                               float scale) {
+                               float scale,
+                               float height) {
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz); // position uses world size, not visual scale
 
-    // Slightly higher offset to avoid z-fighting with tiles
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, 0.01f, wz));
+    // Slightly higher offset to avoid z-fighting with tiles; raised to match the tile's height.
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, height + 0.01f, wz));
     model           = glm::scale(model, glm::vec3(scale));
     glm::mat4 mvp   = m_viewProj * model;
 

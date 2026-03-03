@@ -184,6 +184,10 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         if (sym == SDLK_4) { m_paintTerrain = Terrain::Oasis;    renderHUD(); return true; }
         if (sym == SDLK_5) { m_paintTerrain = Terrain::Ruins;    renderHUD(); return true; }
         if (sym == SDLK_6) { m_paintTerrain = Terrain::Obsidian; renderHUD(); return true; }
+        if (sym == SDLK_7) { m_paintTerrain = Terrain::Mountain; renderHUD(); return true; }
+        if (sym == SDLK_8) { m_paintTerrain = Terrain::River;    renderHUD(); return true; }
+        if (sym == SDLK_9) { m_paintTerrain = Terrain::Wall;     renderHUD(); return true; }
+        if (sym == SDLK_0) { m_paintTerrain = Terrain::Battle;   renderHUD(); return true; }
 
         // ── Object type / test-play ──────────────────────────────────────────
         if (sym == SDLK_o) { cyclePlaceObjType(+1); return true; }
@@ -258,7 +262,8 @@ void WorldBuilderState::renderTerrain() {
     }
     // Always-on grid lines — makes individual hex cells visible when painting.
     for (const auto& [coord, tile] : m_map) {
-        m_hexRenderer.drawOutline(coord, {0.05f, 0.04f, 0.03f}, HEX_SIZE * 0.97f);
+        float h = terrainHeight(tile.terrain);
+        m_hexRenderer.drawOutline(coord, {0.05f, 0.04f, 0.03f}, HEX_SIZE * 0.97f, h);
     }
 }
 
