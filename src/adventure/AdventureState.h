@@ -75,6 +75,11 @@ private:
     std::vector<HexCoord>  m_moveQueue;      // waypoints still to traverse
     int                    m_moveQueueIdx = 0;
 
+    // Movement animation state
+    float                  m_heroFacingAngle = 0.0f;  // radians, 0 = facing right
+    float                  m_walkCycle = 0.0f;         // 0-1 progress within current hex step
+    bool                   m_isWalking = false;
+
     // Path preview
     std::vector<HexCoord> m_previewPath;
 
@@ -95,6 +100,8 @@ private:
 
     static constexpr float HEX_SIZE        = 1.0f;
     static constexpr float CAM_SPEED       = 8.0f;
-    static constexpr float HERO_MOVE_SPEED = 8.0f;
-    static constexpr float CAM_FOLLOW_SPEED = 6.0f;  // camera lerp rate while hero moves
+    static constexpr float HERO_MOVE_SPEED = 12.0f;     // hexes per second
+    static constexpr float CAM_FOLLOW_SPEED = 4.0f;    // camera lerp rate while hero moves
+    static constexpr float WALK_BOB_HEIGHT = 0.08f;    // vertical bob amount
+    static constexpr float STEP_PAUSE      = 0.12f;     // pause at each hex center (seconds)
 };

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ void AdventureState::onEnter() {
 
     std::cout << "[Adventure] Day " << m_day << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
-    std::cout << "  SPACE = end turn  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor\n";
+    std::cout << "  SPACE = end turn  |  R = restart  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor\n";
 }
 
 void AdventureState::onExit() {
@@ -52,6 +53,23 @@ void AdventureState::initMap() {
 }
 
 // ── Game logic ────────────────────────────────────────────────────────────────
+
+namespace {
+
+float angleFromDirection(const glm::vec3& dir) {
+    if (glm::length(dir) < 0.001f) return 0.0f;
+    return std::atan2(dir.x, -dir.z);
+}
+
+float lerpAngle(float from, float to, float t) {
+    float diff = to - from;
+    constexpr float PI = 3.14159265358979f;
+    while (diff > PI) diff -= 2.0f * PI;
+    while (diff < -PI) diff += 2.0f * PI;
+    return from + diff * t;
+}
+
+} // namespace
 
 void AdventureState::moveHero(const HexCoord& dest) {
     if (dest == m_hero.pos)      return;
@@ -80,6 +98,12 @@ void AdventureState::moveHero(const HexCoord& dest) {
     float hx, hz;
     m_moveQueue[1].toWorld(HEX_SIZE, hx, hz);
     m_heroTargetPos = { hx, 0.0f, hz };
+    
+    // Initialize facing direction toward first waypoint
+    glm::vec3 dir = m_heroTargetPos - m_heroRenderPos;
+    m_heroFacingAngle = angleFromDirection(dir);
+    m_walkCycle = 0.0f;
+    m_isWalking = true;
 
     std::cout << "  Hero moved to (" << dest.q << "," << dest.r
               << ")  — " << m_hero.movesLeft << " moves remaining\n";
@@ -135,6 +159,9 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE: Application::get().popState(); return true;
             case SDLK_SPACE:  endTurn(); return true;
+            case SDLK_r:
+                Application::get().replaceState(std::make_unique<AdventureState>(std::move(m_map)));
+                return true;
             case SDLK_w: case SDLK_UP:    m_keyW = true; return true;
             case SDLK_s: case SDLK_DOWN:  m_keyS = true; return true;
             case SDLK_a: case SDLK_LEFT:  m_keyA = true; return true;
@@ -214,24 +241,49 @@ void AdventureState::update(float dt) {
     // Smooth hero animation — step through each hex in the path, not straight-line.
     glm::vec3 delta = m_heroTargetPos - m_heroRenderPos;
     float dist = glm::length(delta);
+    
     if (dist > 0.001f) {
-        float step = HERO_MOVE_SPEED * dt;
-        m_heroRenderPos += (step >= dist) ? delta : (delta / dist) * step;
-
-        // Camera lags behind the moving rider — rider visibly leads the
-        // camera so the map scrolls behind it rather than under a static sprite.
-        glm::vec2 heroXZ = { m_heroRenderPos.x, m_heroRenderPos.z };
-        glm::vec2 camPos = m_cam.position();
-        float lerpFactor = 1.0f - std::exp(-CAM_FOLLOW_SPEED * dt);
-        m_cam.setPosition(camPos + (heroXZ - camPos) * lerpFactor);
-    } else if (!m_moveQueue.empty() &&
+        // Hero is moving between hexes
+        m_isWalking = true;
+        
+        // Calculate progress with easing (ease-in-out for smoother starts/stops)
+        float stepDist = HERO_MOVE_SPEED * dt;
+        float t = (stepDist >= dist) ? 1.0f : stepDist / dist;
+        
+        // Use smoother easing: smoothstep-like curve
+        float easedT = t * t * (3.0f - 2.0f * t);
+        
+        glm::vec3 movement = delta * easedT;
+        m_heroRenderPos += movement;
+        
+        // Update facing direction based on movement direction
+        float targetAngle = angleFromDirection(delta);
+        m_heroFacingAngle = lerpAngle(m_heroFacingAngle, targetAngle, 8.0f * dt);
+        
+        // Walk bob animation - oscillate based on distance traveled
+        float walkSpeed = 15.0f;
+        m_walkCycle += dt * walkSpeed;
+        
+        // Camera does NOT move at all - for testing
+        // glm::vec2 heroXZ = { m_heroRenderPos.x, m_heroRenderPos.z };
+        // m_cam.setPosition(heroXZ);
+        
+    } else if (!m_moveQueue.empty() && 
                m_moveQueueIdx + 1 < static_cast<int>(m_moveQueue.size())) {
-        // Arrived at waypoint — snap render pos and advance to next hex.
+        // Arrived at waypoint — snap render pos and advance to next hex
         m_heroRenderPos = m_heroTargetPos;
+        
+        // Brief pause at each hex (like HoMM stepping rhythm)
+        m_walkCycle = 0.0f;
+        
         ++m_moveQueueIdx;
         float hx, hz;
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.0f, hz };
+    } else {
+        // Hero arrived - NO camera follow
+        // glm::vec2 heroXZ = { m_heroRenderPos.x, m_heroRenderPos.z };
+        // m_cam.setPosition(heroXZ);
     }
 }
 
@@ -301,6 +353,13 @@ void AdventureState::renderHero() {
         : glm::vec3{0.45f, 0.45f, 0.45f};
     m_hexRenderer.drawOutline(spriteHex, moveCol, HEX_SIZE * 0.65f);
 
-    m_spriteRenderer.draw(m_heroRenderPos, HEX_SIZE,
+    // Apply walk bobbing animation when moving
+    glm::vec3 renderPos = m_heroRenderPos;
+    if (m_isWalking) {
+        float bob = std::sin(m_walkCycle) * WALK_BOB_HEIGHT;
+        renderPos.y += bob;
+    }
+
+    m_spriteRenderer.draw(renderPos, HEX_SIZE,
                           m_cam.viewMatrix(), m_cam.projMatrix());
 }

@@ -174,7 +174,8 @@ void HexRenderer::drawOutline(const HexCoord& coord,
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz); // position uses world size, not visual scale
 
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, 0.002f, wz));
+    // Slightly higher offset to avoid z-fighting with tiles
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, 0.01f, wz));
     model           = glm::scale(model, glm::vec3(scale));
     glm::mat4 mvp   = m_viewProj * model;
 
