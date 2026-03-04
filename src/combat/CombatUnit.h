@@ -14,9 +14,9 @@
  * That logic lives in CombatEngine — this struct is pure data.
  */
 struct CombatUnit {
-    UnitType type;           // species data  (TODO → const UnitType* when ResourceManager exists)
+    const UnitType* type  = nullptr; // points into ResourceManager registry — never owned
     int      count        = 0;   // creatures remaining in stack
-    int      hpLeft       = 0;   // HP of the leading creature (1..type.hitPoints)
+    int      hpLeft       = 0;   // HP of the leading creature (1..type->hitPoints)
     bool     isPlayer     = false;
     bool     isDefending  = false;
     HexCoord pos;            // position on the combat grid (CombatMap coordinate space)
@@ -28,21 +28,22 @@ struct CombatUnit {
     // Total HP across the entire stack
     int totalHp() const {
         if (count <= 0) return 0;
-        return (count - 1) * type.hitPoints + hpLeft;
+        return (count - 1) * type->hitPoints + hpLeft;
     }
 
     // Factory: fill hpLeft to full.  pos defaults to origin — CombatEngine
     // overwrites this in placeArmies() before any game logic runs.
-    static CombatUnit make(const UnitType& t, int stackCount, bool player,
+    // Caller must ensure *t outlives this CombatUnit (ResourceManager guarantees this).
+    static CombatUnit make(const UnitType* t, int stackCount, bool player,
                            HexCoord startPos = { 0, 0 }) {
         CombatUnit u;
         u.type          = t;
         u.count         = stackCount;
-        u.hpLeft        = t.hitPoints;
+        u.hpLeft        = t->hitPoints;
         u.isPlayer      = player;
         u.isDefending   = false;
         u.pos           = startPos;
-        u.shotsLeft     = t.shots;
+        u.shotsLeft     = t->shots;
         u.hasRetaliated = false;
         return u;
     }

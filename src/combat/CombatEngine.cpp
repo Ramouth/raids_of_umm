@@ -1,6 +1,8 @@
 #include "CombatEngine.h"
 #include <algorithm>
 #include <iostream>
+#include <queue>
+#include <unordered_set>
 
 CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     : m_player(std::move(player))
@@ -25,19 +27,43 @@ std::vector<HexCoord> CombatEngine::reachableTiles() const {
     if (isOver()) return {};
 
     const CombatUnit& unit = activeUnit();
+
+    // Build a set of all occupied hexes (any living stack, friend or foe).
+    // A unit cannot move through or onto an occupied hex.
+    std::unordered_set<HexCoord> occupied;
+    for (const auto& s : m_player.stacks)
+        if (!s.isDead()) occupied.insert(s.pos);
+    for (const auto& s : m_enemy.stacks)
+        if (!s.isDead()) occupied.insert(s.pos);
+
+    // BFS flood-fill up to moveRange steps from the unit's current position.
+    // State: (hex, steps_used).  We never step onto an occupied hex.
+    struct Node { HexCoord hex; int steps; };
+    std::queue<Node> frontier;
+    std::unordered_set<HexCoord> visited;
+
+    frontier.push({ unit.pos, 0 });
+    visited.insert(unit.pos);
+
     std::vector<HexCoord> result;
 
-    for (HexCoord c : CombatMap::allHexes()) {
-        if (c == unit.pos) continue;
-        if (unit.pos.distanceTo(c) > unit.type.moveRange) continue;
+    while (!frontier.empty()) {
+        auto [hex, steps] = frontier.front();
+        frontier.pop();
 
-        // Not occupied by a friendly stack
-        const auto& allies = unit.isPlayer ? m_player.stacks : m_enemy.stacks;
-        bool blocked = false;
-        for (const auto& ally : allies)
-            if (!ally.isDead() && ally.pos == c) { blocked = true; break; }
+        if (steps >= unit.type->moveRange) continue;
 
-        if (!blocked) result.push_back(c);
+        for (int dir = 0; dir < 6; ++dir) {
+            HexCoord nb = hex.neighbor(dir);
+            if (!CombatMap::inBounds(nb)) continue;
+            if (visited.count(nb)) continue;
+            visited.insert(nb);
+
+            if (occupied.count(nb)) continue;  // blocked — cannot enter or pass through
+
+            result.push_back(nb);
+            frontier.push({ nb, steps + 1 });
+        }
     }
     return result;
 }
@@ -50,7 +76,7 @@ std::vector<HexCoord> CombatEngine::attackableTiles() const {
 
     std::vector<HexCoord> result;
 
-    if (unit.type.isRanged()) {
+    if (unit.type->isRanged()) {
         // Ranged: can target any living enemy on the field
         for (const auto& e : enemies)
             if (!e.isDead()) result.push_back(e.pos);
@@ -77,7 +103,7 @@ void CombatEngine::doMove(HexCoord dest) {
     TurnSlot& slot = m_queue[m_turn];
     CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                       : m_enemy.stacks[slot.stackIndex];
-    std::cout << "[CombatEngine] " << actor.type.name
+    std::cout << "[CombatEngine] " << actor.type->name
               << " moves " << actor.pos.q << "," << actor.pos.r
               << " → " << dest.q << "," << dest.r << "\n";
     actor.pos = dest;
@@ -111,7 +137,7 @@ void CombatEngine::doAttack(int targetIndex) {
     CombatUnit& target = enemyStacks[targetIndex];
 
     // Determine if ranged: unit has shots, has ammo, and target is not adjacent
-    bool isRanged = attacker.type.isRanged()
+    bool isRanged = attacker.type->isRanged()
                     && attacker.shotsLeft > 0
                     && attacker.pos.distanceTo(target.pos) > 1;
     if (isRanged) {
@@ -121,18 +147,18 @@ void CombatEngine::doAttack(int targetIndex) {
     int damage = calcDamage(attacker, target, m_rng);
     applyDamage(target, damage);
 
-    std::cout << "[CombatEngine] " << attacker.type.name
-              << " attacks " << target.type.name
+    std::cout << "[CombatEngine] " << attacker.type->name
+              << " attacks " << target.type->name
               << " for " << damage << " damage"
               << " (" << target.count << " survivors)\n";
 
     // Melee retaliation: target is alive, hasn't retaliated, attacker has no "no_retaliation"
     if (!isRanged && !target.isDead() && !target.hasRetaliated
-        && !attacker.type.hasAbility("no_retaliation")) {
+        && !attacker.type->hasAbility("no_retaliation")) {
         int retDamage = calcDamage(target, attacker, m_rng);
         applyDamage(attacker, retDamage);
         target.hasRetaliated = true;
-        std::cout << "[CombatEngine] " << target.type.name
+        std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
                   << " (" << attacker.count << " survivors)\n";
     }
@@ -143,16 +169,16 @@ void CombatEngine::doAttack(int targetIndex) {
 // static
 int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
                               std::mt19937& rng) {
-    std::uniform_int_distribution<int> dist(attacker.type.minDamage, attacker.type.maxDamage);
+    std::uniform_int_distribution<int> dist(attacker.type->minDamage, attacker.type->maxDamage);
     int baseDmg = 0;
     for (int i = 0; i < attacker.count; ++i)
         baseDmg += dist(rng);
 
     int effectiveDefense = defender.isDefending
-        ? defender.type.defense + defender.type.defense / 4
-        : defender.type.defense;
+        ? defender.type->defense + defender.type->defense / 4
+        : defender.type->defense;
 
-    int diff = attacker.type.attack - effectiveDefense;
+    int diff = attacker.type->attack - effectiveDefense;
     double mult;
     if (diff >= 0)
         mult = 1.0 + 0.05 * std::min(diff, 20);
@@ -162,13 +188,19 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
     return std::max(1, static_cast<int>(baseDmg * mult));
 }
 
+void CombatEngine::teleportUnit(bool isPlayer, int stackIdx, HexCoord pos) {
+    auto& stacks = isPlayer ? m_player.stacks : m_enemy.stacks;
+    if (stackIdx >= 0 && stackIdx < static_cast<int>(stacks.size()))
+        stacks[stackIdx].pos = pos;
+}
+
 // static
 void CombatEngine::applyDamage(CombatUnit& target, int damage) {
     while (damage > 0 && !target.isDead()) {
         if (damage >= target.hpLeft) {
             damage -= target.hpLeft;
             target.count--;
-            target.hpLeft = (target.count > 0) ? target.type.hitPoints : 0;
+            target.hpLeft = (target.count > 0) ? target.type->hitPoints : 0;
         } else {
             target.hpLeft -= damage;
             break;
@@ -181,7 +213,7 @@ void CombatEngine::doDefend() {
     CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                       : m_enemy.stacks[slot.stackIndex];
     actor.isDefending = true;
-    std::cout << "[CombatEngine] " << actor.type.name << " defends\n";
+    std::cout << "[CombatEngine] " << actor.type->name << " defends\n";
     advance();
 }
 
@@ -253,8 +285,8 @@ void CombatEngine::buildQueue() {
                                               : m_enemy.stacks[a.stackIndex];
             const CombatUnit& ub = b.isPlayer ? m_player.stacks[b.stackIndex]
                                               : m_enemy.stacks[b.stackIndex];
-            if (ua.type.speed != ub.type.speed)
-                return ua.type.speed > ub.type.speed;
+            if (ua.type->speed != ub.type->speed)
+                return ua.type->speed > ub.type->speed;
             return a.isPlayer && !b.isPlayer;
         });
 }

@@ -4,9 +4,18 @@
 #include "combat/CombatEngine.h"
 #include "hero/Hero.h"
 
+// ── Test-local type registry ───────────────────────────────────────────────────
+// CombatUnit stores const UnitType* — pointers must outlive the engine.
+// This vector acts as a mini-ResourceManager for the test process.
+static std::vector<UnitType> s_types;
+static const UnitType* reg(UnitType t) {
+    s_types.push_back(std::move(t));
+    return &s_types.back();
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-static UnitType makeUnit(const std::string& name, int speed) {
+static const UnitType* makeUnit(const std::string& name, int speed) {
     UnitType t;
     t.id        = name;
     t.name      = name;
@@ -16,7 +25,7 @@ static UnitType makeUnit(const std::string& name, int speed) {
     t.defense   = 3;
     t.minDamage = 1;
     t.maxDamage = 3;
-    return t;
+    return reg(std::move(t));
 }
 
 static CombatArmy oneStack(const std::string& name, int speed, bool isPlayer) {
@@ -97,14 +106,14 @@ SUITE("CombatEngine — advance wraps to round 2") {
 }
 
 SUITE("CombatUnit — totalHp full stack") {
-    UnitType t = makeUnit("X", 5);
+    const UnitType* t = makeUnit("X", 5);
     CombatUnit u = CombatUnit::make(t, 4, true);
     // 4 creatures × 10 hp each = 40
     CHECK_EQ(u.totalHp(), 40);
 }
 
 SUITE("CombatUnit — isDead only when count == 0") {
-    UnitType t = makeUnit("X", 5);
+    const UnitType* t = makeUnit("X", 5);
     CombatUnit u = CombatUnit::make(t, 3, true);
     CHECK(!u.isDead());
     u.count = 0;
@@ -114,7 +123,7 @@ SUITE("CombatUnit — isDead only when count == 0") {
 SUITE("CombatArmy — allDead requires all stacks dead") {
     CombatArmy army;
     army.isPlayer = true;
-    UnitType t = makeUnit("X", 5);
+    const UnitType* t = makeUnit("X", 5);
     army.stacks.push_back(CombatUnit::make(t, 2, true));
     army.stacks.push_back(CombatUnit::make(t, 3, true));
 
@@ -130,12 +139,12 @@ SUITE("CombatArmy — allDead requires all stacks dead") {
 // ── Movement ──────────────────────────────────────────────────────────────────
 
 static CombatArmy oneStackWithRange(const std::string& name, int speed, int moveRange, bool isPlayer) {
-    UnitType t = makeUnit(name, speed);
+    UnitType t = *makeUnit(name, speed);
     t.moveRange = moveRange;
     CombatArmy army;
     army.ownerName = isPlayer ? "Player" : "Enemy";
     army.isPlayer  = isPlayer;
-    army.stacks.push_back(CombatUnit::make(t, 5, isPlayer));
+    army.stacks.push_back(CombatUnit::make(reg(std::move(t)), 5, isPlayer));
     return army;
 }
 
@@ -210,8 +219,8 @@ SUITE("CombatEngine — doAttackAt returns false for empty hex") {
 // ── Damage resolution ─────────────────────────────────────────────────────────
 
 // Deterministic UnitType: minDmg == maxDmg so every roll is identical.
-static UnitType makeFixed(const std::string& name, int speed,
-                          int dmg, int hp, int atk, int def) {
+static const UnitType* makeFixed(const std::string& name, int speed,
+                                 int dmg, int hp, int atk, int def) {
     UnitType t;
     t.id = t.name  = name;
     t.speed        = speed;
@@ -220,7 +229,7 @@ static UnitType makeFixed(const std::string& name, int speed,
     t.defense      = def;
     t.minDamage    = t.maxDamage = dmg;
     t.moveRange    = 3;
-    return t;
+    return reg(std::move(t));
 }
 
 static CombatArmy fixedStack(const std::string& name, int speed,
@@ -265,15 +274,15 @@ SUITE("CombatEngine — retaliation fires once and reduces attacker") {
     eng.doAttack(0);
 
     const CombatUnit& actor = eng.playerArmy().stacks[0];
-    CHECK(actor.count < before || actor.hpLeft < actor.type.hitPoints);
+    CHECK(actor.count < before || actor.hpLeft < actor.type->hitPoints);
 }
 
 SUITE("CombatEngine — no second retaliation in same round") {
     // Two player stacks (P0 speed=5, P1 speed=4) both attack the same enemy.
     // Enemy retaliates on P0. P1 attacks next — enemy must NOT retaliate again.
     // Retaliation is lethal (dmg=100): if it fires on P1, P1 dies.
-    UnitType pt0 = makeFixed("P0", 5,   5,  10,  5, 5);
-    UnitType pt1 = makeFixed("P1", 4,   5,  10,  5, 5);
+    const UnitType* pt0 = makeFixed("P0", 5,   5,  10,  5, 5);
+    const UnitType* pt1 = makeFixed("P1", 4,   5,  10,  5, 5);
 
     CombatArmy pArmy;
     pArmy.isPlayer = true; pArmy.ownerName = "Player";
@@ -293,7 +302,7 @@ SUITE("CombatEngine — defending unit takes less damage") {
     // Player atk=10, enemy def=4.
     // Normal:    eff_def=4,   diff=6, mult=1.30 → 13 damage.
     // Defending: eff_def=4+1, diff=5, mult=1.25 → 12 damage.
-    UnitType dt = makeFixed("D", 3, 1, 10, 5, 4);
+    const UnitType* dt = makeFixed("D", 3, 1, 10, 5, 4);
 
     // Scenario 1: enemy not defending
     CombatEngine eng1(fixedStack("A", 5, 10, 10, 10, 5, 1, true),
@@ -339,8 +348,9 @@ SUITE("CombatEngine — EnemyWon when player army is eliminated") {
 SUITE("CombatEngine — no_retaliation ability suppresses enemy retaliation") {
     // Attacker has the "no_retaliation" tag; enemy must not hit back.
     // Enemy retaliation would be lethal (dmg=100), so surviving proves it didn't fire.
-    UnitType at = makeFixed("A", 5, 5, 10, 5, 5);
-    at.abilities = {"no_retaliation"};
+    UnitType atBase = *makeFixed("A", 5, 5, 10, 5, 5);
+    atBase.abilities = {"no_retaliation"};
+    const UnitType* at = reg(std::move(atBase));
 
     CombatArmy pArmy;
     pArmy.isPlayer = true; pArmy.ownerName = "Player";
@@ -357,12 +367,13 @@ SUITE("CombatEngine — no_retaliation ability suppresses enemy retaliation") {
 SUITE("CombatEngine — exhausted ammo falls back to melee with retaliation") {
     // Archer type has shots=24 but unit's shotsLeft is forced to 0.
     // Attack must be treated as melee → enemy retaliates.
-    UnitType archer = makeFixed("Archer", 5, 3, 100, 5, 5);
-    archer.shots = 24;  // type is ranged...
+    UnitType archerBase = *makeFixed("Archer", 5, 3, 100, 5, 5);
+    archerBase.shots = 24;  // type is ranged...
+    const UnitType* archerType = reg(std::move(archerBase));
 
     CombatArmy pArmy;
     pArmy.isPlayer = true; pArmy.ownerName = "Player";
-    CombatUnit archerUnit = CombatUnit::make(archer, 1, true);
+    CombatUnit archerUnit = CombatUnit::make(archerType, 1, true);
     archerUnit.shotsLeft = 0;  // ...but ammo is spent
     pArmy.stacks.push_back(archerUnit);
 
@@ -378,8 +389,8 @@ SUITE("CombatEngine — exhausted ammo falls back to melee with retaliation") {
 
 SUITE("CombatEngine — dead stack turn is skipped within a round") {
     // Player kills enemy[0] on first attack; queue must advance to enemy[1], not dead [0].
-    UnitType e1t = makeFixed("E1", 3, 1, 10, 5, 5);
-    UnitType e2t = makeFixed("E2", 3, 1, 10, 5, 5);
+    const UnitType* e1t = makeFixed("E1", 3, 1, 10, 5, 5);
+    const UnitType* e2t = makeFixed("E2", 3, 1, 10, 5, 5);
 
     CombatArmy eArmy;
     eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
@@ -399,18 +410,98 @@ SUITE("CombatEngine — dead stack turn is skipped within a round") {
 SUITE("CombatEngine — ranged attack decrements shotsLeft") {
     // Archer (shots=24) fires from col 0 at enemy at col 10 (distance >> 1).
     // Attack is ranged → shotsLeft drops by 1, no retaliation.
-    UnitType archer = makeFixed("Archer", 5, 3, 10, 5, 5);
-    archer.shots = 24;
+    UnitType archerBase2 = *makeFixed("Archer", 5, 3, 10, 5, 5);
+    archerBase2.shots = 24;
+    const UnitType* archerType2 = reg(std::move(archerBase2));
 
     CombatArmy pArmy;
     pArmy.isPlayer = true; pArmy.ownerName = "Player";
-    pArmy.stacks.push_back(CombatUnit::make(archer, 1, true));
+    pArmy.stacks.push_back(CombatUnit::make(archerType2, 1, true));
 
     CombatEngine eng(std::move(pArmy),
                      fixedStack("D", 3, 1, 10, 5, 5, 1, false));
     CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 24);
     eng.doAttack(0);
     CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 23);
+}
+
+// ── BFS movement ──────────────────────────────────────────────────────────────
+
+SUITE("CombatEngine — BFS: enemy wall blocks path to tiles behind it") {
+    // Player spawns at col 0 row 2.  After construction we teleport three
+    // enemy stacks to col 1 rows 1,2,3 forming a complete wall.
+    // Player has moveRange=3.  Without BFS, toHex(2,2) would appear reachable
+    // (distance 2 ≤ 3). With BFS it is unreachable: every path to col≥2 must
+    // pass through col 1 which is fully occupied.
+
+    const UnitType* pt = makeUnit("P", 5);
+    const UnitType* et = makeUnit("E", 3);
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(pt, 1, true));
+
+    CombatArmy eArmy;
+    eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+
+    CombatEngine eng(std::move(pArmy), std::move(eArmy));
+
+    // Teleport enemies to form the col-1 wall after placeArmies() runs.
+    eng.teleportUnit(false, 0, CombatMap::toHex(1, 1));
+    eng.teleportUnit(false, 1, CombatMap::toHex(1, 2));
+    eng.teleportUnit(false, 2, CombatMap::toHex(1, 3));
+
+    CHECK(eng.currentTurn().isPlayer);
+
+    auto reachable = eng.reachableTiles();
+
+    // toHex(2,2) is behind the wall — must not be reachable.
+    HexCoord blocked = CombatMap::toHex(2, 2);
+    bool found = false;
+    for (const auto& h : reachable)
+        if (h == blocked) { found = true; break; }
+    CHECK(!found);
+}
+
+SUITE("CombatEngine — BFS: tiles on near side of wall are still reachable") {
+    // Same wall setup. Hexes at col 0 rows 0 and 4 are on the near side and
+    // must still be reachable.
+
+    const UnitType* pt = makeUnit("P2", 5);
+    const UnitType* et = makeUnit("E2", 3);
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(pt, 1, true));
+
+    CombatArmy eArmy;
+    eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+    eArmy.stacks.push_back(CombatUnit::make(et, 1, false));
+
+    CombatEngine eng(std::move(pArmy), std::move(eArmy));
+    eng.teleportUnit(false, 0, CombatMap::toHex(1, 1));
+    eng.teleportUnit(false, 1, CombatMap::toHex(1, 2));
+    eng.teleportUnit(false, 2, CombatMap::toHex(1, 3));
+
+    CHECK(eng.currentTurn().isPlayer);
+
+    auto reachable = eng.reachableTiles();
+
+    // col 0, rows 0 and 4 are accessible without crossing the wall.
+    HexCoord near0 = CombatMap::toHex(0, 0);
+    HexCoord near4 = CombatMap::toHex(0, 4);
+    bool found0 = false, found4 = false;
+    for (const auto& h : reachable) {
+        if (h == near0) found0 = true;
+        if (h == near4) found4 = true;
+    }
+    CHECK(found0);
+    CHECK(found4);
 }
 
 #endif // COMBAT_ENGINE_IMPL

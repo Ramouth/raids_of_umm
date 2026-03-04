@@ -81,6 +81,12 @@ public:
     // Advance to the next actor; rebuilds the queue when a round ends.
     void advance();
 
+    // ── Setup helpers (tests / scenario editor) ───────────────────────────────
+
+    // Forcibly place a stack at a position after construction.
+    // Useful in tests where placeArmies() needs to be overridden.
+    void teleportUnit(bool isPlayer, int stackIdx, HexCoord pos);
+
 private:
     // Assign each stack its spawn position on the CombatMap.
     void placeArmies();

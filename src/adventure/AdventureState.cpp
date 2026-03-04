@@ -21,16 +21,19 @@ CombatArmy AdventureState::buildPlayerArmy() const {
 
     for (const auto& slot : m_hero.army) {
         if (!slot.isEmpty())
-            army.stacks.push_back(CombatUnit::make(*slot.unitType, slot.count, true));
+            army.stacks.push_back(CombatUnit::make(slot.unitType, slot.count, true));
     }
 
     // Fallback: if hero has no army (shouldn't happen after initHeroArmy), fight bare-handed.
     if (army.stacks.empty()) {
-        UnitType t;
-        t.id = "hero_alone"; t.name = m_hero.name;
-        t.hitPoints = 20; t.attack = 5; t.defense = 4;
-        t.minDamage = 1;  t.maxDamage = 4; t.speed = 5; t.moveRange = 3;
-        army.stacks.push_back(CombatUnit::make(t, 1, true));
+        static const UnitType s_heroAlone = []() {
+            UnitType t;
+            t.id = "hero_alone"; t.name = "Hero";
+            t.hitPoints = 20; t.attack = 5; t.defense = 4;
+            t.minDamage = 1;  t.maxDamage = 4; t.speed = 5; t.moveRange = 3;
+            return t;
+        }();
+        army.stacks.push_back(CombatUnit::make(&s_heroAlone, 1, true));
     }
     return army;
 }
@@ -43,18 +46,21 @@ CombatArmy AdventureState::buildEnemyArmy(const MapObjectDef& obj) const {
     auto& rm = Application::get().resources();
     if (rm.loaded()) {
         if (const UnitType* t = rm.unit("skeleton_warrior"))
-            army.stacks.push_back(CombatUnit::make(*t, 12, false));
+            army.stacks.push_back(CombatUnit::make(t, 12, false));
         if (const UnitType* t = rm.unit("sand_scorpion"))
-            army.stacks.push_back(CombatUnit::make(*t,  4, false));
+            army.stacks.push_back(CombatUnit::make(t,  4, false));
     }
 
     // Fallback if data didn't load.
     if (army.stacks.empty()) {
-        UnitType t;
-        t.id = "guard"; t.name = "Dungeon Guard";
-        t.hitPoints = 8; t.attack = 5; t.defense = 4;
-        t.minDamage = 1; t.maxDamage = 3; t.speed = 4; t.moveRange = 3;
-        army.stacks.push_back(CombatUnit::make(t, 8, false));
+        static const UnitType s_guard = []() {
+            UnitType t;
+            t.id = "guard"; t.name = "Dungeon Guard";
+            t.hitPoints = 8; t.attack = 5; t.defense = 4;
+            t.minDamage = 1; t.maxDamage = 3; t.speed = 4; t.moveRange = 3;
+            return t;
+        }();
+        army.stacks.push_back(CombatUnit::make(&s_guard, 8, false));
     }
     return army;
 }
