@@ -43,6 +43,8 @@ set(SOURCES
     src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp
     src/castle/CastleState.cpp
+    src/combat/CombatEngine.cpp
+    src/combat/CombatRenderer.cpp
     src/combat/CombatState.cpp
     src/render/HUDRenderer.cpp
     src/worldbuilder/WorldBuilderState.cpp
@@ -92,9 +94,11 @@ add_executable(raids_tests
     tests/test_resources.cpp
     tests/test_worldmap.cpp
     tests/test_camera.cpp
+    tests/test_combat.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
+    src/combat/CombatEngine.cpp
 )
 
 target_include_directories(raids_tests PRIVATE
@@ -107,6 +111,7 @@ target_include_directories(raids_tests PRIVATE
 target_compile_definitions(raids_tests PRIVATE
     WORLDMAP_IMPL               # WorldMap is built — activate its test suites
     CAMERA2D_IMPL               # Camera2D is built — activate its test suites
+    COMBAT_ENGINE_IMPL          # CombatEngine is built — activate its test suites
 )
 
 target_compile_options(raids_tests PRIVATE

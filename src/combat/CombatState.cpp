@@ -1,184 +1,167 @@
 #include "CombatState.h"
 #include "core/Application.h"
-#include "render/HUDRenderer.h"
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
-#include <vector>
 #include <cmath>
 
-struct CombatUnit {
-    int hp;
-    int maxHp;
-    int attack;
-    int defense;
-    bool isPlayer;
-};
-
-class CombatRenderer {
-public:
-    CombatRenderer() {}
-    ~CombatRenderer() {
-        if (m_vao) glDeleteVertexArrays(1, &m_vao);
-        if (m_vbo) glDeleteBuffers(1, &m_vbo);
-    }
-
-    void init() {
-        m_shader = Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
-        
-        glGenVertexArrays(1, &m_vao);
-        glGenBuffers(1, &m_vbo);
-        
-        glBindVertexArray(m_vao);
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 8, nullptr, GL_DYNAMIC_DRAW);
-        
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, nullptr);
-        
-        glBindVertexArray(0);
-    }
-
-    void render(int screenW, int screenH, const std::vector<CombatUnit>& playerUnits, const std::vector<CombatUnit>& enemyUnits) {
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        m_shader.bind();
-        m_shader.setVec2("u_ScreenSize", {static_cast<float>(screenW), static_cast<float>(screenH)});
-        m_shader.setInt("u_UseTexture", 0);
-        
-        float scale = screenH / 600.0f;
-        
-        // Combat background
-        drawRect(0, 0, screenW, screenH, {0.1f, 0.05f, 0.05f, 1.0f});
-        
-        // Battle title bar at top
-        drawRect(0, 0, screenW, 40 * scale, {0.3f, 0.1f, 0.1f, 1.0f});
-        
-        // ===== LEFT SIDE: Player units (bottom-aligned) =====
-        float playerY = screenH - 50 * scale;
-        for (size_t i = 0; i < playerUnits.size(); ++i) {
-            float x = 50 * scale + i * 120 * scale;
-            drawRect(x, playerY - 80 * scale, 100 * scale, 80 * scale, {0.2f, 0.4f, 0.6f, 1.0f});
-            
-            // HP bar
-            float hpFill = static_cast<float>(playerUnits[i].hp) / playerUnits[i].maxHp;
-            drawRect(x + 10 * scale, playerY - 70 * scale, 80 * scale * hpFill, 10 * scale, {0.2f, 0.8f, 0.2f, 1.0f});
-        }
-        
-        // ===== RIGHT SIDE: Enemy units (top-aligned) =====
-        float enemyY = 60 * scale;
-        for (size_t i = 0; i < enemyUnits.size(); ++i) {
-            float x = screenW - 150 * scale - i * 120 * scale;
-            drawRect(x, enemyY, 100 * scale, 80 * scale, {0.6f, 0.2f, 0.2f, 1.0f});
-            
-            // HP bar
-            float hpFill = static_cast<float>(enemyUnits[i].hp) / enemyUnits[i].maxHp;
-            drawRect(x + 10 * scale, enemyY + 10 * scale, 80 * scale * hpFill, 10 * scale, {0.8f, 0.2f, 0.2f, 1.0f});
-        }
-        
-        // ===== BOTTOM: Action buttons =====
-        float btnY = 50 * scale;
-        float btnW = 120 * scale;
-        float btnH = 35 * scale;
-        
-        // Attack button
-        drawRect(100 * scale, btnY, btnW, btnH, {0.6f, 0.3f, 0.1f, 1.0f});
-        
-        // Defend button
-        drawRect(240 * scale, btnY, btnW, btnH, {0.3f, 0.3f, 0.6f, 1.0f});
-        
-        // Cast Spell button
-        drawRect(380 * scale, btnY, btnW, btnH, {0.3f, 0.5f, 0.3f, 1.0f});
-        
-        // Retreat button
-        drawRect(520 * scale, btnY, btnW, btnH, {0.5f, 0.2f, 0.2f, 1.0f});
-        
-        glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
-    }
-
-private:
-    void drawRect(float x, float y, float w, float h, const glm::vec4& color) {
-        float verts[] = { x, y, x + w, y, x + w, y + h, x, y + h };
-        
-        glBindVertexArray(m_vao);
-        glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
-        
-        m_shader.setVec4("u_Color", color);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    }
-
-    GLuint m_vao = 0;
-    GLuint m_vbo = 0;
-    Shader m_shader;
-};
-
-static CombatRenderer* g_combatRenderer = nullptr;
-static std::vector<CombatUnit> g_playerUnits;
-static std::vector<CombatUnit> g_enemyUnits;
-
-CombatState::CombatState() {}
+CombatState::CombatState(CombatArmy player, CombatArmy enemy)
+    : m_engine(std::move(player), std::move(enemy))
+{}
 
 void CombatState::onEnter() {
-    m_initialized = true;
-    
-    g_combatRenderer = new CombatRenderer();
-    g_combatRenderer->init();
-    
-    // Initialize 3 player units (can be up to 6)
-    g_playerUnits = {
-        {50, 50, 8, 4, true},
-        {40, 40, 6, 3, true},
-        {30, 30, 10, 2, true}
-    };
-    
-    // Initialize 3 enemy units
-    g_enemyUnits = {
-        {45, 45, 7, 3, false},
-        {35, 35, 9, 2, false},
-        {25, 25, 8, 1, false}
-    };
-    
-    std::cout << "[Combat] Battle started!\n";
+    m_renderer.init();
+
+    // Centre the camera on the combat grid.
+    // Grid is 11 cols × 5 rows; centre hex ≈ col 5, row 2.
+    // toHex(5, 2) → q=5, r=2-(5-1)/2=0  →  toWorld: x=7.5, z=√3*2.5≈4.33
+    m_cam.setPosition({ 7.5f, 4.3f });
+    m_cam.setZoom(6.5f);
+
+    std::cout << "[CombatState] Battle started\n";
 }
 
 void CombatState::onExit() {
-    delete g_combatRenderer;
-    g_combatRenderer = nullptr;
-    g_playerUnits.clear();
-    g_enemyUnits.clear();
-    std::cout << "[Combat] Battle ended\n";
+    std::cout << "[CombatState] Battle ended — ";
+    switch (m_engine.result()) {
+        case CombatResult::PlayerWon: std::cout << "player won\n";  break;
+        case CombatResult::EnemyWon:  std::cout << "enemy won\n";   break;
+        case CombatResult::Retreated: std::cout << "retreated\n";   break;
+        default:                      std::cout << "ongoing\n";     break;
+    }
 }
 
 void CombatState::update(float dt) {
-    (void)dt;
+    if (m_engine.isOver()) {
+        Application::get().popState();
+        return;
+    }
+
+    // Advance move animation
+    if (m_anim.active) {
+        m_animProgress += dt / MOVE_ANIM_DURATION;
+        if (m_animProgress >= 1.0f) {
+            m_animProgress = 1.0f;
+            m_anim.active  = false;
+        }
+        float t = m_animProgress;
+        // Smooth-step interpolation
+        t = t * t * (3.f - 2.f * t);
+        m_anim.worldPos = m_animFrom + t * (m_animTo - m_animFrom);
+    }
+
+    // Camera pan (normalised so diagonal isn't faster)
+    float dx = 0.f, dz = 0.f;
+    if (m_panLeft)  dx -= 1.f;
+    if (m_panRight) dx += 1.f;
+    if (m_panUp)    dz -= 1.f;
+    if (m_panDown)  dz += 1.f;
+    if (dx != 0.f || dz != 0.f) {
+        float len = std::sqrt(dx*dx + dz*dz);
+        m_cam.pan(dx / len * CAM_SPEED * dt,
+                  dz / len * CAM_SPEED * dt);
+    }
 }
 
 void CombatState::render() {
-    glClearColor(0.1f, 0.05f, 0.05f, 1.0f);
+    glClearColor(0.05f, 0.04f, 0.06f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    if (g_combatRenderer) {
-        auto& app = Application::get();
-        g_combatRenderer->render(app.width(), app.height(), g_playerUnits, g_enemyUnits);
-    }
+
+    auto& app = Application::get();
+    m_cam.resize(app.width(), app.height());
+    m_renderer.render(app.width(), app.height(),
+                      m_engine, m_cam, m_hoveredHex, m_hasHovered, m_anim);
 }
 
 bool CombatState::handleEvent(void* sdlEvent) {
-    SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
+    const SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
 
+    // ── Key down ──────────────────────────────────────────────────────────────
     if (e->type == SDL_KEYDOWN) {
-        if (e->key.keysym.sym == SDLK_ESCAPE || 
-            e->key.keysym.sym == SDLK_SPACE ||
-            e->key.keysym.sym == SDLK_RETURN) {
-            Application::get().popState();
-            return true;
+        switch (e->key.keysym.sym) {
+            // Camera pan
+            case SDLK_UP:    case SDLK_w: m_panUp    = true; return true;
+            case SDLK_DOWN:  case SDLK_s: m_panDown  = true; return true;
+            case SDLK_LEFT:  case SDLK_a: m_panLeft  = true; return true;
+            case SDLK_RIGHT: case SDLK_d: m_panRight = true; return true;
+
+            // Combat actions (blocked while move animation plays)
+            case SDLK_RETURN: case SDLK_KP_ENTER:
+                if (!m_engine.isOver() && !m_anim.active) m_engine.doAttack(0);
+                return true;
+            case SDLK_SPACE:
+                if (!m_engine.isOver() && !m_anim.active) m_engine.doDefend();
+                return true;
+            case SDLK_ESCAPE:
+                if (!m_engine.isOver()) m_engine.doRetreat();
+                return true;
+            default: break;
         }
     }
+
+    // ── Key up ────────────────────────────────────────────────────────────────
+    if (e->type == SDL_KEYUP) {
+        switch (e->key.keysym.sym) {
+            case SDLK_UP:    case SDLK_w: m_panUp    = false; return true;
+            case SDLK_DOWN:  case SDLK_s: m_panDown  = false; return true;
+            case SDLK_LEFT:  case SDLK_a: m_panLeft  = false; return true;
+            case SDLK_RIGHT: case SDLK_d: m_panRight = false; return true;
+            default: break;
+        }
+    }
+
+    // ── Mouse move → hex hover ────────────────────────────────────────────────
+    if (e->type == SDL_MOUSEMOTION) {
+        glm::vec2 world = m_cam.screenToWorld(
+            static_cast<float>(e->motion.x),
+            static_cast<float>(e->motion.y));
+        HexCoord hc = HexCoord::fromWorld(world.x, world.y, HEX_SIZE);
+        if (CombatMap::inBounds(hc)) {
+            m_hoveredHex = hc;
+            m_hasHovered = true;
+        } else {
+            m_hasHovered = false;
+        }
+        return false;  // don't consume — let AdventureState below still see it
+    }
+
+    // ── Left click → move or attack ───────────────────────────────────────────
+    if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+        if (m_engine.isOver() || m_anim.active) return true;
+
+        glm::vec2 world = m_cam.screenToWorld(
+            static_cast<float>(e->button.x),
+            static_cast<float>(e->button.y));
+        HexCoord clicked = HexCoord::fromWorld(world.x, world.y, HEX_SIZE);
+
+        if (!CombatMap::inBounds(clicked)) return true;
+
+        // Try attack first (click on an attackable enemy hex)
+        if (m_engine.doAttackAt(clicked)) return true;
+
+        // Try move (click on a reachable empty hex)
+        if (m_engine.canMoveTo(clicked)) {
+            // Identify which stack is moving for animation
+            const TurnSlot& slot = m_engine.currentTurn();
+            m_anim.isPlayer   = slot.isPlayer;
+            m_anim.stackIndex = slot.stackIndex;
+
+            // World positions for interpolation
+            const CombatUnit& actor = m_engine.activeUnit();
+            float fx, fz, tx, tz;
+            actor.pos.toWorld(HEX_SIZE, fx, fz);
+            clicked.toWorld(HEX_SIZE, tx, tz);
+            m_animFrom     = { fx, 0.f, fz };
+            m_animTo       = { tx, 0.f, tz };
+            m_animProgress = 0.f;
+            m_anim.worldPos = m_animFrom;
+            m_anim.active  = true;
+
+            m_engine.doMove(clicked);  // updates logical pos + advances turn
+        }
+        return true;
+    }
+
     return false;
 }

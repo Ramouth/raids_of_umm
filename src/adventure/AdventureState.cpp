@@ -1,6 +1,7 @@
 #include "AdventureState.h"
 #include "castle/CastleState.h"
 #include "combat/CombatState.h"
+#include "combat/CombatUnit.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include <SDL2/SDL.h>
@@ -10,6 +11,30 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+
+// ── Stub army factory ─────────────────────────────────────────────────────────
+// Temporary: builds hardcoded armies until ResourceManager + Army exist.
+// Replace this with real hero army and enemy encounter data when ready.
+
+static CombatArmy makeStubArmy(bool isPlayer) {
+    UnitType t;
+    if (isPlayer) {
+        t.id = "desert_archer"; t.name = "Desert Archer";
+        t.attack = 6; t.defense = 3; t.minDamage = 2; t.maxDamage = 4;
+        t.hitPoints = 10; t.speed = 6; t.moveRange = 3; t.shots = 24;
+    } else {
+        t.id = "skeleton_warrior"; t.name = "Skeleton Warrior";
+        t.attack = 5; t.defense = 4; t.minDamage = 1; t.maxDamage = 3;
+        t.hitPoints = 6; t.speed = 5; t.moveRange = 4;
+        t.abilities = { "undead" };
+    }
+
+    CombatArmy army;
+    army.ownerName = isPlayer ? "Hero" : "Dungeon Guardian";
+    army.isPlayer  = isPlayer;
+    army.stacks.push_back(CombatUnit::make(t, isPlayer ? 10 : 12, isPlayer));
+    return army;
+}
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -144,7 +169,8 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             break;
         case ObjType::Dungeon:
             std::cout << "     Entering combat!\n";
-            Application::get().pushState(std::make_unique<CombatState>());
+            Application::get().pushState(
+                std::make_unique<CombatState>(makeStubArmy(true), makeStubArmy(false)));
             break;
         case ObjType::GoldMine:
             std::cout << "     +500 Gold per turn secured!\n";
@@ -326,7 +352,8 @@ void AdventureState::update(float dt) {
         // Check for battle terrain
         MapTile* currentTile = m_map.tileAt(m_hero.pos);
         if (currentTile && currentTile->terrain == Terrain::Battle) {
-            Application::get().pushState(std::make_unique<CombatState>());
+            Application::get().pushState(
+                std::make_unique<CombatState>(makeStubArmy(true), makeStubArmy(false)));
         }
     }
 }
