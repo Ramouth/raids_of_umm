@@ -51,6 +51,8 @@ set(SOURCES
     src/render/RenderOffsets.cpp
     src/ui/EditorPalette.cpp
     src/worldbuilder/WorldBuilderState.cpp
+    src/core/ResourceManager.cpp
+    src/hero/Hero.cpp
 )
 
 add_executable(raids_of_umm ${SOURCES})
@@ -98,11 +100,14 @@ add_executable(raids_tests
     tests/test_worldmap.cpp
     tests/test_camera.cpp
     tests/test_combat.cpp
+    tests/test_resourcemanager.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
     src/render/RenderOffsets.cpp
     src/combat/CombatEngine.cpp
+    src/core/ResourceManager.cpp
+    src/hero/Hero.cpp
 )
 
 target_include_directories(raids_tests PRIVATE
@@ -116,6 +121,7 @@ target_compile_definitions(raids_tests PRIVATE
     WORLDMAP_IMPL               # WorldMap is built — activate its test suites
     CAMERA2D_IMPL               # Camera2D is built — activate its test suites
     COMBAT_ENGINE_IMPL          # CombatEngine is built — activate its test suites
+    RESOURCE_MANAGER_IMPL       # ResourceManager is built — activate its test suites
 )
 
 target_compile_options(raids_tests PRIVATE
