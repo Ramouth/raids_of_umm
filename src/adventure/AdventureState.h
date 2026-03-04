@@ -1,7 +1,9 @@
 #pragma once
 #include "core/StateMachine.h"
 #include "world/WorldMap.h"
+#include "world/MapObject.h"
 #include "hero/Hero.h"
+#include "combat/CombatArmy.h"
 #include "render/HexRenderer.h"
 #include "render/SpriteRenderer.h"
 #include "render/HUDRenderer.h"
@@ -46,7 +48,12 @@ public:
 
 private:
     // ── Initialisation ───────────────────────────────────────────────────────
-    void initMap();     // only called when no external map was provided
+    void initMap();          // only called when no external map was provided
+    void initHeroArmy();     // give hero a starting army from ResourceManager (first enter only)
+
+    // ── Combat army builders ──────────────────────────────────────────────────
+    CombatArmy buildPlayerArmy() const;
+    CombatArmy buildEnemyArmy(const MapObjectDef& obj) const;
 
     // ── Game logic ───────────────────────────────────────────────────────────
     void moveHero(const HexCoord& dest);

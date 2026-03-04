@@ -12,28 +12,65 @@
 #include <cmath>
 #include <memory>
 
-// ── Stub army factory ─────────────────────────────────────────────────────────
-// Temporary: builds hardcoded armies until ResourceManager + Army exist.
-// Replace this with real hero army and enemy encounter data when ready.
+// ── Army builders ─────────────────────────────────────────────────────────────
 
-static CombatArmy makeStubArmy(bool isPlayer) {
-    UnitType t;
-    if (isPlayer) {
-        t.id = "desert_archer"; t.name = "Desert Archer";
-        t.attack = 6; t.defense = 3; t.minDamage = 2; t.maxDamage = 4;
-        t.hitPoints = 10; t.speed = 6; t.moveRange = 3; t.shots = 24;
-    } else {
-        t.id = "skeleton_warrior"; t.name = "Skeleton Warrior";
-        t.attack = 5; t.defense = 4; t.minDamage = 1; t.maxDamage = 3;
-        t.hitPoints = 6; t.speed = 5; t.moveRange = 4;
-        t.abilities = { "undead" };
+CombatArmy AdventureState::buildPlayerArmy() const {
+    CombatArmy army;
+    army.ownerName = m_hero.name;
+    army.isPlayer  = true;
+
+    for (const auto& slot : m_hero.army) {
+        if (!slot.isEmpty())
+            army.stacks.push_back(CombatUnit::make(*slot.unitType, slot.count, true));
     }
 
-    CombatArmy army;
-    army.ownerName = isPlayer ? "Hero" : "Dungeon Guardian";
-    army.isPlayer  = isPlayer;
-    army.stacks.push_back(CombatUnit::make(t, isPlayer ? 10 : 12, isPlayer));
+    // Fallback: if hero has no army (shouldn't happen after initHeroArmy), fight bare-handed.
+    if (army.stacks.empty()) {
+        UnitType t;
+        t.id = "hero_alone"; t.name = m_hero.name;
+        t.hitPoints = 20; t.attack = 5; t.defense = 4;
+        t.minDamage = 1;  t.maxDamage = 4; t.speed = 5; t.moveRange = 3;
+        army.stacks.push_back(CombatUnit::make(t, 1, true));
+    }
     return army;
+}
+
+CombatArmy AdventureState::buildEnemyArmy(const MapObjectDef& obj) const {
+    CombatArmy army;
+    army.ownerName = obj.name;
+    army.isPlayer  = false;
+
+    auto& rm = Application::get().resources();
+    if (rm.loaded()) {
+        if (const UnitType* t = rm.unit("skeleton_warrior"))
+            army.stacks.push_back(CombatUnit::make(*t, 12, false));
+        if (const UnitType* t = rm.unit("sand_scorpion"))
+            army.stacks.push_back(CombatUnit::make(*t,  4, false));
+    }
+
+    // Fallback if data didn't load.
+    if (army.stacks.empty()) {
+        UnitType t;
+        t.id = "guard"; t.name = "Dungeon Guard";
+        t.hitPoints = 8; t.attack = 5; t.defense = 4;
+        t.minDamage = 1; t.maxDamage = 3; t.speed = 4; t.moveRange = 3;
+        army.stacks.push_back(CombatUnit::make(t, 8, false));
+    }
+    return army;
+}
+
+void AdventureState::initHeroArmy() {
+    if (m_hero.armySize() > 0) return;  // already initialised (re-enter after combat)
+
+    auto& rm = Application::get().resources();
+    if (!rm.loaded()) return;
+
+    if (const UnitType* t = rm.unit("desert_archer"))
+        m_hero.addUnit(t, 10);
+    if (const UnitType* t = rm.unit("mummy"))
+        m_hero.addUnit(t, 3);
+
+    std::cout << "[Adventure] Hero army: " << m_hero.armySize() << " stacks.\n";
 }
 
 // ── Construction ──────────────────────────────────────────────────────────────
@@ -59,6 +96,8 @@ void AdventureState::onEnter() {
 
     if (!m_externalMap)
         initMap();
+
+    initHeroArmy();
 
     // Load render offsets (missing file = fresh start, not an error)
     if (auto err = m_offsets.load("assets/render_offsets.json"))
@@ -180,7 +219,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
         case ObjType::Dungeon:
             std::cout << "     Entering combat!\n";
             Application::get().pushState(
-                std::make_unique<CombatState>(makeStubArmy(true), makeStubArmy(false)));
+                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(*obj)));
             break;
         case ObjType::GoldMine:
             std::cout << "     +500 Gold per turn secured!\n";
@@ -362,8 +401,9 @@ void AdventureState::update(float dt) {
         // Check for battle terrain
         MapTile* currentTile = m_map.tileAt(m_hero.pos);
         if (currentTile && currentTile->terrain == Terrain::Battle) {
+            MapObjectDef battleObj{ m_hero.pos, ObjType::Dungeon, "Battle Encounter" };
             Application::get().pushState(
-                std::make_unique<CombatState>(makeStubArmy(true), makeStubArmy(false)));
+                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(battleObj)));
         }
     }
 }

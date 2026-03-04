@@ -1,5 +1,6 @@
 #pragma once
 #include "StateMachine.h"
+#include "ResourceManager.h"
 #include <string>
 #include <cstdint>
 
@@ -41,22 +42,28 @@ public:
     float aspectRatio() const;
     SDL_Window* window() const { return m_window; }
 
+    // Game data — loaded once at startup, stable for the application lifetime.
+    ResourceManager&       resources()       { return m_resources; }
+    const ResourceManager& resources() const { return m_resources; }
+
     // Singleton-style global access for convenience
     static Application& get();
 
 private:
     void initSDL(const std::string& title, int w, int h);
     void initGL();
+    void initResources();
     void shutdown();
 
     void processEvents();
 
     SDL_Window*   m_window  = nullptr;
     SDL_GLContext m_context = nullptr;
-    StateMachine  m_states;
-    bool          m_running = false;
-    int           m_width;
-    int           m_height;
+    StateMachine    m_states;
+    ResourceManager m_resources;
+    bool            m_running = false;
+    int             m_width;
+    int             m_height;
 
     static Application* s_instance;
 };

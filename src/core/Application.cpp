@@ -17,6 +17,7 @@ Application::Application(const std::string& title, int width, int height)
     s_instance = this;
     initSDL(title, width, height);
     initGL();
+    initResources();
 }
 
 Application::~Application() {
@@ -82,6 +83,16 @@ void Application::initGL() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // Dark void — makes the hex-map boundary clearly visible against the background.
     glClearColor(0.04f, 0.04f, 0.06f, 1.0f);
+}
+
+void Application::initResources() {
+    if (auto err = m_resources.load("data")) {
+        std::cerr << "[ResourceManager] " << *err << "\n";
+    } else {
+        std::cout << "[ResourceManager] Loaded "
+                  << m_resources.unitsByTier().size() << " units, "
+                  << m_resources.allSpells().size()   << " spells.\n";
+    }
 }
 
 void Application::shutdown() {
