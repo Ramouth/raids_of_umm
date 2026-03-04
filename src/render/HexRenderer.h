@@ -51,13 +51,16 @@ public:
     // texId:       GL texture to bind for this tile; 0 = use the white placeholder.
     void drawTile(const HexCoord& coord,
                   const glm::vec3& color,
-                  float visualScale = 1.0f,
-                  float height      = 0.0f,
-                  GLuint texId      = 0);
+                  float visualScale          = 1.0f,
+                  float height               = 0.0f,
+                  GLuint texId               = 0,
+                  const glm::vec2& xzOffset  = {0.0f, 0.0f});
 
     // Draw a wireframe outline.  scale multiplies the unit hex outline.
     // height should match the tile's terrainHeight() so the outline sits on the tile face.
-    void drawOutline(const HexCoord& coord, const glm::vec3& color, float scale = 1.0f, float height = 0.0f);
+    void drawOutline(const HexCoord& coord, const glm::vec3& color,
+                     float scale = 1.0f, float height = 0.0f,
+                     const glm::vec2& xzOffset = {0.0f, 0.0f});
 
     void endFrame();
 

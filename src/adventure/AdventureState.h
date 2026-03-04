@@ -6,6 +6,7 @@
 #include "render/SpriteRenderer.h"
 #include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
+#include "render/RenderOffsets.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <unordered_set>
@@ -112,6 +113,8 @@ private:
 
     // Whether this state owns a procedurally generated map or a provided one.
     bool m_externalMap = false;
+
+    RenderOffsetConfig m_offsets;
 
     static constexpr float HEX_SIZE        = 1.0f;
     static constexpr float CAM_SPEED       = 8.0f;

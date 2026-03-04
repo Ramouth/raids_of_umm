@@ -48,6 +48,7 @@ set(SOURCES
     src/combat/CombatRenderer.cpp
     src/combat/CombatState.cpp
     src/render/HUDRenderer.cpp
+    src/render/RenderOffsets.cpp
     src/worldbuilder/WorldBuilderState.cpp
 )
 
@@ -99,6 +100,7 @@ add_executable(raids_tests
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
+    src/render/RenderOffsets.cpp
     src/combat/CombatEngine.cpp
 )
 

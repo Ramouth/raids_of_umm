@@ -2,7 +2,10 @@
 #include "core/StateMachine.h"
 #include "world/WorldMap.h"
 #include "render/HexRenderer.h"
+#include "render/HUDRenderer.h"
+#include "render/SpriteRenderer.h"
 #include "render/Camera2D.h"
+#include "render/RenderOffsets.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <string>
@@ -76,13 +79,22 @@ private:
     void renderTerrain();
     void renderObjects();
     void renderCursor();
-    void renderHUD();      // console-only HUD for now; proper UI comes later
+    void renderHUD();           // console-only HUD
+    void renderDevToolHUD();    // on-screen overlay for the alignment dev tool
+
+    // ── Dev tool helpers ─────────────────────────────────────────────────────
+    void devNudge(float dx, float dz, float dy);   // apply a nudge to selected tile
+    void devSaveOffsets();
+    void devResetSelected();
 
     // ── Members ──────────────────────────────────────────────────────────────
 
-    WorldMap    m_map;
-    Camera2D    m_cam;
-    HexRenderer m_hexRenderer;
+    WorldMap       m_map;
+    Camera2D       m_cam;
+    HexRenderer    m_hexRenderer;
+    HUDRenderer    m_hud;
+    SpriteRenderer m_buildingSpriteRenderer;
+    SpriteRenderer m_enemySpriteRenderer;
 
     EditorTool  m_tool         = EditorTool::PaintTile;
     Terrain     m_paintTerrain = Terrain::Sand;
@@ -101,6 +113,19 @@ private:
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
     bool m_ctrlHeld = false;
 
-    static constexpr float HEX_SIZE  = 1.0f;
-    static constexpr float CAM_SPEED = 8.0f;
+    // ── Dev tool (F1) ────────────────────────────────────────────────────────
+    enum class DevMode { Global, PerTile };
+    enum class DevEdit { Terrain, Object  };
+
+    bool        m_devToolActive  = false;
+    HexCoord    m_devSelected;
+    bool        m_hasDevSelected = false;
+    DevMode     m_devMode        = DevMode::Global;
+    DevEdit     m_devEdit        = DevEdit::Terrain;
+    RenderOffsetConfig m_offsets;
+
+    static constexpr float NUDGE_STEP = 0.02f;
+    static constexpr float HEX_SIZE   = 1.0f;
+    static constexpr float CAM_SPEED  = 8.0f;
+    static constexpr const char* OFFSETS_PATH = "assets/render_offsets.json";
 };

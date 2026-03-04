@@ -174,10 +174,13 @@ void HexRenderer::drawTile(const HexCoord& coord,
                             const glm::vec3& color,
                             float visualScale,
                             float height,
-                            GLuint texId) {
+                            GLuint texId,
+                            const glm::vec2& xzOffset) {
     // Always use the world hex size for positioning so tokens land on the correct tile
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz);
+    wx += xzOffset.x;
+    wz += xzOffset.y;
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, height, wz));
     model           = glm::scale(model, glm::vec3(visualScale));
@@ -203,9 +206,12 @@ void HexRenderer::drawTile(const HexCoord& coord,
 void HexRenderer::drawOutline(const HexCoord& coord,
                                const glm::vec3& color,
                                float scale,
-                               float height) {
+                               float height,
+                               const glm::vec2& xzOffset) {
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz); // position uses world size, not visual scale
+    wx += xzOffset.x;
+    wz += xzOffset.y;
 
     // Slightly higher offset to avoid z-fighting with tiles; raised to match the tile's height.
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(wx, height + 0.01f, wz));

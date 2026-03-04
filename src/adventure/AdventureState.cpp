@@ -60,6 +60,10 @@ void AdventureState::onEnter() {
     if (!m_externalMap)
         initMap();
 
+    // Load render offsets (missing file = fresh start, not an error)
+    if (auto err = m_offsets.load("assets/render_offsets.json"))
+        std::cerr << "[Adventure] Offsets load warning: " << *err << "\n";
+
     // Place hero at origin; ensure it's passable.
     m_hero.pos = {0, 0};
     if (MapTile* t = m_map.tileAt(m_hero.pos))
@@ -160,9 +164,13 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
     if (!obj) return;
 
     bool alreadyVisited = m_visitedObjects.count(coord) > 0;
-    if (alreadyVisited) return;
 
-    m_visitedObjects.insert(coord);
+    // Towns are always re-enterable (recruit, build, etc.).
+    // One-time objects (dungeons, mines, artifacts) block re-entry once visited.
+    if (alreadyVisited && obj->type != ObjType::Town) return;
+
+    if (obj->type != ObjType::Town)
+        m_visitedObjects.insert(coord);
     std::cout << "  *** Visited " << obj->typeName() << ": " << obj->name << " ***\n";
 
     switch (obj->type) {
@@ -392,10 +400,11 @@ void AdventureState::render() {
 
 void AdventureState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
+        RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
         glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
-        float h         = terrainHeight(tile.terrain);
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex);
+        float h         = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
     }
 
     // Hover outline (yellow).
@@ -421,12 +430,14 @@ void AdventureState::renderPathPreview() {
 void AdventureState::renderObjects() {
     for (const auto& obj : m_map.objects()) {
         if (obj.type == ObjType::Dungeon) continue;
-        
+
+        RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
         float wx, wz;
         obj.pos.toWorld(HEX_SIZE, wx, wz);
-        
+        wx += off.dx;  wz += off.dz;
+
         float spriteScale = HEX_SIZE * 1.8f;
-        m_buildingSpriteRenderer.draw({wx, 0.0f, wz}, spriteScale,
+        m_buildingSpriteRenderer.draw({wx, off.dy, wz}, spriteScale,
                                      m_cam.viewMatrix(), m_cam.projMatrix());
     }
 }
@@ -436,9 +447,12 @@ void AdventureState::renderEnemySprites() {
         if (obj.type != ObjType::Dungeon) continue;
         if (m_visitedObjects.count(obj.pos)) continue;  // defeated — don't render
 
+        RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
         float wx, wz;
         obj.pos.toWorld(HEX_SIZE, wx, wz);
-        m_enemySpriteRenderer.draw({wx, 0.0f, wz}, HEX_SIZE,
+        wx += off.dx;  wz += off.dz;
+
+        m_enemySpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE,
                                    m_cam.viewMatrix(), m_cam.projMatrix());
     }
 }

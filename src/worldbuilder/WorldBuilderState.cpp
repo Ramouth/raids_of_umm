@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <cstdio>
 #include <iostream>
 
 // ── Construction ──────────────────────────────────────────────────────────────
@@ -19,6 +20,11 @@ void WorldBuilderState::onEnter() {
     m_cam = Camera2D(app.width(), app.height());
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
+    m_hud.init();
+    m_buildingSpriteRenderer.init();
+    m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
+    m_enemySpriteRenderer.init();
+    m_enemySpriteRenderer.loadSprite("assets/textures/units/enemy_scout.png");
 
     if (m_loadOnEnter) {
         loadMap();
@@ -26,9 +32,14 @@ void WorldBuilderState::onEnter() {
         newMap();
     }
 
+    // Load render offsets (missing file is not an error — fresh start)
+    if (auto err = m_offsets.load(OFFSETS_PATH))
+        std::cerr << "[WorldBuilder] Offsets load warning: " << *err << "\n";
+
     std::cout << "[WorldBuilder] Ready.\n";
     std::cout << "  Tab=cycle tool  1-6=terrain  O=obj type\n";
     std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit\n";
+    std::cout << "  F1=alignment editor\n";
     renderHUD();
 }
 
@@ -162,18 +173,54 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         // ── Application ─────────────────────────────────────────────────────
         if (sym == SDLK_ESCAPE) { Application::get().quit(); return true; }
 
-        // ── Ctrl+letter shortcuts (check before single-key pan) ─────────────
+        // ── F1: toggle alignment dev tool ────────────────────────────────────
+        // Use scancode (physical key) — more reliable than keycode on Linux/Wayland.
+        if (e->key.keysym.scancode == SDL_SCANCODE_F1) {
+            m_devToolActive = !m_devToolActive;
+            if (!m_devToolActive) m_hasDevSelected = false;
+            std::cout << "[DevTool] " << (m_devToolActive ? "ON" : "OFF") << "\n";
+            return true;
+        }
+
+        // ── Ctrl+letter shortcuts ─────────────────────────────────────────────
         if (m_ctrlHeld) {
             if (sym == SDLK_s) { saveMap(); return true; }
             if (sym == SDLK_l) { loadMap(); return true; }
             if (sym == SDLK_n) { newMap();  return true; }
+            if (sym == SDLK_o) { devSaveOffsets(); return true; }
         }
 
-        // ── Camera pan (no modifier required) ───────────────────────────────
-        if (sym == SDLK_w || sym == SDLK_UP)    { m_keyW = true; return true; }
-        if (sym == SDLK_s || sym == SDLK_DOWN)  { m_keyS = true; return true; }
-        if (sym == SDLK_a || sym == SDLK_LEFT)  { m_keyA = true; return true; }
-        if (sym == SDLK_d || sym == SDLK_RIGHT) { m_keyD = true; return true; }
+        // ── Dev tool keys (only when active) ─────────────────────────────────
+        if (m_devToolActive) {
+            // Arrow keys: nudge X/Z offset (steal from camera pan)
+            if (sym == SDLK_LEFT)  { devNudge(-NUDGE_STEP, 0, 0); return true; }
+            if (sym == SDLK_RIGHT) { devNudge(+NUDGE_STEP, 0, 0); return true; }
+            if (sym == SDLK_UP)    { devNudge(0, -NUDGE_STEP, 0); return true; }
+            if (sym == SDLK_DOWN)  { devNudge(0, +NUDGE_STEP, 0); return true; }
+            // [ / ] : nudge Y (height)
+            if (sym == SDLK_LEFTBRACKET)  { devNudge(0, 0, -NUDGE_STEP); return true; }
+            if (sym == SDLK_RIGHTBRACKET) { devNudge(0, 0, +NUDGE_STEP); return true; }
+            // Mode / target toggles
+            if (sym == SDLK_g) { m_devMode = DevMode::Global;  return true; }
+            if (sym == SDLK_t) { m_devMode = DevMode::PerTile; return true; }
+            if (sym == SDLK_b) {
+                m_devEdit = (m_devEdit == DevEdit::Terrain) ? DevEdit::Object : DevEdit::Terrain;
+                return true;
+            }
+            if (sym == SDLK_r) { devResetSelected(); return true; }
+        }
+
+        // ── Camera pan (WASD always; arrows only when dev tool is inactive) ──
+        if (sym == SDLK_w)                                    { m_keyW = true; return true; }
+        if (sym == SDLK_s && !m_ctrlHeld)                     { m_keyS = true; return true; }
+        if (sym == SDLK_a)                                    { m_keyA = true; return true; }
+        if (sym == SDLK_d)                                    { m_keyD = true; return true; }
+        if (!m_devToolActive) {
+            if (sym == SDLK_UP)    { m_keyW = true; return true; }
+            if (sym == SDLK_DOWN)  { m_keyS = true; return true; }
+            if (sym == SDLK_LEFT)  { m_keyA = true; return true; }
+            if (sym == SDLK_RIGHT) { m_keyD = true; return true; }
+        }
 
         // ── Tool cycling ────────────────────────────────────────────────────
         if (sym == SDLK_TAB) { cycleTool(); return true; }
@@ -191,16 +238,20 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         if (sym == SDLK_0) { m_paintTerrain = Terrain::Battle;   renderHUD(); return true; }
 
         // ── Object type / test-play ──────────────────────────────────────────
-        if (sym == SDLK_o) { cyclePlaceObjType(+1); return true; }
-        if (sym == SDLK_p) { launchPlay();           return true; }
+        if (sym == SDLK_o && !m_ctrlHeld) { cyclePlaceObjType(+1); return true; }
+        if (sym == SDLK_p)                { launchPlay();           return true; }
     }
 
     if (e->type == SDL_KEYUP) {
         switch (e->key.keysym.sym) {
-            case SDLK_w: case SDLK_UP:    m_keyW = false; return true;
-            case SDLK_s: case SDLK_DOWN:  m_keyS = false; return true;
-            case SDLK_a: case SDLK_LEFT:  m_keyA = false; return true;
-            case SDLK_d: case SDLK_RIGHT: m_keyD = false; return true;
+            case SDLK_w:                              m_keyW = false; return true;
+            case SDLK_s:                              m_keyS = false; return true;
+            case SDLK_a:                              m_keyA = false; return true;
+            case SDLK_d:                              m_keyD = false; return true;
+            case SDLK_UP:    if (!m_devToolActive) { m_keyW = false; return true; } break;
+            case SDLK_DOWN:  if (!m_devToolActive) { m_keyS = false; return true; } break;
+            case SDLK_LEFT:  if (!m_devToolActive) { m_keyA = false; return true; } break;
+            case SDLK_RIGHT: if (!m_devToolActive) { m_keyD = false; return true; } break;
         }
     }
 
@@ -219,7 +270,16 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
         glm::vec2 wp = m_cam.screenToWorld(e->button.x, e->button.y);
         HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
-        applyToolAt(hc);
+        if (m_devToolActive) {
+            // In dev mode, click selects a tile instead of applying the editor tool.
+            // Auto-switch edit target: object mode if an object is present, terrain otherwise.
+            m_devSelected    = hc;
+            m_hasDevSelected = m_map.hasTile(hc);
+            if (m_hasDevSelected)
+                m_devEdit = m_map.objectAt(hc) ? DevEdit::Object : DevEdit::Terrain;
+        } else {
+            applyToolAt(hc);
+        }
         return true;
     }
 
@@ -253,17 +313,27 @@ void WorldBuilderState::render() {
     renderObjects();
     renderCursor();
     m_hexRenderer.endFrame();
+
+    if (m_devToolActive) {
+        auto& app = Application::get();
+        m_hud.begin(app.width(), app.height());
+        renderDevToolHUD();
+        // Restore 3D state for next frame
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+    }
 }
 
 void WorldBuilderState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
+        RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
         glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
-        float h         = terrainHeight(tile.terrain);
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex);
+        float h         = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
     }
-    // Always-on grid lines — drawn at the tile boundary (scale = HEX_SIZE),
-    // not inset (0.97×), so lines appear between tiles rather than inside them.
+    // Always-on grid lines
     for (const auto& [coord, tile] : m_map) {
         float h = terrainHeight(tile.terrain);
         m_hexRenderer.drawOutline(coord, {0.05f, 0.04f, 0.03f}, HEX_SIZE, h);
@@ -271,33 +341,176 @@ void WorldBuilderState::renderTerrain() {
 }
 
 void WorldBuilderState::renderObjects() {
+    glm::mat4 view = m_cam.viewMatrix();
+    glm::mat4 proj = m_cam.projMatrix();
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     for (const auto& obj : m_map.objects()) {
-        glm::vec3 col = objTypeColor(obj.type);
-        m_hexRenderer.drawTile(obj.pos, col, HEX_SIZE * 0.55f, 0.25f);
+        RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
+        float wx, wz;
+        obj.pos.toWorld(HEX_SIZE, wx, wz);
+        wx += off.dx;  wz += off.dz;
+
+        if (obj.type == ObjType::Dungeon) {
+            m_enemySpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE, view, proj);
+        } else {
+            m_buildingSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.8f, view, proj);
+        }
     }
+
+    glDisable(GL_BLEND);
 }
 
 void WorldBuilderState::renderCursor() {
+    // Dev tool: draw a bright yellow ring around the selected tile
+    if (m_devToolActive && m_hasDevSelected) {
+        m_hexRenderer.drawOutline(m_devSelected, {1.0f, 1.0f, 0.0f}, HEX_SIZE * 1.02f);
+    }
+
     if (!m_hasHovered) return;
 
-    // Cursor colour depends on active tool.
+    // Hover cursor — cyan in dev mode, tool-colour otherwise
     glm::vec3 cursorCol;
-    switch (m_tool) {
-        case EditorTool::PaintTile:   cursorCol = terrainColor(m_paintTerrain); break;
-        case EditorTool::PlaceObject: cursorCol = objTypeColor(m_placeObjType); break;
-        case EditorTool::Erase:       cursorCol = { 1.0f, 0.2f, 0.2f }; break;
-        case EditorTool::Select:      cursorCol = { 1.0f, 1.0f, 1.0f }; break;
+    if (m_devToolActive) {
+        cursorCol = {0.0f, 1.0f, 1.0f};
+    } else {
+        switch (m_tool) {
+            case EditorTool::PaintTile:   cursorCol = terrainColor(m_paintTerrain); break;
+            case EditorTool::PlaceObject: cursorCol = objTypeColor(m_placeObjType); break;
+            case EditorTool::Erase:       cursorCol = { 1.0f, 0.2f, 0.2f }; break;
+            case EditorTool::Select:      cursorCol = { 1.0f, 1.0f, 1.0f }; break;
+        }
     }
     m_hexRenderer.drawOutline(m_hovered, cursorCol, HEX_SIZE * 0.95f);
 }
 
 void WorldBuilderState::renderHUD() {
-    // No graphical HUD yet — print state to console.
-    // This will be replaced by an on-screen panel when the UI system exists.
     const char* toolNames[] = { "PaintTile", "PlaceObject", "Erase", "Select" };
     std::cout << "  [HUD] tool=" << toolNames[static_cast<int>(m_tool)]
               << "  terrain=" << terrainName(m_paintTerrain)
               << "  objType=" << objTypeName(m_placeObjType)
               << (m_dirty ? "  *unsaved*" : "")
               << "\n";
+}
+
+// ── Dev Tool helpers ──────────────────────────────────────────────────────────
+
+void WorldBuilderState::devNudge(float dx, float dz, float dy) {
+    if (!m_hasDevSelected) return;
+
+    const MapTile* tile = m_map.tileAt(m_devSelected);
+    if (!tile) return;
+
+    bool perTile = (m_devMode == DevMode::PerTile);
+
+    if (m_devEdit == DevEdit::Terrain) {
+        RenderOffset& off = m_offsets.terrainRef(m_devSelected, tile->terrain, perTile);
+        off.dx += dx;  off.dz += dz;  off.dy += dy;
+    } else {
+        const MapObjectDef* obj = m_map.objectAt(m_devSelected);
+        if (!obj) return;
+        RenderOffset& off = m_offsets.objectRef(m_devSelected, obj->type, perTile);
+        off.dx += dx;  off.dz += dz;  off.dy += dy;
+    }
+    devSaveOffsets();
+}
+
+void WorldBuilderState::devSaveOffsets() {
+    if (auto err = m_offsets.save(OFFSETS_PATH))
+        std::cerr << "[DevTool] Save failed: " << *err << "\n";
+}
+
+void WorldBuilderState::devResetSelected() {
+    if (!m_hasDevSelected) return;
+    const MapTile* tile = m_map.tileAt(m_devSelected);
+    if (!tile) return;
+    bool perTile = (m_devMode == DevMode::PerTile);
+    if (m_devEdit == DevEdit::Terrain) {
+        m_offsets.terrainRef(m_devSelected, tile->terrain, perTile) = {};
+    } else {
+        const MapObjectDef* obj = m_map.objectAt(m_devSelected);
+        if (obj) m_offsets.objectRef(m_devSelected, obj->type, perTile) = {};
+    }
+    devSaveOffsets();
+}
+
+void WorldBuilderState::renderDevToolHUD() {
+    auto& app = Application::get();
+    int sw = app.width();
+
+    // Panel background
+    float pw = 360.0f, ph = 210.0f;
+    float px = (float)sw - pw - 10.0f, py = 10.0f;
+    m_hud.drawRect(px, py, pw, ph, {0.0f, 0.0f, 0.0f, 0.78f});
+    m_hud.drawRect(px, py, pw, 3.0f, {1.0f, 1.0f, 0.0f, 1.0f}); // yellow top border
+
+    float ts = 1.5f;
+    float tx = px + 8.0f;
+    float ty = py + 8.0f;
+    float ls = 14.0f; // line spacing
+
+    glm::vec4 white  = {1.0f, 1.0f, 1.0f, 1.0f};
+    glm::vec4 yellow = {1.0f, 1.0f, 0.0f, 1.0f};
+    glm::vec4 cyan   = {0.0f, 1.0f, 1.0f, 1.0f};
+    glm::vec4 grey   = {0.6f, 0.6f, 0.6f, 1.0f};
+
+    m_hud.drawText(tx, ty, ts, "=== ALIGNMENT EDITOR (F1=close) ===", yellow); ty += ls;
+    m_hud.drawText(tx, ty, ts, "Click=select  Arrows=X/Z  [/]=Y  R=reset", grey); ty += ls;
+    m_hud.drawText(tx, ty, ts, "G=Global  T=Per-tile  B=Terrain/Object", grey); ty += ls * 1.4f;
+
+    if (!m_hasDevSelected) {
+        m_hud.drawText(tx, ty, ts, "No tile selected — click a tile", cyan);
+        return;
+    }
+
+    const MapTile* tile = m_map.tileAt(m_devSelected);
+    if (!tile) return;
+
+    // Tile info
+    char buf[128];
+    std::snprintf(buf, sizeof(buf), "Tile  (%d, %d)  terrain=%s",
+                  m_devSelected.q, m_devSelected.r,
+                  std::string(terrainName(tile->terrain)).c_str());
+    m_hud.drawText(tx, ty, ts, buf, white); ty += ls;
+
+    const char* modeStr = (m_devMode == DevMode::Global)  ? "Global"   : "Per-tile";
+    const char* editStr = (m_devEdit == DevEdit::Terrain) ? "Terrain" : "Object";
+    std::snprintf(buf, sizeof(buf), "Mode: %s   Editing: %s   (B=toggle)", modeStr, editStr);
+    m_hud.drawText(tx, ty, ts, buf, cyan); ty += ls * 1.2f;
+
+    const MapObjectDef* obj = m_map.objectAt(m_devSelected);
+
+    // Terrain offset row
+    {
+        RenderOffset t = m_offsets.forTerrain(m_devSelected, tile->terrain);
+        glm::vec4 rowCol = (m_devEdit == DevEdit::Terrain) ? yellow : grey;
+        std::snprintf(buf, sizeof(buf), "Terrain  dx=%.3f  dz=%.3f  dy=%.3f",
+                      t.dx, t.dz, t.dy);
+        m_hud.drawText(tx, ty, ts, buf, rowCol); ty += ls;
+    }
+
+    // Object offset row (only shown if object present)
+    if (obj) {
+        RenderOffset o = m_offsets.forObject(m_devSelected, obj->type);
+        glm::vec4 rowCol = (m_devEdit == DevEdit::Object) ? yellow : grey;
+        std::snprintf(buf, sizeof(buf), "Object   dx=%.3f  dz=%.3f  dy=%.3f  [%s]",
+                      o.dx, o.dz, o.dy, std::string(objTypeName(obj->type)).c_str());
+        m_hud.drawText(tx, ty, ts, buf, rowCol); ty += ls;
+    } else {
+        m_hud.drawText(tx, ty, ts, "Object   (none on this tile)", grey); ty += ls;
+    }
+    ty += ls * 0.4f;
+
+    // Override status hint in per-tile mode
+    bool perTile = (m_devMode == DevMode::PerTile);
+    if (perTile) {
+        bool hasTileOvr = m_offsets.tileOverride.count(m_devSelected) > 0;
+        bool hasObjOvr  = m_offsets.objectOverride.count(m_devSelected) > 0;
+        bool hasOverride = (m_devEdit == DevEdit::Terrain) ? hasTileOvr : hasObjOvr;
+        m_hud.drawText(tx, ty, ts,
+                       hasOverride ? "(per-tile override active)" : "(using global default)",
+                       grey);
+    }
 }
