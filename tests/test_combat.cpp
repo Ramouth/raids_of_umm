@@ -206,4 +206,138 @@ SUITE("CombatEngine — doAttackAt returns false for empty hex") {
     CHECK(!eng.doAttackAt(empty));
 }
 
+// ── Damage resolution ─────────────────────────────────────────────────────────
+
+// Deterministic UnitType: minDmg == maxDmg so every roll is identical.
+static UnitType makeFixed(const std::string& name, int speed,
+                          int dmg, int hp, int atk, int def) {
+    UnitType t;
+    t.id = t.name  = name;
+    t.speed        = speed;
+    t.hitPoints    = hp;
+    t.attack       = atk;
+    t.defense      = def;
+    t.minDamage    = t.maxDamage = dmg;
+    t.moveRange    = 3;
+    return t;
+}
+
+static CombatArmy fixedStack(const std::string& name, int speed,
+                             int dmg, int hp, int atk, int def,
+                             int count, bool isPlayer) {
+    CombatArmy army;
+    army.ownerName = isPlayer ? "Player" : "Enemy";
+    army.isPlayer  = isPlayer;
+    army.stacks.push_back(
+        CombatUnit::make(makeFixed(name, speed, dmg, hp, atk, def), count, isPlayer));
+    return army;
+}
+
+SUITE("CombatEngine — applyDamage kills exact creature count") {
+    // Attacker: 1×, dmg=10, atk=5; defender: 3×, hp=5, def=5.
+    // diff=0 → mult=1.0, damage=10 → kills 2 of 3 (each 5 HP).
+    CombatEngine eng(fixedStack("A", 5, 10, 100, 5, 5, 1, true),
+                     fixedStack("D", 3,  1,   5, 5, 5, 3, false));
+    eng.doAttack(0);
+
+    CHECK_EQ(eng.enemyArmy().stacks[0].count,  1);
+    CHECK_EQ(eng.enemyArmy().stacks[0].hpLeft, 5);
+}
+
+SUITE("CombatEngine — doAttack reduces target count") {
+    // Player 5×dmg=5 → 25 damage vs enemy 3×hp=10 (30 total HP) → kills 2 of 3.
+    CombatEngine eng(fixedStack("A", 5, 5, 10, 5, 5, 5, true),
+                     fixedStack("D", 3, 1, 10, 5, 5, 3, false));
+    eng.doAttack(0);
+
+    const CombatUnit& target = eng.enemyArmy().stacks[0];
+    CHECK(!target.isDead());
+    CHECK(target.count < 3);
+}
+
+SUITE("CombatEngine — retaliation fires once and reduces attacker") {
+    // Enemy: 5×dmg=5, strong retaliator (25 retaliation damage).
+    // Player: 3×hp=10 (30 total HP) → 25 damage leaves count=1.
+    CombatEngine eng(fixedStack("A", 5, 2, 10, 5, 5, 3, true),
+                     fixedStack("D", 3, 5, 10, 5, 5, 5, false));
+    int before = eng.playerArmy().stacks[0].count;
+    eng.doAttack(0);
+
+    const CombatUnit& actor = eng.playerArmy().stacks[0];
+    CHECK(actor.count < before || actor.hpLeft < actor.type.hitPoints);
+}
+
+SUITE("CombatEngine — no second retaliation in same round") {
+    // Two player stacks (P0 speed=5, P1 speed=4) both attack the same enemy.
+    // Enemy retaliates on P0. P1 attacks next — enemy must NOT retaliate again.
+    // Retaliation is lethal (dmg=100): if it fires on P1, P1 dies.
+    UnitType pt0 = makeFixed("P0", 5,   5,  10,  5, 5);
+    UnitType pt1 = makeFixed("P1", 4,   5,  10,  5, 5);
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(pt0, 3, true));
+    pArmy.stacks.push_back(CombatUnit::make(pt1, 3, true));
+
+    CombatEngine eng(std::move(pArmy),
+                     fixedStack("E", 3, 100, 100, 10, 5, 5, false));
+
+    eng.doAttack(0);  // P0 attacks E → E retaliates (P0 may die)
+    eng.doAttack(0);  // P1 attacks E → E must NOT retaliate (hasRetaliated=true)
+
+    CHECK_EQ(eng.playerArmy().stacks[1].count, 3);  // P1 untouched
+}
+
+SUITE("CombatEngine — defending unit takes less damage") {
+    // Player atk=10, enemy def=4.
+    // Normal:    eff_def=4,   diff=6, mult=1.30 → 13 damage.
+    // Defending: eff_def=4+1, diff=5, mult=1.25 → 12 damage.
+    UnitType dt = makeFixed("D", 3, 1, 10, 5, 4);
+
+    // Scenario 1: enemy not defending
+    CombatEngine eng1(fixedStack("A", 5, 10, 10, 10, 5, 1, true),
+                      fixedStack("D", 3,  1, 10,  5, 4, 100, false));
+    eng1.doAttack(0);
+    int hp1 = eng1.enemyArmy().stacks[0].totalHp();
+
+    // Scenario 2: enemy pre-set to isDefending
+    CombatArmy eArmy2;
+    eArmy2.isPlayer = false; eArmy2.ownerName = "Enemy";
+    CombatUnit defUnit = CombatUnit::make(dt, 100, false);
+    defUnit.isDefending = true;
+    eArmy2.stacks.push_back(defUnit);
+    CombatEngine eng2(fixedStack("A", 5, 10, 10, 10, 5, 1, true), std::move(eArmy2));
+    eng2.doAttack(0);
+    int hp2 = eng2.enemyArmy().stacks[0].totalHp();
+
+    CHECK(hp2 > hp1);  // defending unit absorbed more damage
+}
+
+SUITE("CombatEngine — win condition triggers after lethal attack") {
+    // Single enemy with 10 HP; player 5×dmg=10 → 50 damage → instant kill.
+    CombatEngine eng(fixedStack("A", 5, 10, 10, 5, 5, 5, true),
+                     fixedStack("D", 3,  1, 10, 5, 5, 1, false));
+    CHECK(!eng.isOver());
+    eng.doAttack(0);
+    CHECK(eng.isOver());
+    CHECK(eng.result() == CombatResult::PlayerWon);
+}
+
+SUITE("CombatEngine — ranged attack decrements shotsLeft") {
+    // Archer (shots=24) fires from col 0 at enemy at col 10 (distance >> 1).
+    // Attack is ranged → shotsLeft drops by 1, no retaliation.
+    UnitType archer = makeFixed("Archer", 5, 3, 10, 5, 5);
+    archer.shots = 24;
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(archer, 1, true));
+
+    CombatEngine eng(std::move(pArmy),
+                     fixedStack("D", 3, 1, 10, 5, 5, 1, false));
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 24);
+    eng.doAttack(0);
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 23);
+}
+
 #endif // COMBAT_ENGINE_IMPL

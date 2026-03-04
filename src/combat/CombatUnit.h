@@ -15,11 +15,13 @@
  */
 struct CombatUnit {
     UnitType type;           // species data  (TODO → const UnitType* when ResourceManager exists)
-    int      count    = 0;   // creatures remaining in stack
-    int      hpLeft   = 0;   // HP of the leading creature (1..type.hitPoints)
+    int      count        = 0;   // creatures remaining in stack
+    int      hpLeft       = 0;   // HP of the leading creature (1..type.hitPoints)
     bool     isPlayer     = false;
     bool     isDefending  = false;
     HexCoord pos;            // position on the combat grid (CombatMap coordinate space)
+    int      shotsLeft    = 0;   // remaining ammo; 0 means melee-only
+    bool     hasRetaliated = false; // true once this stack retaliates this round
 
     bool isDead()  const { return count <= 0; }
 
@@ -33,6 +35,15 @@ struct CombatUnit {
     // overwrites this in placeArmies() before any game logic runs.
     static CombatUnit make(const UnitType& t, int stackCount, bool player,
                            HexCoord startPos = { 0, 0 }) {
-        return CombatUnit{ t, stackCount, t.hitPoints, player, false, startPos };
+        CombatUnit u;
+        u.type          = t;
+        u.count         = stackCount;
+        u.hpLeft        = t.hitPoints;
+        u.isPlayer      = player;
+        u.isDefending   = false;
+        u.pos           = startPos;
+        u.shotsLeft     = t.shots;
+        u.hasRetaliated = false;
+        return u;
     }
 };

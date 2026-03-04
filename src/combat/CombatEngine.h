@@ -1,6 +1,7 @@
 #pragma once
 #include "CombatArmy.h"
 #include "CombatMap.h"
+#include <random>
 #include <vector>
 
 /*
@@ -90,6 +91,13 @@ private:
     // Check if either side is fully dead and update m_result accordingly.
     void checkWinCondition();
 
+    // HoMM3-style damage roll: sum rand(min,max) over each creature in attacker.
+    static int calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
+                          std::mt19937& rng);
+
+    // Cascade damage through the stack, decrementing count as creatures die.
+    static void applyDamage(CombatUnit& target, int damage);
+
     CombatArmy            m_player;
     CombatArmy            m_enemy;
     CombatMap             m_map;
@@ -97,4 +105,5 @@ private:
     int                   m_turn  = 0;
     int                   m_round = 1;
     CombatResult          m_result = CombatResult::Ongoing;
+    std::mt19937          m_rng;
 };

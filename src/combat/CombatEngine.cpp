@@ -5,6 +5,7 @@
 CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     : m_player(std::move(player))
     , m_enemy(std::move(enemy))
+    , m_rng(std::random_device{}())
 {
     placeArmies();
     buildQueue();
@@ -98,13 +99,81 @@ bool CombatEngine::doAttackAt(HexCoord targetHex) {
     return false;
 }
 
-// ── Actions (stubs) ───────────────────────────────────────────────────────────
+// ── Actions ───────────────────────────────────────────────────────────────────
 
 void CombatEngine::doAttack(int targetIndex) {
-    (void)targetIndex;
-    std::cout << "[CombatEngine] " << activeUnit().type.name
-              << " attacks (stub — damage resolution not yet implemented)\n";
+    if (isOver()) return;
+
+    TurnSlot& slot = m_queue[m_turn];
+    CombatUnit& attacker = slot.isPlayer ? m_player.stacks[slot.stackIndex]
+                                         : m_enemy.stacks[slot.stackIndex];
+    auto& enemyStacks = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+    CombatUnit& target = enemyStacks[targetIndex];
+
+    // Determine if ranged: unit has shots, has ammo, and target is not adjacent
+    bool isRanged = attacker.type.isRanged()
+                    && attacker.shotsLeft > 0
+                    && attacker.pos.distanceTo(target.pos) > 1;
+    if (isRanged) {
+        --attacker.shotsLeft;
+    }
+
+    int damage = calcDamage(attacker, target, m_rng);
+    applyDamage(target, damage);
+
+    std::cout << "[CombatEngine] " << attacker.type.name
+              << " attacks " << target.type.name
+              << " for " << damage << " damage"
+              << " (" << target.count << " survivors)\n";
+
+    // Melee retaliation: target is alive, hasn't retaliated, attacker has no "no_retaliation"
+    if (!isRanged && !target.isDead() && !target.hasRetaliated
+        && !attacker.type.hasAbility("no_retaliation")) {
+        int retDamage = calcDamage(target, attacker, m_rng);
+        applyDamage(attacker, retDamage);
+        target.hasRetaliated = true;
+        std::cout << "[CombatEngine] " << target.type.name
+                  << " retaliates for " << retDamage << " damage"
+                  << " (" << attacker.count << " survivors)\n";
+    }
+
     advance();
+}
+
+// static
+int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
+                              std::mt19937& rng) {
+    std::uniform_int_distribution<int> dist(attacker.type.minDamage, attacker.type.maxDamage);
+    int baseDmg = 0;
+    for (int i = 0; i < attacker.count; ++i)
+        baseDmg += dist(rng);
+
+    int effectiveDefense = defender.isDefending
+        ? defender.type.defense + defender.type.defense / 4
+        : defender.type.defense;
+
+    int diff = attacker.type.attack - effectiveDefense;
+    double mult;
+    if (diff >= 0)
+        mult = 1.0 + 0.05 * std::min(diff, 20);
+    else
+        mult = std::max(0.3, 1.0 + 0.025 * diff);
+
+    return std::max(1, static_cast<int>(baseDmg * mult));
+}
+
+// static
+void CombatEngine::applyDamage(CombatUnit& target, int damage) {
+    while (damage > 0 && !target.isDead()) {
+        if (damage >= target.hpLeft) {
+            damage -= target.hpLeft;
+            target.count--;
+            target.hpLeft = (target.count > 0) ? target.type.hitPoints : 0;
+        } else {
+            target.hpLeft -= damage;
+            break;
+        }
+    }
 }
 
 void CombatEngine::doDefend() {
@@ -136,8 +205,8 @@ void CombatEngine::advance() {
         ++m_round;
         m_turn = 0;
 
-        for (auto& s : m_player.stacks) s.isDefending = false;
-        for (auto& s : m_enemy.stacks)  s.isDefending = false;
+        for (auto& s : m_player.stacks) { s.isDefending = false; s.hasRetaliated = false; }
+        for (auto& s : m_enemy.stacks)  { s.isDefending = false; s.hasRetaliated = false; }
 
         buildQueue();
         std::cout << "[CombatEngine] --- Round " << m_round << " ---\n";

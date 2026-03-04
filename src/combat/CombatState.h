@@ -55,6 +55,11 @@ private:
     glm::vec3     m_animTo        = { 0.f, 0.f, 0.f };
     float         m_animProgress  = 0.f;  // 0..1
 
+    // True once the player has acknowledged the battle result — popped next update().
+    // Never call popState() directly from handleEvent (use-after-free when
+    // m_processing is false during processEvents).
+    bool m_wantsDismiss = false;
+
     static constexpr float CAM_SPEED          = 8.0f;
     static constexpr float HEX_SIZE           = 1.0f;
     static constexpr float MOVE_ANIM_DURATION = 0.30f;

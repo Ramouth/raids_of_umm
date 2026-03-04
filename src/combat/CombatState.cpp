@@ -33,8 +33,23 @@ void CombatState::onExit() {
 }
 
 void CombatState::update(float dt) {
-    if (m_engine.isOver()) {
+    // Deferred dismiss — safe to pop here because StateMachine sets m_processing=true
+    // during update(), so pop() enqueues rather than destroying the object mid-call.
+    if (m_wantsDismiss) {
         Application::get().popState();
+        return;
+    }
+
+    // Battle over — wait for player to press any key / click to dismiss.
+    if (m_engine.isOver()) return;
+
+    // Simple enemy AI: auto-advance non-player turns.
+    // Finds the first living player stack and attacks it.
+    if (!m_anim.active && !m_engine.currentTurn().isPlayer) {
+        const auto& targets = m_engine.playerArmy().stacks;
+        for (int i = 0; i < static_cast<int>(targets.size()); ++i) {
+            if (!targets[i].isDead()) { m_engine.doAttack(i); break; }
+        }
         return;
     }
 
@@ -77,6 +92,18 @@ void CombatState::render() {
 bool CombatState::handleEvent(void* sdlEvent) {
     const SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
 
+    // ── Battle-over dismissal ─────────────────────────────────────────────────
+    // When the battle is decided, any key press or left-click queues a dismiss.
+    // We never call popState() directly here — see m_wantsDismiss comment in .h.
+    if (m_engine.isOver()) {
+        if (e->type == SDL_KEYDOWN ||
+            (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT)) {
+            m_wantsDismiss = true;
+            return true;
+        }
+        return false;
+    }
+
     // ── Key down ──────────────────────────────────────────────────────────────
     if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
@@ -86,15 +113,20 @@ bool CombatState::handleEvent(void* sdlEvent) {
             case SDLK_LEFT:  case SDLK_a: m_panLeft  = true; return true;
             case SDLK_RIGHT: case SDLK_d: m_panRight = true; return true;
 
-            // Combat actions (blocked while move animation plays)
+            // Combat actions — only valid on the player's turn.
+            // Enemy turns are auto-advanced in update() instead.
             case SDLK_RETURN: case SDLK_KP_ENTER:
-                if (!m_engine.isOver() && !m_anim.active) m_engine.doAttack(0);
+                if (!m_anim.active && m_engine.currentTurn().isPlayer)
+                    m_engine.doAttack(0);
                 return true;
             case SDLK_SPACE:
-                if (!m_engine.isOver() && !m_anim.active) m_engine.doDefend();
+                if (!m_anim.active && m_engine.currentTurn().isPlayer)
+                    m_engine.doDefend();
                 return true;
+            // ESC always retreats and queues immediate dismiss.
             case SDLK_ESCAPE:
-                if (!m_engine.isOver()) m_engine.doRetreat();
+                m_engine.doRetreat();
+                m_wantsDismiss = true;
                 return true;
             default: break;
         }
@@ -126,9 +158,9 @@ bool CombatState::handleEvent(void* sdlEvent) {
         return false;  // don't consume — let AdventureState below still see it
     }
 
-    // ── Left click → move or attack ───────────────────────────────────────────
+    // ── Left click → move or attack (player's turn only) ─────────────────────
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
-        if (m_engine.isOver() || m_anim.active) return true;
+        if (m_anim.active || !m_engine.currentTurn().isPlayer) return true;
 
         glm::vec2 world = m_cam.screenToWorld(
             static_cast<float>(e->button.x),
