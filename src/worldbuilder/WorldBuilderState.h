@@ -6,6 +6,7 @@
 #include "render/SpriteRenderer.h"
 #include "render/Camera2D.h"
 #include "render/RenderOffsets.h"
+#include "ui/EditorPalette.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <string>
@@ -75,6 +76,9 @@ private:
     void loadMap();
     void launchPlay();     // push AdventureState with a copy of m_map
 
+    // ── Palette sync ─────────────────────────────────────────────────────────
+    void syncFromPalette();  // apply palette selection → m_tool / m_paintTerrain / m_placeObjType
+
     // ── Rendering helpers ────────────────────────────────────────────────────
     void renderTerrain();
     void renderObjects();
@@ -95,6 +99,7 @@ private:
     HUDRenderer    m_hud;
     SpriteRenderer m_buildingSpriteRenderer;
     SpriteRenderer m_enemySpriteRenderer;
+    EditorPalette  m_palette;
 
     EditorTool  m_tool         = EditorTool::PaintTile;
     Terrain     m_paintTerrain = Terrain::Sand;

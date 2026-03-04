@@ -49,6 +49,7 @@ set(SOURCES
     src/combat/CombatState.cpp
     src/render/HUDRenderer.cpp
     src/render/RenderOffsets.cpp
+    src/ui/EditorPalette.cpp
     src/worldbuilder/WorldBuilderState.cpp
 )
 

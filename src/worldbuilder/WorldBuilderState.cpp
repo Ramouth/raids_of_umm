@@ -36,6 +36,12 @@ void WorldBuilderState::onEnter() {
     if (auto err = m_offsets.load(OFFSETS_PATH))
         std::cerr << "[WorldBuilder] Offsets load warning: " << *err << "\n";
 
+    // Give the palette terrain texture IDs for icon previews
+    GLuint texIds[TERRAIN_COUNT];
+    for (int i = 0; i < TERRAIN_COUNT; ++i)
+        texIds[i] = m_hexRenderer.terrainTex(static_cast<Terrain>(i));
+    m_palette.setTerrainTextures(texIds, TERRAIN_COUNT);
+
     std::cout << "[WorldBuilder] Ready.\n";
     std::cout << "  Tab=cycle tool  1-6=terrain  O=obj type\n";
     std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit\n";
@@ -226,16 +232,16 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         if (sym == SDLK_TAB) { cycleTool(); return true; }
 
         // ── Terrain shortcuts 1–6 ────────────────────────────────────────────
-        if (sym == SDLK_1) { m_paintTerrain = Terrain::Sand;     renderHUD(); return true; }
-        if (sym == SDLK_2) { m_paintTerrain = Terrain::Dune;     renderHUD(); return true; }
-        if (sym == SDLK_3) { m_paintTerrain = Terrain::Rock;     renderHUD(); return true; }
-        if (sym == SDLK_4) { m_paintTerrain = Terrain::Oasis;    renderHUD(); return true; }
-        if (sym == SDLK_5) { m_paintTerrain = Terrain::Ruins;    renderHUD(); return true; }
-        if (sym == SDLK_6) { m_paintTerrain = Terrain::Obsidian; renderHUD(); return true; }
-        if (sym == SDLK_7) { m_paintTerrain = Terrain::Mountain; renderHUD(); return true; }
-        if (sym == SDLK_8) { m_paintTerrain = Terrain::River;    renderHUD(); return true; }
-        if (sym == SDLK_9) { m_paintTerrain = Terrain::Wall;     renderHUD(); return true; }
-        if (sym == SDLK_0) { m_paintTerrain = Terrain::Battle;   renderHUD(); return true; }
+        if (sym == SDLK_1) { m_paintTerrain = Terrain::Sand;     m_palette.selectTerrain(Terrain::Sand);     renderHUD(); return true; }
+        if (sym == SDLK_2) { m_paintTerrain = Terrain::Dune;     m_palette.selectTerrain(Terrain::Dune);     renderHUD(); return true; }
+        if (sym == SDLK_3) { m_paintTerrain = Terrain::Rock;     m_palette.selectTerrain(Terrain::Rock);     renderHUD(); return true; }
+        if (sym == SDLK_4) { m_paintTerrain = Terrain::Oasis;    m_palette.selectTerrain(Terrain::Oasis);    renderHUD(); return true; }
+        if (sym == SDLK_5) { m_paintTerrain = Terrain::Ruins;    m_palette.selectTerrain(Terrain::Ruins);    renderHUD(); return true; }
+        if (sym == SDLK_6) { m_paintTerrain = Terrain::Obsidian; m_palette.selectTerrain(Terrain::Obsidian); renderHUD(); return true; }
+        if (sym == SDLK_7) { m_paintTerrain = Terrain::Mountain; m_palette.selectTerrain(Terrain::Mountain); renderHUD(); return true; }
+        if (sym == SDLK_8) { m_paintTerrain = Terrain::River;    m_palette.selectTerrain(Terrain::River);    renderHUD(); return true; }
+        if (sym == SDLK_9) { m_paintTerrain = Terrain::Wall;     m_palette.selectTerrain(Terrain::Wall);     renderHUD(); return true; }
+        if (sym == SDLK_0) { m_paintTerrain = Terrain::Battle;   m_palette.selectTerrain(Terrain::Battle);   renderHUD(); return true; }
 
         // ── Object type / test-play ──────────────────────────────────────────
         if (sym == SDLK_o && !m_ctrlHeld) { cyclePlaceObjType(+1); return true; }
@@ -261,18 +267,29 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     }
 
     if (e->type == SDL_MOUSEMOTION) {
-        glm::vec2 wp = m_cam.screenToWorld(e->motion.x, e->motion.y);
-        HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
-        m_hasHovered = m_map.hasTile(hc);
-        m_hovered    = hc;
+        // Palette gets first look — blocks map hover when cursor is over panel
+        if (!m_palette.handleMouseMove(e->motion.x, e->motion.y)) {
+            glm::vec2 wp = m_cam.screenToWorld(e->motion.x, e->motion.y);
+            HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
+            m_hasHovered = m_map.hasTile(hc);
+            m_hovered    = hc;
+        } else {
+            m_hasHovered = false;  // hide map cursor while over palette
+        }
     }
 
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+        // Palette click — sync selection to editor tool state
+        if (m_palette.containsPoint(e->button.x)) {
+            m_palette.handleMouseClick(e->button.x, e->button.y);
+            syncFromPalette();
+            return true;
+        }
+
+        // Map click
         glm::vec2 wp = m_cam.screenToWorld(e->button.x, e->button.y);
         HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
         if (m_devToolActive) {
-            // In dev mode, click selects a tile instead of applying the editor tool.
-            // Auto-switch edit target: object mode if an object is present, terrain otherwise.
             m_devSelected    = hc;
             m_hasDevSelected = m_map.hasTile(hc);
             if (m_hasDevSelected)
@@ -314,11 +331,13 @@ void WorldBuilderState::render() {
     renderCursor();
     m_hexRenderer.endFrame();
 
-    if (m_devToolActive) {
+    // 2D overlay — palette always visible, dev tool panel only when active
+    {
         auto& app = Application::get();
         m_hud.begin(app.width(), app.height());
-        renderDevToolHUD();
-        // Restore 3D state for next frame
+        m_palette.render(m_hud, app.height());
+        if (m_devToolActive)
+            renderDevToolHUD();
         glDisable(GL_BLEND);
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
@@ -393,6 +412,24 @@ void WorldBuilderState::renderHUD() {
               << "  objType=" << objTypeName(m_placeObjType)
               << (m_dirty ? "  *unsaved*" : "")
               << "\n";
+}
+
+// ── Palette sync ─────────────────────────────────────────────────────────────
+
+void WorldBuilderState::syncFromPalette() {
+    switch (m_palette.activeCategory()) {
+        case EditorPalette::Category::Terrain:
+            m_paintTerrain = m_palette.selectedTerrain();
+            m_tool = EditorTool::PaintTile;
+            break;
+        case EditorPalette::Category::Objects:
+            m_placeObjType = m_palette.selectedObjType();
+            m_tool = EditorTool::PlaceObject;
+            break;
+        case EditorPalette::Category::Units:
+            break;
+    }
+    renderHUD();
 }
 
 // ── Dev Tool helpers ──────────────────────────────────────────────────────────
