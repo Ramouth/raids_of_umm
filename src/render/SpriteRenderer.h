@@ -31,9 +31,20 @@ public:
     void loadSprite(const std::string& pngPath);
 
     // worldPos — base (bottom-centre) of the sprite in world space
-    // size     — width and height in world units
+    // size     — width and height in world units (square)
     void draw(const glm::vec3& worldPos, float size,
               const glm::mat4& view, const glm::mat4& proj);
+
+    // Non-square variant: separate world-space width and height
+    void draw(const glm::vec3& worldPos, float worldWidth, float worldHeight,
+              const glm::mat4& view, const glm::mat4& proj);
+
+    // Animation: select a frame from a horizontal spritesheet before draw().
+    // Defaults are frame=0, numFrames=1 (full texture = single static sprite).
+    void setFrame(int frame, int numFrames) {
+        m_frame     = frame;
+        m_numFrames = numFrames;
+    }
 
 private:
     void buildQuad();
@@ -43,4 +54,7 @@ private:
     GLuint m_vbo = 0;
     GLuint m_ibo = 0;
     GLuint m_tex = 0;
+
+    int m_frame     = 0;
+    int m_numFrames = 1;
 };

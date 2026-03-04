@@ -35,7 +35,8 @@ public:
                     float worldHexSize           = 1.0f,
                     const glm::vec3& sunDir      = glm::vec3(0.4f, 1.0f, 0.3f),
                     const glm::vec3& sunColor    = glm::vec3(1.0f, 0.92f, 0.70f),
-                    const glm::vec3& ambientColor= glm::vec3(0.35f, 0.30f, 0.22f));
+                    const glm::vec3& ambientColor= glm::vec3(0.35f, 0.30f, 0.22f),
+                    const glm::vec3& cameraPos   = glm::vec3(0.0f, 0.0f, 0.0f));
 
     // Load terrain textures from assetRoot/textures/terrain/<name>.png.
     // Missing files are silently skipped; those tiles fall back to solid colour.

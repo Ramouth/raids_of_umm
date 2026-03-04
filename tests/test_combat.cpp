@@ -2,6 +2,7 @@
 
 #ifdef COMBAT_ENGINE_IMPL
 #include "combat/CombatEngine.h"
+#include "hero/Hero.h"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -321,6 +322,78 @@ SUITE("CombatEngine — win condition triggers after lethal attack") {
     eng.doAttack(0);
     CHECK(eng.isOver());
     CHECK(eng.result() == CombatResult::PlayerWon);
+}
+
+SUITE("CombatEngine — EnemyWon when player army is eliminated") {
+    // Enemy has higher speed and one-shots the player stack.
+    CombatEngine eng(fixedStack("P", 3, 1, 10, 5, 5, 1, true),
+                     fixedStack("E", 5, 10, 10, 5, 5, 5, false));
+
+    CHECK(!eng.currentTurn().isPlayer);  // enemy acts first (speed 5 > 3)
+    eng.doAttack(0);  // enemy: 5×dmg=10=50 damage → player 1×hp=10 dies
+
+    CHECK(eng.isOver());
+    CHECK(eng.result() == CombatResult::EnemyWon);
+}
+
+SUITE("CombatEngine — no_retaliation ability suppresses enemy retaliation") {
+    // Attacker has the "no_retaliation" tag; enemy must not hit back.
+    // Enemy retaliation would be lethal (dmg=100), so surviving proves it didn't fire.
+    UnitType at = makeFixed("A", 5, 5, 10, 5, 5);
+    at.abilities = {"no_retaliation"};
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(at, 3, true));
+
+    CombatEngine eng(std::move(pArmy),
+                     fixedStack("E", 3, 100, 100, 10, 5, 5, false));
+
+    int hpBefore = eng.playerArmy().stacks[0].totalHp();
+    eng.doAttack(0);
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), hpBefore);  // no retaliation
+}
+
+SUITE("CombatEngine — exhausted ammo falls back to melee with retaliation") {
+    // Archer type has shots=24 but unit's shotsLeft is forced to 0.
+    // Attack must be treated as melee → enemy retaliates.
+    UnitType archer = makeFixed("Archer", 5, 3, 100, 5, 5);
+    archer.shots = 24;  // type is ranged...
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    CombatUnit archerUnit = CombatUnit::make(archer, 1, true);
+    archerUnit.shotsLeft = 0;  // ...but ammo is spent
+    pArmy.stacks.push_back(archerUnit);
+
+    // Enemy: 5× dmg=5 retaliator (would deal 25 damage to player's 100 HP)
+    CombatEngine eng(std::move(pArmy),
+                     fixedStack("E", 3, 5, 100, 5, 5, 5, false));
+
+    int hpBefore = eng.playerArmy().stacks[0].totalHp();
+    eng.doAttack(0);  // melee (no shots left) → retaliation fires
+    CHECK(eng.playerArmy().stacks[0].totalHp() < hpBefore);
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 0);  // unchanged (melee path)
+}
+
+SUITE("CombatEngine — dead stack turn is skipped within a round") {
+    // Player kills enemy[0] on first attack; queue must advance to enemy[1], not dead [0].
+    UnitType e1t = makeFixed("E1", 3, 1, 10, 5, 5);
+    UnitType e2t = makeFixed("E2", 3, 1, 10, 5, 5);
+
+    CombatArmy eArmy;
+    eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
+    eArmy.stacks.push_back(CombatUnit::make(e1t, 1, false));  // dies from 50 dmg
+    eArmy.stacks.push_back(CombatUnit::make(e2t, 3, false));  // survives
+
+    CombatEngine eng(fixedStack("P", 5, 10, 10, 5, 5, 5, true), std::move(eArmy));
+
+    CHECK(eng.currentTurn().isPlayer);
+    eng.doAttack(0);  // P kills E1 (50 damage, count=1 × hp=10)
+
+    const TurnSlot& next = eng.currentTurn();
+    CHECK(!next.isPlayer);
+    CHECK_EQ(next.stackIndex, 1);  // E2, not dead E1
 }
 
 SUITE("CombatEngine — ranged attack decrements shotsLeft") {

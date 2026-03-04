@@ -11,7 +11,7 @@ out vec4 FragColor;
 
 void main() {
     if (u_UseTexture) {
-        FragColor = texture(u_Texture, v_TexCoord) * v_Color;
+        FragColor = texture(u_Texture, v_TexCoord) * u_Color;
     } else {
         FragColor = u_Color;
     }

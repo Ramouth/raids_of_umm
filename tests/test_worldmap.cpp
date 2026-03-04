@@ -139,4 +139,96 @@ SUITE("WorldMap — placeObject and removeObjectAt") {
     CHECK_EQ(map.objects().size(), before);
 }
 
+SUITE("WorldMap — clear removes all tiles and objects") {
+    WorldMap map;
+    map.generateProcedural(5, 1);
+
+    MapObjectDef obj;
+    obj.pos = {0, 0};
+    obj.type = ObjType::Town;
+    obj.name = "Test Town";
+    map.placeObject(obj);
+
+    map.clear(0);
+
+    CHECK_EQ(map.tileCount(), 1);
+    CHECK_EQ(map.objects().size(), 0);
+}
+
+SUITE("WorldMap — hasTile returns correct presence") {
+    WorldMap map;
+    map.generateProcedural(3, 1);
+
+    CHECK(map.hasTile({0, 0}));
+    CHECK(map.hasTile({-2, 1}));
+    CHECK(!map.hasTile({10, 10}));
+    CHECK(!map.hasTile({100, -50}));
+}
+
+SUITE("WorldMap — removeTile deletes tile") {
+    WorldMap map;
+    map.generateProcedural(3, 1);
+
+    CHECK(map.hasTile({0, 0}));
+    map.removeTile({0, 0});
+    CHECK(!map.hasTile({0, 0}));
+}
+
+SUITE("WorldMap — objectAt finds placed object") {
+    WorldMap map;
+    map.generateProcedural(3, 1);
+
+    MapObjectDef obj;
+    obj.pos = {2, -1};
+    obj.type = ObjType::Dungeon;
+    obj.name = "Test Dungeon";
+    map.placeObject(obj);
+
+    const MapObjectDef* found = map.objectAt({2, -1});
+    CHECK(found != nullptr);
+    CHECK(found->type == ObjType::Dungeon);
+    CHECK(found->name == "Test Dungeon");
+
+    CHECK(map.objectAt({0, 0}) == nullptr);
+}
+
+SUITE("WorldMap — findPath returns valid path") {
+    WorldMap map;
+    map.generateProcedural(5, 1);
+
+    auto path = map.findPath({0, 0}, {2, 0});
+
+    CHECK(!path.empty());
+    CHECK(path.front() == HexCoord(0, 0));
+    CHECK(path.back() == HexCoord(2, 0));
+}
+
+SUITE("WorldMap — findPathWeighted uses move costs") {
+    WorldMap map;
+    map.generateProcedural(5, 1);
+
+    MapTile dune;
+    dune.terrain = Terrain::Dune;
+    dune.passable = true;
+    dune.moveCost = 1.5f;
+    map.setTile({1, 0}, dune);
+
+    auto path = map.findPathWeighted({0, 0}, {2, 0});
+
+    CHECK(!path.empty());
+    CHECK(path.front() == HexCoord(0, 0));
+    CHECK(path.back() == HexCoord(2, 0));
+}
+
+SUITE("WorldMap — name and radius metadata") {
+    WorldMap map;
+    map.generateProcedural(3, 1);
+
+    CHECK(map.radius() == 3);
+    CHECK(map.name() == "Untitled Map");
+
+    map.setName("Test Map");
+    CHECK(map.name() == "Test Map");
+}
+
 #endif // WORLDMAP_IMPL

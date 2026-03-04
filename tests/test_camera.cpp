@@ -92,4 +92,73 @@ SUITE("Camera2D — viewport resize updates projection") {
     CHECK_NEAR(w2.x, 0.0f, 0.05f);
 }
 
+SUITE("Camera2D — setPosition moves to absolute location") {
+    Camera2D cam(1280, 720);
+    cam.setPosition({10.0f, -5.0f});
+    auto pos = cam.position();
+    CHECK_NEAR(pos.x, 10.0f, 1e-4f);
+    CHECK_NEAR(pos.y, -5.0f, 1e-4f);
+}
+
+SUITE("Camera2D — adjustZoom changes zoom level") {
+    Camera2D cam(1280, 720);
+    float initialZoom = cam.zoom();
+    cam.adjustZoom(2.0f);
+    CHECK(cam.zoom() > initialZoom);
+
+    cam.adjustZoom(-1.0f);
+    CHECK(cam.zoom() < initialZoom + 2.0f);
+}
+
+SUITE("Camera2D — adjustZoom clamps at limits") {
+    Camera2D cam(1280, 720);
+    cam.adjustZoom(999.0f);
+    CHECK(cam.zoom() <= Camera2D::MAX_ZOOM);
+
+    cam.setZoom(5.0f);
+    cam.adjustZoom(-999.0f);
+    CHECK(cam.zoom() >= Camera2D::MIN_ZOOM);
+}
+
+SUITE("Camera2D — vpWidth and vpHeight return dimensions") {
+    Camera2D cam(1024, 768);
+    CHECK_EQ(cam.vpWidth(), 1024);
+    CHECK_EQ(cam.vpHeight(), 768);
+
+    cam.resize(1920, 1080);
+    CHECK_EQ(cam.vpWidth(), 1920);
+    CHECK_EQ(cam.vpHeight(), 1080);
+}
+
+SUITE("Camera2D — viewMatrix translates and scales") {
+    Camera2D cam(1280, 720);
+    cam.setPosition({5.0f, 3.0f});
+    cam.setZoom(10.0f);
+
+    glm::mat4 view = cam.viewMatrix();
+
+    CHECK(view != glm::mat4(1.0f));
+}
+
+SUITE("Camera2D — projMatrix creates orthographic projection") {
+    Camera2D cam(1280, 720);
+    glm::mat4 proj = cam.projMatrix();
+
+    CHECK(proj[3][3] == 1.0f);
+}
+
+SUITE("Camera2D — viewProjMatrix combines view and projection") {
+    Camera2D cam(1280, 720);
+    glm::mat4 viewProj = cam.viewProjMatrix();
+    glm::mat4 view = cam.viewMatrix();
+    glm::mat4 proj = cam.projMatrix();
+
+    glm::mat4 combined = proj * view;
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            CHECK_NEAR(viewProj[i][j], combined[i][j], 1e-5f);
+        }
+    }
+}
+
 #endif // CAMERA2D_IMPL

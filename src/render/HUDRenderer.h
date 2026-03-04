@@ -9,11 +9,14 @@ public:
     ~HUDRenderer();
 
     void init();
+    // Must be called once per frame before any drawRect/drawText calls.
+    // Binds the shader, sets screen size, disables depth test.
+    void begin(int screenW, int screenH);
+
     void render(int screenW, int screenH, int day, int movesLeft, int movesMax, int visitedCount,
                 int heroQ, int heroR, bool infiniteMoves = false);
-
-private:
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
+    void drawTexturedRect(float x, float y, float w, float h, GLuint texId);
     void drawText(float x, float y, float scale, const char* text, const glm::vec4& color);
 
     Shader m_shader;
@@ -21,6 +24,10 @@ private:
     // Rect rendering  (4 verts, GL_TRIANGLE_FAN, 2-float positions)
     GLuint m_vao = 0;
     GLuint m_vbo = 0;
+
+    // Textured rect (4 verts, GL_TRIANGLE_FAN, position+UV)
+    GLuint m_texVao = 0;
+    GLuint m_texVbo = 0;
 
     // Text rendering  (stb_easy_font quads → indexed triangles)
     GLuint m_textVao = 0;

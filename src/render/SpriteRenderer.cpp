@@ -67,14 +67,21 @@ void SpriteRenderer::loadSprite(const std::string& pngPath) {
 
 void SpriteRenderer::draw(const glm::vec3& worldPos, float size,
                            const glm::mat4& view, const glm::mat4& proj) {
+    draw(worldPos, size, size, view, proj);
+}
+
+void SpriteRenderer::draw(const glm::vec3& worldPos, float worldWidth, float worldHeight,
+                           const glm::mat4& view, const glm::mat4& proj) {
     if (!m_tex || !m_shader.valid()) return;
 
     m_shader.bind();
-    m_shader.setVec3 ("u_Center",  worldPos);
-    m_shader.setFloat("u_Size",    size);
-    m_shader.setMat4 ("u_View",    view);
-    m_shader.setMat4 ("u_Proj",    proj);
-    m_shader.setInt  ("u_Texture", 0);
+    m_shader.setVec3 ("u_Center",    worldPos);
+    m_shader.setVec2 ("u_Size",      glm::vec2(worldWidth, worldHeight));
+    m_shader.setMat4 ("u_View",      view);
+    m_shader.setMat4 ("u_Proj",      proj);
+    m_shader.setInt  ("u_Frame",     m_frame);
+    m_shader.setInt  ("u_NumFrames", m_numFrames);
+    m_shader.setInt  ("u_Texture",   0);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_tex);

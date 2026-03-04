@@ -73,7 +73,8 @@ void CombatRenderer::render(int screenW, int screenH,
         HEX_SIZE,
         glm::vec3(0.4f, 1.0f, 0.3f),    // sun direction
         glm::vec3(1.0f, 0.90f, 0.72f),  // sun colour
-        glm::vec3(0.35f, 0.30f, 0.20f)  // ambient
+        glm::vec3(0.35f, 0.30f, 0.20f), // ambient
+        glm::vec3(cam.position().x, 0.0f, cam.position().y)
     );
 
     GLuint sandTex = m_hexRenderer.terrainTex(Terrain::Sand);

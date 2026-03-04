@@ -150,7 +150,8 @@ void HexRenderer::beginFrame(const glm::mat4& viewProj,
                               float worldHexSize,
                               const glm::vec3& sunDir,
                               const glm::vec3& sunColor,
-                              const glm::vec3& ambientColor) {
+                              const glm::vec3& ambientColor,
+                              const glm::vec3& cameraPos) {
     m_viewProj      = viewProj;
     m_worldHexSize  = worldHexSize;
     m_begun         = true;
@@ -160,6 +161,9 @@ void HexRenderer::beginFrame(const glm::mat4& viewProj,
     m_shader.setVec3("u_SunColor",    sunColor);
     m_shader.setVec3("u_AmbientColor",ambientColor);
     m_shader.setInt ("u_Texture", 0);
+    m_shader.setFloat("u_FogDensity", 0.015f);
+    m_shader.setVec3("u_FogColor",    {0.76f, 0.69f, 0.50f});
+    m_shader.setVec3("u_CameraPos",   cameraPos);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_whiteTex);

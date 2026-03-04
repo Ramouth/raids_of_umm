@@ -19,6 +19,7 @@ out vec3 v_WorldNormal;
 out vec3 v_WorldPos;
 out vec2 v_TexCoord;
 out vec3 v_Color;
+out float v_EdgeDist;  // distance from hex center (for edge darkening)
 
 void main() {
     vec3 pos = a_Position;
@@ -29,4 +30,7 @@ void main() {
     v_WorldPos    = (u_Model * vec4(pos, 1.0)).xyz;
     v_TexCoord    = a_TexCoord;
     v_Color       = u_TileColor;
+    
+    // Calculate distance from center for edge darkening effect
+    v_EdgeDist = length(a_TexCoord - vec2(0.5));
 }

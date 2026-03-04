@@ -39,6 +39,7 @@ set(SOURCES
     src/render/HexRenderer.cpp
     src/render/Texture.cpp
     src/render/SpriteRenderer.cpp
+    src/render/AnimatedSprite.cpp
     src/render/Camera2D.cpp
     src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp

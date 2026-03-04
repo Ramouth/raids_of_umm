@@ -200,6 +200,15 @@ void CombatEngine::advance() {
 
     ++m_turn;
 
+    // Skip any stacks that died mid-round (retaliation, splash, etc.)
+    while (m_turn < static_cast<int>(m_queue.size())) {
+        const TurnSlot& s = m_queue[m_turn];
+        const CombatUnit& u = s.isPlayer ? m_player.stacks[s.stackIndex]
+                                         : m_enemy.stacks[s.stackIndex];
+        if (!u.isDead()) break;
+        ++m_turn;
+    }
+
     if (m_turn >= static_cast<int>(m_queue.size())) {
         // All living stacks have acted — start next round
         ++m_round;

@@ -17,16 +17,16 @@
 
 inline glm::vec3 terrainColor(Terrain t) noexcept {
     switch (t) {
-        case Terrain::Sand:     return { 0.87f, 0.74f, 0.42f };
-        case Terrain::Dune:     return { 0.72f, 0.55f, 0.25f };
-        case Terrain::Rock:     return { 0.55f, 0.48f, 0.38f };
-        case Terrain::Oasis:    return { 0.30f, 0.58f, 0.42f };
-        case Terrain::Ruins:    return { 0.70f, 0.63f, 0.50f };
-        case Terrain::Obsidian: return { 0.18f, 0.16f, 0.20f };
-        case Terrain::Mountain: return { 0.40f, 0.35f, 0.30f };
-        case Terrain::River:    return { 0.20f, 0.40f, 0.70f };
-        case Terrain::Wall:     return { 0.50f, 0.50f, 0.50f };
-        case Terrain::Battle:   return { 0.60f, 0.10f, 0.10f };
+        case Terrain::Sand:     return { 0.96f, 0.87f, 0.58f };  // bright sand
+        case Terrain::Dune:     return { 0.85f, 0.72f, 0.45f };  // golden dune
+        case Terrain::Rock:     return { 0.65f, 0.58f, 0.50f };  // warm rock
+        case Terrain::Oasis:    return { 0.35f, 0.75f, 0.55f };  // vibrant green-blue
+        case Terrain::Ruins:    return { 0.78f, 0.70f, 0.58f };  // sun-bleached stone
+        case Terrain::Obsidian: return { 0.22f, 0.20f, 0.25f };  // dark volcanic
+        case Terrain::Mountain: return { 0.50f, 0.45f, 0.42f };  // dusty brown-gray
+        case Terrain::River:    return { 0.30f, 0.55f, 0.85f };  // bright blue water
+        case Terrain::Wall:     return { 0.60f, 0.58f, 0.55f };  // pale stone
+        case Terrain::Battle:   return { 0.75f, 0.20f, 0.20f };  // blood-red
         default:                return { 1.00f, 0.00f, 1.00f }; // magenta = unknown
     }
 }

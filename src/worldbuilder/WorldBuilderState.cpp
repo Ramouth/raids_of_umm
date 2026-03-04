@@ -248,7 +248,7 @@ void WorldBuilderState::update(float dt) {
 
 void WorldBuilderState::render() {
     glm::mat4 vp = m_cam.viewProjMatrix();
-    m_hexRenderer.beginFrame(vp, HEX_SIZE);
+    m_hexRenderer.beginFrame(vp, HEX_SIZE, {0.4f, 1.0f, 0.3f}, {1.0f, 0.92f, 0.70f}, {0.35f, 0.30f, 0.22f}, {m_cam.position().x, 0.0f, m_cam.position().y});
     renderTerrain();
     renderObjects();
     renderCursor();

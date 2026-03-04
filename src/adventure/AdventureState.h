@@ -69,6 +69,7 @@ private:
     HexRenderer    m_hexRenderer;
     SpriteRenderer m_spriteRenderer;
     SpriteRenderer m_enemySpriteRenderer;
+    SpriteRenderer m_buildingSpriteRenderer;
     HUDRenderer    m_hud;
 
     // Session state — visited flags live here, NOT in WorldMap.

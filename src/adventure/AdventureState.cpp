@@ -53,6 +53,8 @@ void AdventureState::onEnter() {
     m_spriteRenderer.loadSprite("assets/textures/units/armoured_warrior.png");
     m_enemySpriteRenderer.init();
     m_enemySpriteRenderer.loadSprite("assets/textures/units/enemy_scout.png");
+    m_buildingSpriteRenderer.init();
+    m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
     m_hud.init();
 
     if (!m_externalMap)
@@ -368,15 +370,15 @@ void AdventureState::render() {
     glm::mat4 proj = m_cam.projMatrix();
     glm::mat4 vp   = m_cam.viewProjMatrix();
 
-    m_hexRenderer.beginFrame(vp, HEX_SIZE);
+    m_hexRenderer.beginFrame(vp, HEX_SIZE, {0.4f, 1.0f, 0.3f}, {1.0f, 0.92f, 0.70f}, {0.35f, 0.30f, 0.22f}, {m_cam.position().x, 0.0f, m_cam.position().y});
     renderTerrain();
     renderPathPreview();
-    renderObjects();
     m_hexRenderer.endFrame();
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
+    renderObjects();
     renderEnemySprites();
     renderHero();
     glDepthMask(GL_TRUE);
@@ -418,11 +420,14 @@ void AdventureState::renderPathPreview() {
 
 void AdventureState::renderObjects() {
     for (const auto& obj : m_map.objects()) {
-        if (obj.type == ObjType::Dungeon) continue;  // rendered as sprite in renderEnemySprites()
-        glm::vec3 col = objTypeColor(obj.type);
-        bool visited  = m_visitedObjects.count(obj.pos) > 0;
-        if (visited) col *= 0.55f;
-        m_hexRenderer.drawTile(obj.pos, col, HEX_SIZE * 0.55f, 0.25f);
+        if (obj.type == ObjType::Dungeon) continue;
+        
+        float wx, wz;
+        obj.pos.toWorld(HEX_SIZE, wx, wz);
+        
+        float spriteScale = HEX_SIZE * 1.8f;
+        m_buildingSpriteRenderer.draw({wx, 0.0f, wz}, spriteScale,
+                                     m_cam.viewMatrix(), m_cam.projMatrix());
     }
 }
 

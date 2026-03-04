@@ -17,6 +17,8 @@ HUDRenderer::HUDRenderer() {}
 HUDRenderer::~HUDRenderer() {
     if (m_vao)     glDeleteVertexArrays(1, &m_vao);
     if (m_vbo)     glDeleteBuffers(1, &m_vbo);
+    if (m_texVao)  glDeleteVertexArrays(1, &m_texVao);
+    if (m_texVbo)  glDeleteBuffers(1, &m_texVbo);
     if (m_textVao) glDeleteVertexArrays(1, &m_textVao);
     if (m_textVbo) glDeleteBuffers(1, &m_textVbo);
     if (m_textIbo) glDeleteBuffers(1, &m_textIbo);
@@ -25,7 +27,7 @@ HUDRenderer::~HUDRenderer() {
 void HUDRenderer::init() {
     m_shader = Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
 
-    // ── Rect VAO (4 verts, GL_TRIANGLE_FAN) ──────────────────────────────────
+    // ── Rect VAO (4 verts, GL_TRIANGLE_FAN, position only) ───────────────────
     glGenVertexArrays(1, &m_vao);
     glGenBuffers(1, &m_vbo);
 
@@ -34,6 +36,21 @@ void HUDRenderer::init() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(HUDVertex) * 4, nullptr, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(HUDVertex), nullptr);
+    glBindVertexArray(0);
+
+    // ── Textured rect VAO (4 verts, GL_TRIANGLE_FAN, position + UV) ──────────
+    struct TexVert { float x, y, u, v; };
+    glGenVertexArrays(1, &m_texVao);
+    glGenBuffers(1, &m_texVbo);
+    glBindVertexArray(m_texVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_texVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(TexVert) * 4, nullptr, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(TexVert),
+                          reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TexVert),
+                          reinterpret_cast<void*>(sizeof(float) * 2));
     glBindVertexArray(0);
 
     // ── Text VAO (stb_easy_font quads → pre-built index buffer) ─────────────
@@ -68,6 +85,20 @@ void HUDRenderer::init() {
     glBindVertexArray(0);
 }
 
+// ── begin ────────────────────────────────────────────────────────────────────
+
+void HUDRenderer::begin(int sw, int sh) {
+    m_sw = sw;
+    m_sh = sh;
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    m_shader.bind();
+    m_shader.setVec2("u_ScreenSize", {(float)sw, (float)sh});
+    m_shader.setInt("u_UseTexture", 0);
+}
+
 // ── drawRect ─────────────────────────────────────────────────────────────────
 
 void HUDRenderer::drawRect(float x, float y, float w, float h, const glm::vec4& color) {
@@ -83,6 +114,37 @@ void HUDRenderer::drawRect(float x, float y, float w, float h, const glm::vec4& 
     glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts.data());
     m_shader.setVec4("u_Color", color);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+}
+
+// ── drawTexturedRect ─────────────────────────────────────────────────────────
+// Draws a textured quad in pixel space. The texture is assumed to be stored
+// row-0-at-top (as produced by loadTexturePNG), so UV v=0 → top of image.
+
+void HUDRenderer::drawTexturedRect(float x, float y, float w, float h, GLuint texId) {
+    struct TexVert { float x, y, u, v; };
+    // v=0 at top-left, v=1 at bottom-right (matches row-0-at-top GL upload)
+    const std::array<TexVert, 4> verts = {{
+        {x,     y,     0.0f, 0.0f},
+        {x + w, y,     1.0f, 0.0f},
+        {x + w, y + h, 1.0f, 1.0f},
+        {x,     y + h, 0.0f, 1.0f},
+    }};
+
+    glBindVertexArray(m_texVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_texVbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts.data());
+
+    m_shader.setInt("u_UseTexture", 1);
+    m_shader.setVec4("u_Color", {1.0f, 1.0f, 1.0f, 1.0f});  // white: no tint
+    m_shader.setInt("u_Texture", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texId);
+
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    m_shader.setInt("u_UseTexture", 0);
 }
 
 // ── drawText ─────────────────────────────────────────────────────────────────
