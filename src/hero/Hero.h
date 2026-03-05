@@ -2,6 +2,7 @@
 #include "hex/HexCoord.h"
 #include "world/Resources.h"
 #include "entities/UnitType.h"
+#include "factions/Faction.h"
 #include <string>
 #include <array>
 #include <vector>
@@ -33,6 +34,7 @@ struct ArmySlot {
 struct Hero {
     // ── Identity ──────────────────────────────────────────────────────────────
     std::string name = "Hero";
+    int factionId = Faction::Player;
 
     // ── Adventure map ─────────────────────────────────────────────────────────
     HexCoord pos       { 0, 0 };

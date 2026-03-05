@@ -13,6 +13,8 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     buildQueue();
     std::cout << "[CombatEngine] Round 1 start — "
               << m_queue.size() << " stacks in initiative order\n";
+    // Catch degenerate cases (empty army passed in) before any action is taken.
+    checkWinCondition();
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -106,6 +108,15 @@ void CombatEngine::doMove(HexCoord dest) {
     std::cout << "[CombatEngine] " << actor.type->name
               << " moves " << actor.pos.q << "," << actor.pos.r
               << " → " << dest.q << "," << dest.r << "\n";
+
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::UnitMoved;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    ev.from       = actor.pos;   // captured before update
+    ev.to         = dest;
+    m_events.push_back(ev);
+
     actor.pos = dest;
     advance();
 }
@@ -134,7 +145,11 @@ void CombatEngine::doAttack(int targetIndex) {
     CombatUnit& attacker = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                          : m_enemy.stacks[slot.stackIndex];
     auto& enemyStacks = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+
+    // Bounds and liveness guard — silently ignore invalid or dead targets.
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(enemyStacks.size())) return;
     CombatUnit& target = enemyStacks[targetIndex];
+    if (target.isDead()) return;
 
     // Determine if ranged: unit has shots, has ammo, and target is not adjacent
     bool isRanged = attacker.type->isRanged()
@@ -142,6 +157,17 @@ void CombatEngine::doAttack(int targetIndex) {
                     && attacker.pos.distanceTo(target.pos) > 1;
     if (isRanged) {
         --attacker.shotsLeft;
+    }
+
+    // ── Attack event ─────────────────────────────────────────────────────────
+    {
+        CombatEvent ev;
+        ev.type           = CombatEvent::Type::UnitAttacked;
+        ev.isPlayer       = slot.isPlayer;
+        ev.stackIndex     = slot.stackIndex;
+        ev.targetIsPlayer = !slot.isPlayer;
+        ev.targetIndex    = targetIndex;
+        m_events.push_back(ev);
     }
 
     int damage = calcDamage(attacker, target, m_rng);
@@ -152,15 +178,60 @@ void CombatEngine::doAttack(int targetIndex) {
               << " for " << damage << " damage"
               << " (" << target.count << " survivors)\n";
 
-    // Melee retaliation: target is alive, hasn't retaliated, attacker has no "no_retaliation"
+    // ── Damage event ─────────────────────────────────────────────────────────
+    {
+        CombatEvent ev;
+        ev.type       = CombatEvent::Type::UnitDamaged;
+        ev.isPlayer   = !slot.isPlayer;   // target's army
+        ev.stackIndex = targetIndex;
+        ev.damage     = damage;
+        m_events.push_back(ev);
+    }
+    if (target.isDead()) {
+        CombatEvent ev;
+        ev.type       = CombatEvent::Type::UnitDied;
+        ev.isPlayer   = !slot.isPlayer;
+        ev.stackIndex = targetIndex;
+        m_events.push_back(ev);
+    }
+
+    // ── Melee retaliation ────────────────────────────────────────────────────
     if (!isRanged && !target.isDead() && !target.hasRetaliated
         && !attacker.type->hasAbility("no_retaliation")) {
+
+        {
+            CombatEvent ev;
+            ev.type           = CombatEvent::Type::UnitAttacked;
+            ev.isPlayer       = !slot.isPlayer;   // retaliator
+            ev.stackIndex     = targetIndex;
+            ev.targetIsPlayer = slot.isPlayer;
+            ev.targetIndex    = slot.stackIndex;
+            m_events.push_back(ev);
+        }
+
         int retDamage = calcDamage(target, attacker, m_rng);
         applyDamage(attacker, retDamage);
         target.hasRetaliated = true;
+
         std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
                   << " (" << attacker.count << " survivors)\n";
+
+        {
+            CombatEvent ev;
+            ev.type       = CombatEvent::Type::UnitDamaged;
+            ev.isPlayer   = slot.isPlayer;   // attacker took retaliation
+            ev.stackIndex = slot.stackIndex;
+            ev.damage     = retDamage;
+            m_events.push_back(ev);
+        }
+        if (attacker.isDead()) {
+            CombatEvent ev;
+            ev.type       = CombatEvent::Type::UnitDied;
+            ev.isPlayer   = slot.isPlayer;
+            ev.stackIndex = slot.stackIndex;
+            m_events.push_back(ev);
+        }
     }
 
     advance();
@@ -214,12 +285,31 @@ void CombatEngine::doDefend() {
                                       : m_enemy.stacks[slot.stackIndex];
     actor.isDefending = true;
     std::cout << "[CombatEngine] " << actor.type->name << " defends\n";
+
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::UnitDefended;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    m_events.push_back(ev);
+
     advance();
 }
 
 void CombatEngine::doRetreat() {
+    if (isOver()) return;
     std::cout << "[CombatEngine] Player retreats\n";
     m_result = CombatResult::Retreated;
+
+    CombatEvent ev;
+    ev.type   = CombatEvent::Type::BattleEnded;
+    ev.result = CombatResult::Retreated;
+    m_events.push_back(ev);
+}
+
+std::vector<CombatEvent> CombatEngine::drainEvents() {
+    std::vector<CombatEvent> out;
+    out.swap(m_events);
+    return out;
 }
 
 // ── Turn advancement ──────────────────────────────────────────────────────────
@@ -295,8 +385,16 @@ void CombatEngine::checkWinCondition() {
     if (m_enemy.allDead()) {
         m_result = CombatResult::PlayerWon;
         std::cout << "[CombatEngine] " << m_player.ownerName << " wins!\n";
+        CombatEvent ev;
+        ev.type   = CombatEvent::Type::BattleEnded;
+        ev.result = CombatResult::PlayerWon;
+        m_events.push_back(ev);
     } else if (m_player.allDead()) {
         m_result = CombatResult::EnemyWon;
         std::cout << "[CombatEngine] " << m_enemy.ownerName << " wins!\n";
+        CombatEvent ev;
+        ev.type   = CombatEvent::Type::BattleEnded;
+        ev.result = CombatResult::EnemyWon;
+        m_events.push_back(ev);
     }
 }

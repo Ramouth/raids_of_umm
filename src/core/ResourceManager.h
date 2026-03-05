@@ -1,6 +1,8 @@
 #pragma once
 #include "entities/UnitType.h"
 #include "world/SpellDef.h"
+#include "world/MapObject.h"
+#include "world/Resources.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -30,6 +32,9 @@ public:
     const UnitType* unit (const std::string& id) const;
     const SpellDef* spell(const std::string& id) const;
 
+    // Returns daily income for a capturable mine type (empty pool if unknown).
+    ResourcePool mineIncome(ObjType type) const;
+
     // Ordered views for UI (palette, spellbook).
     // unitsByTier() is sorted ascending by tier, then alphabetically by name.
     const std::vector<const UnitType*>& unitsByTier() const { return m_unitsByTier; }
@@ -47,7 +52,11 @@ private:
 
     bool m_loaded = false;
 
-    std::optional<std::string> loadUnits (const std::string& path);
-    std::optional<std::string> loadSpells(const std::string& path);
+    std::optional<std::string> loadUnits    (const std::string& path);
+    std::optional<std::string> loadSpells   (const std::string& path);
+    std::optional<std::string> loadBuildings(const std::string& path);
     void rebuildViews();
+
+    // Keyed by ObjType cast to int; populated by loadBuildings().
+    std::unordered_map<int, ResourcePool> m_mineIncome;
 };

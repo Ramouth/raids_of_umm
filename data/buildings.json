@@ -1,0 +1,6 @@
+{
+  "mineIncome": [
+    { "type": "GoldMine",    "dailyIncome": { "Gold": 1000 } },
+    { "type": "CrystalMine", "dailyIncome": { "SandCrystal": 2 } }
+  ]
+}

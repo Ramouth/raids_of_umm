@@ -75,6 +75,8 @@ void StateMachine::applyPending() {
                     m_stack.back()->onExit();
                     m_stack.pop_back();
                 }
+                if (!m_stack.empty())
+                    m_stack.back()->onResume();
                 break;
             case Op::Replace:
                 if (!m_stack.empty()) {

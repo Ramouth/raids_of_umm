@@ -4,6 +4,7 @@
 #include "combat/CombatUnit.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
+#include "world/Resources.h"
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -105,6 +106,8 @@ void AdventureState::onEnter() {
 
     initHeroArmy();
 
+    m_turnManager.init(2000);
+
     // Load render offsets (missing file = fresh start, not an error)
     if (auto err = m_offsets.load("assets/render_offsets.json"))
         std::cerr << "[Adventure] Offsets load warning: " << *err << "\n";
@@ -127,13 +130,55 @@ void AdventureState::onEnter() {
     m_heroRenderPos = { hx, 0.0f, hz };
     m_heroTargetPos = m_heroRenderPos;
 
-    std::cout << "[Adventure] Day " << m_day << " — " << m_map.name() << "\n";
+    std::cout << "[Adventure] Day " << m_turnManager.day() << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
     std::cout << "  SPACE = end turn  |  R = restart  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor\n";
 }
 
 void AdventureState::onExit() {
     std::cout << "[Adventure] Exited\n";
+}
+
+void AdventureState::onResume() {
+    if (!m_pendingCombat) return;
+
+    // Move the outcome out before releasing the shared_ptr — taking a reference
+    // then calling reset() would destroy the object and leave a dangling ref.
+    CombatOutcome outcome = std::move(*m_pendingCombat);
+    m_pendingCombat.reset();
+
+    switch (outcome.result) {
+        case CombatResult::PlayerWon: {
+            std::cout << "[Adventure] Victory! Syncing hero army from survivors.\n";
+            // Rebuild hero army from surviving stacks (preserves unit types & counts).
+            for (auto& slot : m_hero.army) slot = {};
+            for (const auto& s : outcome.survivors) {
+                if (s.type && s.count > 0)
+                    m_hero.addUnit(s.type, s.count);
+            }
+            std::cout << "[Adventure] Army after battle: " << m_hero.armySize() << " stacks.\n";
+            break;
+        }
+        case CombatResult::EnemyWon: {
+            std::cout << "[Adventure] Defeat! Hero army wiped out.\n";
+            for (auto& slot : m_hero.army) slot = {};
+            // Restore the dungeon guard so it can be challenged again (or ended game later).
+            auto it = m_objectControl.find(m_combatCoord);
+            if (it != m_objectControl.end())
+                it->second.guardDefeated = false;
+            break;
+        }
+        case CombatResult::Retreated: {
+            std::cout << "[Adventure] Retreated — hero army restored to pre-battle state.\n";
+            // Restore guard visibility so the dungeon is still accessible.
+            auto it = m_objectControl.find(m_combatCoord);
+            if (it != m_objectControl.end())
+                it->second.guardDefeated = false;
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void AdventureState::initMap() {
@@ -199,23 +244,33 @@ void AdventureState::moveHero(const HexCoord& dest) {
     m_pendingVisit = dest;
     m_hasPendingVisit = true;
 
-    std::cout << "  [Day " << m_day << "] Hero moved to (" << dest.q << "," << dest.r
-              << ") — Moves: " << m_hero.movesLeft << "/" << m_hero.movesMax 
-              << " | Visited: " << m_visitedObjects.size() << "\n";
+    std::cout << "  [Day " << m_turnManager.day() << "] Hero moved to (" << dest.q << "," << dest.r
+              << ") — Moves: " << m_hero.movesLeft << "/" << m_hero.movesMax
+              << " | Controlled: " << m_objectControl.size() << "\n";
 }
 
 void AdventureState::onHeroVisit(const HexCoord& coord) {
     const MapObjectDef* obj = m_map.objectAt(coord);
     if (!obj) return;
 
-    bool alreadyVisited = m_visitedObjects.count(coord) > 0;
+    bool alreadyHandled = false;
+    if (auto it = m_objectControl.find(coord); it != m_objectControl.end()) {
+        if (obj->type == ObjType::Dungeon)
+            alreadyHandled = it->second.guardDefeated;
+        else
+            alreadyHandled = it->second.ownerFaction == 1;
+    }
 
     // Towns are always re-enterable (recruit, build, etc.).
-    // One-time objects (dungeons, mines, artifacts) block re-entry once visited.
-    if (alreadyVisited && obj->type != ObjType::Town) return;
+    // One-time objects (dungeons, mines, artifacts) block re-entry once handled.
+    if (alreadyHandled && obj->type != ObjType::Town) return;
 
-    if (obj->type != ObjType::Town)
-        m_visitedObjects.insert(coord);
+    auto& ctrl = m_objectControl[coord];
+    ctrl.objType = obj->type;
+    if (obj->type == ObjType::Dungeon)
+        ctrl.guardDefeated = true;
+    else if (obj->type != ObjType::Town)
+        ctrl.ownerFaction = 1;
     std::cout << "  *** Visited " << obj->typeName() << ": " << obj->name << " ***\n";
 
     switch (obj->type) {
@@ -224,8 +279,11 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             break;
         case ObjType::Dungeon:
             std::cout << "     Entering combat!\n";
+            m_pendingCombat = std::make_shared<CombatOutcome>();
+            m_combatCoord   = coord;
             Application::get().pushState(
-                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(*obj)));
+                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(*obj),
+                                              m_pendingCombat));
             break;
         case ObjType::GoldMine:
             std::cout << "     +500 Gold per turn secured!\n";
@@ -242,11 +300,12 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 }
 
 void AdventureState::endTurn() {
-    ++m_day;
-    m_hero.resetMoves();
+    int day = m_turnManager.nextDay(m_hero, m_objectControl,
+                                    Application::get().resources());
+    int gold = m_turnManager.playerFaction().treasury[Resource::Gold];
     m_heroSelected = false;
     m_previewPath.clear();
-    std::cout << "[Adventure] Day " << m_day << " begins. Moves restored.\n";
+    std::cout << "[Adventure] Day " << day << " begins. Gold: " << gold << "\n";
 }
 
 void AdventureState::wait() {
@@ -439,9 +498,11 @@ void AdventureState::render() {
     glDisable(GL_BLEND);
 
     if (m_showHUD)
-        m_hud.render(app.width(), app.height(), m_day, m_hero.movesLeft, m_hero.movesMax,
-                     static_cast<int>(m_visitedObjects.size()),
-                     m_hero.pos.q, m_hero.pos.r, m_infiniteMoves);
+        m_hud.render(app.width(), app.height(), m_turnManager.day(),
+                     m_hero.movesLeft, m_hero.movesMax,
+                     static_cast<int>(m_objectControl.size()),
+                     m_hero.pos.q, m_hero.pos.r, m_infiniteMoves,
+                     m_turnManager.playerFaction().treasury[Resource::Gold]);
 }
 
 void AdventureState::renderTerrain() {
@@ -491,7 +552,8 @@ void AdventureState::renderObjects() {
 void AdventureState::renderEnemySprites() {
     for (const auto& obj : m_map.objects()) {
         if (obj.type != ObjType::Dungeon) continue;
-        if (m_visitedObjects.count(obj.pos)) continue;  // defeated — don't render
+        auto it = m_objectControl.find(obj.pos);
+        if (it != m_objectControl.end() && it->second.guardDefeated) continue;  // defeated — don't render
 
         RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
         float wx, wz;

@@ -44,6 +44,7 @@ set(SOURCES
     src/world/WorldMap.cpp
     src/adventure/AdventureState.cpp
     src/castle/CastleState.cpp
+    src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
     src/combat/CombatRenderer.cpp
     src/combat/CombatState.cpp
@@ -52,6 +53,7 @@ set(SOURCES
     src/ui/EditorPalette.cpp
     src/worldbuilder/WorldBuilderState.cpp
     src/core/ResourceManager.cpp
+    src/core/TurnManager.cpp
     src/hero/Hero.cpp
 )
 
@@ -105,6 +107,7 @@ add_executable(raids_tests
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
     src/render/RenderOffsets.cpp
+    src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
     src/core/ResourceManager.cpp
     src/hero/Hero.cpp

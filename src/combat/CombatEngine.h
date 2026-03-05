@@ -1,13 +1,9 @@
 #pragma once
 #include "CombatArmy.h"
+#include "CombatEvent.h"
 #include "CombatMap.h"
 #include <random>
 #include <vector>
-
-/*
- * CombatResult — outcome of a finished battle.
- */
-enum class CombatResult { Ongoing, PlayerWon, EnemyWon, Retreated };
 
 /*
  * TurnSlot — identifies which stack in which army is currently acting.
@@ -81,6 +77,11 @@ public:
     // Advance to the next actor; rebuilds the queue when a round ends.
     void advance();
 
+    // ── Event queue ──────────────────────────────────────────────────────────
+    // Returns all events produced since the last drain, then clears the queue.
+    // Call once per update() tick; consume each event to drive animations.
+    std::vector<CombatEvent> drainEvents();
+
     // ── Setup helpers (tests / scenario editor) ───────────────────────────────
 
     // Forcibly place a stack at a position after construction.
@@ -112,4 +113,6 @@ private:
     int                   m_round = 1;
     CombatResult          m_result = CombatResult::Ongoing;
     std::mt19937          m_rng;
+
+    std::vector<CombatEvent> m_events;   // output queue; drained by CombatState
 };

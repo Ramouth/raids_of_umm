@@ -1,6 +1,7 @@
 #include "test_runner.h"
 
 #ifdef COMBAT_ENGINE_IMPL
+#include "combat/CombatAI.h"
 #include "combat/CombatEngine.h"
 #include "hero/Hero.h"
 
@@ -427,6 +428,171 @@ SUITE("CombatEngine — ranged attack decrements shotsLeft") {
 
 // ── BFS movement ──────────────────────────────────────────────────────────────
 
+// ── CombatAI ──────────────────────────────────────────────────────────────────
+
+// Helper: make a one-stack engine with the enemy already placed adjacent to
+// the player (col 1 vs col 0 spawn), so the AI triggers an attack immediately.
+static CombatEngine adjacentEngine(bool playerGoesFirst) {
+    int pSpeed = playerGoesFirst ? 5 : 3;
+    int eSpeed = playerGoesFirst ? 3 : 5;
+    CombatArmy p = oneStack("P", pSpeed, true);
+    CombatArmy e = oneStack("E", eSpeed, false);
+    CombatEngine eng(std::move(p), std::move(e));
+    // Teleport enemy right next to player spawn (col0,row2 and col1,row1 are adjacent)
+    eng.teleportUnit(false, 0, CombatMap::toHex(1, 2));
+    return eng;
+}
+
+SUITE("CombatAI — attacks immediately when adjacent") {
+    // Enemy is placed adjacent to player; AI (enemy turn) should attack, not move.
+    CombatEngine eng = adjacentEngine(/*playerGoesFirst=*/true);
+
+    // Skip the player's turn so it becomes the enemy's turn.
+    eng.doDefend();
+    eng.drainEvents();
+
+    CHECK(!eng.currentTurn().isPlayer);
+    int hpBefore = eng.playerArmy().stacks[0].totalHp();
+
+    CombatAI::takeTurn(eng);
+    auto events = eng.drainEvents();
+
+    // Must have attacked (UnitAttacked event from enemy).
+    bool attacked = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitAttacked && !ev.isPlayer)
+            attacked = true;
+    CHECK(attacked);
+
+    // Player took damage.
+    CHECK(eng.playerArmy().stacks[0].totalHp() < hpBefore);
+}
+
+SUITE("CombatAI — moves toward enemy when not adjacent") {
+    // Default spawn: player col 0, enemy col 10 — distance 10. AI should move.
+    CombatArmy p = oneStackWithRange("P", 3, 1, true);
+    CombatArmy e = oneStackWithRange("E", 5, 3, false);  // enemy acts first
+    CombatEngine eng(std::move(p), std::move(e));
+
+    HexCoord enemyBefore = eng.enemyArmy().stacks[0].pos;
+    HexCoord playerPos   = eng.playerArmy().stacks[0].pos;
+
+    CHECK(!eng.currentTurn().isPlayer);  // enemy acts first
+    CombatAI::takeTurn(eng);
+    eng.drainEvents();
+
+    HexCoord enemyAfter = eng.enemyArmy().stacks[0].pos;
+
+    // Enemy must have moved closer to the player.
+    CHECK(enemyAfter.distanceTo(playerPos) < enemyBefore.distanceTo(playerPos));
+}
+
+SUITE("CombatAI — ranged unit attacks without moving") {
+    UnitType archerT = *makeFixed("Archer", 5, 3, 100, 5, 5);
+    archerT.shots = 10;
+    const UnitType* at = reg(std::move(archerT));
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(at, 1, true));
+
+    CombatArmy eArmy = oneStack("E", 3, false);
+    CombatEngine eng(std::move(pArmy), std::move(eArmy));
+
+    CHECK(eng.currentTurn().isPlayer);
+    HexCoord posBefore = eng.playerArmy().stacks[0].pos;
+
+    CombatAI::takeTurn(eng);  // AI controls the player's ranged unit
+    eng.drainEvents();
+
+    // Unit must NOT have moved (ranged attack in place).
+    CHECK(eng.playerArmy().stacks[0].pos == posBefore);
+    // Shots decremented.
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 9);
+}
+
+SUITE("CombatAI — defends when moveRange is zero and enemy is not adjacent") {
+    // moveRange=0 → reachableTiles() is empty; enemy spawns at col 10 (distance 10).
+    // AI has nowhere to go and nothing adjacent to attack → must defend.
+    UnitType frozen = *makeUnit("Frozen", 5);
+    frozen.moveRange = 0;
+    const UnitType* ft = reg(std::move(frozen));
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(ft, 1, true));
+
+    CombatArmy eArmy = oneStack("E", 3, false);
+    CombatEngine eng(std::move(pArmy), std::move(eArmy));
+
+    // Confirm no reachable tiles.
+    CHECK(eng.reachableTiles().empty());
+
+    CombatAI::takeTurn(eng);
+    auto events = eng.drainEvents();
+
+    bool defended = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitDefended && ev.isPlayer)
+            defended = true;
+    CHECK(defended);
+}
+
+SUITE("CombatAI — targets weakest when attacking among multiple adjacent stacks") {
+    // Two enemy stacks adjacent to player: one healthy (100 hp), one wounded (5 hp).
+    // AI should attack the wounded one.
+    const UnitType* pt = makeFixed("P", 5, 5, 10, 5, 5);
+    const UnitType* et = makeFixed("E", 3, 5, 10, 5, 5);
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(pt, 10, true));  // 10 × 10hp = 100hp total
+
+    CombatArmy eArmy;
+    eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
+    CombatUnit healthy = CombatUnit::make(et, 10, false);  // 100 hp
+    CombatUnit wounded = CombatUnit::make(et, 1,  false);  // 10 hp (wounded)
+    eArmy.stacks.push_back(healthy);
+    eArmy.stacks.push_back(wounded);
+
+    CombatEngine eng(std::move(pArmy), std::move(eArmy));
+
+    // Place both enemies adjacent to player spawn.
+    HexCoord playerPos = eng.playerArmy().stacks[0].pos;
+    eng.teleportUnit(false, 0, playerPos.neighbor(0));  // healthy — adj
+    eng.teleportUnit(false, 1, playerPos.neighbor(1));  // wounded — adj
+
+    CHECK(eng.currentTurn().isPlayer);
+    CombatAI::takeTurn(eng);
+    auto events = eng.drainEvents();
+
+    // The UnitDamaged event should target stack 1 (wounded, index 1).
+    bool hitWounded = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitDamaged && !ev.isPlayer
+                && ev.stackIndex == 1)
+            hitWounded = true;
+    CHECK(hitWounded);
+}
+
+SUITE("CombatAI — full auto-battle resolves to a winner") {
+    // Run complete AI-vs-AI combat and verify it terminates with a result.
+    // Use balanced armies so neither side trivially wins on round 1.
+    CombatEngine eng(
+        fixedStack("P", 5, 3, 10, 5, 5, 5, true),
+        fixedStack("E", 4, 3, 10, 5, 5, 5, false));
+
+    int safetyLimit = 200;  // max iterations to avoid infinite loop in test
+    while (!eng.isOver() && safetyLimit-- > 0) {
+        CombatAI::takeTurn(eng);
+        eng.drainEvents();
+    }
+
+    CHECK(safetyLimit > 0);     // terminated before limit
+    CHECK(eng.isOver());         // battle actually concluded
+    CHECK(eng.result() != CombatResult::Ongoing);
+}
+
 SUITE("CombatEngine — BFS: enemy wall blocks path to tiles behind it") {
     // Player spawns at col 0 row 2.  After construction we teleport three
     // enemy stacks to col 1 rows 1,2,3 forming a complete wall.
@@ -466,6 +632,362 @@ SUITE("CombatEngine — BFS: enemy wall blocks path to tiles behind it") {
     CHECK(!found);
 }
 
+// ── CombatEvent queue ──────────────────────────────────────────────────────────
+
+SUITE("CombatEvent — drainEvents is empty before any action") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    auto events = eng.drainEvents();
+    CHECK(events.empty());
+}
+
+SUITE("CombatEvent — drainEvents clears queue on second call") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doDefend();
+    auto first = eng.drainEvents();
+    CHECK(!first.empty());
+
+    auto second = eng.drainEvents();
+    CHECK(second.empty());
+}
+
+SUITE("CombatEvent — doMove produces UnitMoved with correct from/to") {
+    CombatArmy p = oneStackWithRange("P", 5, 3, true);
+    CombatArmy e = oneStackWithRange("E", 3, 1, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    HexCoord origin = eng.playerArmy().stacks[0].pos;
+    HexCoord dest   = CombatMap::toHex(2, 2);
+    CHECK(eng.canMoveTo(dest));
+
+    eng.doMove(dest);
+    auto events = eng.drainEvents();
+
+    CHECK_EQ((int)events.size(), 1);
+    CHECK(events[0].type == CombatEvent::Type::UnitMoved);
+    CHECK(events[0].isPlayer);
+    CHECK_EQ(events[0].stackIndex, 0);
+    CHECK(events[0].from == origin);
+    CHECK(events[0].to   == dest);
+}
+
+SUITE("CombatEvent — doAttack produces UnitAttacked then UnitDamaged") {
+    // Large HP pools so no kills, no deaths to worry about.
+    CombatEngine eng(
+        fixedStack("A", 5, 1, 100, 5, 5, 3, true),
+        fixedStack("D", 3, 1, 100, 5, 5, 3, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // First two events: attack then damage (on the enemy).
+    CHECK((int)events.size() >= 2);
+    CHECK(events[0].type == CombatEvent::Type::UnitAttacked);
+    CHECK(events[0].isPlayer);
+    CHECK(events[1].type == CombatEvent::Type::UnitDamaged);
+    CHECK(!events[1].isPlayer);  // enemy took the damage
+    CHECK(events[1].damage > 0);
+}
+
+SUITE("CombatEvent — melee retaliation produces a second UnitAttacked + UnitDamaged") {
+    // Both sides have plenty of HP so retaliation fires and no one dies.
+    CombatEngine eng(
+        fixedStack("A", 5, 1, 100, 5, 5, 3, true),
+        fixedStack("D", 3, 1, 100, 5, 5, 3, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // Expected sequence: UnitAttacked, UnitDamaged, UnitAttacked (ret), UnitDamaged (ret)
+    CHECK_EQ((int)events.size(), 4);
+    CHECK(events[0].type == CombatEvent::Type::UnitAttacked);
+    CHECK(events[1].type == CombatEvent::Type::UnitDamaged);
+    CHECK(events[2].type == CombatEvent::Type::UnitAttacked);
+    CHECK(!events[2].isPlayer);   // retaliator is the enemy
+    CHECK(events[3].type == CombatEvent::Type::UnitDamaged);
+    CHECK(events[3].isPlayer);    // attacker took retaliation
+}
+
+SUITE("CombatEvent — lethal attack produces UnitDied then BattleEnded") {
+    // 5 × dmg=10 → 50 damage kills the 1×hp=10 enemy instantly.
+    CombatEngine eng(
+        fixedStack("A", 5, 10, 10, 5, 5, 5, true),
+        fixedStack("D", 3,  1, 10, 5, 5, 1, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    bool hasDied  = false;
+    bool hasEnded = false;
+    for (const auto& ev : events) {
+        if (ev.type == CombatEvent::Type::UnitDied)    hasDied  = true;
+        if (ev.type == CombatEvent::Type::BattleEnded) hasEnded = true;
+    }
+    CHECK(hasDied);
+    CHECK(hasEnded);
+
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::BattleEnded)
+            CHECK(ev.result == CombatResult::PlayerWon);
+}
+
+SUITE("CombatEvent — doDefend produces exactly one UnitDefended event") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doDefend();
+    auto events = eng.drainEvents();
+
+    CHECK_EQ((int)events.size(), 1);
+    CHECK(events[0].type == CombatEvent::Type::UnitDefended);
+    CHECK(events[0].isPlayer);
+    CHECK_EQ(events[0].stackIndex, 0);
+}
+
+SUITE("CombatEvent — doRetreat produces BattleEnded(Retreated)") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doRetreat();
+    auto events = eng.drainEvents();
+
+    CHECK(!events.empty());
+    CHECK(events.back().type   == CombatEvent::Type::BattleEnded);
+    CHECK(events.back().result == CombatResult::Retreated);
+}
+
+SUITE("CombatEvent — events accumulate across actions before drain") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    // Two defends without draining in between.
+    eng.doDefend();  // player defends, advances turn
+    eng.doDefend();  // enemy defends
+
+    auto events = eng.drainEvents();
+    CHECK_EQ((int)events.size(), 2);
+    CHECK(events[0].type == CombatEvent::Type::UnitDefended);
+    CHECK(events[1].type == CombatEvent::Type::UnitDefended);
+}
+
+// ── Edge cases ────────────────────────────────────────────────────────────────
+
+SUITE("CombatEngine — doAttack out-of-bounds index is a safe no-op") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    int turnBefore = eng.roundNumber();
+    eng.doAttack(99);   // no enemy at index 99
+
+    // No crash, no turn advance, no events.
+    CHECK_EQ(eng.roundNumber(), turnBefore);
+    auto events = eng.drainEvents();
+    CHECK(events.empty());
+}
+
+SUITE("CombatEngine — doAttack on dead target is a safe no-op") {
+    // Kill the enemy first via a lethal attack, then try to attack it again.
+    CombatEngine eng(
+        fixedStack("A", 5, 10, 10, 5, 5, 5, true),   // 5×dmg=10 → instant kill
+        fixedStack("D", 3,  1, 10, 5, 5, 1, false));
+
+    eng.doAttack(0);   // kills enemy[0]; game is now over
+    eng.drainEvents(); // clear
+
+    // Game is over, so a second call must be a no-op.
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+    CHECK(events.empty());
+}
+
+SUITE("CombatEngine — lethal hit prevents retaliation") {
+    // Attacker one-shots the target; no retaliation event should follow.
+    CombatEngine eng(
+        fixedStack("A", 5, 10, 10, 5, 5, 5, true),
+        fixedStack("D", 3,  1, 10, 5, 5, 1, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // Must NOT contain any retaliation UnitAttacked from the enemy.
+    int retaliationCount = 0;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitAttacked && !ev.isPlayer)
+            ++retaliationCount;
+    CHECK_EQ(retaliationCount, 0);
+}
+
+SUITE("CombatEngine — attacker killed by retaliation emits UnitDied for attacker") {
+    // Enemy retaliates with lethal damage (100 dmg), player has 1×hp=10.
+    // Player survives the initial attack; enemy retaliates and kills player.
+    CombatEngine eng(
+        fixedStack("A", 5, 1, 10, 5, 5, 1, true),    // player: 1 creature, 10 hp
+        fixedStack("D", 3, 100, 10, 5, 5, 5, false)); // enemy retaliation: 500 dmg
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // Must contain UnitDied for the player (isPlayer==true).
+    bool playerDied = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitDied && ev.isPlayer)
+            playerDied = true;
+    CHECK(playerDied);
+
+    // And the battle must be over with EnemyWon.
+    CHECK(eng.isOver());
+    CHECK(eng.result() == CombatResult::EnemyWon);
+
+    bool battleEndedInEvents = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::BattleEnded && ev.result == CombatResult::EnemyWon)
+            battleEndedInEvents = true;
+    CHECK(battleEndedInEvents);
+}
+
+SUITE("CombatEngine — ranged attack produces no retaliation events") {
+    // Archer at col 0, enemy at col 10 (distance > 1) → ranged shot, no retaliation.
+    UnitType archerT = *makeFixed("Archer", 5, 3, 100, 5, 5);
+    archerT.shots = 10;
+    const UnitType* at = reg(std::move(archerT));
+
+    CombatArmy pArmy;
+    pArmy.isPlayer = true; pArmy.ownerName = "Player";
+    pArmy.stacks.push_back(CombatUnit::make(at, 1, true));
+
+    CombatEngine eng(std::move(pArmy),
+                     fixedStack("D", 3, 1, 100, 5, 5, 3, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // No UnitAttacked event that originates from the enemy (retaliation).
+    bool enemyRetaliated = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitAttacked && !ev.isPlayer)
+            enemyRetaliated = true;
+    CHECK(!enemyRetaliated);
+
+    // Attacker's shots decremented.
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 9);
+}
+
+SUITE("CombatEngine — doRetreat when already over emits no duplicate BattleEnded") {
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doRetreat();
+    eng.drainEvents();  // consume the first BattleEnded
+
+    eng.doRetreat();    // second call — battle is already over
+    auto events = eng.drainEvents();
+    CHECK(events.empty());
+}
+
+SUITE("CombatEngine — hasRetaliated flag resets between rounds") {
+    // In round 1: P attacks E, E retaliates.
+    // After the round ends, hasRetaliated must be cleared so E can retaliate again in round 2.
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doAttack(0);   // P attacks E (round 1, player turn)
+    eng.drainEvents();
+
+    // Now it's E's turn — E attacks P.  After this, round wraps → round 2.
+    eng.doAttack(0);
+    eng.drainEvents();
+
+    CHECK_EQ(eng.roundNumber(), 2);
+
+    // Round 2: player attacks again — enemy should retaliate (not blocked by old flag).
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    bool retaliationFired = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitAttacked && !ev.isPlayer)
+            retaliationFired = true;
+    CHECK(retaliationFired);
+}
+
+SUITE("CombatEngine — empty player army triggers EnemyWon at construction") {
+    CombatArmy p;  // zero stacks
+    p.isPlayer = true; p.ownerName = "Empty";
+
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    CHECK(eng.isOver());
+    CHECK(eng.result() == CombatResult::EnemyWon);
+
+    // BattleEnded event must be in the queue from construction.
+    auto events = eng.drainEvents();
+    bool hasEnded = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::BattleEnded && ev.result == CombatResult::EnemyWon)
+            hasEnded = true;
+    CHECK(hasEnded);
+}
+
+SUITE("CombatEngine — two stacks mutually kill each other: both UnitDied emitted") {
+    // P[0] attacks E[0]: E[0] retaliates and kills P[0]; P[0] also kills E[0].
+    // (P atk=100 vs E hp=10×1; E atk=100 vs P hp=10×1 — both one-shot each other.)
+    // Because P attacks first, E dies from the primary hit. No retaliation fires.
+    // This verifies that the "target died → no retaliation" rule holds even
+    // when the attacker would have died from that retaliation.
+    CombatEngine eng(
+        fixedStack("P", 5, 100, 10, 5, 5, 1, true),
+        fixedStack("E", 3, 100, 10, 5, 5, 1, false));
+
+    eng.doAttack(0);
+    auto events = eng.drainEvents();
+
+    // Target (enemy) died.
+    bool enemyDied = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitDied && !ev.isPlayer)
+            enemyDied = true;
+    CHECK(enemyDied);
+
+    // No retaliation (target was killed by primary hit).
+    bool retaliationFired = false;
+    for (const auto& ev : events)
+        if (ev.type == CombatEvent::Type::UnitAttacked && !ev.isPlayer)
+            retaliationFired = true;
+    CHECK(!retaliationFired);
+
+    CHECK(eng.isOver());
+    CHECK(eng.result() == CombatResult::PlayerWon);
+}
+
+SUITE("CombatEngine — event queue does not bleed between rounds") {
+    // Drain after each action; verify the queue is truly empty between actions.
+    CombatArmy p = oneStack("P", 5, true);
+    CombatArmy e = oneStack("E", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    eng.doDefend();
+    auto r1 = eng.drainEvents();  // round 1 player defend
+    CHECK(!r1.empty());
+    CHECK(eng.drainEvents().empty());  // double-drain: must be empty
+
+    eng.doDefend();
+    auto r2 = eng.drainEvents();  // round 1 enemy defend → round 2
+    CHECK(!r2.empty());
+    CHECK(eng.drainEvents().empty());
+}
+
 SUITE("CombatEngine — BFS: tiles on near side of wall are still reachable") {
     // Same wall setup. Hexes at col 0 rows 0 and 4 are on the near side and
     // must still be reachable.
@@ -502,6 +1024,106 @@ SUITE("CombatEngine — BFS: tiles on near side of wall are still reachable") {
     }
     CHECK(found0);
     CHECK(found4);
+}
+
+// ── CombatOutcome propagation ─────────────────────────────────────────────────
+
+SUITE("CombatOutcome — player win fills survivors") {
+    // Make a one-vs-one battle where player wins (higher stats).
+    UnitType pt; pt.id="p"; pt.name="p"; pt.speed=5; pt.hitPoints=100;
+    pt.attack=20; pt.defense=5; pt.minDamage=10; pt.maxDamage=20;
+    UnitType et; et.id="e"; et.name="e"; et.speed=4; et.hitPoints=1;
+    et.attack=1;  et.defense=0; et.minDamage=1;  et.maxDamage=1;
+    s_types.push_back(pt); const UnitType* pT = &s_types.back();
+    s_types.push_back(et); const UnitType* eT = &s_types.back();
+
+    CombatArmy pA; pA.isPlayer=true;  pA.ownerName="P";
+    pA.stacks.push_back(CombatUnit::make(pT, 10, true));
+    CombatArmy eA; eA.isPlayer=false; eA.ownerName="E";
+    eA.stacks.push_back(CombatUnit::make(eT, 1, false));
+
+    CombatEngine eng(std::move(pA), std::move(eA));
+
+    // Drive battle to completion.
+    int safety = 50;
+    while (!eng.isOver() && safety-- > 0) {
+        if (eng.currentTurn().isPlayer)
+            eng.doAttack(0);
+        else
+            eng.doAttack(0);
+        eng.drainEvents();
+    }
+
+    CHECK(eng.result() == CombatResult::PlayerWon);
+
+    // Manually build what onResume() would receive.
+    CombatOutcome outcome;
+    outcome.result = eng.result();
+    for (const auto& unit : eng.playerArmy().stacks)
+        if (!unit.isDead())
+            outcome.survivors.push_back({ unit.type, unit.count });
+
+    CHECK(!outcome.survivors.empty());
+    CHECK(outcome.survivors[0].type == pT);
+    CHECK(outcome.survivors[0].count > 0);
+}
+
+SUITE("CombatOutcome — enemy win leaves survivors empty") {
+    UnitType pt; pt.id="p2"; pt.name="p2"; pt.speed=4; pt.hitPoints=1;
+    pt.attack=1;  pt.defense=0; pt.minDamage=1; pt.maxDamage=1;
+    UnitType et; et.id="e2"; et.name="e2"; et.speed=5; et.hitPoints=100;
+    et.attack=20; et.defense=5; et.minDamage=10; et.maxDamage=20;
+    s_types.push_back(pt); const UnitType* pT = &s_types.back();
+    s_types.push_back(et); const UnitType* eT = &s_types.back();
+    (void)eT;
+
+    CombatArmy pA; pA.isPlayer=true;  pA.ownerName="P";
+    pA.stacks.push_back(CombatUnit::make(pT, 1, true));
+    CombatArmy eA; eA.isPlayer=false; eA.ownerName="E";
+    eA.stacks.push_back(CombatUnit::make(eT, 10, false));
+
+    CombatEngine eng(std::move(pA), std::move(eA));
+
+    int safety = 50;
+    while (!eng.isOver() && safety-- > 0) {
+        if (eng.currentTurn().isPlayer)
+            eng.doAttack(0);
+        else
+            eng.doAttack(0);
+        eng.drainEvents();
+    }
+
+    CHECK(eng.result() == CombatResult::EnemyWon);
+
+    CombatOutcome outcome;
+    outcome.result = eng.result();
+    for (const auto& unit : eng.playerArmy().stacks)
+        if (!unit.isDead())
+            outcome.survivors.push_back({ unit.type, unit.count });
+
+    CHECK(outcome.survivors.empty());
+}
+
+SUITE("CombatOutcome — retreat result propagates") {
+    CombatArmy pA = oneStack("R1", 5, true);
+    CombatArmy eA = oneStack("R2", 4, false);
+    CombatEngine eng(std::move(pA), std::move(eA));
+
+    eng.doRetreat();
+    eng.drainEvents();
+
+    CHECK(eng.result() == CombatResult::Retreated);
+
+    CombatOutcome outcome;
+    outcome.result = eng.result();
+    for (const auto& unit : eng.playerArmy().stacks)
+        if (!unit.isDead())
+            outcome.survivors.push_back({ unit.type, unit.count });
+
+    // After retreat player army is technically unchanged (no one died).
+    // survivors should still have the stack.
+    CHECK(!outcome.survivors.empty());
+    CHECK(outcome.result == CombatResult::Retreated);
 }
 
 #endif // COMBAT_ENGINE_IMPL

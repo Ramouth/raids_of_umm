@@ -18,12 +18,14 @@ static_assert(sizeof(kResourceKeys) / sizeof(kResourceKeys[0]) == RESOURCE_COUNT
 std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_units.clear();
     m_spells.clear();
+    m_mineIncome.clear();
     m_unitsByTier.clear();
     m_allSpells.clear();
     m_loaded = false;
 
-    if (auto err = loadUnits (dataDir + "/units.json"))  return err;
-    if (auto err = loadSpells(dataDir + "/spells.json")) return err;
+    if (auto err = loadUnits    (dataDir + "/units.json"))     return err;
+    if (auto err = loadSpells   (dataDir + "/spells.json"))    return err;
+    if (auto err = loadBuildings(dataDir + "/buildings.json")) return err;
 
     rebuildViews();
     m_loaded = true;
@@ -126,6 +128,47 @@ std::optional<std::string> ResourceManager::loadSpells(const std::string& path) 
             m_spells.emplace(s.id, std::move(s));
     }
     return std::nullopt;
+}
+
+std::optional<std::string> ResourceManager::loadBuildings(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open())
+        return "ResourceManager: cannot open " + path;
+
+    json root;
+    try { root = json::parse(f); }
+    catch (const json::exception& e) {
+        return std::string("ResourceManager: JSON parse error in ") + path + ": " + e.what();
+    }
+
+    // String → ObjType lookup table.
+    static const std::unordered_map<std::string, ObjType> kObjTypeMap = {
+        { "GoldMine",    ObjType::GoldMine    },
+        { "CrystalMine", ObjType::CrystalMine },
+        { "Town",        ObjType::Town        },
+        { "Dungeon",     ObjType::Dungeon     },
+        { "Artifact",    ObjType::Artifact    },
+    };
+
+    for (const auto& j : root.value("mineIncome", json::array())) {
+        std::string typeName = j.value("type", "");
+        auto typeIt = kObjTypeMap.find(typeName);
+        if (typeIt == kObjTypeMap.end()) continue;
+
+        ResourcePool pool;
+        if (j.contains("dailyIncome") && j["dailyIncome"].is_object()) {
+            const auto& inc = j["dailyIncome"];
+            for (int i = 0; i < RESOURCE_COUNT; ++i)
+                pool[static_cast<Resource>(i)] = inc.value(kResourceKeys[i], 0);
+        }
+        m_mineIncome[static_cast<int>(typeIt->second)] = pool;
+    }
+    return std::nullopt;
+}
+
+ResourcePool ResourceManager::mineIncome(ObjType type) const {
+    auto it = m_mineIncome.find(static_cast<int>(type));
+    return it != m_mineIncome.end() ? it->second : ResourcePool{};
 }
 
 void ResourceManager::rebuildViews() {

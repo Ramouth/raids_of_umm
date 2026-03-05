@@ -1,17 +1,20 @@
 #pragma once
 #include "core/StateMachine.h"
+#include "core/TurnManager.h"
 #include "world/WorldMap.h"
 #include "world/MapObject.h"
 #include "hero/Hero.h"
 #include "combat/CombatArmy.h"
+#include "combat/CombatEvent.h"
 #include "render/HexRenderer.h"
 #include "render/SpriteRenderer.h"
 #include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
 #include "render/RenderOffsets.h"
 #include "hex/HexCoord.h"
+#include "world/ObjectControl.h"
 #include <glm/glm.hpp>
-#include <unordered_set>
+#include <memory>
 #include <vector>
 
 /*
@@ -21,7 +24,7 @@
  *   WorldMap        : static map data (terrain + object definitions)
  *   Hero            : the player character
  *   Camera2D        : viewport
- *   m_visitedObjects: per-session visited flags (game state, NOT map data)
+ *   m_objectControl : per-session ownership/defeat flags (game state, NOT map data)
  *
  * Constructed either procedurally (default) or from an existing WorldMap
  * (e.g. handed in by WorldBuilderState for test-play).
@@ -40,8 +43,9 @@ public:
     // or a loaded save file). The map is moved in — no copying.
     explicit AdventureState(WorldMap map);
 
-    void onEnter() override;
-    void onExit()  override;
+    void onEnter()  override;
+    void onExit()   override;
+    void onResume() override;  // called after CombatState / CastleState pops
     void update(float dt) override;
     void render()  override;
     bool handleEvent(void* sdlEvent) override;
@@ -80,8 +84,8 @@ private:
     SpriteRenderer m_buildingSpriteRenderer;
     HUDRenderer    m_hud;
 
-    // Session state — visited flags live here, NOT in WorldMap.
-    std::unordered_set<HexCoord> m_visitedObjects;
+    // Session state — object ownership/defeat flags live here, NOT in WorldMap.
+    ObjectControlMap m_objectControl;
 
     // Smooth movement — render pos chases waypoints along the actual hex path
     glm::vec3              m_heroRenderPos { 0.0f };
@@ -109,7 +113,7 @@ private:
     // Key states for camera pan
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
 
-    int m_day = 1;
+    TurnManager m_turnManager;
 
     // Toggle the dev HUD — set false here (or press H) to hide it
     bool m_showHUD = true;
@@ -120,6 +124,10 @@ private:
 
     // Whether this state owns a procedurally generated map or a provided one.
     bool m_externalMap = false;
+
+    // Pending combat result — set before pushing CombatState, read in onResume().
+    std::shared_ptr<CombatOutcome> m_pendingCombat;
+    HexCoord                       m_combatCoord;  // map coord of the dungeon fought at
 
     RenderOffsetConfig m_offsets;
 

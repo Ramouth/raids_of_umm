@@ -1,11 +1,17 @@
 #pragma once
 #include "core/StateMachine.h"
 #include "CombatEngine.h"
+#include "CombatEvent.h"
 #include "CombatRenderer.h"
 #include "CombatMap.h"
 #include "render/Camera2D.h"
+#include "render/HUDRenderer.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
+#include <deque>
+#include <queue>
+#include <memory>
+#include <string>
 
 /*
  * CombatState — thin coordinator for the combat screen.
@@ -27,7 +33,10 @@
  */
 class CombatState final : public GameState {
 public:
-    explicit CombatState(CombatArmy player, CombatArmy enemy);
+    // outcome: optional shared result written in onExit() for the caller to read
+    //          after this state is popped.  Pass nullptr to ignore.
+    explicit CombatState(CombatArmy player, CombatArmy enemy,
+                         std::shared_ptr<CombatOutcome> outcome = nullptr);
 
     void onEnter() override;
     void onExit()  override;
@@ -36,9 +45,23 @@ public:
     bool handleEvent(void* sdlEvent) override;
 
 private:
+    // ── Animation helpers ─────────────────────────────────────────────────────
+    void tickAnimation(float dt);
+    void startEventAnimation(const CombatEvent& ev);
+
+    // ── Combat log ────────────────────────────────────────────────────────────
+    struct LogEntry { std::string text; glm::vec4 color; };
+    void pushLog(std::string text, glm::vec4 color);
+    void renderLog(int screenW, int screenH);
+
+    // ── Members ───────────────────────────────────────────────────────────────
     CombatEngine   m_engine;
     CombatRenderer m_renderer;
+    HUDRenderer    m_hud;
     Camera2D       m_cam;
+
+    std::deque<LogEntry> m_log;
+    static constexpr int MAX_LOG = 14;
 
     HexCoord m_hoveredHex;
     bool     m_hasHovered = false;
@@ -49,18 +72,34 @@ private:
     bool m_panLeft  = false;
     bool m_panRight = false;
 
-    // Movement animation
+    // ── Event-driven animation ────────────────────────────────────────────────
+    std::queue<CombatEvent> m_pendingEvents;  // events waiting to be animated
+    CombatEvent             m_currentEvent;   // event currently being animated
+    bool                    m_animating    = false;
+    float                   m_animTimer    = 0.f;
+    float                   m_animDuration = 0.f;
+
+    // Per-frame interpolated render state (passed to CombatRenderer).
     UnitAnimState m_anim;
-    glm::vec3     m_animFrom      = { 0.f, 0.f, 0.f };
-    glm::vec3     m_animTo        = { 0.f, 0.f, 0.f };
-    float         m_animProgress  = 0.f;  // 0..1
+    glm::vec3     m_animFrom = { 0.f, 0.f, 0.f };
+    glm::vec3     m_animTo   = { 0.f, 0.f, 0.f };
+
+    // Auto-battle: AI controls friendly units too (toggle with A key).
+    bool m_autoBattle = false;
 
     // True once the player has acknowledged the battle result — popped next update().
     // Never call popState() directly from handleEvent (use-after-free when
     // m_processing is false during processEvents).
     bool m_wantsDismiss = false;
 
-    static constexpr float CAM_SPEED          = 8.0f;
-    static constexpr float HEX_SIZE           = 1.0f;
-    static constexpr float MOVE_ANIM_DURATION = 0.30f;
+    // Written in onExit(); caller reads this after the state is popped.
+    std::shared_ptr<CombatOutcome> m_outcome;
+
+    static constexpr float CAM_SPEED           = 8.0f;
+    static constexpr float HEX_SIZE            = 1.0f;
+    static constexpr float MOVE_ANIM_DURATION  = 0.30f;
+    static constexpr float ATTACK_ANIM_DURATION= 0.20f;
+    static constexpr float DAMAGE_ANIM_DURATION= 0.15f;
+    static constexpr float DEATH_ANIM_DURATION = 0.40f;
+    static constexpr float FLASH_ANIM_DURATION = 0.05f;
 };

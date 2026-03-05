@@ -185,7 +185,7 @@ void HUDRenderer::drawText(float x, float y, float scale,
 void HUDRenderer::render(int screenW, int screenH,
                           int day, int movesLeft, int movesMax,
                           int visitedCount, int heroQ, int heroR,
-                          bool infiniteMoves) {
+                          bool infiniteMoves, int gold) {
     m_sw = screenW;
     m_sh = screenH;
 
@@ -259,10 +259,10 @@ void HUDRenderer::render(int screenW, int screenH,
         std::snprintf(line1, sizeof(line1), "DAY %d   WEEK %d   MOVES %d/%d",
                       day, week, movesLeft, movesMax);
 
-    // Build line 2: "POS (q,r)   VISITED n"
-    char line2[64];
-    std::snprintf(line2, sizeof(line2), "POS (%d, %d)   VISITED %d",
-                  heroQ, heroR, visitedCount);
+    // Build line 2: "POS (q,r)   VISITED n   GOLD n"
+    char line2[80];
+    std::snprintf(line2, sizeof(line2), "POS (%d, %d)   VISITED %d   GOLD %d",
+                  heroQ, heroR, visitedCount, gold);
 
     // Text background band
     float bandH = 36 * scale;
