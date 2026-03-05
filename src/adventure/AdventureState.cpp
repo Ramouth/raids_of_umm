@@ -108,6 +108,25 @@ void AdventureState::onEnter() {
 
     m_turnManager.init(2000);
 
+    // Seed TownState for every Town on the map (initial pool = one week's growth).
+    {
+        auto& rm = Application::get().resources();
+        m_townStates.clear();
+        for (const auto& obj : m_map.objects()) {
+            if (obj.type == ObjType::Town) {
+                TownState& ts = m_townStates[obj.pos];
+                if (rm.loaded()) {
+                    for (const UnitType* u : rm.unitsByTier()) {
+                        if (u->weeklyGrowth > 0)
+                            ts.recruitPool[u->id] = u->weeklyGrowth;
+                    }
+                }
+                std::cout << "[Adventure] Town '" << obj.name
+                          << "' seeded with " << ts.recruitPool.size() << " unit type(s).\n";
+            }
+        }
+    }
+
     // Load render offsets (missing file = fresh start, not an error)
     if (auto err = m_offsets.load("assets/render_offsets.json"))
         std::cerr << "[Adventure] Offsets load warning: " << *err << "\n";
@@ -140,6 +159,28 @@ void AdventureState::onExit() {
 }
 
 void AdventureState::onResume() {
+    // Handle recruit result from CastleState.
+    if (m_pendingRecruit) {
+        TownState* srcTown = nullptr;
+        auto tsIt = m_townStates.find(m_pendingRecruit->townCoord);
+        if (tsIt != m_townStates.end()) srcTown = &tsIt->second;
+
+        for (const auto& s : m_pendingRecruit->hired) {
+            if (!s.type || s.count <= 0) continue;
+            if (!m_hero.addUnit(s.type, s.count)) {
+                // Army is full — refund gold and return units to the pool.
+                ResourcePool& treasury = m_turnManager.playerFaction().treasury;
+                for (int i = 0; i < s.count; ++i) treasury += s.type->cost;
+                if (srcTown) srcTown->recruitPool[s.type->id] += s.count;
+                std::cout << "[Adventure] Refunded " << s.count << "x " << s.type->name
+                          << " — army full.\n";
+            }
+        }
+        if (!m_pendingRecruit->hired.empty())
+            std::cout << "[Adventure] After recruit: " << m_hero.armySize() << " stacks.\n";
+        m_pendingRecruit.reset();
+    }
+
     if (!m_pendingCombat) return;
 
     // Move the outcome out before releasing the shared_ptr — taking a reference
@@ -162,6 +203,7 @@ void AdventureState::onResume() {
         case CombatResult::EnemyWon: {
             std::cout << "[Adventure] Defeat! Hero army wiped out.\n";
             for (auto& slot : m_hero.army) slot = {};
+            m_isDefeated = true;
             // Restore the dungeon guard so it can be challenged again (or ended game later).
             auto it = m_objectControl.find(m_combatCoord);
             if (it != m_objectControl.end())
@@ -274,9 +316,15 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
     std::cout << "  *** Visited " << obj->typeName() << ": " << obj->name << " ***\n";
 
     switch (obj->type) {
-        case ObjType::Town:
-            Application::get().pushState(std::make_unique<CastleState>(obj->name));
+        case ObjType::Town: {
+            TownState& ts = m_townStates[coord];
+            ResourcePool& treasury = m_turnManager.playerFaction().treasury;
+            m_pendingRecruit = std::make_shared<RecruitResult>();
+            m_pendingRecruit->townCoord = coord;
+            Application::get().pushState(
+                std::make_unique<CastleState>(obj->name, ts, treasury, m_hero, m_pendingRecruit));
             break;
+        }
         case ObjType::Dungeon:
             std::cout << "     Entering combat!\n";
             m_pendingCombat = std::make_shared<CombatOutcome>();
@@ -301,7 +349,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 
 void AdventureState::endTurn() {
     int day = m_turnManager.nextDay(m_hero, m_objectControl,
-                                    Application::get().resources());
+                                    Application::get().resources(), m_townStates);
     int gold = m_turnManager.playerFaction().treasury[Resource::Gold];
     m_heroSelected = false;
     m_previewPath.clear();
@@ -319,6 +367,22 @@ void AdventureState::wait() {
 
 bool AdventureState::handleEvent(void* sdlEvent) {
     SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
+
+    // Defeat screen: only allow restart or quit.
+    if (m_isDefeated) {
+        if (e->type == SDL_KEYDOWN) {
+            switch (e->key.keysym.sym) {
+                case SDLK_r:
+                    Application::get().replaceState(std::make_unique<AdventureState>());
+                    return true;
+                case SDLK_ESCAPE:
+                    Application::get().popState();
+                    return true;
+                default: break;
+            }
+        }
+        return true;  // swallow all other events while defeated
+    }
 
     if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
@@ -497,12 +561,63 @@ void AdventureState::render() {
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
 
-    if (m_showHUD)
+    if (m_showHUD) {
         m_hud.render(app.width(), app.height(), m_turnManager.day(),
                      m_hero.movesLeft, m_hero.movesMax,
                      static_cast<int>(m_objectControl.size()),
                      m_hero.pos.q, m_hero.pos.r, m_infiniteMoves,
                      m_turnManager.playerFaction().treasury[Resource::Gold]);
+
+        // ── Army panel (bottom-right) ─────────────────────────────────────────
+        int sw = app.width(), sh = app.height();
+        float sc     = sh / 600.0f;
+        float slotW  = 65 * sc;
+        float slotH  = 52 * sc;
+        float gap    = 4  * sc;
+        float totalW = Hero::ARMY_SLOTS * (slotW + gap) - gap;
+        float panX   = sw - totalW - 10 * sc;
+        float panY   = sh - slotH - 10 * sc;
+
+        m_hud.begin(sw, sh);
+        // Backing strip
+        m_hud.drawRect(panX - 6*sc, panY - 6*sc, totalW + 12*sc, slotH + 12*sc,
+                       {0.0f, 0.0f, 0.0f, 0.60f});
+
+        char slotBuf[32];
+        for (int i = 0; i < Hero::ARMY_SLOTS; ++i) {
+            const ArmySlot& slot = m_hero.army[i];
+            float sx = panX + i * (slotW + gap);
+
+            glm::vec4 bg = slot.isEmpty()
+                ? glm::vec4{0.08f, 0.06f, 0.04f, 0.50f}
+                : glm::vec4{0.14f, 0.09f, 0.05f, 0.90f};
+            m_hud.drawRect(sx, panY, slotW, slotH, bg);
+
+            if (!slot.isEmpty()) {
+                // First 7 chars of unit name (keeps slots compact)
+                std::snprintf(slotBuf, sizeof(slotBuf), "%.7s", slot.unitType->name.c_str());
+                m_hud.drawText(sx + 3*sc, panY + 5*sc,  sc * 0.85f,
+                               slotBuf, {0.85f, 0.80f, 0.65f, 1.0f});
+                std::snprintf(slotBuf, sizeof(slotBuf), "%d", slot.count);
+                m_hud.drawText(sx + 3*sc, panY + 25*sc, sc * 1.6f,
+                               slotBuf, {0.35f, 0.90f, 0.35f, 1.0f});
+            }
+        }
+    }
+
+    if (m_isDefeated) {
+        int w = app.width(), h = app.height();
+        m_hud.begin(w, h);
+        // Dark translucent veil.
+        m_hud.drawRect(0, 0, static_cast<float>(w), static_cast<float>(h),
+                       {0.0f, 0.0f, 0.0f, 0.65f});
+        float sc = h / 600.0f;
+        // y-DOWN: smaller y = higher on screen; larger y = lower.
+        m_hud.drawText(w * 0.5f - 90 * sc, h * 0.5f - 20 * sc, sc * 3.0f,
+                       "DEFEATED", {0.9f, 0.15f, 0.1f, 1.0f});
+        m_hud.drawText(w * 0.5f - 115 * sc, h * 0.5f + 30 * sc, sc * 1.2f,
+                       "Press R to restart  |  ESC to exit", {0.85f, 0.8f, 0.7f, 1.0f});
+    }
 }
 
 void AdventureState::renderTerrain() {

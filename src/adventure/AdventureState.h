@@ -13,6 +13,8 @@
 #include "render/RenderOffsets.h"
 #include "hex/HexCoord.h"
 #include "world/ObjectControl.h"
+#include "world/TownState.h"
+#include "castle/RecruitResult.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
@@ -86,6 +88,15 @@ private:
 
     // Session state — object ownership/defeat flags live here, NOT in WorldMap.
     ObjectControlMap m_objectControl;
+
+    // Per-town recruit pools and building state (keyed by town HexCoord).
+    TownStateMap m_townStates;
+
+    // Pending recruit result — set before pushing CastleState, read in onResume().
+    std::shared_ptr<RecruitResult> m_pendingRecruit;
+
+    // True after a combat defeat; blocks movement and shows overlay.
+    bool m_isDefeated = false;
 
     // Smooth movement — render pos chases waypoints along the actual hex path
     glm::vec3              m_heroRenderPos { 0.0f };
