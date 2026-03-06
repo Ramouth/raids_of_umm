@@ -18,14 +18,17 @@ static_assert(sizeof(kResourceKeys) / sizeof(kResourceKeys[0]) == RESOURCE_COUNT
 std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_units.clear();
     m_spells.clear();
+    m_items.clear();
     m_mineIncome.clear();
     m_unitsByTier.clear();
     m_allSpells.clear();
+    m_allItems.clear();
     m_loaded = false;
 
     if (auto err = loadUnits    (dataDir + "/units.json"))     return err;
     if (auto err = loadSpells   (dataDir + "/spells.json"))    return err;
     if (auto err = loadBuildings(dataDir + "/buildings.json")) return err;
+    if (auto err = loadItems    (dataDir + "/items.json"))     return err;
 
     rebuildViews();
     m_loaded = true;
@@ -42,7 +45,46 @@ const SpellDef* ResourceManager::spell(const std::string& id) const {
     return it != m_spells.end() ? &it->second : nullptr;
 }
 
+const WondrousItem* ResourceManager::item(const std::string& id) const {
+    auto it = m_items.find(id);
+    return it != m_items.end() ? &it->second : nullptr;
+}
+
 // ── Private ───────────────────────────────────────────────────────────────────
+
+std::optional<std::string> ResourceManager::loadItems(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open())
+        return "ResourceManager: cannot open " + path;
+
+    json root;
+    try { root = json::parse(f); }
+    catch (const json::exception& e) {
+        return std::string("ResourceManager: JSON parse error in ") + path + ": " + e.what();
+    }
+
+    for (const auto& j : root.value("items", json::array())) {
+        WondrousItem it;
+        it.id          = j.value("id",          "");
+        it.name        = j.value("name",        "");
+        it.description = j.value("description", "");
+        it.slot        = j.value("slot",        "");
+        it.cursed      = j.value("cursed",      false);
+
+        if (j.contains("passiveEffects") && j["passiveEffects"].is_array()) {
+            for (const auto& ej : j["passiveEffects"]) {
+                ItemEffect e;
+                e.stat   = ej.value("stat",   "");
+                e.amount = ej.value("amount", 0);
+                it.passiveEffects.push_back(std::move(e));
+            }
+        }
+
+        if (!it.id.empty())
+            m_items.emplace(it.id, std::move(it));
+    }
+    return std::nullopt;
+}
 
 std::optional<std::string> ResourceManager::loadUnits(const std::string& path) {
     std::ifstream f(path);
@@ -187,6 +229,14 @@ void ResourceManager::rebuildViews() {
     std::sort(m_allSpells.begin(), m_allSpells.end(),
         [](const SpellDef* a, const SpellDef* b) {
             if (a->level != b->level) return a->level < b->level;
+            return a->name < b->name;
+        });
+
+    m_allItems.clear();
+    for (const auto& kv : m_items)
+        m_allItems.push_back(&kv.second);
+    std::sort(m_allItems.begin(), m_allItems.end(),
+        [](const WondrousItem* a, const WondrousItem* b) {
             return a->name < b->name;
         });
 }

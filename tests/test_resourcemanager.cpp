@@ -204,4 +204,71 @@ SUITE("Hero — wallet is initially zeroed") {
         CHECK_EQ(h.wallet[static_cast<Resource>(i)], 0);
 }
 
+// ── WondrousItem loading ──────────────────────────────────────────────────────
+
+SUITE("ResourceManager — loads all 5 items from data/items.json") {
+    ResourceManager rm;
+    rm.load("data");
+    CHECK_EQ((int)rm.allItems().size(), 5);
+}
+
+SUITE("ResourceManager — known item lookup returns correct fields") {
+    ResourceManager rm;
+    rm.load("data");
+    const WondrousItem* it = rm.item("scarab_amulet");
+    CHECK(it != nullptr);
+    CHECK(it->name == std::string("Scarab Amulet"));
+    CHECK(it->slot == std::string("amulet"));
+    CHECK(!it->cursed);
+}
+
+SUITE("ResourceManager — item passive effects are parsed") {
+    ResourceManager rm;
+    rm.load("data");
+    const WondrousItem* it = rm.item("scarab_amulet");
+    CHECK(it != nullptr);
+    CHECK_EQ((int)it->passiveEffects.size(), 1);
+    CHECK(it->passiveEffects[0].stat == std::string("attack"));
+    CHECK_EQ(it->passiveEffects[0].amount, 1);
+}
+
+SUITE("ResourceManager — cursed item flag is parsed") {
+    ResourceManager rm;
+    rm.load("data");
+    const WondrousItem* it = rm.item("cursed_eye_of_set");
+    CHECK(it != nullptr);
+    CHECK(it->cursed);
+    CHECK_EQ((int)it->passiveEffects.size(), 2);
+}
+
+SUITE("ResourceManager — cursed item has mixed bonus and penalty") {
+    ResourceManager rm;
+    rm.load("data");
+    const WondrousItem* it = rm.item("cursed_eye_of_set");
+    CHECK(it != nullptr);
+    // One positive, one negative effect.
+    int positives = 0, negatives = 0;
+    for (const auto& e : it->passiveEffects) {
+        if (e.amount > 0) ++positives;
+        if (e.amount < 0) ++negatives;
+    }
+    CHECK_EQ(positives, 1);
+    CHECK_EQ(negatives, 1);
+}
+
+SUITE("ResourceManager — unknown item returns nullptr") {
+    ResourceManager rm;
+    rm.load("data");
+    CHECK(rm.item("does_not_exist") == nullptr);
+}
+
+SUITE("ResourceManager — allItems sorted alphabetically by name") {
+    ResourceManager rm;
+    rm.load("data");
+    const auto& items = rm.allItems();
+    CHECK(!items.empty());
+    for (size_t i = 1; i < items.size(); ++i)
+        CHECK(items[i-1]->name <= items[i]->name);
+}
+
 #endif // RESOURCE_MANAGER_IMPL

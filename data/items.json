@@ -1,0 +1,55 @@
+{
+  "items": [
+    {
+      "id": "scarab_amulet",
+      "name": "Scarab Amulet",
+      "slot": "amulet",
+      "cursed": false,
+      "description": "A carved lapis scarab humming with old battle-magic. Your troops strike harder.",
+      "passiveEffects": [
+        { "stat": "attack", "amount": 1 }
+      ]
+    },
+    {
+      "id": "veil_of_sands",
+      "name": "Veil of Sands",
+      "slot": "armor",
+      "cursed": false,
+      "description": "Woven from enchanted sandstorm dust. Blows deflect blows.",
+      "passiveEffects": [
+        { "stat": "defense", "amount": 2 }
+      ]
+    },
+    {
+      "id": "obsidian_edge",
+      "name": "Obsidian Edge",
+      "slot": "weapon",
+      "cursed": false,
+      "description": "A shard of volcanic glass bound to your hero's will. Each strike cuts deeper.",
+      "passiveEffects": [
+        { "stat": "damage", "amount": 3 }
+      ]
+    },
+    {
+      "id": "cursed_eye_of_set",
+      "name": "Cursed Eye of Set",
+      "slot": "trinket",
+      "cursed": true,
+      "description": "The god's gaze grants savage fury — but rots the bearer's guard. Cannot be discarded.",
+      "passiveEffects": [
+        { "stat": "attack",  "amount":  4 },
+        { "stat": "defense", "amount": -2 }
+      ]
+    },
+    {
+      "id": "serpent_band",
+      "name": "Serpent Band",
+      "slot": "trinket",
+      "cursed": false,
+      "description": "A coiling bronze band. The serpent spirit inside quickens your warriors' legs.",
+      "passiveEffects": [
+        { "stat": "speed", "amount": 1 }
+      ]
+    }
+  ]
+}
