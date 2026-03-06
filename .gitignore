@@ -4,6 +4,7 @@ local_deps/
 
 # PixelLab scripts and API credentials
 generate_*.py
+assets/pixellab
 assets/pixellab_api.txt
 
 # Logs
