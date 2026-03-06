@@ -167,9 +167,13 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
             break;
         }
         case CombatEvent::Type::UnitAttacked: {
-            const char* atk = unitName(m_engine, ev.isPlayer, ev.stackIndex);
+            const char* atk = unitName(m_engine, ev.isPlayer,       ev.stackIndex);
             const char* def = unitName(m_engine, ev.targetIsPlayer, ev.targetIndex);
-            std::snprintf(buf, sizeof(buf), "%s attacks %s", atk, def);
+            const char* verb = ev.isRetaliation ? "retaliates vs" : "attacks";
+            if (ev.wasFlanked)
+                std::snprintf(buf, sizeof(buf), "%s %s %s [PINNED]", atk, verb, def);
+            else
+                std::snprintf(buf, sizeof(buf), "%s %s %s", atk, verb, def);
             pushLog(buf, ev.isPlayer ? COL_PLAYER : COL_ENEMY);
             break;
         }

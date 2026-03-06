@@ -159,6 +159,15 @@ void CombatEngine::doAttack(int targetIndex) {
         --attacker.shotsLeft;
     }
 
+    // Flanking / Pinned: target has attackers on two opposite hex sides.
+    // Pinned units take 150% damage and lose their retaliation.
+    const auto& friendlyStacks = slot.isPlayer ? m_player.stacks : m_enemy.stacks;
+    bool pinned = !isRanged && isFlanked(target, friendlyStacks);
+    if (pinned) {
+        target.hasRetaliated = true;  // suppress retaliation before it fires
+        std::cout << "[CombatEngine] " << target.type->name << " is PINNED — no retaliation, +50% damage\n";
+    }
+
     // ── Attack event ─────────────────────────────────────────────────────────
     {
         CombatEvent ev;
@@ -167,10 +176,12 @@ void CombatEngine::doAttack(int targetIndex) {
         ev.stackIndex     = slot.stackIndex;
         ev.targetIsPlayer = !slot.isPlayer;
         ev.targetIndex    = targetIndex;
+        ev.wasFlanked     = pinned;
         m_events.push_back(ev);
     }
 
     int damage = calcDamage(attacker, target, m_rng);
+    if (pinned) damage = damage * 3 / 2;
     applyDamage(target, damage);
 
     std::cout << "[CombatEngine] " << attacker.type->name
@@ -206,6 +217,7 @@ void CombatEngine::doAttack(int targetIndex) {
             ev.stackIndex     = targetIndex;
             ev.targetIsPlayer = slot.isPlayer;
             ev.targetIndex    = slot.stackIndex;
+            ev.isRetaliation  = true;
             m_events.push_back(ev);
         }
 
@@ -215,7 +227,7 @@ void CombatEngine::doAttack(int targetIndex) {
 
         std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
-                  << " (" << attacker.count << " survivors)\n";
+                  << " (" << attacker.type->name << ": " << attacker.count << " left)\n";
 
         {
             CombatEvent ev;
@@ -235,6 +247,27 @@ void CombatEngine::doAttack(int targetIndex) {
     }
 
     advance();
+}
+
+// static
+bool CombatEngine::isFlanked(const CombatUnit& target,
+                               const std::vector<CombatUnit>& attackers) {
+    // Opposite-direction pairs on a hex grid: (0,3), (1,4), (2,5).
+    // Pinned = at least one pair where both opposite neighbours are occupied
+    // by a living attacker.
+    for (int dir = 0; dir < 3; ++dir) {
+        HexCoord sideA = target.pos.neighbor(dir);
+        HexCoord sideB = target.pos.neighbor(dir + 3);
+        bool hasA = false, hasB = false;
+        for (const auto& s : attackers) {
+            if (!s.isDead()) {
+                if (s.pos == sideA) hasA = true;
+                if (s.pos == sideB) hasB = true;
+            }
+        }
+        if (hasA && hasB) return true;
+    }
+    return false;
 }
 
 // static

@@ -1126,4 +1126,128 @@ SUITE("CombatOutcome — retreat result propagates") {
     CHECK(outcome.result == CombatResult::Retreated);
 }
 
+// ── Flanking / Pinned ─────────────────────────────────────────────────────────
+
+// Helper: two-stack player army
+static CombatArmy twoStacks(const std::string& a, const std::string& b,
+                             int speed, bool isPlayer) {
+    CombatArmy army;
+    army.ownerName = isPlayer ? "Player" : "Enemy";
+    army.isPlayer  = isPlayer;
+    army.stacks.push_back(CombatUnit::make(makeUnit(a, speed), 5, isPlayer));
+    army.stacks.push_back(CombatUnit::make(makeUnit(b, speed), 5, isPlayer));
+    return army;
+}
+
+SUITE("CombatEngine — isFlanked false when only one attacker") {
+    // One player stack adjacent to the target, no opposite-side attacker.
+    CombatArmy p = twoStacks("A", "B", 6, true);
+    CombatArmy e = oneStack("Target", 4, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    // Place target at (0,0), one attacker at neighbor(0) — no flanking yet.
+    HexCoord targetPos{ 0, 0 };
+    eng.teleportUnit(false, 0, targetPos);
+    eng.teleportUnit(true,  0, targetPos.neighbor(0));
+    eng.teleportUnit(true,  1, targetPos.neighbor(1)); // same side cluster, not opposite
+
+    const auto& target    = eng.enemyArmy().stacks[0];
+    const auto& attackers = eng.playerArmy().stacks;
+    CHECK(!CombatEngine::isFlanked(target, attackers));
+}
+
+SUITE("CombatEngine — isFlanked true when attackers on opposite sides") {
+    CombatArmy p = twoStacks("A", "B", 6, true);
+    CombatArmy e = oneStack("Target", 4, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    HexCoord targetPos{ 0, 0 };
+    eng.teleportUnit(false, 0, targetPos);
+    eng.teleportUnit(true,  0, targetPos.neighbor(0));   // side 0
+    eng.teleportUnit(true,  1, targetPos.neighbor(3));   // opposite side 3
+
+    const auto& target    = eng.enemyArmy().stacks[0];
+    const auto& attackers = eng.playerArmy().stacks;
+    CHECK(CombatEngine::isFlanked(target, attackers));
+}
+
+SUITE("CombatEngine — pinned unit takes at least 150% of minimum possible damage") {
+    // Attacker: 20 creatures, minDmg=2, maxDmg=2 (fixed), attack=5, defense=1.
+    // Target: defense=1. mult = 1 + 0.05*(5-1) = 1.2.
+    // Non-flanked minimum: 20 * 2 * 1.2 = 48.
+    // Flanked minimum:     48 * 1.5     = 72.
+    // Target has 10000 HP so it won't die; we just check dealt damage >= 72.
+
+    UnitType atkType; atkType.id="atk"; atkType.name="Atk";
+    atkType.speed=6; atkType.hitPoints=10; atkType.attack=5; atkType.defense=1;
+    atkType.minDamage=2; atkType.maxDamage=2;
+    const UnitType* atkPtr = reg(atkType);
+
+    UnitType defType; defType.id="def"; defType.name="Def";
+    defType.speed=4; defType.hitPoints=10000; defType.attack=1; defType.defense=1;
+    defType.minDamage=1; defType.maxDamage=1;
+    const UnitType* defPtr = reg(defType);
+
+    CombatArmy p; p.ownerName="Player"; p.isPlayer=true;
+    p.stacks.push_back(CombatUnit::make(atkPtr, 20, true));
+    p.stacks.push_back(CombatUnit::make(atkPtr, 20, true));
+
+    CombatArmy e; e.ownerName="Enemy"; e.isPlayer=false;
+    e.stacks.push_back(CombatUnit::make(defPtr, 1, false));
+
+    CombatEngine eng(std::move(p), std::move(e));
+
+    HexCoord targetPos{ 3, 0 };
+    eng.teleportUnit(false, 0, targetPos);
+    eng.teleportUnit(true,  0, targetPos.neighbor(0)); // side 0
+    eng.teleportUnit(true,  1, targetPos.neighbor(3)); // opposite side 3 → pinned
+
+    CHECK(CombatEngine::isFlanked(eng.enemyArmy().stacks[0],
+                                   eng.playerArmy().stacks));
+
+    int hpBefore = eng.enemyArmy().stacks[0].hpLeft;
+    eng.doAttack(0);
+    eng.drainEvents();
+    int hpAfter  = eng.enemyArmy().stacks[0].hpLeft;
+    int dealt    = hpBefore - hpAfter;
+
+    CHECK(dealt >= 72);  // flanked floor: 20 * 2 * 1.2 * 1.5 = 72
+}
+
+SUITE("CombatEngine — pinned unit cannot retaliate") {
+    UnitType strongType; strongType.id="strong"; strongType.name="Strong";
+    strongType.speed=6; strongType.hitPoints=5; strongType.attack=10;
+    strongType.defense=1; strongType.minDamage=1; strongType.maxDamage=2;
+    const UnitType* strongPtr = reg(strongType);
+
+    UnitType weakType; weakType.id="weak"; weakType.name="Weak";
+    weakType.speed=4; weakType.hitPoints=50; weakType.attack=1;
+    weakType.defense=1; weakType.minDamage=1; weakType.maxDamage=1;
+    const UnitType* weakPtr = reg(weakType);
+
+    CombatArmy p; p.ownerName="Player"; p.isPlayer=true;
+    p.stacks.push_back(CombatUnit::make(strongPtr, 5, true));
+    p.stacks.push_back(CombatUnit::make(strongPtr, 5, true));
+
+    CombatArmy e; e.ownerName="Enemy"; e.isPlayer=false;
+    e.stacks.push_back(CombatUnit::make(weakPtr, 100, false));
+
+    CombatEngine eng(std::move(p), std::move(e));
+
+    // Pin the target: player stacks on opposite sides
+    HexCoord targetPos{ 3, 0 };
+    eng.teleportUnit(false, 0, targetPos);
+    eng.teleportUnit(true,  0, targetPos.neighbor(0));
+    eng.teleportUnit(true,  1, targetPos.neighbor(3));
+
+    int attackerCountBefore = eng.playerArmy().stacks[0].count;
+
+    // Player stack 0 attacks — target is pinned, should not retaliate
+    eng.doAttack(0);
+    eng.drainEvents();
+
+    // Attacker count unchanged = no retaliation damage killed any creatures
+    CHECK_EQ(eng.playerArmy().stacks[0].count, attackerCountBefore);
+}
+
 #endif // COMBAT_ENGINE_IMPL

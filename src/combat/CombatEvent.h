@@ -40,7 +40,8 @@ struct CombatOutcome {
  *
  * Field usage by Type:
  *   UnitMoved    — isPlayer, stackIndex, from, to
- *   UnitAttacked — isPlayer, stackIndex, targetIsPlayer, targetIndex
+ *   UnitAttacked — isPlayer, stackIndex, targetIsPlayer, targetIndex,
+ *                  isRetaliation, wasFlanked
  *   UnitDamaged  — isPlayer, stackIndex, damage
  *   UnitDied     — isPlayer, stackIndex
  *   UnitDefended — isPlayer, stackIndex
@@ -63,8 +64,10 @@ struct CombatEvent {
     int          stackIndex     = -1;
 
     // Target (UnitAttacked only)
-    bool         targetIsPlayer = false;
-    int          targetIndex    = -1;
+    bool         targetIsPlayer  = false;
+    int          targetIndex     = -1;
+    bool         isRetaliation   = false;  // true when this attack is a counter-attack
+    bool         wasFlanked      = false;  // true when target was pinned (flanking bonus applied)
 
     // Damage amount (UnitDamaged only)
     int          damage         = 0;

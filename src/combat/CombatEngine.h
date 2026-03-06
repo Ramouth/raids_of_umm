@@ -77,6 +77,11 @@ public:
     // Advance to the next actor; rebuilds the queue when a round ends.
     void advance();
 
+    // True if target has friendly attackers on two opposite hex sides.
+    // Pinned units take 150% damage and cannot retaliate.
+    static bool isFlanked(const CombatUnit& target,
+                          const std::vector<CombatUnit>& attackers);
+
     // ── Event queue ──────────────────────────────────────────────────────────
     // Returns all events produced since the last drain, then clears the queue.
     // Call once per update() tick; consume each event to drive animations.
@@ -104,6 +109,7 @@ private:
 
     // Cascade damage through the stack, decrementing count as creatures die.
     static void applyDamage(CombatUnit& target, int damage);
+
 
     CombatArmy            m_player;
     CombatArmy            m_enemy;
