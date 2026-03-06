@@ -1250,4 +1250,51 @@ SUITE("CombatEngine — pinned unit cannot retaliate") {
     CHECK_EQ(eng.playerArmy().stacks[0].count, attackerCountBefore);
 }
 
+// ── CombatOutcome SC fields ───────────────────────────────────────────────────
+
+SUITE("CombatOutcome — scFound is empty by default") {
+    CombatOutcome outcome;
+    CHECK(outcome.scFound.empty());
+}
+
+SUITE("CombatOutcome — scFound can hold an SC") {
+    CombatOutcome outcome;
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.name      = "Kha'Rim the Wanderer";
+    sc.archetype = "tank";
+    outcome.scFound.push_back(sc);
+    CHECK_EQ((int)outcome.scFound.size(), 1);
+    CHECK(outcome.scFound[0].id        == std::string("kharim"));
+    CHECK(outcome.scFound[0].archetype == std::string("tank"));
+}
+
+SUITE("Hero — addSpecial from outcome scFound") {
+    Hero h;
+    CombatOutcome outcome;
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.name      = "Kha'Rim the Wanderer";
+    sc.archetype = "tank";
+    outcome.scFound.push_back(sc);
+
+    // Simulate what AdventureState::onResume() does.
+    for (const auto& s : outcome.scFound)
+        h.addSpecial(s);
+
+    CHECK_EQ((int)h.specials.size(), 1);
+    CHECK(h.specials[0].id == std::string("kharim"));
+}
+
+SUITE("Hero — SC not added twice if outcome processed twice (guard check)") {
+    Hero h;
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.archetype = "tank";
+
+    CHECK(h.addSpecial(sc));
+    CHECK(!h.addSpecial(sc));  // duplicate id rejected
+    CHECK_EQ((int)h.specials.size(), 1);
+}
+
 #endif // COMBAT_ENGINE_IMPL

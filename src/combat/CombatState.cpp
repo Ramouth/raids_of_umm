@@ -10,11 +10,13 @@
 #include <cstdlib>
 
 CombatState::CombatState(CombatArmy player, CombatArmy enemy,
-                         std::shared_ptr<CombatOutcome> outcome,
-                         std::vector<std::string>       lootTable)
+                         std::shared_ptr<CombatOutcome>  outcome,
+                         std::vector<std::string>        lootTable,
+                         std::optional<SpecialCharacter> dungeonSC)
     : m_engine(std::move(player), std::move(enemy))
     , m_outcome(std::move(outcome))
     , m_lootTable(std::move(lootTable))
+    , m_dungeonSC(std::move(dungeonSC))
 {}
 
 // ── Log helpers ───────────────────────────────────────────────────────────────
@@ -89,6 +91,10 @@ void CombatState::onExit() {
             int idx = std::rand() % static_cast<int>(m_lootTable.size());
             m_outcome->itemsFound.push_back(m_lootTable[idx]);
         }
+
+        // On victory, the dungeon's resident SC (if any) joins the hero.
+        if (m_engine.result() == CombatResult::PlayerWon && m_dungeonSC.has_value())
+            m_outcome->scFound.push_back(*m_dungeonSC);
     }
 }
 

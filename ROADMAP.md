@@ -38,10 +38,10 @@ not just a tech demo. Every item below is a hard dependency.
 | 2 | Turn logic: move points, day/week cycle | ✅ done | — |
 | 3 | Wondrous item data + Hero inventory | ✅ done | A, B |
 | 4 | Dungeon drops item on victory | ✅ done | C |
-| 5 | Combat attack-range highlights (red/blue) | ⬜ | D0 |
-| 6 | Flanking / Pinned mechanic | ⬜ | D1–D2 |
-| 7 | `SpecialCharacter` struct + spawns at dungeon | ⬜ | F1 |
-| 8 | Clearing dungeon recruits SC into hero party | ⬜ | F2 |
+| 5 | Combat attack-range highlights (red/blue) | ✅ done | D0 |
+| 6 | Flanking / Pinned mechanic | ✅ done | D1–D2 |
+| 7 | `SpecialCharacter` struct + spawns at dungeon | ✅ done | F1 |
+| 8 | Clearing dungeon recruits SC into hero party | ✅ done | F2 |
 | 9 | `EquipmentState` — equip items onto SCs | ⬜ | G1–G2 |
 | 10 | Cursed item locks in slot (no unequip) | ⬜ | G3 |
 | 11 | Equipped item passive effects fire in combat | ⬜ | E1 |

@@ -334,4 +334,110 @@ SUITE("ResourceManager — allItems sorted alphabetically by name") {
         CHECK(items[i-1]->name <= items[i]->name);
 }
 
+// ── SpecialCharacter ──────────────────────────────────────────────────────────
+
+SUITE("SpecialCharacter — default is empty") {
+    SpecialCharacter sc;
+    CHECK(sc.isEmpty());
+    for (int i = 0; i < 4; ++i)
+        CHECK(sc.equipped[i] == nullptr);
+}
+
+SUITE("SpecialCharacter — fields round-trip") {
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.name      = "Kha'Rim the Wanderer";
+    sc.archetype = "tank";
+    CHECK(!sc.isEmpty());
+    CHECK(sc.id        == std::string("kharim"));
+    CHECK(sc.name      == std::string("Kha'Rim the Wanderer"));
+    CHECK(sc.archetype == std::string("tank"));
+}
+
+SUITE("SpecialCharacter — equipped slots hold item pointers") {
+    ResourceManager rm;
+    rm.load("data");
+    SpecialCharacter sc;
+    sc.id = "kharim";
+    sc.equipped[0] = rm.item("scarab_amulet");
+    CHECK(sc.equipped[0] != nullptr);
+    CHECK(sc.equipped[0]->id == std::string("scarab_amulet"));
+    CHECK(sc.equipped[1] == nullptr);
+}
+
+// ── Hero SC party management ──────────────────────────────────────────────────
+
+SUITE("Hero — starts with empty specials") {
+    Hero h;
+    CHECK(h.specials.empty());
+    CHECK(!h.scFull());
+}
+
+SUITE("Hero — addSpecial stores an SC") {
+    Hero h;
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.name      = "Kha'Rim the Wanderer";
+    sc.archetype = "tank";
+    CHECK(h.addSpecial(sc));
+    CHECK_EQ((int)h.specials.size(), 1);
+    CHECK(h.specials[0].id == std::string("kharim"));
+}
+
+SUITE("Hero — addSpecial rejects empty id") {
+    Hero h;
+    SpecialCharacter sc;   // id is ""
+    CHECK(!h.addSpecial(sc));
+    CHECK(h.specials.empty());
+}
+
+SUITE("Hero — addSpecial rejects duplicate id") {
+    Hero h;
+    SpecialCharacter sc;
+    sc.id = "kharim";
+    CHECK(h.addSpecial(sc));
+    CHECK(!h.addSpecial(sc));
+    CHECK_EQ((int)h.specials.size(), 1);
+}
+
+SUITE("Hero — scFull after 3 specials, rejects 4th") {
+    Hero h;
+    for (int i = 0; i < Hero::SC_SLOTS; ++i) {
+        SpecialCharacter sc;
+        sc.id = std::string("sc") + std::to_string(i);
+        CHECK(h.addSpecial(sc));
+    }
+    CHECK(h.scFull());
+    SpecialCharacter extra;
+    extra.id = "extra";
+    CHECK(!h.addSpecial(extra));
+    CHECK_EQ((int)h.specials.size(), 3);
+}
+
+SUITE("Hero — findSpecial returns pointer when present") {
+    Hero h;
+    SpecialCharacter sc;
+    sc.id        = "kharim";
+    sc.archetype = "tank";
+    h.addSpecial(sc);
+    SpecialCharacter* found = h.findSpecial("kharim");
+    CHECK(found != nullptr);
+    CHECK(found->archetype == std::string("tank"));
+}
+
+SUITE("Hero — findSpecial returns nullptr when absent") {
+    Hero h;
+    CHECK(h.findSpecial("nobody") == nullptr);
+}
+
+SUITE("Hero — findSpecial const overload works") {
+    Hero h;
+    SpecialCharacter sc;
+    sc.id = "kharim";
+    h.addSpecial(sc);
+    const Hero& ch = h;
+    CHECK(ch.findSpecial("kharim") != nullptr);
+    CHECK(ch.findSpecial("other")  == nullptr);
+}
+
 #endif // RESOURCE_MANAGER_IMPL

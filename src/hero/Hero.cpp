@@ -48,6 +48,31 @@ bool Hero::addUnit(const UnitType* type, int count) {
     return false;  // army full
 }
 
+bool Hero::scFull() const {
+    return static_cast<int>(specials.size()) >= SC_SLOTS;
+}
+
+bool Hero::addSpecial(const SpecialCharacter& sc) {
+    if (sc.isEmpty()) return false;
+    if (scFull()) return false;
+    for (const auto& s : specials)
+        if (s.id == sc.id) return false;
+    specials.push_back(sc);
+    return true;
+}
+
+SpecialCharacter* Hero::findSpecial(const std::string& id) {
+    for (auto& s : specials)
+        if (s.id == id) return &s;
+    return nullptr;
+}
+
+const SpecialCharacter* Hero::findSpecial(const std::string& id) const {
+    for (const auto& s : specials)
+        if (s.id == id) return &s;
+    return nullptr;
+}
+
 bool Hero::hasItem(const std::string& id) const {
     for (const auto* it : items)
         if (it && it->id == id) return true;

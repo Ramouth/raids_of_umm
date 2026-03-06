@@ -15,6 +15,7 @@
 #include "world/ObjectControl.h"
 #include "world/TownState.h"
 #include "castle/RecruitResult.h"
+#include "dungeon/DungeonOutcome.h"
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
@@ -70,7 +71,6 @@ private:
     // ── Rendering helpers ────────────────────────────────────────────────────
     void renderTerrain();
     void renderObjects();
-    void renderEnemySprites();
     void renderHero();
     void renderPathPreview();
 
@@ -82,7 +82,7 @@ private:
 
     HexRenderer    m_hexRenderer;
     SpriteRenderer m_spriteRenderer;
-    SpriteRenderer m_enemySpriteRenderer;
+    SpriteRenderer m_dungeonSpriteRenderer;
     SpriteRenderer m_buildingSpriteRenderer;
     HUDRenderer    m_hud;
 
@@ -136,9 +136,9 @@ private:
     // Whether this state owns a procedurally generated map or a provided one.
     bool m_externalMap = false;
 
-    // Pending combat result — set before pushing CombatState, read in onResume().
-    std::shared_ptr<CombatOutcome> m_pendingCombat;
-    HexCoord                       m_combatCoord;  // map coord of the dungeon fought at
+    // Pending dungeon result — set before pushing DungeonState, read in onResume().
+    std::shared_ptr<DungeonOutcome> m_pendingDungeon;
+    HexCoord                        m_dungeonCoord;  // overworld coord of the entered dungeon
 
     RenderOffsetConfig m_offsets;
 

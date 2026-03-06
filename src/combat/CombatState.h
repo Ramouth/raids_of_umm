@@ -6,9 +6,11 @@
 #include "CombatMap.h"
 #include "render/Camera2D.h"
 #include "render/HUDRenderer.h"
+#include "entities/SpecialCharacter.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <deque>
+#include <optional>
 #include <queue>
 #include <memory>
 #include <string>
@@ -36,8 +38,9 @@ public:
     // outcome: optional shared result written in onExit() for the caller to read
     //          after this state is popped.  Pass nullptr to ignore.
     explicit CombatState(CombatArmy player, CombatArmy enemy,
-                         std::shared_ptr<CombatOutcome> outcome  = nullptr,
-                         std::vector<std::string>       lootTable = {});
+                         std::shared_ptr<CombatOutcome>  outcome   = nullptr,
+                         std::vector<std::string>        lootTable = {},
+                         std::optional<SpecialCharacter> dungeonSC = std::nullopt);
 
     void onEnter() override;
     void onExit()  override;
@@ -98,6 +101,9 @@ private:
 
     // Item IDs eligible to drop on PlayerWon. One is chosen at random.
     std::vector<std::string> m_lootTable;
+
+    // SC resident in this dungeon; joins hero on PlayerWon (nullopt = no SC).
+    std::optional<SpecialCharacter> m_dungeonSC;
 
     static constexpr float CAM_SPEED           = 8.0f;
     static constexpr float HEX_SIZE            = 1.0f;

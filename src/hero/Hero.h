@@ -3,6 +3,7 @@
 #include "world/Resources.h"
 #include "world/WondrousItem.h"
 #include "entities/UnitType.h"
+#include "entities/SpecialCharacter.h"
 #include "factions/Faction.h"
 #include <string>
 #include <array>
@@ -72,6 +73,20 @@ struct Hero {
 
     // True if inventory contains an item with this id.
     bool hasItem(const std::string& id) const;
+
+    // ── Special Characters (up to 3 party members) ───────────────────────────
+    static constexpr int SC_SLOTS = 3;
+    std::vector<SpecialCharacter> specials;  // max SC_SLOTS entries
+
+    // True when all SC slots are occupied.
+    bool scFull() const;
+
+    // Add an SC. Returns false if party is full or id is already present.
+    bool addSpecial(const SpecialCharacter& sc);
+
+    // Find an SC by id. Returns nullptr if not in party.
+    SpecialCharacter*       findSpecial(const std::string& id);
+    const SpecialCharacter* findSpecial(const std::string& id) const;
 
     // ── Spellbook ─────────────────────────────────────────────────────────────
     int spellPower = 1;

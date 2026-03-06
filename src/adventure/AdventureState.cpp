@@ -1,7 +1,10 @@
 #include "AdventureState.h"
 #include "castle/CastleState.h"
+#include "combat/CombatAI.h"
+#include "combat/CombatEngine.h"
 #include "combat/CombatState.h"
 #include "combat/CombatUnit.h"
+#include "dungeon/DungeonState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include "world/Resources.h"
@@ -24,6 +27,11 @@ CombatArmy AdventureState::buildPlayerArmy() const {
         if (!slot.isEmpty())
             army.stacks.push_back(CombatUnit::make(slot.unitType, slot.count, true));
     }
+
+    // SCs fight as solo units (count=1).
+    for (const auto& sc : m_hero.specials)
+        if (!sc.isEmpty())
+            army.stacks.push_back(CombatUnit::make(&sc.combatStats, 1, true));
 
     // Fallback: if hero has no army (shouldn't happen after initHeroArmy), fight bare-handed.
     if (army.stacks.empty()) {
@@ -95,8 +103,8 @@ void AdventureState::onEnter() {
     m_hexRenderer.loadTerrainTextures();
     m_spriteRenderer.init();
     m_spriteRenderer.loadSprite("assets/textures/units/armoured_warrior.png");
-    m_enemySpriteRenderer.init();
-    m_enemySpriteRenderer.loadSprite("assets/textures/units/enemy_scout.png");
+    m_dungeonSpriteRenderer.init();
+    m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
     m_buildingSpriteRenderer.init();
     m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
     m_hud.init();
@@ -181,54 +189,40 @@ void AdventureState::onResume() {
         m_pendingRecruit.reset();
     }
 
-    if (!m_pendingCombat) return;
+    if (!m_pendingDungeon) return;
 
-    // Move the outcome out before releasing the shared_ptr — taking a reference
-    // then calling reset() would destroy the object and leave a dangling ref.
-    CombatOutcome outcome = std::move(*m_pendingCombat);
-    m_pendingCombat.reset();
+    DungeonOutcome outcome = std::move(*m_pendingDungeon);
+    m_pendingDungeon.reset();
 
-    switch (outcome.result) {
-        case CombatResult::PlayerWon: {
-            std::cout << "[Adventure] Victory! Syncing hero army from survivors.\n";
-            // Rebuild hero army from surviving stacks (preserves unit types & counts).
-            for (auto& slot : m_hero.army) slot = {};
-            for (const auto& s : outcome.survivors) {
-                if (s.type && s.count > 0)
-                    m_hero.addUnit(s.type, s.count);
-            }
-            std::cout << "[Adventure] Army after battle: " << m_hero.armySize() << " stacks.\n";
+    // Sync hero army from dungeon survivors.
+    for (auto& slot : m_hero.army) slot = {};
+    for (const auto& s : outcome.survivors)
+        if (s.type && s.count > 0)
+            m_hero.addUnit(s.type, s.count);
+    std::cout << "[Adventure] Returned from dungeon. Army: " << m_hero.armySize() << " stacks.\n";
 
-            // Add any dropped items to hero inventory.
-            auto& rm = Application::get().resources();
-            for (const auto& itemId : outcome.itemsFound) {
-                if (const WondrousItem* it = rm.item(itemId)) {
-                    if (m_hero.addItem(it))
-                        std::cout << "[Adventure] Found item: " << it->name << "\n";
-                }
-            }
-            break;
+    if (outcome.survivors.empty()) {
+        // Hero wiped out in dungeon.
+        std::cout << "[Adventure] Hero defeated in dungeon.\n";
+        m_isDefeated = true;
+        return;
+    }
+
+    if (outcome.completed) {
+        m_objectControl[m_dungeonCoord].guardDefeated = true;
+
+        auto& rm = Application::get().resources();
+        for (const auto& sc : outcome.scRecruited) {
+            if (m_hero.addSpecial(sc))
+                std::cout << "[Adventure] " << sc.name << " joins your party!\n";
+            else
+                std::cout << "[Adventure] Party full — " << sc.name << " could not join.\n";
         }
-        case CombatResult::EnemyWon: {
-            std::cout << "[Adventure] Defeat! Hero army wiped out.\n";
-            for (auto& slot : m_hero.army) slot = {};
-            m_isDefeated = true;
-            // Restore the dungeon guard so it can be challenged again (or ended game later).
-            auto it = m_objectControl.find(m_combatCoord);
-            if (it != m_objectControl.end())
-                it->second.guardDefeated = false;
-            break;
+        for (const auto& id : outcome.itemsFound) {
+            if (const WondrousItem* it = rm.item(id))
+                if (m_hero.addItem(it))
+                    std::cout << "[Adventure] Found item: " << it->name << "\n";
         }
-        case CombatResult::Retreated: {
-            std::cout << "[Adventure] Retreated — hero army restored to pre-battle state.\n";
-            // Restore guard visibility so the dungeon is still accessible.
-            auto it = m_objectControl.find(m_combatCoord);
-            if (it != m_objectControl.end())
-                it->second.guardDefeated = false;
-            break;
-        }
-        default:
-            break;
     }
 }
 
@@ -318,9 +312,8 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 
     auto& ctrl = m_objectControl[coord];
     ctrl.objType = obj->type;
-    if (obj->type == ObjType::Dungeon)
-        ctrl.guardDefeated = true;
-    else if (obj->type != ObjType::Town)
+    // Note: guardDefeated for dungeons is set in onResume() when DungeonOutcome.completed is true.
+    if (obj->type != ObjType::Town && obj->type != ObjType::Dungeon)
         ctrl.ownerFaction = 1;
     std::cout << "  *** Visited " << obj->typeName() << ": " << obj->name << " ***\n";
 
@@ -334,14 +327,18 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
                 std::make_unique<CastleState>(obj->name, ts, treasury, m_hero, m_pendingRecruit));
             break;
         }
-        case ObjType::Dungeon:
-            std::cout << "     Entering combat!\n";
-            m_pendingCombat = std::make_shared<CombatOutcome>();
-            m_combatCoord   = coord;
+        case ObjType::Dungeon: {
+            std::cout << "     Entering dungeon!\n";
+            m_pendingDungeon = std::make_shared<DungeonOutcome>();
+            m_dungeonCoord   = coord;
+            SpecialCharacter kharim = SpecialCharacter::make(
+                "kharim", "Kha'Rim the Wanderer", "tank");
             Application::get().pushState(
-                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(*obj),
-                                              m_pendingCombat));
+                std::make_unique<DungeonState>(m_hero, kharim,
+                                               std::vector<std::string>{},
+                                               m_pendingDungeon));
             break;
+        }
         case ObjType::GoldMine:
             std::cout << "     +500 Gold per turn secured!\n";
             break;
@@ -411,6 +408,36 @@ bool AdventureState::handleEvent(void* sdlEvent) {
             case SDLK_r:
                 Application::get().replaceState(std::make_unique<AdventureState>(std::move(m_map)));
                 return true;
+            case SDLK_q: {
+                // Quick auto-resolved test combat — no visuals, instant result.
+                static const UnitType s_dummy = []() {
+                    UnitType t;
+                    t.id = "dummy"; t.name = "Training Dummy";
+                    t.hitPoints = 5; t.attack = 2; t.defense = 2;
+                    t.minDamage = 1; t.maxDamage = 2; t.speed = 2; t.moveRange = 2;
+                    return t;
+                }();
+                CombatArmy enemy;
+                enemy.ownerName = "Training Dummies";
+                enemy.isPlayer  = false;
+                enemy.stacks.push_back(CombatUnit::make(&s_dummy, 6, false));
+
+                CombatEngine sim(buildPlayerArmy(), std::move(enemy));
+                constexpr int MAX_TURNS = 500;
+                for (int i = 0; i < MAX_TURNS && !sim.isOver(); ++i)
+                    CombatAI::takeTurn(sim);
+
+                const char* res = sim.result() == CombatResult::PlayerWon ? "PLAYER WINS"
+                                : sim.result() == CombatResult::EnemyWon  ? "ENEMY WINS"
+                                                                           : "DRAW/RETREAT";
+                std::cout << "[QuickCombat] " << res
+                          << " after round " << sim.roundNumber() << "\n";
+                for (const auto& s : sim.playerArmy().stacks)
+                    if (!s.isDead())
+                        std::cout << "  Survivor: " << s.type->name
+                                  << " x" << s.count << "\n";
+                return true;
+            }
             case SDLK_UP:    m_keyW = true; return true;
             case SDLK_DOWN:  m_keyS = true; return true;
             case SDLK_LEFT:  m_keyA = true; return true;
@@ -565,7 +592,6 @@ void AdventureState::render() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
     renderObjects();
-    renderEnemySprites();
     renderHero();
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -610,6 +636,39 @@ void AdventureState::render() {
                 std::snprintf(slotBuf, sizeof(slotBuf), "%d", slot.count);
                 m_hud.drawText(sx + 3*sc, panY + 25*sc, sc * 1.6f,
                                slotBuf, {0.35f, 0.90f, 0.35f, 1.0f});
+            }
+        }
+
+        // ── SC party panel (above army panel) ────────────────────────────────
+        float scSlotW = slotW;
+        float scSlotH = 38 * sc;
+        float scTotalW = Hero::SC_SLOTS * (scSlotW + gap) - gap;
+        float scPanX  = sw - scTotalW - 10 * sc;
+        float scPanY  = panY - scSlotH - 8 * sc;
+
+        m_hud.drawRect(scPanX - 6*sc, scPanY - 6*sc, scTotalW + 12*sc, scSlotH + 12*sc,
+                       {0.0f, 0.0f, 0.0f, 0.50f});
+
+        for (int i = 0; i < Hero::SC_SLOTS; ++i) {
+            float sx = scPanX + i * (scSlotW + gap);
+            bool occupied = i < static_cast<int>(m_hero.specials.size());
+
+            glm::vec4 bg = occupied
+                ? glm::vec4{0.10f, 0.08f, 0.16f, 0.90f}   // dark purple when filled
+                : glm::vec4{0.06f, 0.05f, 0.10f, 0.45f};  // dimmer empty slot
+            m_hud.drawRect(sx, scPanY, scSlotW, scSlotH, bg);
+
+            if (occupied) {
+                const SpecialCharacter& sc_char = m_hero.specials[i];
+                std::snprintf(slotBuf, sizeof(slotBuf), "%.7s", sc_char.name.c_str());
+                m_hud.drawText(sx + 3*sc, scPanY + 4*sc,  sc * 0.80f,
+                               slotBuf, {0.90f, 0.80f, 1.00f, 1.0f});
+                std::snprintf(slotBuf, sizeof(slotBuf), "%.6s", sc_char.archetype.c_str());
+                m_hud.drawText(sx + 3*sc, scPanY + 20*sc, sc * 0.75f,
+                               slotBuf, {0.65f, 0.55f, 0.85f, 1.0f});
+            } else {
+                m_hud.drawText(sx + 3*sc, scPanY + 12*sc, sc * 0.75f,
+                               "- SC -", {0.30f, 0.25f, 0.40f, 0.70f});
             }
         }
     }
@@ -660,32 +719,21 @@ void AdventureState::renderPathPreview() {
 
 void AdventureState::renderObjects() {
     for (const auto& obj : m_map.objects()) {
-        if (obj.type == ObjType::Dungeon) continue;
-
         RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
         float wx, wz;
         obj.pos.toWorld(HEX_SIZE, wx, wz);
         wx += off.dx;  wz += off.dz;
 
-        float spriteScale = HEX_SIZE * 1.8f;
-        m_buildingSpriteRenderer.draw({wx, off.dy, wz}, spriteScale,
-                                     m_cam.viewMatrix(), m_cam.projMatrix());
-    }
-}
-
-void AdventureState::renderEnemySprites() {
-    for (const auto& obj : m_map.objects()) {
-        if (obj.type != ObjType::Dungeon) continue;
-        auto it = m_objectControl.find(obj.pos);
-        if (it != m_objectControl.end() && it->second.guardDefeated) continue;  // defeated — don't render
-
-        RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
-        float wx, wz;
-        obj.pos.toWorld(HEX_SIZE, wx, wz);
-        wx += off.dx;  wz += off.dz;
-
-        m_enemySpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE,
-                                   m_cam.viewMatrix(), m_cam.projMatrix());
+        if (obj.type == ObjType::Dungeon) {
+            // Hide entrance sprite once the dungeon is cleared.
+            auto it = m_objectControl.find(obj.pos);
+            if (it != m_objectControl.end() && it->second.guardDefeated) continue;
+            m_dungeonSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
+                                         m_cam.viewMatrix(), m_cam.projMatrix());
+        } else {
+            m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
+                                          m_cam.viewMatrix(), m_cam.projMatrix());
+        }
     }
 }
 
