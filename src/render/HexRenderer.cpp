@@ -4,9 +4,11 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <stdexcept>
 #include <array>
 #include <string>
+#include <vector>
 
 // Flat-top hex: vertices at angles 0, 60, 120, 180, 240, 300 degrees
 static constexpr float PI = 3.14159265358979f;
@@ -66,8 +68,9 @@ HexRenderer::~HexRenderer() {
     if (m_lineVbo) glDeleteBuffers(1, &m_lineVbo);
     if (m_lineVao) glDeleteVertexArrays(1, &m_lineVao);
     if (m_whiteTex) glDeleteTextures(1, &m_whiteTex);
-    for (GLuint& t : m_terrainTex)
-        if (t) { glDeleteTextures(1, &t); t = 0; }
+    for (auto& row : m_terrainTex)
+        for (GLuint& t : row)
+            if (t) { glDeleteTextures(1, &t); t = 0; }
 }
 
 void HexRenderer::init() {
@@ -121,19 +124,50 @@ void HexRenderer::buildMesh() {
 }
 
 void HexRenderer::loadTerrainTextures(const std::string& assetRoot) {
+    namespace fs = std::filesystem;
+
     for (int i = 0; i < TERRAIN_COUNT; ++i) {
         Terrain t = static_cast<Terrain>(i);
         std::string name(terrainName(t));
         std::transform(name.begin(), name.end(), name.begin(),
                        [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
-        std::string path = assetRoot + "/textures/terrain/" + name + ".png";
-        GLuint id = loadTexturePNG(path);
-        m_terrainTex[i] = id;  // 0 if file not found — that's fine
+
+        m_variantCount[i] = 0;
+
+        // Each terrain type lives in its own subdirectory:
+        //   assets/textures/terrain/<name>/
+        // All .png files found there are loaded as variants, sorted alphabetically
+        // for deterministic ordering. Drop a file in the folder to add a variant.
+        fs::path dir = fs::path(assetRoot) / "textures" / "terrain" / name;
+
+        if (fs::is_directory(dir)) {
+            std::vector<fs::path> pngs;
+            for (const auto& entry : fs::directory_iterator(dir)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".png")
+                    pngs.push_back(entry.path());
+            }
+            std::sort(pngs.begin(), pngs.end());
+
+            for (const auto& p : pngs) {
+                if (m_variantCount[i] >= MAX_TERRAIN_VARIANTS) break;
+                GLuint id = loadTexturePNG(p.string());
+                if (id)
+                    m_terrainTex[i][m_variantCount[i]++] = id;
+            }
+        }
     }
 }
 
-GLuint HexRenderer::terrainTex(Terrain t) const {
-    return m_terrainTex[static_cast<int>(t)];
+GLuint HexRenderer::terrainTex(Terrain t, int variant) const {
+    int ti = static_cast<int>(t);
+    int vc = m_variantCount[ti];
+    if (vc == 0) return 0;
+    int v = (variant >= 0 && variant < vc) ? variant : 0;
+    return m_terrainTex[ti][v];
+}
+
+int HexRenderer::terrainVariantCount(Terrain t) const {
+    return m_variantCount[static_cast<int>(t)];
 }
 
 void HexRenderer::buildWhiteTexture() {

@@ -38,12 +38,17 @@ public:
                     const glm::vec3& ambientColor= glm::vec3(0.35f, 0.30f, 0.22f),
                     const glm::vec3& cameraPos   = glm::vec3(0.0f, 0.0f, 0.0f));
 
-    // Load terrain textures from assetRoot/textures/terrain/<name>.png.
-    // Missing files are silently skipped; those tiles fall back to solid colour.
+    // Load terrain textures from assetRoot/textures/terrain/.
+    // Tries <name>1.png, <name>2.png ... up to MAX_TERRAIN_VARIANTS per terrain.
+    // Falls back to <name>.png for variant 0 if no numbered files exist.
     void loadTerrainTextures(const std::string& assetRoot = "assets");
 
-    // Returns the GL texture ID for this terrain, or 0 if none was loaded.
-    GLuint terrainTex(Terrain t) const;
+    // Returns the GL texture ID for (terrain, variant), clamped to loaded range.
+    // Returns 0 if no texture was loaded for this terrain.
+    GLuint terrainTex(Terrain t, int variant = 0) const;
+
+    // How many variants were loaded for this terrain (0 = none, falls back to colour).
+    int terrainVariantCount(Terrain t) const;
 
     // Draw a hex shape centred on the axial coordinate.
     // visualScale: size of the drawn hex (< worldHexSize → token, == worldHexSize → terrain tile).
@@ -77,7 +82,8 @@ private:
     GLuint  m_lineVao = 0;
     GLuint  m_lineVbo = 0;
     GLuint  m_whiteTex = 0;
-    GLuint  m_terrainTex[TERRAIN_COUNT] = {};
+    GLuint  m_terrainTex[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS] = {};
+    int     m_variantCount[TERRAIN_COUNT] = {};
 
     glm::mat4 m_viewProj{1.0f};
     float     m_worldHexSize = 1.0f; // used for toWorld() positioning

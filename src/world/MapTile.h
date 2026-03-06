@@ -30,12 +30,14 @@ enum class Terrain : uint8_t {
     COUNT  // must remain last — used for iteration and bounds checks
 };
 
-constexpr int TERRAIN_COUNT = static_cast<int>(Terrain::COUNT);
+constexpr int TERRAIN_COUNT        = static_cast<int>(Terrain::COUNT);
+constexpr int MAX_TERRAIN_VARIANTS = 8;  // max texture variants per terrain type
 
 struct MapTile {
     Terrain terrain  = Terrain::Sand;
     bool    passable = true;
-    float   moveCost = 1.0f;  // 1.0 = normal cost; Obsidian sets passable=false
+    float   moveCost = 1.0f;   // 1.0 = normal cost; Obsidian sets passable=false
+    uint8_t variant  = 0;      // texture variant index (0 = default)
 };
 
 // ── Helpers (data queries — not presentation) ─────────────────────────────────

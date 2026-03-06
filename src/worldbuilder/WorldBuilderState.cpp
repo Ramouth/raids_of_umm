@@ -21,10 +21,12 @@ void WorldBuilderState::onEnter() {
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
     m_hud.init();
-    m_buildingSpriteRenderer.init();
-    m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
-    m_enemySpriteRenderer.init();
-    m_enemySpriteRenderer.loadSprite("assets/textures/units/enemy_scout.png");
+    m_townSpriteRenderer.init();
+    m_townSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
+    m_dungeonSpriteRenderer.init();
+    m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
+    m_goldMineSpriteRenderer.init();
+    m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
 
     if (m_loadOnEnter) {
         loadMap();
@@ -36,11 +38,16 @@ void WorldBuilderState::onEnter() {
     if (auto err = m_offsets.load(OFFSETS_PATH))
         std::cerr << "[WorldBuilder] Offsets load warning: " << *err << "\n";
 
-    // Give the palette terrain texture IDs for icon previews
-    GLuint texIds[TERRAIN_COUNT];
-    for (int i = 0; i < TERRAIN_COUNT; ++i)
-        texIds[i] = m_hexRenderer.terrainTex(static_cast<Terrain>(i));
-    m_palette.setTerrainTextures(texIds, TERRAIN_COUNT);
+    // Give the palette per-terrain variant textures and counts
+    GLuint textures[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS] = {};
+    int    variantCounts[TERRAIN_COUNT] = {};
+    for (int i = 0; i < TERRAIN_COUNT; ++i) {
+        Terrain t = static_cast<Terrain>(i);
+        variantCounts[i] = m_hexRenderer.terrainVariantCount(t);
+        for (int v = 0; v < MAX_TERRAIN_VARIANTS; ++v)
+            textures[i][v] = m_hexRenderer.terrainTex(t, v);
+    }
+    m_palette.setTerrainData(textures, variantCounts);
 
     std::cout << "[WorldBuilder] Ready.\n";
     std::cout << "  Tab=cycle tool  1-6=terrain  O=obj type\n";
@@ -101,6 +108,7 @@ void WorldBuilderState::applyToolAt(const HexCoord& coord) {
     switch (m_tool) {
         case EditorTool::PaintTile: {
             MapTile tile = makeTile(m_paintTerrain);
+            tile.variant = static_cast<uint8_t>(m_palette.selectedVariant());
             // Preserve any existing object's passability requirement.
             if (m_map.objectAt(coord))
                 tile.passable = true;
@@ -262,11 +270,21 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     }
 
     if (e->type == SDL_MOUSEWHEEL) {
-        m_cam.adjustZoom(-e->wheel.y * Camera2D::ZOOM_STEP);
+        if (m_palette.containsPoint(e->wheel.x)) {
+            m_palette.scroll(-e->wheel.y * 3);
+        } else {
+            m_cam.adjustZoom(-e->wheel.y * Camera2D::ZOOM_STEP);
+        }
         return true;
     }
 
     if (e->type == SDL_MOUSEMOTION) {
+        if (m_palDragging) {
+            // Drag-scrolling the palette
+            int delta = e->motion.y - m_palDragStartY;
+            m_palette.setScrollY(m_palDragScrollY - delta);
+            return true;
+        }
         // Palette gets first look — blocks map hover when cursor is over panel
         if (!m_palette.handleMouseMove(e->motion.x, e->motion.y)) {
             glm::vec2 wp = m_cam.screenToWorld(e->motion.x, e->motion.y);
@@ -279,10 +297,11 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     }
 
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
-        // Palette click — sync selection to editor tool state
         if (m_palette.containsPoint(e->button.x)) {
-            m_palette.handleMouseClick(e->button.x, e->button.y);
-            syncFromPalette();
+            // Start drag tracking — actual click fires on mouse-up if drag is small
+            m_palDragging    = true;
+            m_palDragStartY  = e->button.y;
+            m_palDragScrollY = m_palette.scrollY();
             return true;
         }
 
@@ -298,6 +317,20 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             applyToolAt(hc);
         }
         return true;
+    }
+
+    if (e->type == SDL_MOUSEBUTTONUP && e->button.button == SDL_BUTTON_LEFT) {
+        if (m_palDragging) {
+            m_palDragging = false;
+            int travelY = e->button.y - m_palDragStartY;
+            if (travelY < 0) travelY = -travelY;
+            if (travelY < 5) {
+                // Small movement → treat as a click
+                m_palette.handleMouseClick(e->button.x, e->button.y);
+                syncFromPalette();
+            }
+            return true;
+        }
     }
 
     if (e->type == SDL_WINDOWEVENT &&
@@ -347,7 +380,7 @@ void WorldBuilderState::render() {
 void WorldBuilderState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
-        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
+        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
         glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
         float h         = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
@@ -372,10 +405,19 @@ void WorldBuilderState::renderObjects() {
         obj.pos.toWorld(HEX_SIZE, wx, wz);
         wx += off.dx;  wz += off.dz;
 
-        if (obj.type == ObjType::Dungeon) {
-            m_enemySpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE, view, proj);
-        } else {
-            m_buildingSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.8f, view, proj);
+        switch (obj.type) {
+            case ObjType::Dungeon:
+                m_dungeonSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE, view, proj);
+                break;
+            case ObjType::GoldMine:
+            case ObjType::CrystalMine:
+                m_goldMineSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.4f, view, proj);
+                break;
+            case ObjType::Town:
+            case ObjType::Artifact:
+            default:
+                m_townSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.8f, view, proj);
+                break;
         }
     }
 
