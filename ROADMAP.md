@@ -161,10 +161,49 @@ not a rewrite.
 
 > Art that covers broken systems is wasted work. Do this after MVP is fun.
 
-- Hex edge blending shader (Sand↔Dune soft transitions)
-- Sprite per ObjType: Town (pyramid), Mine (tent), Dungeon (ruin entrance)
-- Unit sprites with hit-flash and death animation (AnimatedSprite system ready)
-- Pixel-art HUD frames, minimap
+### Graphics direction: quality pixel art, not modern 3D
+
+The target look is **HoMM3-era 2D pixel art** — rich, hand-crafted sprites on
+a hex grid. Not a modern PBR pipeline. This is achievable within the current
+OpenGL 3.3 Core renderer with focused effort.
+
+**Non-negotiable technical baseline (do before any art work):**
+
+1. **GL_NEAREST everywhere** — all textures must use `GL_NEAREST` mag/min
+   filter. Any `GL_LINEAR` interpolation on pixel art produces blur. Audit
+   every `glTexParameteri` call in `Texture.cpp`.
+
+2. **Integer display scaling** — render to a fixed logical resolution
+   (e.g. 960×540) then scale up to the window by an integer factor.
+   Prevents sub-pixel bleed at non-integer window sizes. Needs an offscreen
+   FBO + a simple blit pass.
+
+3. **SpriteBatcher** (already in post-MVP backlog) — must land before Phase 3
+   art work begins. One draw call per texture vs one per sprite.
+
+**Art pipeline — PixelLab + manual touch-up:**
+
+- All sprites generated at 128×128, transparent background (flood-fill removal
+  script already exists in this codebase).
+- Style: limited palette (~16–24 colours), no anti-aliasing, 1px black or dark
+  outline on all characters.
+- Terrain tiles: 128×128, follow hex tile guide in `assets/pixellab`.
+- Background removal: corner flood-fill script (tolerance 30) works for clean
+  studio backgrounds; complex backgrounds need manual masking in Aseprite.
+
+**Phase 3 deliverables in order:**
+
+| # | Task |
+|---|------|
+| 1 | Audit + fix all texture filters → GL_NEAREST |
+| 2 | Integer-scale FBO pass |
+| 3 | SpriteBatcher (prerequisite) |
+| 4 | Hex edge blending shader (Sand↔Dune soft transitions) |
+| 5 | Sprite per ObjType: Town (pyramid), Mine (tent), Dungeon (ruin entrance) |
+| 6 | Full unit roster sprites (all 7 unit types + SCs) |
+| 7 | Unit hit-flash + death animation (AnimatedSprite system already wired) |
+| 8 | Pixel-art HUD frame, portrait slots, minimap |
+| 9 | Optional: scanline / CRT overlay shader (toggle in settings) |
 
 ---
 
