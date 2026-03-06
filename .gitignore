@@ -1,3 +1,10 @@
 build/
 local_deps/
 *.deb
+
+# PixelLab scripts and API credentials
+generate_*.py
+assets/pixellab_api.txt
+
+# Logs
+game.log
