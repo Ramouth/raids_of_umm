@@ -7,6 +7,11 @@
 #include <iostream>
 #include <zlib.h>
 
+// These standard GL constants are not included in this project's stripped GLAD.
+#ifndef GL_NEAREST_MIPMAP_LINEAR
+#  define GL_NEAREST_MIPMAP_LINEAR 0x2702
+#endif
+
 static uint32_t readU32BE(const uint8_t* p) {
     return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16)
          | (uint32_t(p[2]) <<  8) |  uint32_t(p[3]);
@@ -119,7 +124,10 @@ GLuint loadTexturePNG(const std::string& path) {
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    // GL_NEAREST mag → crisp pixel art when zoomed in.
+    // GL_NEAREST_MIPMAP_LINEAR min → clean downscaling via mipmaps without blurring.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);

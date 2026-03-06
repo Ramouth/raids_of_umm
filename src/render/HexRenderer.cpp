@@ -225,11 +225,12 @@ void HexRenderer::drawTile(const HexCoord& coord,
     if (texId != 0)
         glBindTexture(GL_TEXTURE_2D, texId);
 
-    m_shader.setMat4 ("u_MVP",          mvp);
-    m_shader.setMat4 ("u_Model",        model);
-    m_shader.setMat3 ("u_NormalMatrix", norm);
-    m_shader.setVec3 ("u_TileColor",    color);
-    m_shader.setFloat("u_Height",       0.0f);
+    m_shader.setMat4("u_MVP",          mvp);
+    m_shader.setMat4("u_Model",        model);
+    m_shader.setMat3("u_NormalMatrix", norm);
+    m_shader.setVec3("u_TileColor",    color);
+    m_shader.setFloat("u_Height",      0.0f);
+    m_shader.setInt  ("u_Textured",    texId != 0 ? 1 : 0);
 
     glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_SHORT, nullptr);
 
