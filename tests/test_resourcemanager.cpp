@@ -204,6 +204,69 @@ SUITE("Hero — wallet is initially zeroed") {
         CHECK_EQ(h.wallet[static_cast<Resource>(i)], 0);
 }
 
+// ── Hero item inventory ───────────────────────────────────────────────────────
+
+SUITE("Hero — starts with empty item inventory") {
+    Hero h;
+    CHECK(h.items.empty());
+}
+
+SUITE("Hero — addItem stores the pointer") {
+    ResourceManager rm;
+    rm.load("data");
+    Hero h;
+    const WondrousItem* it = rm.item("scarab_amulet");
+    CHECK(h.addItem(it));
+    CHECK_EQ((int)h.items.size(), 1);
+    CHECK(h.items[0] == it);
+}
+
+SUITE("Hero — hasItem returns true after add") {
+    ResourceManager rm;
+    rm.load("data");
+    Hero h;
+    h.addItem(rm.item("scarab_amulet"));
+    CHECK(h.hasItem("scarab_amulet"));
+    CHECK(!h.hasItem("veil_of_sands"));
+}
+
+SUITE("Hero — addItem rejects duplicate id") {
+    ResourceManager rm;
+    rm.load("data");
+    Hero h;
+    const WondrousItem* it = rm.item("scarab_amulet");
+    CHECK(h.addItem(it));
+    CHECK(!h.addItem(it));
+    CHECK_EQ((int)h.items.size(), 1);
+}
+
+SUITE("Hero — addItem rejects nullptr") {
+    Hero h;
+    CHECK(!h.addItem(nullptr));
+    CHECK(h.items.empty());
+}
+
+SUITE("Hero — can carry multiple different items") {
+    ResourceManager rm;
+    rm.load("data");
+    Hero h;
+    h.addItem(rm.item("scarab_amulet"));
+    h.addItem(rm.item("obsidian_edge"));
+    h.addItem(rm.item("serpent_band"));
+    CHECK_EQ((int)h.items.size(), 3);
+}
+
+SUITE("Hero — cursed item added same as normal item") {
+    ResourceManager rm;
+    rm.load("data");
+    Hero h;
+    const WondrousItem* it = rm.item("cursed_eye_of_set");
+    CHECK(it != nullptr);
+    CHECK(it->cursed);
+    CHECK(h.addItem(it));
+    CHECK(h.hasItem("cursed_eye_of_set"));
+}
+
 // ── WondrousItem loading ──────────────────────────────────────────────────────
 
 SUITE("ResourceManager — loads all 5 items from data/items.json") {

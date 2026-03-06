@@ -48,6 +48,18 @@ bool Hero::addUnit(const UnitType* type, int count) {
     return false;  // army full
 }
 
+bool Hero::hasItem(const std::string& id) const {
+    for (const auto* it : items)
+        if (it && it->id == id) return true;
+    return false;
+}
+
+bool Hero::addItem(const WondrousItem* item) {
+    if (!item || hasItem(item->id)) return false;
+    items.push_back(item);
+    return true;
+}
+
 bool Hero::knowsSpell(const std::string& id) const {
     return std::find(knownSpells.begin(), knownSpells.end(), id) != knownSpells.end();
 }

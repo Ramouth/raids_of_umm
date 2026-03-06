@@ -1,6 +1,7 @@
 #pragma once
 #include "hex/HexCoord.h"
 #include "world/Resources.h"
+#include "world/WondrousItem.h"
 #include "entities/UnitType.h"
 #include "factions/Faction.h"
 #include <string>
@@ -62,6 +63,15 @@ struct Hero {
     // Add units to an existing stack or the first empty slot.
     // Returns false if no empty slot available (army full with different types).
     bool addUnit(const UnitType* type, int count);
+
+    // ── Item inventory ────────────────────────────────────────────────────────
+    std::vector<const WondrousItem*> items;
+
+    // Add item to inventory. Returns false if hero already carries this id.
+    bool addItem(const WondrousItem* item);
+
+    // True if inventory contains an item with this id.
+    bool hasItem(const std::string& id) const;
 
     // ── Spellbook ─────────────────────────────────────────────────────────────
     int spellPower = 1;
