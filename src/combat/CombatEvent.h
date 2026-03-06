@@ -1,6 +1,7 @@
 #pragma once
 #include "hex/HexCoord.h"
 #include "entities/UnitType.h"
+#include <string>
 #include <vector>
 #include <memory>
 
@@ -25,7 +26,8 @@ struct SurvivorStack {
 
 struct CombatOutcome {
     CombatResult               result    = CombatResult::Ongoing;
-    std::vector<SurvivorStack> survivors; // living player stacks after battle
+    std::vector<SurvivorStack> survivors;  // living player stacks after battle
+    std::vector<std::string>   itemsFound; // item IDs awarded on PlayerWon (C3 fills this)
 };
 
 /*

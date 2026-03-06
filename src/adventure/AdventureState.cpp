@@ -198,6 +198,15 @@ void AdventureState::onResume() {
                     m_hero.addUnit(s.type, s.count);
             }
             std::cout << "[Adventure] Army after battle: " << m_hero.armySize() << " stacks.\n";
+
+            // Add any dropped items to hero inventory.
+            auto& rm = Application::get().resources();
+            for (const auto& itemId : outcome.itemsFound) {
+                if (const WondrousItem* it = rm.item(itemId)) {
+                    if (m_hero.addItem(it))
+                        std::cout << "[Adventure] Found item: " << it->name << "\n";
+                }
+            }
             break;
         }
         case CombatResult::EnemyWon: {

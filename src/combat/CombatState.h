@@ -36,7 +36,8 @@ public:
     // outcome: optional shared result written in onExit() for the caller to read
     //          after this state is popped.  Pass nullptr to ignore.
     explicit CombatState(CombatArmy player, CombatArmy enemy,
-                         std::shared_ptr<CombatOutcome> outcome = nullptr);
+                         std::shared_ptr<CombatOutcome> outcome  = nullptr,
+                         std::vector<std::string>       lootTable = {});
 
     void onEnter() override;
     void onExit()  override;
@@ -94,6 +95,9 @@ private:
 
     // Written in onExit(); caller reads this after the state is popped.
     std::shared_ptr<CombatOutcome> m_outcome;
+
+    // Item IDs eligible to drop on PlayerWon. One is chosen at random.
+    std::vector<std::string> m_lootTable;
 
     static constexpr float CAM_SPEED           = 8.0f;
     static constexpr float HEX_SIZE            = 1.0f;

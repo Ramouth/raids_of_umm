@@ -7,11 +7,14 @@
 #include <iostream>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 CombatState::CombatState(CombatArmy player, CombatArmy enemy,
-                         std::shared_ptr<CombatOutcome> outcome)
+                         std::shared_ptr<CombatOutcome> outcome,
+                         std::vector<std::string>       lootTable)
     : m_engine(std::move(player), std::move(enemy))
     , m_outcome(std::move(outcome))
+    , m_lootTable(std::move(lootTable))
 {}
 
 // ── Log helpers ───────────────────────────────────────────────────────────────
@@ -79,6 +82,12 @@ void CombatState::onExit() {
         for (const auto& unit : m_engine.playerArmy().stacks) {
             if (!unit.isDead())
                 m_outcome->survivors.push_back({ unit.type, unit.count });
+        }
+
+        // On victory, award one random item from the loot table (if any).
+        if (m_engine.result() == CombatResult::PlayerWon && !m_lootTable.empty()) {
+            int idx = std::rand() % static_cast<int>(m_lootTable.size());
+            m_outcome->itemsFound.push_back(m_lootTable[idx]);
         }
     }
 }

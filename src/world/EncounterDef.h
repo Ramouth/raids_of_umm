@@ -22,4 +22,8 @@ struct EncounterDef {
     std::string id;    // e.g. "dungeon_default"
     std::string name;  // displayed as the enemy army's ownerName in combat
     std::vector<EncounterStack> stacks;
+
+    // Item IDs that can drop when this encounter is won.
+    // Empty = no loot. On victory, one item is chosen at random (C3).
+    std::vector<std::string> lootTable;
 };
