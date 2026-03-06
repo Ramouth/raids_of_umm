@@ -108,10 +108,12 @@ void WorldMap::generateProcedural(int radius, uint32_t seed) {
 
             Terrain t;
             if      (n < 0.04f)                  t = Terrain::Oasis;
-            else if (n < 0.14f)                  t = Terrain::Rock;
-            else if (n < 0.20f)                  t = Terrain::Ruins;
-            else if (n < 0.24f)                  t = Terrain::Obsidian;
-            else if (n < 0.44f && dist > 0.4f)  t = Terrain::Dune;
+            else if (n < 0.12f)                  t = Terrain::Rock;
+            else if (n < 0.18f)                  t = Terrain::Ruins;
+            else if (n < 0.22f)                  t = Terrain::Obsidian;
+            else if (n < 0.28f && dist > 0.25f) t = Terrain::Mountain;
+            else if (n < 0.33f && dist < 0.75f) t = Terrain::River;
+            else if (n < 0.53f && dist > 0.35f) t = Terrain::Dune;
             else                                 t = Terrain::Sand;
 
             m_grid.set(coord, makeTile(t));
@@ -170,7 +172,8 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
                 {"r",        coord.r},
                 {"terrain",  terrainToStr(tile.terrain)},
                 {"passable", tile.passable},
-                {"moveCost", tile.moveCost}
+                {"moveCost", tile.moveCost},
+                {"variant",  (int)tile.variant}
             });
         }
         j["tiles"] = std::move(tiles);
@@ -222,6 +225,7 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
             tile.terrain  = terrainFromStr(t.value("terrain",  "sand"));
             tile.passable = t.value("passable", true);
             tile.moveCost = t.value("moveCost", 1.0f);
+            tile.variant  = static_cast<uint8_t>(t.value("variant", 0));
             m_grid.set(coord, tile);
         }
 

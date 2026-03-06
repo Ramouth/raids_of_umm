@@ -8,6 +8,7 @@
 #include "render/RenderOffsets.h"
 #include "ui/EditorPalette.h"
 #include "hex/HexCoord.h"
+#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
@@ -123,6 +124,9 @@ private:
     bool m_palDragging    = false;
     int  m_palDragStartY  = 0;
     int  m_palDragScrollY = 0;
+
+    // Assorted texture IDs (owned here, freed in onExit)
+    std::vector<GLuint> m_assortedTexIds;
 
     // ── Dev tool (F1) ────────────────────────────────────────────────────────
     enum class DevMode { Global, PerTile };

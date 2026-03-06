@@ -27,15 +27,20 @@ class HUDRenderer;
  */
 class EditorPalette {
 public:
-    enum class Category { Terrain = 0, Objects = 1, Units = 2 };
+    enum class Category { Terrain = 0, Objects = 1, Units = 2, Assorted = 3 };
 
-    static constexpr float PANEL_W = 240.0f;
+    static constexpr float PANEL_W      = 240.0f;
+    static constexpr int   MAX_ASSORTED = 64;
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     // Call after HexRenderer::loadTerrainTextures().
     void setTerrainData(const GLuint textures[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS],
                         const int variantCounts[TERRAIN_COUNT]);
+
+    // Call after scanning assets/textures/assorted/.
+    // names: null-terminated stem of each file (e.g. "for_sorting_r0_c0").
+    void setAssortedData(const GLuint* texs, const char names[][64], int count);
 
     // Keyboard shortcut sync — expands the group for t, collapses others.
     void selectTerrain(Terrain t) {
@@ -49,6 +54,8 @@ public:
         if (m_cat != Category::Objects) m_scrollY = 0;
         m_objType = t; m_cat = Category::Objects;
     }
+
+    int  selectedAssorted() const { return m_assortedSelected; }
 
     void scroll(int delta)  { m_scrollY += delta; clampScroll(); }
     void resetScroll()      { m_scrollY = 0; }
@@ -83,9 +90,10 @@ private:
     static constexpr float VAR_INDENT = 14.0f;  // indent for variant cards
     static constexpr float GRP_ICON   = 28.0f;  // icon size in group header
     static constexpr float VAR_ICON   = 24.0f;  // icon size in variant card
-    static constexpr float CARD_H     = 56.0f;  // object card height
-    static constexpr float ICON_S     = 38.0f;  // icon size in object card
-    static constexpr float PAD        =  8.0f;
+    static constexpr float CARD_H          = 56.0f;  // object card height
+    static constexpr float ICON_S          = 38.0f;  // icon size in object card
+    static constexpr float PAD             =  8.0f;
+    static constexpr float ASSORTED_CARD_H = 106.0f; // assorted thumbnail card (2-col grid)
 
     // ── Render helpers ────────────────────────────────────────────────────────
     void renderHeader       (HUDRenderer& hud) const;
@@ -98,10 +106,14 @@ private:
     void renderObjCard      (HUDRenderer& hud, float y, bool selected, bool hovered,
                              glm::vec3 iconColor, GLuint iconTex,
                              const char* name, const char* sub) const;
+    void renderAssortedGrid (HUDRenderer& hud, int screenH) const;
 
     // ── Layout helpers ────────────────────────────────────────────────────────
     float listStartY()    const { return HDR_H + TAB_H; }
     float contentHeight() const;
+
+    // 2-column assorted grid: card index (-1 = miss) at screen coords.
+    int  assortedCardAtPoint(int x, int y) const;
 
     int  tabAtPoint(int x, int y) const;
 
@@ -129,6 +141,12 @@ private:
 
     GLuint m_terrainTex[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS] = {};
     int    m_variantCount[TERRAIN_COUNT] = {};
+
+    GLuint m_assortedTex[MAX_ASSORTED]      = {};
+    char   m_assortedNames[MAX_ASSORTED][64] = {};
+    int    m_assortedCount   = 0;
+    int    m_assortedSelected = -1;
+    int    m_assortedHover    = -1;
 
     void clampScroll();
 };

@@ -2,11 +2,15 @@
 #include "adventure/AdventureState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
+#include "render/Texture.h"
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <cstdio>
 #include <iostream>
+#include <filesystem>
+#include <algorithm>
+#include <cstring>
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -49,6 +53,31 @@ void WorldBuilderState::onEnter() {
     }
     m_palette.setTerrainData(textures, variantCounts);
 
+    // Scan assets/textures/assorted/ and pass thumbnails to the palette
+    {
+        namespace fs = std::filesystem;
+        fs::path assortedDir = fs::path("assets") / "textures" / "assorted";
+        std::vector<fs::path> pngs;
+        if (fs::is_directory(assortedDir)) {
+            for (const auto& e : fs::directory_iterator(assortedDir))
+                if (e.is_regular_file() && e.path().extension() == ".png")
+                    pngs.push_back(e.path());
+        }
+        std::sort(pngs.begin(), pngs.end());
+
+        int count = (int)std::min(pngs.size(), (size_t)EditorPalette::MAX_ASSORTED);
+        GLuint  assortedTex[EditorPalette::MAX_ASSORTED]       = {};
+        char    assortedNames[EditorPalette::MAX_ASSORTED][64]  = {};
+        for (int i = 0; i < count; ++i) {
+            assortedTex[i] = loadTexturePNG(pngs[i].string());
+            std::string stem = pngs[i].stem().string();
+            std::strncpy(assortedNames[i], stem.c_str(), 63);
+            assortedNames[i][63] = '\0';
+            m_assortedTexIds.push_back(assortedTex[i]);
+        }
+        m_palette.setAssortedData(assortedTex, assortedNames, count);
+    }
+
     std::cout << "[WorldBuilder] Ready.\n";
     std::cout << "  Tab=cycle tool  1-6=terrain  O=obj type\n";
     std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit\n";
@@ -59,6 +88,9 @@ void WorldBuilderState::onEnter() {
 void WorldBuilderState::onExit() {
     if (m_dirty)
         std::cout << "[WorldBuilder] Warning: unsaved changes.\n";
+    for (GLuint id : m_assortedTexIds)
+        if (id) glDeleteTextures(1, &id);
+    m_assortedTexIds.clear();
 }
 
 // ── Map operations ────────────────────────────────────────────────────────────
@@ -298,7 +330,12 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
 
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
         if (m_palette.containsPoint(e->button.x)) {
-            // Start drag tracking — actual click fires on mouse-up if drag is small
+            // Sync the tool immediately on every palette press so that the active
+            // tool always reflects the current palette category — regardless of
+            // whether the mouse-up travelY check later treats this as a drag.
+            syncFromPalette();
+            // Start drag tracking — item selection (card/variant) fires on mouse-up
+            // if drag is small (travelY < 5).
             m_palDragging    = true;
             m_palDragStartY  = e->button.y;
             m_palDragScrollY = m_palette.scrollY();
@@ -469,6 +506,8 @@ void WorldBuilderState::syncFromPalette() {
             m_tool = EditorTool::PlaceObject;
             break;
         case EditorPalette::Category::Units:
+        case EditorPalette::Category::Assorted:
+            m_tool = EditorTool::Select;
             break;
     }
     renderHUD();

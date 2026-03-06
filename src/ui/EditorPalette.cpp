@@ -35,6 +35,16 @@ void EditorPalette::setTerrainData(const GLuint textures[TERRAIN_COUNT][MAX_TERR
     }
 }
 
+void EditorPalette::setAssortedData(const GLuint* texs, const char names[][64], int count) {
+    m_assortedCount = std::min(count, MAX_ASSORTED);
+    for (int i = 0; i < m_assortedCount; ++i) {
+        m_assortedTex[i] = texs[i];
+        std::strncpy(m_assortedNames[i], names[i], 63);
+        m_assortedNames[i][63] = '\0';
+    }
+    m_assortedSelected = -1;
+}
+
 // ── Layout helpers ────────────────────────────────────────────────────────────
 
 float EditorPalette::contentHeight() const {
@@ -46,6 +56,10 @@ float EditorPalette::contentHeight() const {
                 h += (float)std::max(1, m_variantCount[i]) * VAR_H;
         }
         return h;
+    }
+    if (m_cat == Category::Assorted) {
+        int rows = (m_assortedCount + 1) / 2;
+        return (float)rows * ASSORTED_CARD_H;
     }
     return (float)OBJ_TYPE_COUNT * CARD_H;
 }
@@ -61,7 +75,19 @@ void EditorPalette::clampScroll() {
 int EditorPalette::tabAtPoint(int x, int y) const {
     if (x < 0 || x >= (int)PW) return -1;
     if (y < (int)HDR_H || y >= (int)(HDR_H + TAB_H)) return -1;
-    return (int)(x / (PW / 3.0f));
+    return (int)(x / (PW / 4.0f));
+}
+
+int EditorPalette::assortedCardAtPoint(int x, int y) const {
+    if (x < 0 || x >= (int)PW) return -1;
+    float colW = PW / 2.0f;
+    float ly   = listStartY() - (float)m_scrollY;
+    if (y < (int)ly) return -1;
+    int row = (int)((y - ly) / ASSORTED_CARD_H);
+    int col = (int)(x / colW);
+    int idx = row * 2 + col;
+    if (idx < 0 || idx >= m_assortedCount) return -1;
+    return idx;
 }
 
 bool EditorPalette::terrainHitTest(int /*x*/, int y, int& out_ti, int& out_v) const {
@@ -117,7 +143,8 @@ bool EditorPalette::handleMouseMove(int x, int y) {
     }
 
     if (m_cat == Category::Terrain) {
-        m_hoverCard = -1;
+        m_hoverCard     = -1;
+        m_assortedHover = -1;
         int ti, v;
         if (terrainHitTest(x, y, ti, v)) {
             m_hoverGroup   = ti;
@@ -126,9 +153,14 @@ bool EditorPalette::handleMouseMove(int x, int y) {
             m_hoverGroup   = -1;
             m_hoverVariant = -1;
         }
+    } else if (m_cat == Category::Assorted) {
+        m_hoverGroup    = -1;
+        m_hoverCard     = -1;
+        m_assortedHover = assortedCardAtPoint(x, y);
     } else {
-        m_hoverGroup = -1;
-        m_hoverCard  = objCardAtPoint(x, y);
+        m_hoverGroup    = -1;
+        m_assortedHover = -1;
+        m_hoverCard     = objCardAtPoint(x, y);
     }
     return true;
 }
@@ -184,6 +216,13 @@ bool EditorPalette::handleMouseClick(int x, int y) {
         return true;
     }
 
+    if (m_cat == Category::Assorted) {
+        int card = assortedCardAtPoint(x, y);
+        if (card >= 0)
+            m_assortedSelected = (m_assortedSelected == card) ? -1 : card;
+        return true;
+    }
+
     return true;  // consume all clicks inside panel
 }
 
@@ -207,13 +246,14 @@ void EditorPalette::renderHeader(HUDRenderer& hud) const {
 }
 
 void EditorPalette::renderTabs(HUDRenderer& hud) const {
-    float tabW = PW / 3.0f;
+    static constexpr int   NUM_TABS = 4;
+    float tabW = PW / (float)NUM_TABS;
     float ty   = HDR_H;
 
     hud.drawRect(0.0f, ty, PW, TAB_H, C_TAB_BG);
 
-    const char* labels[] = { "Terrain", "Objects", "Units" };
-    for (int i = 0; i < 3; ++i) {
+    const char* labels[] = { "Terrain", "Objects", "Units", "Assorted" };
+    for (int i = 0; i < NUM_TABS; ++i) {
         float tx     = i * tabW;
         bool  active = (static_cast<int>(m_cat) == i);
         bool  hov    = (m_hoverTab == i);
@@ -227,9 +267,9 @@ void EditorPalette::renderTabs(HUDRenderer& hud) const {
         float lw  = (float)strlen(labels[i]) * 7.2f;
         float tx2 = tx + (tabW - lw) / 2.0f;
         float ty2 = ty + (TAB_H - 11.0f) / 2.0f;
-        hud.drawText(tx2, ty2, 1.2f, labels[i], active ? C_AMBER : C_SUB);
+        hud.drawText(tx2, ty2, 1.1f, labels[i], active ? C_AMBER : C_SUB);
 
-        if (i < 2)
+        if (i < NUM_TABS - 1)
             hud.drawRect(tx + tabW - 1.0f, ty, 1.0f, TAB_H, C_DIV);
     }
     hud.drawRect(0.0f, ty + TAB_H - 1.0f, PW, 1.0f, C_DIV);
@@ -275,6 +315,9 @@ void EditorPalette::renderItems(HUDRenderer& hud, int screenH) const {
                           objTypeColor(ot), 0,
                           std::string(objTypeName(ot)).c_str(), "Object");
         }
+
+    } else if (m_cat == Category::Assorted) {
+        renderAssortedGrid(hud, screenH);
 
     } else {
         // Units placeholder
@@ -420,4 +463,55 @@ void EditorPalette::renderObjCard(HUDRenderer& hud, float y,
     float nameY = y + CARD_H / 2.0f - 10.0f;
     hud.drawText(textX, nameY,        1.5f, name, selected ? C_AMBER : C_TEXT);
     hud.drawText(textX, nameY + 13.0f, 1.2f, sub,  C_SUB);
+}
+
+void EditorPalette::renderAssortedGrid(HUDRenderer& hud, int screenH) const {
+    if (m_assortedCount == 0) {
+        float ls = listStartY();
+        hud.drawRect(0.0f, ls, PW, 48.0f, C_CARD);
+        hud.drawText(PAD + 4.0f, ls + 16.0f, 1.3f, "No assorted textures", C_SUB);
+        return;
+    }
+
+    static constexpr float THUMB_S = 80.0f;  // thumbnail size
+    const float COL_W = PW / 2.0f;
+    float ls = listStartY();
+    float visBottom = (float)screenH;
+
+    for (int i = 0; i < m_assortedCount; ++i) {
+        int   row  = i / 2;
+        int   col  = i % 2;
+        float cx   = col * COL_W;
+        float cy   = ls - (float)m_scrollY + row * ASSORTED_CARD_H;
+
+        if (cy + ASSORTED_CARD_H < ls) continue;
+        if (cy > visBottom) break;
+
+        bool sel = (m_assortedSelected == i);
+        bool hov = (m_assortedHover   == i);
+
+        glm::vec4 bg = sel ? C_SEL : (hov ? C_HOVER : C_CARD);
+        hud.drawRect(cx, cy, COL_W, ASSORTED_CARD_H, bg);
+
+        if (sel) hud.drawRect(cx, cy, 3.0f, ASSORTED_CARD_H, C_AMBER);
+
+        // Thumbnail centered in card
+        float thumbX = cx + (COL_W - THUMB_S) / 2.0f;
+        float thumbY = cy + PAD;
+        hud.drawRect(thumbX, thumbY, THUMB_S, THUMB_S, {0.05f, 0.05f, 0.08f, 1.0f});
+        if (m_assortedTex[i])
+            hud.drawTexturedRect(thumbX, thumbY, THUMB_S, THUMB_S, m_assortedTex[i]);
+
+        // Name (truncated to fit)
+        char label[20];
+        std::strncpy(label, m_assortedNames[i], 19);
+        label[19] = '\0';
+        float nameY = thumbY + THUMB_S + 3.0f;
+        hud.drawText(cx + 4.0f, nameY, 0.9f, label, sel ? C_AMBER : C_SUB);
+
+        // Divider between rows
+        hud.drawRect(cx, cy + ASSORTED_CARD_H - 1.0f, COL_W, 1.0f, C_DIV);
+    }
+    // Vertical divider between columns
+    hud.drawRect(COL_W - 1.0f, ls, 1.0f, (float)screenH - ls, C_DIV);
 }
