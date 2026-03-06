@@ -121,6 +121,29 @@ damage formula.
 | 9 | Glass Cannon channel mechanic (F3) | High-skill play |
 | 10 | Buildings in CastleState | Economy depth |
 | 11 | Multiple heroes | Strategy layer |
+| 12 | **SpriteBatcher** — before Phase 3 animations | Performance |
+
+### SpriteBatcher — when and why
+
+Current `SpriteRenderer` does one GL draw call per sprite. Fine for MVP
+(~20 sprites max). Starts to hurt when Phase 3 lands: per-unit hit-flash,
+death animations, and adventure map object icons push toward 50+ sprites/frame
+with frequent texture state changes.
+
+**Do this before Phase 3, not during.** The interface is simple:
+
+```cpp
+// Submit phase — no GL, just record
+batcher.submit(texId, worldPos, size);
+
+// Flush — one draw call per unique texture (or one with atlas)
+batcher.flush(view, proj);
+```
+
+Current `SpriteRenderer::draw()` call sites swap to `submit()` one-for-one.
+Fits cleanly into the `beginFrame` / `endFrame` pattern already in
+`CombatRenderer` and `AdventureState`. Migration is a find-and-replace,
+not a rewrite.
 
 ---
 
