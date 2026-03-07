@@ -14,6 +14,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
+from sc_defs import USHARI, EffectKind
 
 # ── Config ────────────────────────────────────────────────────────────────────
 W, H     = 1140, 760
@@ -170,6 +171,57 @@ class Unit:
     @property
     def push_ready(self):       return self.push_cd == 0 and self.push_range > 0 and self.push_cd_max > 0
 
+# ── SC runtime state ──────────────────────────────────────────────────────────
+
+@dataclass
+class SCState:
+    defn: object          # SCDefinition — untyped to avoid circular import issues
+    unit: object          # the linked Unit in combat
+    level: int = 1
+    xp:    int = 0
+    unlocked_actions: set = field(default_factory=set)
+
+    def xp_needed(self):
+        """XP required to reach next level, or None if at max."""
+        if self.level >= self.defn.max_level:
+            return None
+        return self.defn.xp_thresholds[self.level - 1]
+
+    def add_xp(self, amount: int) -> bool:
+        """Award XP. Returns True if a level-up threshold was crossed."""
+        if self.xp_needed() is None:
+            return False
+        self.xp += amount
+        return self.xp >= self.xp_needed()
+
+    def apply_level_up(self) -> list:
+        """Advance one level: apply stat growth, heal, unlock abilities. Returns log lines."""
+        self.level += 1
+        msgs = [f"*** {self.defn.name} reached level {self.level}! ***"]
+
+        # Stat growth — only touch fields the Unit actually has
+        for stat, delta in self.defn.stat_growth.items():
+            if hasattr(self.unit, stat):
+                old = getattr(self.unit, stat)
+                setattr(self.unit, stat, old + delta)
+                msgs.append(f"  {stat}: {old} → {old + delta}")
+
+        # Flat heal on level-up
+        healed = min(self.defn.level_up_heal, self.unit.max_hp - self.unit.hp)
+        self.unit.hp += healed
+        msgs.append(f"  Healed {healed} HP")
+
+        # Unlock abilities defined for this level
+        for ab in self.defn.abilities:
+            if ab.level == self.level:
+                for eff in ab.effects:
+                    if eff.kind == EffectKind.UNLOCK:
+                        self.unlocked_actions.add(eff.action_key)
+                        msgs.append(f"  Unlocked: {eff.action_key}")
+
+        return msgs
+
+
 # ── Scene setup ───────────────────────────────────────────────────────────────
 def make_grid():
     """Hex grid of radius 5 (91 hexes)."""
@@ -254,6 +306,10 @@ class Arena:
         self.aoe_set:   set = set()   # preview cells for special
         self.push_set:  set = set()   # valid push target positions
 
+        # Link SC to the player Special Character unit
+        sc_unit = next(u for u in self.units if u.kind == Kind.SPECIAL and u.team == 0)
+        self.sc = SCState(defn=USHARI, unit=sc_unit)
+
         self.log: list = ["Arena ready — Team A goes first (highest init first)."]
 
         self._next_turn()
@@ -274,6 +330,10 @@ class Arena:
         self.active = u
         self._cancel()
         self.log.append(f"--- {u.name} ({'A' if u.team==0 else 'B'}) ---")
+        if u is self.sc.unit:
+            if self.sc.add_xp(self.sc.defn.per_turn_xp):
+                for msg in self.sc.apply_level_up():
+                    self.log.append(msg)
         if u.team == 1:
             self._ai_turn(u)
 
@@ -320,6 +380,10 @@ class Arena:
             if e.hp <= 0:
                 e.alive = False
                 self.log.append(f"    {e.name} defeated!")
+                if caster is self.sc.unit:
+                    if self.sc.add_xp(self.sc.defn.kill_bonus_xp):
+                        for msg in self.sc.apply_level_up():
+                            self.log.append(msg)
         caster.sp_cd  = caster.sp_cd_max
         caster.acted  = True
 
@@ -559,6 +623,23 @@ class Arena:
                 lines.append(f"Aura   : r={u.eff_aura_radius}  def+{u.aura_def}")
             if u.items:
                 lines.append(f"Items  : {', '.join(i.name for i in u.items)}")
+            # SC level / XP
+            sc = self.sc
+            xp_needed = sc.xp_needed()
+            xp_bar = ""
+            if xp_needed:
+                filled = int(10 * sc.xp / xp_needed)
+                xp_bar = "[" + "=" * filled + "-" * (10 - filled) + f"] {sc.xp}/{xp_needed}"
+            else:
+                xp_bar = "[MAX LEVEL]"
+            lines += [
+                "",
+                f"SC: {sc.defn.name}  Lv.{sc.level}/{sc.defn.max_level}",
+                f"XP: {xp_bar}",
+            ]
+            if sc.unlocked_actions:
+                lines.append(f"    {' | '.join(sc.unlocked_actions)}")
+
             lines += [
                 "",
                 f"Mode   : {self.mode.upper()}",
