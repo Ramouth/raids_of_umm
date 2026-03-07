@@ -1,6 +1,7 @@
 #include "DungeonState.h"
 #include "combat/CombatState.h"
 #include "combat/CombatUnit.h"
+#include "world/WondrousItem.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include <SDL2/SDL.h>
@@ -188,9 +189,20 @@ CombatArmy DungeonState::buildPlayerArmy() const {
     for (const auto& slot : m_hero.army)
         if (!slot.isEmpty())
             army.stacks.push_back(CombatUnit::make(slot.unitType, slot.count, true));
-    for (const auto& sc : m_hero.specials)
-        if (!sc.isEmpty())
-            army.stacks.push_back(CombatUnit::make(&sc.combatStats, 1, true));
+    for (const auto& sc : m_hero.specials) {
+        if (sc.isEmpty()) continue;
+        CombatUnit cu = CombatUnit::make(&sc.combatStats, 1, true);
+        for (const WondrousItem* item : sc.equipped) {
+            if (!item) continue;
+            for (const ItemEffect& ef : item->passiveEffects) {
+                if      (ef.stat == "attack")  cu.attackBonus  += ef.amount;
+                else if (ef.stat == "defense") cu.defenseBonus += ef.amount;
+                else if (ef.stat == "damage")  cu.damageBonus  += ef.amount;
+                else if (ef.stat == "speed")   cu.speedBonus   += ef.amount;
+            }
+        }
+        army.stacks.push_back(cu);
+    }
     if (army.stacks.empty()) {
         static const UnitType s_heroAlone = []() {
             UnitType t;

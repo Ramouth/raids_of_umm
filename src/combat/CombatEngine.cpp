@@ -273,16 +273,20 @@ bool CombatEngine::isFlanked(const CombatUnit& target,
 // static
 int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
                               std::mt19937& rng) {
+    // Base damage roll: each creature in the stack rolls [minDmg, maxDmg],
+    // then adds a flat per-creature bonus from equipped items.
     std::uniform_int_distribution<int> dist(attacker.type->minDamage, attacker.type->maxDamage);
     int baseDmg = 0;
     for (int i = 0; i < attacker.count; ++i)
-        baseDmg += dist(rng);
+        baseDmg += dist(rng) + attacker.damageBonus;
 
-    int effectiveDefense = defender.isDefending
-        ? defender.type->defense + defender.type->defense / 4
-        : defender.type->defense;
+    // Effective attack and defense incorporate item bonuses.
+    int effAtk = attacker.effectiveAttack();
+    int effDef = defender.effectiveDefense();
+    if (defender.isDefending)
+        effDef += effDef / 4;
 
-    int diff = attacker.type->attack - effectiveDefense;
+    int diff = effAtk - effDef;
     double mult;
     if (diff >= 0)
         mult = 1.0 + 0.05 * std::min(diff, 20);
@@ -401,15 +405,16 @@ void CombatEngine::buildQueue() {
         if (!m_enemy.stacks[i].isDead())
             m_queue.push_back({ false, i });
 
-    // Higher speed acts first; player wins ties
+    // Higher effective speed acts first (base speed + item bonuses); player wins ties.
     std::stable_sort(m_queue.begin(), m_queue.end(),
         [&](const TurnSlot& a, const TurnSlot& b) {
             const CombatUnit& ua = a.isPlayer ? m_player.stacks[a.stackIndex]
                                               : m_enemy.stacks[a.stackIndex];
             const CombatUnit& ub = b.isPlayer ? m_player.stacks[b.stackIndex]
                                               : m_enemy.stacks[b.stackIndex];
-            if (ua.type->speed != ub.type->speed)
-                return ua.type->speed > ub.type->speed;
+            int sa = ua.effectiveSpeed();
+            int sb = ub.effectiveSpeed();
+            if (sa != sb) return sa > sb;
             return a.isPlayer && !b.isPlayer;
         });
 }

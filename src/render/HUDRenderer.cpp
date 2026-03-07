@@ -183,7 +183,8 @@ void HUDRenderer::drawText(float x, float y, float scale,
 // ── render ────────────────────────────────────────────────────────────────────
 
 void HUDRenderer::render(int screenW, int screenH,
-                          int day, int movesLeft, int movesMax,
+                          int day, int month, int weekOfMonth,
+                          int movesLeft, int movesMax,
                           int visitedCount, int heroQ, int heroR,
                           bool infiniteMoves, int gold) {
     m_sw = screenW;
@@ -198,23 +199,23 @@ void HUDRenderer::render(int screenW, int screenH,
     m_shader.setVec2("u_ScreenSize", {(float)screenW, (float)screenH});
     m_shader.setInt("u_UseTexture", 0);
 
-    float scale = screenH / 600.0f;
+    float sc = screenH / 600.0f;
 
-    float hudX = 10 * scale;
-    float hudY = screenH - (110 * scale) - 10 * scale;
-    float hudW = 350 * scale;
-    float hudH = 100 * scale;
+    float hudX = 10 * sc;
+    float hudY = screenH - (120 * sc) - 10 * sc;  // slightly taller for week pips
+    float hudW = 350 * sc;
+    float hudH = 110 * sc;
 
     // ── Background panel ─────────────────────────────────────────────────────
     drawRect(hudX, hudY, hudW, hudH, {0.0f, 0.0f, 0.0f, 0.7f});
-    drawRect(hudX, hudY, hudW, 3 * scale, {0.5f, 0.4f, 0.2f, 1.0f});
-    drawRect(hudX, hudY + hudH - 3 * scale, hudW, 3 * scale, {0.5f, 0.4f, 0.2f, 1.0f});
+    drawRect(hudX, hudY, hudW, 3 * sc, {0.5f, 0.4f, 0.2f, 1.0f});
+    drawRect(hudX, hudY + hudH - 3 * sc, hudW, 3 * sc, {0.5f, 0.4f, 0.2f, 1.0f});
 
-    // ── Moves bar (middle of panel) ───────────────────────────────────────────
-    float movesBarX = hudX + 12 * scale;
-    float movesBarY = hudY + 42 * scale;
-    float movesBarW = hudW - 24 * scale;
-    float movesBarH = 20 * scale;
+    // ── Moves bar ────────────────────────────────────────────────────────────
+    float movesBarX = hudX + 12 * sc;
+    float movesBarY = hudY + 48 * sc;
+    float movesBarW = hudW - 24 * sc;
+    float movesBarH = 20 * sc;
 
     drawRect(movesBarX, movesBarY, movesBarW, movesBarH, {0.15f, 0.12f, 0.10f, 1.0f});
     float fill = movesMax > 0 ? static_cast<float>(movesLeft) / movesMax : 0.0f;
@@ -224,56 +225,68 @@ void HUDRenderer::render(int screenW, int screenH,
             ? glm::vec4{1.0f, 0.75f, 0.1f, 1.0f}
             : glm::vec4{0.8f, 0.2f, 0.2f, 1.0f};
     if (infiniteMoves) barColor = {0.3f, 0.6f, 1.0f, 1.0f};
-    drawRect(movesBarX + 2 * scale, movesBarY + 2 * scale,
-             (movesBarW - 4 * scale) * (infiniteMoves ? 1.0f : fill),
-             movesBarH - 4 * scale, barColor);
+    drawRect(movesBarX + 2 * sc, movesBarY + 2 * sc,
+             (movesBarW - 4 * sc) * (infiniteMoves ? 1.0f : fill),
+             movesBarH - 4 * sc, barColor);
 
-    // ── Day pip row (top of panel) ────────────────────────────────────────────
-    //   Seven squares, filled for days 1–7 (current week).
-    float pipY  = hudY + 72 * scale;
-    float pipSz = 14 * scale;
-    float pipGap = 4 * scale;
-    int dayInWeek = ((day - 1) % 7) + 1;
-    for (int i = 0; i < 7; ++i) {
-        float px = hudX + 12 * scale + i * (pipSz + pipGap);
-        glm::vec4 pipCol = (i < dayInWeek)
-            ? glm::vec4{0.9f, 0.7f, 0.1f, 1.0f}
-            : glm::vec4{0.25f, 0.22f, 0.18f, 1.0f};
-        drawRect(px, pipY, pipSz, pipSz, pipCol);
+    // ── Week-of-month pips (4 squares) ───────────────────────────────────────
+    //   Row above the day pips. Filled squares = weeks elapsed in the month.
+    float weekPipY  = hudY + 76 * sc;
+    float weekPipSz = 10 * sc;
+    float weekPipGap = 4 * sc;
+    for (int i = 0; i < 4; ++i) {
+        float px = hudX + 12 * sc + i * (weekPipSz + weekPipGap);
+        glm::vec4 col = (i < weekOfMonth)
+            ? glm::vec4{0.6f, 0.45f, 0.1f, 1.0f}   // filled — warm amber
+            : glm::vec4{0.20f, 0.18f, 0.14f, 1.0f}; // empty — dark
+        drawRect(px, weekPipY, weekPipSz, weekPipSz, col);
     }
 
-    // ── Text info strip above the panel ──────────────────────────────────────
-    //   Two lines: row 1 = day/moves, row 2 = position/visited/mode
-    //   textScale: stb chars are ~9px tall; at textScale=scale*1.5 → ~14px on a 600px screen.
-    float ts  = scale * 1.5f;
-    float tx  = hudX + 4 * scale;
-    float ty1 = hudY - 32 * scale;  // first line above panel
-    float ty2 = hudY - 16 * scale;  // second line above panel
+    // ── Day-of-week pips (7 squares) ─────────────────────────────────────────
+    float dayPipY  = hudY + 90 * sc;
+    float dayPipSz = 14 * sc;
+    float dayPipGap = 4 * sc;
+    int dayInWeek = ((day - 1) % 7) + 1;
+    for (int i = 0; i < 7; ++i) {
+        float px = hudX + 12 * sc + i * (dayPipSz + dayPipGap);
+        glm::vec4 col = (i < dayInWeek)
+            ? glm::vec4{0.9f, 0.7f, 0.1f, 1.0f}    // filled — gold
+            : glm::vec4{0.25f, 0.22f, 0.18f, 1.0f}; // empty
+        drawRect(px, dayPipY, dayPipSz, dayPipSz, col);
+    }
 
-    // Build line 1: "DAY 5   WEEK 1   MOVES 3/8"
-    char line1[64];
-    int week = ((day - 1) / 7) + 1;
+    // ── Text strip above panel (3 rows) ──────────────────────────────────────
+    float ts  = sc * 1.5f;
+    float tx  = hudX + 4 * sc;
+    float ty1 = hudY - 44 * sc;   // Month · Week · Day
+    float ty2 = hudY - 28 * sc;   // Moves
+    float ty3 = hudY - 12 * sc;   // Position / Visited / Gold
+
+    char line1[80], line2[64], line3[80];
+
+    // "MONTH 2  WEEK 3  DAY 5"
+    std::snprintf(line1, sizeof(line1), "MONTH %d   WEEK %d   DAY %d",
+                  month, weekOfMonth, dayInWeek);
+
+    // "MOVES 3/8" or "MOVES INF"
     if (infiniteMoves)
-        std::snprintf(line1, sizeof(line1), "DAY %d   WEEK %d   MOVES INF", day, week);
+        std::snprintf(line2, sizeof(line2), "MOVES INF");
     else
-        std::snprintf(line1, sizeof(line1), "DAY %d   WEEK %d   MOVES %d/%d",
-                      day, week, movesLeft, movesMax);
+        std::snprintf(line2, sizeof(line2), "MOVES %d/%d", movesLeft, movesMax);
 
-    // Build line 2: "POS (q,r)   VISITED n   GOLD n"
-    char line2[80];
-    std::snprintf(line2, sizeof(line2), "POS (%d, %d)   VISITED %d   GOLD %d",
+    // "POS (q,r)  VISITED n  GOLD n"
+    std::snprintf(line3, sizeof(line3), "POS (%d,%d)   VISITED %d   GOLD %d",
                   heroQ, heroR, visitedCount, gold);
 
-    // Text background band
-    float bandH = 36 * scale;
-    drawRect(hudX, hudY - bandH - 2 * scale, hudW, bandH, {0.0f, 0.0f, 0.0f, 0.55f});
+    // Text background band — tall enough for three rows
+    float bandH = 52 * sc;
+    drawRect(hudX, hudY - bandH - 2 * sc, hudW, bandH, {0.0f, 0.0f, 0.0f, 0.55f});
 
-    // Draw the two text lines
-    glm::vec4 textCol  = {1.0f, 0.95f, 0.7f, 1.0f};  // warm white
-    glm::vec4 warnCol  = {1.0f, 0.35f, 0.2f, 1.0f};  // orange-red for INF
-
-    drawText(tx, ty1, ts, line1, infiniteMoves ? warnCol : textCol);
-    drawText(tx, ty2, ts, line2, {0.75f, 0.85f, 0.95f, 1.0f});
+    glm::vec4 textCol = {1.0f, 0.95f, 0.7f, 1.0f};
+    glm::vec4 warnCol = {1.0f, 0.35f, 0.2f, 1.0f};
+    drawText(tx, ty1, ts, line1, textCol);
+    drawText(tx, ty2, ts, line2, infiniteMoves ? warnCol : textCol);
+    drawText(tx, ty3, ts, line3, {0.75f, 0.85f, 0.95f, 1.0f});
 
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);

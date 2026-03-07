@@ -23,6 +23,18 @@ struct CombatUnit {
     int      shotsLeft    = 0;   // remaining ammo; 0 means melee-only
     bool     hasRetaliated = false; // true once this stack retaliates this round
 
+    // Passive item bonuses — zero for ordinary stacks.
+    // Populated at army-build time from SpecialCharacter::equipped[].
+    int attackBonus  = 0;
+    int defenseBonus = 0;
+    int damageBonus  = 0;  // flat bonus added per-creature before the atk/def multiplier
+    int speedBonus   = 0;  // added to type->speed for initiative order
+
+    // Effective stats (base + item bonuses) — convenience used by CombatEngine.
+    int effectiveAttack()  const { return type->attack  + attackBonus;  }
+    int effectiveDefense() const { return type->defense + defenseBonus; }
+    int effectiveSpeed()   const { return type->speed   + speedBonus;   }
+
     bool isDead()  const { return count <= 0; }
 
     // Total HP across the entire stack

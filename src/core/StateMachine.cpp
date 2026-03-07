@@ -18,6 +18,8 @@ void StateMachine::pop() {
     if (m_stack.empty()) return;
     m_stack.back()->onExit();
     m_stack.pop_back();
+    if (!m_stack.empty())
+        m_stack.back()->onResume();
 }
 
 void StateMachine::replace(std::unique_ptr<GameState> state) {

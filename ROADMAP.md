@@ -42,10 +42,10 @@ not just a tech demo. Every item below is a hard dependency.
 | 6 | Flanking / Pinned mechanic | ✅ done | D1–D2 |
 | 7 | `SpecialCharacter` struct + spawns at dungeon | ✅ done | F1 |
 | 8 | Clearing dungeon recruits SC into hero party | ✅ done | F2 |
-| 9 | `EquipmentState` — equip items onto SCs | ⬜ | G1–G2 |
-| 10 | Cursed item locks in slot (no unequip) | ⬜ | G3 |
-| 11 | Equipped item passive effects fire in combat | ⬜ | E1 |
-| 12 | Loot table wired to hardcoded dungeon guard | ⬜ | C fixup |
+| 9 | `EquipmentState` — equip items onto SCs | ✅ done | G1–G2 |
+| 10 | Cursed item locks in slot (no unequip) | ✅ done | G3 |
+| 11 | Equipped item passive effects fire in combat | ✅ done | E1 |
+| 12 | Loot table wired to hardcoded dungeon guard | ✅ done | C fixup |
 
 **Done = MVP shipped.**
 
@@ -122,6 +122,7 @@ damage formula.
 | 10 | Buildings in CastleState | Economy depth |
 | 11 | Multiple heroes | Strategy layer |
 | 12 | **SpriteBatcher** — before Phase 3 animations | Performance |
+| 13 | **Unit sprites in army slots** — small per-unit icon in each slot so unit type is visually unambiguous (no more reading truncated names) | Clarity |
 
 ### SpriteBatcher — when and why
 

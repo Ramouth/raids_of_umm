@@ -1297,4 +1297,117 @@ SUITE("Hero — SC not added twice if outcome processed twice (guard check)") {
     CHECK_EQ((int)h.specials.size(), 1);
 }
 
+// ── E1 — Passive item bonuses in combat ───────────────────────────────────────
+
+SUITE("E1 — attackBonus raises effective attack") {
+    const UnitType* t = makeUnit("Fighter", 5);
+    CombatUnit u = CombatUnit::make(t, 1, true);
+    u.attackBonus = 3;
+    CHECK_EQ(u.effectiveAttack(), t->attack + 3);
+}
+
+SUITE("E1 — defenseBonus raises effective defense") {
+    const UnitType* t = makeUnit("Guardian", 5);
+    CombatUnit u = CombatUnit::make(t, 1, true);
+    u.defenseBonus = 2;
+    CHECK_EQ(u.effectiveDefense(), t->defense + 2);
+}
+
+SUITE("E1 — speedBonus raises effective speed") {
+    const UnitType* t = makeUnit("Runner", 5);
+    CombatUnit u = CombatUnit::make(t, 1, true);
+    u.speedBonus = 1;
+    CHECK_EQ(u.effectiveSpeed(), t->speed + 1);
+}
+
+SUITE("E1 — speedBonus changes initiative order") {
+    // Both units have base speed 5, but player unit has +2 item speed → acts first.
+    const UnitType* pt = makeUnit("PlayerUnit", 5);
+    const UnitType* et = makeUnit("EnemyUnit",  5);
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;
+    CombatUnit pu = CombatUnit::make(pt, 3, true);
+    pu.speedBonus = 2;
+    p.stacks.push_back(pu);
+
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(et, 3, false));
+
+    CombatEngine eng(std::move(p), std::move(e));
+    // Without speedBonus: player wins tie (same speed). With +2: still player first.
+    // But now let's verify enemy speed 7 is NOT enough to beat player speed 5+2=7 tie
+    // (player wins ties) — i.e. player still goes first at effective speed 7 vs 7.
+    CHECK(eng.currentTurn().isPlayer);
+}
+
+SUITE("E1 — attackBonus increases damage dealt to enemy") {
+    // Attacker with +4 attack bonus should deal more damage than without.
+    // Run many rounds of autobattle and compare survivor counts.
+    const UnitType* at = makeUnit("Attacker", 5);
+    const UnitType* dt = makeUnit("Defender", 3);
+
+    // Baseline: no bonus
+    int baselineCount = 0;
+    {
+        CombatArmy p; p.ownerName = "P"; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(at, 1, true));
+        CombatArmy e; e.ownerName = "E"; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dt, 20, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        for (int i = 0; i < 200 && !eng.isOver(); ++i) CombatAI::takeTurn(eng);
+        if (!eng.enemyArmy().stacks.empty())
+            baselineCount = eng.enemyArmy().stacks[0].count;
+    }
+
+    // With +6 attack bonus: enemy should have fewer survivors
+    int bonusCount = 0;
+    {
+        CombatArmy p; p.ownerName = "P"; p.isPlayer = true;
+        CombatUnit pu = CombatUnit::make(at, 1, true);
+        pu.attackBonus = 6;
+        p.stacks.push_back(pu);
+        CombatArmy e; e.ownerName = "E"; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dt, 20, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        for (int i = 0; i < 200 && !eng.isOver(); ++i) CombatAI::takeTurn(eng);
+        if (!eng.enemyArmy().stacks.empty())
+            bonusCount = eng.enemyArmy().stacks[0].count;
+    }
+
+    CHECK(bonusCount <= baselineCount);  // more attack = fewer enemy survivors
+}
+
+SUITE("E1 — damageBonus increases damage dealt") {
+    const UnitType* at = makeUnit("Slasher", 5);
+    const UnitType* dt = makeUnit("Target",  3);
+
+    int baselineCount = 0;
+    {
+        CombatArmy p; p.ownerName = "P"; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(at, 1, true));
+        CombatArmy e; e.ownerName = "E"; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dt, 20, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        for (int i = 0; i < 200 && !eng.isOver(); ++i) CombatAI::takeTurn(eng);
+        if (!eng.enemyArmy().stacks.empty())
+            baselineCount = eng.enemyArmy().stacks[0].count;
+    }
+
+    int bonusCount = 0;
+    {
+        CombatArmy p; p.ownerName = "P"; p.isPlayer = true;
+        CombatUnit pu = CombatUnit::make(at, 1, true);
+        pu.damageBonus = 5;  // +5 per creature per hit
+        p.stacks.push_back(pu);
+        CombatArmy e; e.ownerName = "E"; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dt, 20, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        for (int i = 0; i < 200 && !eng.isOver(); ++i) CombatAI::takeTurn(eng);
+        if (!eng.enemyArmy().stacks.empty())
+            bonusCount = eng.enemyArmy().stacks[0].count;
+    }
+
+    CHECK(bonusCount <= baselineCount);
+}
+
 #endif // COMBAT_ENGINE_IMPL

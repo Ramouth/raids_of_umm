@@ -5,6 +5,7 @@
 #include "combat/CombatState.h"
 #include "combat/CombatUnit.h"
 #include "dungeon/DungeonState.h"
+#include "equipment/EquipmentState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include "world/Resources.h"
@@ -28,10 +29,27 @@ CombatArmy AdventureState::buildPlayerArmy() const {
             army.stacks.push_back(CombatUnit::make(slot.unitType, slot.count, true));
     }
 
-    // SCs fight as solo units (count=1).
-    for (const auto& sc : m_hero.specials)
-        if (!sc.isEmpty())
-            army.stacks.push_back(CombatUnit::make(&sc.combatStats, 1, true));
+    // SCs fight as solo units (count=1), with passive item bonuses baked in.
+    for (const auto& sc : m_hero.specials) {
+        if (sc.isEmpty()) continue;
+        CombatUnit cu = CombatUnit::make(&sc.combatStats, 1, true);
+        for (const WondrousItem* item : sc.equipped) {
+            if (!item) continue;
+            for (const ItemEffect& ef : item->passiveEffects) {
+                if      (ef.stat == "attack")  cu.attackBonus  += ef.amount;
+                else if (ef.stat == "defense") cu.defenseBonus += ef.amount;
+                else if (ef.stat == "damage")  cu.damageBonus  += ef.amount;
+                else if (ef.stat == "speed")   cu.speedBonus   += ef.amount;
+            }
+        }
+        if (cu.attackBonus || cu.defenseBonus || cu.damageBonus || cu.speedBonus)
+            std::cout << "[Adventure] " << sc.name << " item bonuses:"
+                      << " atk+" << cu.attackBonus
+                      << " def+" << cu.defenseBonus
+                      << " dmg+" << cu.damageBonus
+                      << " spd+" << cu.speedBonus << "\n";
+        army.stacks.push_back(cu);
+    }
 
     // Fallback: if hero has no army (shouldn't happen after initHeroArmy), fight bare-handed.
     if (army.stacks.empty()) {
@@ -335,7 +353,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
                 "kharim", "Kha'Rim the Wanderer", "tank");
             Application::get().pushState(
                 std::make_unique<DungeonState>(m_hero, kharim,
-                                               std::vector<std::string>{},
+                                               std::vector<std::string>{"scarab_amulet"},
                                                m_pendingDungeon));
             break;
         }
@@ -354,12 +372,24 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 }
 
 void AdventureState::endTurn() {
-    int day = m_turnManager.nextDay(m_hero, m_objectControl,
-                                    Application::get().resources(), m_townStates);
+    m_turnManager.nextDay(m_hero, m_objectControl,
+                          Application::get().resources(), m_townStates);
+
     int gold = m_turnManager.playerFaction().treasury[Resource::Gold];
     m_heroSelected = false;
     m_previewPath.clear();
-    std::cout << "[Adventure] Day " << day << " begins. Gold: " << gold << "\n";
+
+    // ── End-of-turn summary ───────────────────────────────────────────────────
+    std::cout << "[Turn] Month " << m_turnManager.month()
+              << "  Week "       << m_turnManager.weekOfMonth()
+              << "  Day "        << m_turnManager.dayOfWeek()
+              << "  (Day "       << m_turnManager.day() << " absolute)"
+              << "  | Gold: "    << gold
+              << "  | Moves: "   << m_hero.movesLeft << "/" << m_hero.movesMax
+              << "\n";
+
+    if (!m_turnManager.lastEvent().empty())
+        std::cout << "[Turn] >>> " << m_turnManager.lastEvent() << " <<<\n";
 }
 
 void AdventureState::wait() {
@@ -376,7 +406,7 @@ bool AdventureState::handleEvent(void* sdlEvent) {
 
     // Defeat screen: only allow restart or quit.
     if (m_isDefeated) {
-        if (e->type == SDL_KEYDOWN) {
+        if (e->type == SDL_KEYDOWN && !e->key.repeat) {
             switch (e->key.keysym.sym) {
                 case SDLK_r:
                     Application::get().replaceState(std::make_unique<AdventureState>());
@@ -390,11 +420,15 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         return true;  // swallow all other events while defeated
     }
 
-    if (e->type == SDL_KEYDOWN) {
+    if (e->type == SDL_KEYDOWN && !e->key.repeat) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE: Application::get().popState(); return true;
             case SDLK_SPACE:  endTurn(); return true;
             case SDLK_h:      m_showHUD = !m_showHUD; return true;
+            case SDLK_e:
+                Application::get().pushState(
+                    std::make_unique<EquipmentState>(m_hero));
+                return true;
             case SDLK_w:      wait(); return true;
             case SDLK_p: {
                 float now = SDL_GetTicks() / 1000.0f;
@@ -470,6 +504,17 @@ bool AdventureState::handleEvent(void* sdlEvent) {
     }
 
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+        auto& app2 = Application::get();
+        float sc2  = app2.height() / 600.0f;
+        float btnX = 10 * sc2, btnY = 10 * sc2;
+        float btnW = 110 * sc2, btnH = 36 * sc2;
+        float mx = static_cast<float>(e->button.x);
+        float my = static_cast<float>(e->button.y);
+        if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
+            endTurn();
+            return true;
+        }
+
         glm::vec2 wp      = m_cam.screenToWorld(e->button.x, e->button.y);
         HexCoord  clicked = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
 
@@ -597,7 +642,10 @@ void AdventureState::render() {
     glDisable(GL_BLEND);
 
     if (m_showHUD) {
-        m_hud.render(app.width(), app.height(), m_turnManager.day(),
+        m_hud.render(app.width(), app.height(),
+                     m_turnManager.day(),
+                     m_turnManager.month(),
+                     m_turnManager.weekOfMonth(),
                      m_hero.movesLeft, m_hero.movesMax,
                      static_cast<int>(m_objectControl.size()),
                      m_hero.pos.q, m_hero.pos.r, m_infiniteMoves,
@@ -605,37 +653,51 @@ void AdventureState::render() {
 
         // ── Army panel (bottom-right) ─────────────────────────────────────────
         int sw = app.width(), sh = app.height();
-        float sc     = sh / 600.0f;
-        float slotW  = 65 * sc;
-        float slotH  = 52 * sc;
-        float gap    = 4  * sc;
-        float totalW = Hero::ARMY_SLOTS * (slotW + gap) - gap;
-        float panX   = sw - totalW - 10 * sc;
-        float panY   = sh - slotH - 10 * sc;
+        float sc      = sh / 600.0f;
+        float slotW   = 65 * sc;
+        float slotH   = 52 * sc;
+        float gap     = 4  * sc;
+        float labelH  = 16 * sc;
+        float totalW  = Hero::ARMY_SLOTS * (slotW + gap) - gap;
+        float panX    = sw - totalW - 10 * sc;
+        float panY    = sh - slotH - 10 * sc;
 
         m_hud.begin(sw, sh);
-        // Backing strip
-        m_hud.drawRect(panX - 6*sc, panY - 6*sc, totalW + 12*sc, slotH + 12*sc,
-                       {0.0f, 0.0f, 0.0f, 0.60f});
+
+        // Backing strip — tall enough to include the "ARMY" label row above slots.
+        float stripY = panY - labelH - 6 * sc;
+        float stripH = slotH + labelH + 14 * sc;
+        m_hud.drawRect(panX - 6*sc, stripY, totalW + 12*sc, stripH,
+                       {0.0f, 0.0f, 0.0f, 0.72f});
+        m_hud.drawText(panX, stripY + 3*sc, sc * 1.05f,
+                       "ARMY", {0.65f, 0.52f, 0.25f, 1.0f});
 
         char slotBuf[32];
         for (int i = 0; i < Hero::ARMY_SLOTS; ++i) {
             const ArmySlot& slot = m_hero.army[i];
             float sx = panX + i * (slotW + gap);
 
-            glm::vec4 bg = slot.isEmpty()
-                ? glm::vec4{0.08f, 0.06f, 0.04f, 0.50f}
-                : glm::vec4{0.14f, 0.09f, 0.05f, 0.90f};
-            m_hud.drawRect(sx, panY, slotW, slotH, bg);
+            if (slot.isEmpty()) {
+                m_hud.drawRect(sx, panY, slotW, slotH, {0.08f, 0.06f, 0.04f, 0.50f});
+            } else {
+                // Golden border so occupied slots stand out clearly.
+                m_hud.drawRect(sx, panY, slotW, slotH, {0.65f, 0.48f, 0.15f, 1.0f});
+                m_hud.drawRect(sx + 2*sc, panY + 2*sc,
+                               slotW - 4*sc, slotH - 4*sc, {0.20f, 0.14f, 0.07f, 0.95f});
 
-            if (!slot.isEmpty()) {
-                // First 7 chars of unit name (keeps slots compact)
-                std::snprintf(slotBuf, sizeof(slotBuf), "%.7s", slot.unitType->name.c_str());
-                m_hud.drawText(sx + 3*sc, panY + 5*sc,  sc * 0.85f,
-                               slotBuf, {0.85f, 0.80f, 0.65f, 1.0f});
+                // Show the last word of the unit name so "Desert Archer" → "Archer",
+                // "Skeleton Warrior" → "Warrior", "Mummy" → "Mummy".
+                const std::string& fullName = slot.unitType->name;
+                auto spacePos = fullName.rfind(' ');
+                const char* label = (spacePos != std::string::npos)
+                    ? fullName.c_str() + spacePos + 1
+                    : fullName.c_str();
+                std::snprintf(slotBuf, sizeof(slotBuf), "%.7s", label);
+                m_hud.drawText(sx + 3*sc, panY + 5*sc, sc * 0.85f,
+                               slotBuf, {0.95f, 0.88f, 0.70f, 1.0f});
                 std::snprintf(slotBuf, sizeof(slotBuf), "%d", slot.count);
                 m_hud.drawText(sx + 3*sc, panY + 25*sc, sc * 1.6f,
-                               slotBuf, {0.35f, 0.90f, 0.35f, 1.0f});
+                               slotBuf, {0.35f, 0.92f, 0.35f, 1.0f});
             }
         }
 
@@ -671,6 +733,30 @@ void AdventureState::render() {
                                "- SC -", {0.30f, 0.25f, 0.40f, 0.70f});
             }
         }
+    }
+
+    // ── End Turn button — top-left, always visible ───────────────────────────
+    {
+        int sw = app.width(), sh = app.height();
+        float sc = sh / 600.0f;
+        float btnX = 10 * sc, btnY = 10 * sc;
+        float btnW = 110 * sc, btnH = 36 * sc;
+
+        m_hud.begin(sw, sh);
+
+        // Glow gold when hero is out of moves (nudge the player to end turn).
+        bool outOfMoves = !m_infiniteMoves && m_hero.movesLeft == 0;
+        glm::vec4 borderCol = outOfMoves
+            ? glm::vec4{0.95f, 0.80f, 0.20f, 1.0f}
+            : glm::vec4{0.50f, 0.40f, 0.18f, 1.0f};
+        glm::vec4 bgCol = outOfMoves
+            ? glm::vec4{0.25f, 0.18f, 0.04f, 0.97f}
+            : glm::vec4{0.10f, 0.08f, 0.04f, 0.90f};
+
+        m_hud.drawRect(btnX, btnY, btnW, btnH, borderCol);
+        m_hud.drawRect(btnX + 2*sc, btnY + 2*sc, btnW - 4*sc, btnH - 4*sc, bgCol);
+        m_hud.drawText(btnX + 8*sc, btnY + 10*sc, sc * 1.3f,
+                       "END TURN", {1.0f, 0.95f, 0.70f, 1.0f});
     }
 
     if (m_isDefeated) {

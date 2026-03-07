@@ -56,6 +56,7 @@ set(SOURCES
     src/core/TurnManager.cpp
     src/hero/Hero.cpp
     src/dungeon/DungeonState.cpp
+    src/equipment/EquipmentState.cpp
 )
 
 add_executable(raids_of_umm ${SOURCES})
