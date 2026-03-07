@@ -1,29 +1,89 @@
 [GL] Renderer : llvmpipe (LLVM 20.1.2, 256 bits)
-[GL] Version  : 4.5 (Core Profile) Mesa 25.0.7-0ubuntu0.24.04.2
-[Texture] Loaded assets/textures/terrain/sand.png (64x64 ch=4)
-[Texture] Loaded assets/textures/terrain/dune.png (64x64 ch=4)
-[Texture] Cannot open: assets/textures/terrain/rock.png
-[Texture] Cannot open: assets/textures/terrain/oasis.png
-[Texture] Cannot open: assets/textures/terrain/ruins.png
-[Texture] Cannot open: assets/textures/terrain/obsidian.png
-[Texture] Loaded assets/textures/terrain/mountain.png (64x64 ch=4)
-[Texture] Cannot open: assets/textures/terrain/river.png
-[Texture] Cannot open: assets/textures/terrain/wall.png
-[Texture] Cannot open: assets/textures/terrain/battle.png
+[GL] Version  : 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.1
+[ResourceManager] Loaded 7 units, 5 spells.
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/objects/castle.png (128x128 ch=4)
+[Texture] Loaded assets/textures/objects/dungeon.png (64x64 ch=4)
+[Texture] Loaded assets/textures/objects/goldmine.png (64x64 ch=4)
 [WorldBuilder] New procedural map, radius 12  (469 tiles)
   [HUD] tool=PaintTile  terrain=Sand  objType=Town
+[Texture] Loaded assets/textures/assorted/for_sorting2_r0_c0.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting2_r0_c1.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting2_r1_c0.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting2_r1_c1.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting4.png (256x256 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting_r0_c0.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting_r0_c1.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting_r1_c0.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/for_sorting_r1_c1.png (128x128 ch=4)
+[Texture] Loaded assets/textures/assorted/oasis.png (64x64 ch=4)
 [WorldBuilder] Ready.
   Tab=cycle tool  1-6=terrain  O=obj type
   Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit
+  F1=alignment editor
   [HUD] tool=PaintTile  terrain=Sand  objType=Town
 [WorldBuilder] Launching test-play...
-[Texture] Loaded assets/textures/terrain/sand.png (64x64 ch=4)
-[Texture] Loaded assets/textures/terrain/dune.png (64x64 ch=4)
-[Texture] Cannot open: assets/textures/terrain/rock.png
-[Texture] Cannot open: assets/textures/terrain/oasis.png
-[Texture] Cannot open: assets/textures/terrain/ruins.png
-[Texture] Cannot open: assets/textures/terrain/obsidian.png
-[Texture] Loaded assets/textures/terrain/mountain.png (64x64 ch=4)
-[Texture] Cannot open: assets/textures/terrain/river.png
-[Texture] Cannot open: assets/textures/terrain/wall.png
-[Texture] Cannot open: assets/textures/terrain/battle.png
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/units/armoured_warrior.png (128x128 ch=4)
+[Texture] Loaded assets/textures/objects/dungeon.png (64x64 ch=4)
+[Texture] Loaded assets/textures/objects/castle.png (128x128 ch=4)
+[Adventure] Hero army: 2 stacks.
+[Adventure] Town 'Umm'Natur' seeded with 7 unit type(s).
+[Adventure] Day 1 — Untitled Map
+  Click hero to select, then click a tile to move.
+  SPACE = end turn  |  R = restart  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor
+  Hero selected
+  [Day 1] Hero moved to (0,4) — Moves: 4/8 | Controlled: 0
+  *** Visited Town: Umm'Natur ***
+[Texture] Loaded assets/textures/buildings/castle_interior.png (320x200 ch=4)
+[Castle] Entered Umm'Natur  (treasury: 2000 gold)
+[Castle] Exited — hired 0 unit type(s).
+[Turn] Month 1  Week 1  Day 2  (Day 2 absolute)  | Gold: 2000  | Moves: 8/8
+[Main] Clean exit.
+[Adventure] Exited
