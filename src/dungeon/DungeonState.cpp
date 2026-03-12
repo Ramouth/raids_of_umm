@@ -111,6 +111,13 @@ void DungeonState::onExit() {
         m_outcome->scRecruited.push_back(m_dungeonSC);
 
     m_outcome->itemsFound = std::move(m_collectedItems);
+
+    // Pass SC progression earned inside this dungeon back to the adventure map.
+    m_outcome->scUpdates.clear();
+    for (const auto& sc : m_hero.specials) {
+        if (sc.isEmpty() || !sc.def) continue;
+        m_outcome->scUpdates.push_back({ sc.id, sc.level, sc.xp, sc.unlockedAbilities });
+    }
 }
 
 void DungeonState::onResume() {
@@ -124,6 +131,24 @@ void DungeonState::onResume() {
     for (const auto& s : result.survivors)
         if (s.type && s.count > 0)
             m_hero.addUnit(s.type, s.count);
+
+    // Sync SC progression earned in combat back to the hero snapshot.
+    for (const auto& upd : result.scUpdates) {
+        SpecialCharacter* sc = m_hero.findSpecial(upd.scId);
+        if (!sc || !sc->def) continue;
+        int levelDelta = upd.level - sc->level;
+        for (int i = 0; i < levelDelta; ++i) {
+            sc->combatStats.attack    += sc->def->attackGrowth;
+            sc->combatStats.defense   += sc->def->defenseGrowth;
+            sc->combatStats.hitPoints += sc->def->maxHpGrowth;
+        }
+        sc->level             = upd.level;
+        sc->xp                = upd.xp;
+        sc->unlockedAbilities = upd.unlockedAbilities;
+        if (levelDelta > 0)
+            std::cout << "[Dungeon] " << sc->name
+                      << " is now level " << sc->level << "!\n";
+    }
 
     switch (result.result) {
         case CombatResult::PlayerWon:
@@ -200,6 +225,16 @@ CombatArmy DungeonState::buildPlayerArmy() const {
                 else if (ef.stat == "damage")  cu.damageBonus  += ef.amount;
                 else if (ef.stat == "speed")   cu.speedBonus   += ef.amount;
             }
+        }
+        cu.isSpecialCharacter = true;
+        cu.scId               = sc.id;
+        cu.scDef              = sc.def;
+        cu.scLevel            = sc.level;
+        cu.scXp               = sc.xp;
+        cu.scUnlocked         = sc.unlockedAbilities;
+        if (sc.def) {
+            cu.killXp    = sc.def->killBonusXp;
+            cu.perTurnXp = sc.def->perTurnXp;
         }
         army.stacks.push_back(cu);
     }

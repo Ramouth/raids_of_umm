@@ -15,6 +15,13 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
               << m_queue.size() << " stacks in initiative order\n";
     // Catch degenerate cases (empty army passed in) before any action is taken.
     checkWinCondition();
+    // Award per-turn XP to the first active unit (if SC).
+    if (!isOver() && !m_queue.empty()) {
+        TurnSlot& first = m_queue[m_turn];
+        CombatUnit& firstUnit = first.isPlayer ? m_player.stacks[first.stackIndex]
+                                               : m_enemy.stacks[first.stackIndex];
+        awardScXp(firstUnit, first, firstUnit.perTurnXp);
+    }
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -204,6 +211,9 @@ void CombatEngine::doAttack(int targetIndex) {
         ev.isPlayer   = !slot.isPlayer;
         ev.stackIndex = targetIndex;
         m_events.push_back(ev);
+
+        // Award kill XP to the attacker if it is an SC.
+        awardScXp(attacker, slot, attacker.killXp);
     }
 
     // ── Melee retaliation ────────────────────────────────────────────────────
@@ -296,6 +306,50 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
     return std::max(1, static_cast<int>(baseDmg * mult));
 }
 
+// ── SC XP ─────────────────────────────────────────────────────────────────────
+
+void CombatEngine::awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount) {
+    if (!unit.isSpecialCharacter || !unit.scDef || amount <= 0) return;
+
+    unit.scXp += amount;
+
+    CombatEvent xpEv;
+    xpEv.type       = CombatEvent::Type::ScXpGained;
+    xpEv.isPlayer   = slot.isPlayer;
+    xpEv.stackIndex = slot.stackIndex;
+    xpEv.xpAmount   = amount;
+    m_events.push_back(xpEv);
+
+    // Process any level-up thresholds now crossed (handles multi-level jumps).
+    while (unit.scLevel < unit.scDef->maxLevel
+           && unit.scXp >= unit.scDef->xpThresholds[unit.scLevel - 1]) {
+        ++unit.scLevel;
+
+        // Stat growth affects this combat immediately (via bonus fields).
+        unit.attackBonus  += unit.scDef->attackGrowth;
+        unit.defenseBonus += unit.scDef->defenseGrowth;
+        unit.speedBonus   += unit.scDef->speedGrowth;
+        // Heal by levelUpHeal (capped at current max HP for this unit).
+        unit.hpLeft = std::min(unit.hpLeft + unit.scDef->levelUpHeal,
+                               unit.type->hitPoints);
+
+        // Unlock abilities granted at this level.
+        for (const auto& ab : unit.scDef->abilities)
+            if (ab.level == unit.scLevel)
+                unit.scUnlocked.push_back(ab.key);
+
+        CombatEvent lvEv;
+        lvEv.type       = CombatEvent::Type::ScLevelUp;
+        lvEv.isPlayer   = slot.isPlayer;
+        lvEv.stackIndex = slot.stackIndex;
+        lvEv.newLevel   = unit.scLevel;
+        m_events.push_back(lvEv);
+
+        std::cout << "[CombatEngine] " << unit.type->name
+                  << " reached level " << unit.scLevel << "!\n";
+    }
+}
+
 void CombatEngine::teleportUnit(bool isPlayer, int stackIdx, HexCoord pos) {
     auto& stacks = isPlayer ? m_player.stacks : m_enemy.stacks;
     if (stackIdx >= 0 && stackIdx < static_cast<int>(stacks.size()))
@@ -378,6 +432,15 @@ void CombatEngine::advance() {
 
         buildQueue();
         std::cout << "[CombatEngine] --- Round " << m_round << " ---\n";
+    }
+
+    // Per-turn XP for the newly active SC (fires each time a unit becomes active,
+    // including the first turn of each round after queue rebuild).
+    if (!isOver()) {
+        TurnSlot& newSlot = m_queue[m_turn];
+        CombatUnit& newActive = newSlot.isPlayer ? m_player.stacks[newSlot.stackIndex]
+                                                 : m_enemy.stacks[newSlot.stackIndex];
+        awardScXp(newActive, newSlot, newActive.perTurnXp);
     }
 }
 

@@ -1,8 +1,10 @@
 #pragma once
 #include "entities/UnitType.h"
+#include "entities/SCDef.h"
 #include "world/WondrousItem.h"
 #include <string>
 #include <array>
+#include <vector>
 
 /*
  * SpecialCharacter — a named individual who can join the hero's party.
@@ -25,6 +27,14 @@ struct SpecialCharacter {
 
     // Equipment slots — filled by EquipmentState
     std::array<const WondrousItem*, 4> equipped{};
+
+    // ── Progression ───────────────────────────────────────────────────────────
+    // def points to a static SCDef (from findSCDef). nullptr = no progression.
+    // level/xp/unlockedAbilities are updated by AdventureState after each combat.
+    const SCDef*             def                = nullptr;
+    int                      level              = 1;
+    int                      xp                 = 0;
+    std::vector<std::string> unlockedAbilities;
 
     bool isEmpty() const { return id.empty(); }
 

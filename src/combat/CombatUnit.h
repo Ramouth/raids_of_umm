@@ -1,6 +1,9 @@
 #pragma once
 #include "entities/UnitType.h"
+#include "entities/SCDef.h"
 #include "hex/HexCoord.h"
+#include <string>
+#include <vector>
 
 /*
  * CombatUnit — one creature stack taking part in a battle.
@@ -22,6 +25,19 @@ struct CombatUnit {
     HexCoord pos;            // position on the combat grid (CombatMap coordinate space)
     int      shotsLeft    = 0;   // remaining ammo; 0 means melee-only
     bool     hasRetaliated = false; // true once this stack retaliates this round
+
+    // SC progression — zero/nullptr for ordinary stacks.
+    // Set by buildPlayerArmy() when the stack represents a SpecialCharacter.
+    // CombatEngine updates scLevel/scXp/scUnlocked as XP is earned.
+    // CombatState::onExit() reads these back into CombatOutcome::scUpdates.
+    bool                     isSpecialCharacter = false;
+    std::string              scId;             // matches SpecialCharacter::id
+    const SCDef*             scDef    = nullptr;
+    int                      scLevel  = 1;
+    int                      scXp     = 0;
+    int                      killXp   = 0;    // from scDef->killBonusXp
+    int                      perTurnXp= 0;    // from scDef->perTurnXp
+    std::vector<std::string> scUnlocked;       // abilities unlocked so far
 
     // Passive item bonuses — zero for ordinary stacks.
     // Populated at army-build time from SpecialCharacter::equipped[].

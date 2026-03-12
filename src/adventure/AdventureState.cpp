@@ -42,6 +42,18 @@ CombatArmy AdventureState::buildPlayerArmy() const {
                 else if (ef.stat == "speed")   cu.speedBonus   += ef.amount;
             }
         }
+        // Bake SC progression state into the CombatUnit so the engine can
+        // award XP and level-ups during battle, then write them back to outcome.
+        cu.isSpecialCharacter = true;
+        cu.scId               = sc.id;
+        cu.scDef              = sc.def;
+        cu.scLevel            = sc.level;
+        cu.scXp               = sc.xp;
+        cu.scUnlocked         = sc.unlockedAbilities;
+        if (sc.def) {
+            cu.killXp    = sc.def->killBonusXp;
+            cu.perTurnXp = sc.def->perTurnXp;
+        }
         if (cu.attackBonus || cu.defenseBonus || cu.damageBonus || cu.speedBonus)
             std::cout << "[Adventure] " << sc.name << " item bonuses:"
                       << " atk+" << cu.attackBonus
@@ -224,6 +236,25 @@ void AdventureState::onResume() {
         std::cout << "[Adventure] Hero defeated in dungeon.\n";
         m_isDefeated = true;
         return;
+    }
+
+    // Sync SC progression earned inside the dungeon back to the real hero.
+    for (const auto& upd : outcome.scUpdates) {
+        SpecialCharacter* sc = m_hero.findSpecial(upd.scId);
+        if (!sc || !sc->def) continue;
+        int levelDelta = upd.level - sc->level;
+        // Apply permanent stat growth for each level gained.
+        for (int i = 0; i < levelDelta; ++i) {
+            sc->combatStats.attack    += sc->def->attackGrowth;
+            sc->combatStats.defense   += sc->def->defenseGrowth;
+            sc->combatStats.hitPoints += sc->def->maxHpGrowth;
+        }
+        sc->level              = upd.level;
+        sc->xp                 = upd.xp;
+        sc->unlockedAbilities  = upd.unlockedAbilities;
+        if (levelDelta > 0)
+            std::cout << "[Adventure] " << sc->name
+                      << " is now level " << sc->level << "!\n";
     }
 
     if (outcome.completed) {

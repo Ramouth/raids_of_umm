@@ -94,6 +94,10 @@ public:
     void teleportUnit(bool isPlayer, int stackIdx, HexCoord pos);
 
 private:
+    // Award XP to a SC stack; handles level-up logic and emits ScXpGained /
+    // ScLevelUp events.  No-ops if the unit has no SC def or amount <= 0.
+    void awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount);
+
     // Assign each stack its spawn position on the CombatMap.
     void placeArmies();
 

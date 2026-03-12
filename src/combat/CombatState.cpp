@@ -95,6 +95,14 @@ void CombatState::onExit() {
         // On victory, the dungeon's resident SC (if any) joins the hero.
         if (m_engine.result() == CombatResult::PlayerWon && m_dungeonSC.has_value())
             m_outcome->scFound.push_back(*m_dungeonSC);
+
+        // Write SC progression earned during this battle.
+        for (const auto& unit : m_engine.playerArmy().stacks) {
+            if (!unit.isSpecialCharacter) continue;
+            m_outcome->scUpdates.push_back({
+                unit.scId, unit.scLevel, unit.scXp, unit.scUnlocked
+            });
+        }
     }
 }
 
@@ -218,6 +226,21 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
             }
             pushLog("Press any key to continue", COL_DEATH);
             break;
+        case CombatEvent::Type::ScXpGained: {
+            static constexpr glm::vec4 COL_XP = {0.6f, 0.85f, 1.0f, 1.0f};  // light blue
+            const char* name = unitName(m_engine, ev.isPlayer, ev.stackIndex);
+            std::snprintf(buf, sizeof(buf), "  %s +%d XP", name, ev.xpAmount);
+            pushLog(buf, COL_XP);
+            break;
+        }
+        case CombatEvent::Type::ScLevelUp: {
+            static constexpr glm::vec4 COL_LEVEL = {1.0f, 0.9f, 0.2f, 1.0f};  // gold
+            const char* name = unitName(m_engine, ev.isPlayer, ev.stackIndex);
+            std::snprintf(buf, sizeof(buf), "*** %s reached level %d! ***",
+                          name, ev.newLevel);
+            pushLog(buf, COL_LEVEL);
+            break;
+        }
         default: break;
     }
 

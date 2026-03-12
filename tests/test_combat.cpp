@@ -1410,4 +1410,133 @@ SUITE("E1 — damageBonus increases damage dealt") {
     CHECK(bonusCount <= baselineCount);
 }
 
+// ── SC XP system ──────────────────────────────────────────────────────────────
+
+// Helper: build a one-stack SC army with the Ushari definition.
+static CombatArmy scArmy(const std::string& name, int speed) {
+    static std::vector<UnitType> s_scTypes;
+    UnitType t;
+    t.id = name; t.name = name;
+    t.speed = speed; t.hitPoints = 35;
+    t.attack = 6; t.defense = 4; t.minDamage = 2; t.maxDamage = 5;
+    s_scTypes.push_back(t);
+
+    CombatUnit cu = CombatUnit::make(&s_scTypes.back(), 1, true);
+    cu.isSpecialCharacter = true;
+    cu.scId               = "ushari";
+    cu.scDef              = &ushariDef();
+    cu.scLevel            = 1;
+    cu.scXp               = 0;
+    cu.killXp             = ushariDef().killBonusXp;
+    cu.perTurnXp          = ushariDef().perTurnXp;
+
+    CombatArmy army;
+    army.ownerName = "Player"; army.isPlayer = true;
+    army.stacks.push_back(cu);
+    return army;
+}
+
+SUITE("SC XP — per-turn XP fires at battle start") {
+    // The first unit's turn begins at construction → per-turn XP fires.
+    CombatArmy p = scArmy("Ushari", 10);
+    CombatArmy e = oneStack("Skeleton", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+
+    // Drain events, look for ScXpGained.
+    auto evs = eng.drainEvents();
+    bool foundXp = false;
+    for (const auto& ev : evs)
+        if (ev.type == CombatEvent::Type::ScXpGained && ev.isPlayer)
+            foundXp = true;
+    CHECK(foundXp);
+    CHECK(eng.playerArmy().stacks[0].scXp == ushariDef().perTurnXp);
+}
+
+SUITE("SC XP — kill awards kill bonus XP") {
+    // One-shot kill: SC with very high attack vs a single 1-HP enemy.
+    static UnitType s_glass;
+    s_glass.id = "glass"; s_glass.name = "GlassCannon";
+    s_glass.speed = 1; s_glass.hitPoints = 1;
+    s_glass.attack = 1; s_glass.defense = 0; s_glass.minDamage = 1; s_glass.maxDamage = 1;
+
+    CombatUnit enemy = CombatUnit::make(&s_glass, 1, false);
+
+    static UnitType s_tank;
+    s_tank.id = "sc_test"; s_tank.name = "SC";
+    s_tank.speed = 10; s_tank.hitPoints = 35;
+    s_tank.attack = 100; s_tank.defense = 0; s_tank.minDamage = 50; s_tank.maxDamage = 50;
+    static std::vector<UnitType> s_buf; s_buf.push_back(s_tank);
+
+    CombatUnit sc = CombatUnit::make(&s_buf.back(), 1, true);
+    sc.isSpecialCharacter = true;
+    sc.scId               = "ushari";
+    sc.scDef              = &ushariDef();
+    sc.scLevel            = 1;
+    sc.scXp               = 0;
+    sc.killXp             = ushariDef().killBonusXp;
+    sc.perTurnXp          = ushariDef().perTurnXp;
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;  p.stacks.push_back(sc);
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false; e.stacks.push_back(enemy);
+
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();   // discard per-turn XP from construction
+
+    int xpBefore = eng.playerArmy().stacks[0].scXp;
+    eng.doAttack(0);     // SC attacks; glass cannon should die
+
+    int xpAfter = eng.playerArmy().stacks[0].scXp;
+    CHECK(xpAfter > xpBefore);                          // some XP was gained
+    CHECK(xpAfter - xpBefore >= ushariDef().killBonusXp);  // at least kill bonus
+}
+
+SUITE("SC XP — level-up emits ScLevelUp event") {
+    // Prime the SC to be just below level 2 threshold, then force a kill.
+    static UnitType s_weak;
+    s_weak.id = "weak"; s_weak.name = "Weak";
+    s_weak.speed = 1; s_weak.hitPoints = 1;
+    s_weak.attack = 0; s_weak.defense = 0; s_weak.minDamage = 1; s_weak.maxDamage = 1;
+
+    static UnitType s_sc2;
+    s_sc2.id = "sc2"; s_sc2.name = "SC2";
+    s_sc2.speed = 10; s_sc2.hitPoints = 35;
+    s_sc2.attack = 100; s_sc2.defense = 0; s_sc2.minDamage = 50; s_sc2.maxDamage = 50;
+    static std::vector<UnitType> s_buf2; s_buf2.push_back(s_sc2);
+
+    CombatUnit sc = CombatUnit::make(&s_buf2.back(), 1, true);
+    sc.isSpecialCharacter = true;
+    sc.scId               = "ushari";
+    sc.scDef              = &ushariDef();
+    sc.scLevel            = 1;
+    // Pre-load XP to just 1 below the level-2 threshold.
+    sc.scXp               = ushariDef().xpThresholds[0] - 1;
+    sc.killXp             = ushariDef().killBonusXp;
+    sc.perTurnXp          = 0;  // suppress per-turn XP for this test
+
+    CombatUnit weak = CombatUnit::make(&s_weak, 1, false);
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;  p.stacks.push_back(sc);
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false; e.stacks.push_back(weak);
+
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();
+
+    eng.doAttack(0);
+    auto evs = eng.drainEvents();
+
+    bool foundLevelUp = false;
+    int  newLevel     = 0;
+    for (const auto& ev : evs) {
+        if (ev.type == CombatEvent::Type::ScLevelUp && ev.isPlayer) {
+            foundLevelUp = true;
+            newLevel     = ev.newLevel;
+        }
+    }
+    CHECK(foundLevelUp);
+    CHECK(newLevel == 2);
+    CHECK(eng.playerArmy().stacks[0].scLevel == 2);
+    // Ushari's attackGrowth = 1 → attackBonus should be 1 higher than before.
+    CHECK(eng.playerArmy().stacks[0].attackBonus == ushariDef().attackGrowth);
+}
+
 #endif // COMBAT_ENGINE_IMPL

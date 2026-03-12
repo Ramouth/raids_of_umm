@@ -20,4 +20,5 @@ struct DungeonOutcome {
     std::vector<SurvivorStack>    survivors;
     std::vector<SpecialCharacter> scRecruited;
     std::vector<std::string>      itemsFound;
+    std::vector<SCProgressUpdate> scUpdates;  // SC progression earned inside the dungeon
 };
