@@ -1,5 +1,6 @@
 #include "DungeonState.h"
 #include "combat/CombatState.h"
+#include "party/PartyState.h"
 #include "combat/CombatUnit.h"
 #include "world/WondrousItem.h"
 #include "core/Application.h"
@@ -284,6 +285,9 @@ bool DungeonState::handleEvent(void* sdlEvent) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE:
                 m_wantsDismiss = true;
+                return true;
+            case SDLK_f:
+                Application::get().pushState(std::make_unique<PartyState>(m_hero));
                 return true;
             case SDLK_UP:    case SDLK_w: m_keyW = true; return true;
             case SDLK_DOWN:  case SDLK_s: m_keyS = true; return true;

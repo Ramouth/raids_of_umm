@@ -220,6 +220,45 @@ void AdventureState::onResume() {
         m_pendingRecruit.reset();
     }
 
+    // Handle direct combat result (battle-terrain encounter).
+    if (m_pendingCombat) {
+        CombatOutcome result = std::move(*m_pendingCombat);
+        m_pendingCombat.reset();
+
+        // Sync hero army from survivors (skip SC units — they live in specials, not army).
+        for (auto& slot : m_hero.army) slot = {};
+        for (const auto& s : result.survivors) {
+            if (!s.type || s.count <= 0) continue;
+            if (m_hero.findSpecial(s.type->id)) continue;  // SC unit — not an army slot
+            m_hero.addUnit(s.type, s.count);
+        }
+        std::cout << "[Adventure] Returned from combat. Army: " << m_hero.armySize() << " stacks.\n";
+
+        // Sync SC progression earned in combat back to the hero.
+        for (const auto& upd : result.scUpdates) {
+            SpecialCharacter* sc = m_hero.findSpecial(upd.scId);
+            if (!sc || !sc->def) continue;
+            int levelDelta = upd.level - sc->level;
+            for (int i = 0; i < levelDelta; ++i) {
+                sc->combatStats.attack    += sc->def->attackGrowth;
+                sc->combatStats.defense   += sc->def->defenseGrowth;
+                sc->combatStats.hitPoints += sc->def->maxHpGrowth;
+            }
+            sc->level             = upd.level;
+            sc->xp                = upd.xp;
+            sc->unlockedAbilities = upd.unlockedAbilities;
+            if (levelDelta > 0)
+                std::cout << "[Adventure] " << sc->name
+                          << " is now level " << sc->level << "!\n";
+        }
+
+        if (result.result == CombatResult::EnemyWon) {
+            std::cout << "[Adventure] Hero defeated in combat.\n";
+            m_isDefeated = true;
+        }
+        return;
+    }
+
     if (!m_pendingDungeon) return;
 
     DungeonOutcome outcome = std::move(*m_pendingDungeon);
@@ -382,7 +421,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             m_pendingDungeon = std::make_shared<DungeonOutcome>();
             m_dungeonCoord   = coord;
             SpecialCharacter kharim = SpecialCharacter::make(
-                "kharim", "Kha'Rim the Wanderer", "tank");
+                "ushari", "Ushari", "glass_cannon");
             Application::get().pushState(
                 std::make_unique<DungeonState>(m_hero, kharim,
                                                std::vector<std::string>{"scarab_amulet"},
@@ -648,8 +687,10 @@ void AdventureState::update(float dt) {
         MapTile* currentTile = m_map.tileAt(m_hero.pos);
         if (currentTile && currentTile->terrain == Terrain::Battle) {
             MapObjectDef battleObj{ m_hero.pos, ObjType::Dungeon, "Battle Encounter" };
+            m_pendingCombat = std::make_shared<CombatOutcome>();
             Application::get().pushState(
-                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(battleObj)));
+                std::make_unique<CombatState>(buildPlayerArmy(), buildEnemyArmy(battleObj),
+                                              m_pendingCombat));
         }
     }
 }

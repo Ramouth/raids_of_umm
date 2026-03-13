@@ -140,6 +140,9 @@ private:
     std::shared_ptr<DungeonOutcome> m_pendingDungeon;
     HexCoord                        m_dungeonCoord;  // overworld coord of the entered dungeon
 
+    // Pending direct combat result — set before pushing CombatState, read in onResume().
+    std::shared_ptr<CombatOutcome>  m_pendingCombat;
+
     RenderOffsetConfig m_offsets;
 
     static constexpr float HEX_SIZE        = 1.0f;
