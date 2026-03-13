@@ -6,6 +6,7 @@
 #include "combat/CombatUnit.h"
 #include "dungeon/DungeonState.h"
 #include "equipment/EquipmentState.h"
+#include "party/PartyState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include "world/Resources.h"
@@ -459,6 +460,10 @@ bool AdventureState::handleEvent(void* sdlEvent) {
             case SDLK_e:
                 Application::get().pushState(
                     std::make_unique<EquipmentState>(m_hero));
+                return true;
+            case SDLK_f:
+                Application::get().pushState(
+                    std::make_unique<PartyState>(m_hero));
                 return true;
             case SDLK_w:      wait(); return true;
             case SDLK_p: {

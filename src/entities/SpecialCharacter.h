@@ -47,6 +47,7 @@ struct SpecialCharacter {
         sc.name      = name_;
         sc.archetype = archetype_;
 
+        sc.def              = findSCDef(id_);
         sc.combatStats.id   = id_;
         sc.combatStats.name = name_;
 

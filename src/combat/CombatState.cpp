@@ -239,6 +239,13 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
             std::snprintf(buf, sizeof(buf), "*** %s reached level %d! ***",
                           name, ev.newLevel);
             pushLog(buf, COL_LEVEL);
+            // Track for the post-battle XP overlay (player SCs only).
+            if (ev.isPlayer && ev.stackIndex >= 0) {
+                const auto& stacks = m_engine.playerArmy().stacks;
+                if (ev.stackIndex < static_cast<int>(stacks.size())
+                        && stacks[ev.stackIndex].isSpecialCharacter)
+                    m_scLevelUpsThisBattle[stacks[ev.stackIndex].scId]++;
+            }
             break;
         }
         default: break;
@@ -310,6 +317,83 @@ void CombatState::render() {
                       m_engine, m_cam, m_hoveredHex, m_hasHovered, m_anim);
 
     renderLog(app.width(), app.height());
+    if (m_engine.isOver() && m_pendingEvents.empty() && !m_animating)
+        renderXpOverlay(app.width(), app.height());
+}
+
+// ── XP overlay ────────────────────────────────────────────────────────────────
+
+void CombatState::renderXpOverlay(int screenW, int screenH) {
+    // Collect player SC stacks that have a def (progression capable).
+    std::vector<const CombatUnit*> scUnits;
+    for (const auto& u : m_engine.playerArmy().stacks)
+        if (u.isSpecialCharacter && u.scDef)
+            scUnits.push_back(&u);
+    if (scUnits.empty()) return;
+
+    const float scale = screenH / 600.0f;
+    const float lineH = 18.f * scale;
+    const float padX  = 10.f * scale;
+    const float padY  = 8.f  * scale;
+    const float barW  = 110.f * scale;
+    const float barH  = 8.f  * scale;
+    const float rowH  = lineH * 2.6f;
+    const float panelW = 300.f * scale;
+    const float panelH = padY * 2.f + lineH + static_cast<float>(scUnits.size()) * rowH;
+    const float panelX = 8.f * scale;
+    const float panelY = screenH - panelH - 8.f * scale;
+
+    m_hud.begin(screenW, screenH);
+
+    // Background + top accent border.
+    m_hud.drawRect(panelX, panelY, panelW, panelH, {0.0f, 0.0f, 0.0f, 0.82f});
+    m_hud.drawRect(panelX, panelY, panelW, 2.f * scale, {0.7f, 0.6f, 0.2f, 1.0f});
+
+    static constexpr glm::vec4 COL_HEADER = {0.9f, 0.85f, 0.4f, 1.0f};
+    static constexpr glm::vec4 COL_NAME   = {0.9f, 0.9f,  0.9f, 1.0f};
+    static constexpr glm::vec4 COL_XP     = {0.5f, 0.8f,  1.0f, 1.0f};
+    static constexpr glm::vec4 COL_LVUP   = {1.0f, 0.9f,  0.2f, 1.0f};
+
+    const float ts = scale * 1.3f;
+    m_hud.drawText(panelX + padX, panelY + padY, ts, "SC PROGRESS", COL_HEADER);
+
+    float rowY = panelY + padY + lineH;
+
+    for (const CombatUnit* u : scUnits) {
+        // Name + level.
+        char buf[128];
+        std::snprintf(buf, sizeof(buf), "%s  Lv %d", u->type->name.c_str(), u->scLevel);
+        m_hud.drawText(panelX + padX, rowY, ts, buf, COL_NAME);
+
+        // XP progress bar.
+        float barX = panelX + padX;
+        float barY = rowY + lineH * 0.75f;
+        m_hud.drawRect(barX, barY, barW, barH, {0.2f, 0.2f, 0.2f, 1.0f});  // track
+
+        float fillFrac = 0.f;
+        if (u->scLevel < u->scDef->maxLevel) {
+            int prev  = (u->scLevel > 1) ? u->scDef->xpThresholds[u->scLevel - 2] : 0;
+            int next  = u->scDef->xpThresholds[u->scLevel - 1];
+            int range = next - prev;
+            fillFrac  = (range > 0) ? std::min(1.f, static_cast<float>(u->scXp - prev) / range) : 1.f;
+            std::snprintf(buf, sizeof(buf), "%d / %d XP", u->scXp, next);
+        } else {
+            fillFrac = 1.f;
+            std::snprintf(buf, sizeof(buf), "MAX  (%d XP)", u->scXp);
+        }
+        m_hud.drawRect(barX, barY, barW * fillFrac, barH, {0.25f, 0.65f, 0.25f, 1.0f});  // fill
+        m_hud.drawRect(barX, barY, barW, 1.f * scale, {0.4f, 0.4f, 0.4f, 0.8f});         // top line
+        m_hud.drawText(barX + barW + 6.f * scale, barY - 1.f, ts * 0.9f, buf, COL_XP);
+
+        // Level-up badge.
+        auto it = m_scLevelUpsThisBattle.find(u->scId);
+        if (it != m_scLevelUpsThisBattle.end() && it->second > 0) {
+            std::snprintf(buf, sizeof(buf), "* LEVEL UP x%d!", it->second);
+            m_hud.drawText(barX, barY + barH + 2.f * scale, ts, buf, COL_LVUP);
+        }
+
+        rowY += rowH;
+    }
 }
 
 bool CombatState::handleEvent(void* sdlEvent) {

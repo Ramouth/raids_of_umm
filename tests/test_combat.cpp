@@ -1490,6 +1490,141 @@ SUITE("SC XP — kill awards kill bonus XP") {
     CHECK(xpAfter - xpBefore >= ushariDef().killBonusXp);  // at least kill bonus
 }
 
+SUITE("SC XP — per-turn XP fires again on round 2") {
+    // Ushari (speed=10) goes first. After construction scXp = perTurnXp.
+    // Ushari defends → enemy's turn; enemy defends → Ushari's turn again → scXp += perTurnXp.
+    CombatArmy p = scArmy("Ushari", 10);
+    CombatArmy e = oneStack("Skeleton", 3, false);
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();
+
+    int xpAfterTurn1 = eng.playerArmy().stacks[0].scXp;
+    CHECK_EQ(xpAfterTurn1, ushariDef().perTurnXp);
+
+    eng.doDefend();           // Ushari's turn ends
+    eng.drainEvents();
+    eng.doDefend();           // enemy's turn ends → Ushari's turn → per-turn XP fires
+    eng.drainEvents();
+
+    int xpAfterTurn2 = eng.playerArmy().stacks[0].scXp;
+    CHECK_EQ(xpAfterTurn2, ushariDef().perTurnXp * 2);
+}
+
+SUITE("SC XP — multi-level jump crosses two thresholds in one kill") {
+    // Ushari thresholds = {15, 35}, maxLevel = 3.
+    // Set scXp = 34 (just below level-3 threshold) with scLevel = 1.
+    // Kill gives killBonusXp=6 → scXp=40, crossing both thresholds → level 3.
+    static UnitType s_tiny;
+    s_tiny.id = "tiny"; s_tiny.name = "Tiny";
+    s_tiny.speed = 1; s_tiny.hitPoints = 1;
+    s_tiny.attack = 0; s_tiny.defense = 0; s_tiny.minDamage = 1; s_tiny.maxDamage = 1;
+
+    static UnitType s_sc3;
+    s_sc3.id = "sc3"; s_sc3.name = "SC3";
+    s_sc3.speed = 10; s_sc3.hitPoints = 35;
+    s_sc3.attack = 100; s_sc3.defense = 0; s_sc3.minDamage = 50; s_sc3.maxDamage = 50;
+    static std::vector<UnitType> s_buf3; s_buf3.push_back(s_sc3);
+
+    CombatUnit sc = CombatUnit::make(&s_buf3.back(), 1, true);
+    sc.isSpecialCharacter = true;
+    sc.scId               = "ushari";
+    sc.scDef              = &ushariDef();
+    sc.scLevel            = 1;
+    sc.scXp               = ushariDef().xpThresholds[1] - 1;  // 34 — crosses both on next XP gain
+    sc.killXp             = ushariDef().killBonusXp;
+    sc.perTurnXp          = 0;
+
+    CombatUnit tiny = CombatUnit::make(&s_tiny, 1, false);
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;  p.stacks.push_back(sc);
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false; e.stacks.push_back(tiny);
+
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();
+    eng.doAttack(0);
+    eng.drainEvents();
+
+    CHECK_EQ(eng.playerArmy().stacks[0].scLevel, ushariDef().maxLevel);  // jumped to 3
+}
+
+SUITE("SC XP — max level cap prevents further level-up") {
+    // SC already at maxLevel; additional XP must not push scLevel higher.
+    static UnitType s_victim;
+    s_victim.id = "victim"; s_victim.name = "Victim";
+    s_victim.speed = 1; s_victim.hitPoints = 1;
+    s_victim.attack = 0; s_victim.defense = 0; s_victim.minDamage = 1; s_victim.maxDamage = 1;
+
+    static UnitType s_sc4;
+    s_sc4.id = "sc4"; s_sc4.name = "SC4";
+    s_sc4.speed = 10; s_sc4.hitPoints = 35;
+    s_sc4.attack = 100; s_sc4.defense = 0; s_sc4.minDamage = 50; s_sc4.maxDamage = 50;
+    static std::vector<UnitType> s_buf4; s_buf4.push_back(s_sc4);
+
+    CombatUnit sc = CombatUnit::make(&s_buf4.back(), 1, true);
+    sc.isSpecialCharacter = true;
+    sc.scId               = "ushari";
+    sc.scDef              = &ushariDef();
+    sc.scLevel            = ushariDef().maxLevel;  // already at cap
+    sc.scXp               = ushariDef().xpThresholds.back();
+    sc.killXp             = ushariDef().killBonusXp;
+    sc.perTurnXp          = 0;
+
+    CombatUnit victim = CombatUnit::make(&s_victim, 1, false);
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;  p.stacks.push_back(sc);
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false; e.stacks.push_back(victim);
+
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();
+    eng.doAttack(0);
+    auto evs = eng.drainEvents();
+
+    // No ScLevelUp event should have fired.
+    bool hasLevelUp = false;
+    for (const auto& ev : evs)
+        if (ev.type == CombatEvent::Type::ScLevelUp) hasLevelUp = true;
+    CHECK(!hasLevelUp);
+    CHECK_EQ(eng.playerArmy().stacks[0].scLevel, ushariDef().maxLevel);
+}
+
+SUITE("SC XP — level-up heal is capped at max HP") {
+    // Ushari levelUpHeal=15, hitPoints=35.
+    // Set hpLeft=10, prime XP just below threshold, kill → level-up → hp = min(25, 35) = 25.
+    static UnitType s_prey;
+    s_prey.id = "prey"; s_prey.name = "Prey";
+    s_prey.speed = 1; s_prey.hitPoints = 1;
+    s_prey.attack = 0; s_prey.defense = 0; s_prey.minDamage = 1; s_prey.maxDamage = 1;
+
+    static UnitType s_sc5;
+    s_sc5.id = "sc5"; s_sc5.name = "SC5";
+    s_sc5.speed = 10; s_sc5.hitPoints = 35;
+    s_sc5.attack = 100; s_sc5.defense = 0; s_sc5.minDamage = 50; s_sc5.maxDamage = 50;
+    static std::vector<UnitType> s_buf5; s_buf5.push_back(s_sc5);
+
+    CombatUnit sc = CombatUnit::make(&s_buf5.back(), 1, true);
+    sc.isSpecialCharacter = true;
+    sc.scId               = "ushari";
+    sc.scDef              = &ushariDef();
+    sc.scLevel            = 1;
+    sc.scXp               = ushariDef().xpThresholds[0] - 1;
+    sc.killXp             = ushariDef().killBonusXp;
+    sc.perTurnXp          = 0;
+    sc.hpLeft             = 10;  // damaged going in
+
+    CombatUnit prey = CombatUnit::make(&s_prey, 1, false);
+
+    CombatArmy p; p.ownerName = "P"; p.isPlayer = true;  p.stacks.push_back(sc);
+    CombatArmy e; e.ownerName = "E"; e.isPlayer = false; e.stacks.push_back(prey);
+
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.drainEvents();
+    eng.doAttack(0);
+    eng.drainEvents();
+
+    int expectedHp = std::min(10 + ushariDef().levelUpHeal, s_sc5.hitPoints);
+    CHECK_EQ(eng.playerArmy().stacks[0].hpLeft, expectedHp);
+}
+
 SUITE("SC XP — level-up emits ScLevelUp event") {
     // Prime the SC to be just below level 2 threshold, then force a kill.
     static UnitType s_weak;

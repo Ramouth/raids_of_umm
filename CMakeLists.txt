@@ -57,6 +57,7 @@ set(SOURCES
     src/hero/Hero.cpp
     src/dungeon/DungeonState.cpp
     src/equipment/EquipmentState.cpp
+    src/party/PartyState.cpp
 )
 
 add_executable(raids_of_umm ${SOURCES})

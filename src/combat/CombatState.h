@@ -14,6 +14,7 @@
 #include <queue>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 /*
  * CombatState — thin coordinator for the combat screen.
@@ -58,6 +59,9 @@ private:
     void pushLog(std::string text, glm::vec4 color);
     void renderLog(int screenW, int screenH);
 
+    // ── SC XP overlay (shown after battle ends) ───────────────────────────────
+    void renderXpOverlay(int screenW, int screenH);
+
     // ── Members ───────────────────────────────────────────────────────────────
     CombatEngine   m_engine;
     CombatRenderer m_renderer;
@@ -90,6 +94,10 @@ private:
 
     // Auto-battle: AI controls friendly units too (toggle with A key).
     bool m_autoBattle = false;
+
+    // Counts level-ups per SC this battle (keyed by scId); populated as
+    // ScLevelUp events stream through startEventAnimation().
+    std::unordered_map<std::string, int> m_scLevelUpsThisBattle;
 
     // True once the player has acknowledged the battle result — popped next update().
     // Never call popState() directly from handleEvent (use-after-free when
