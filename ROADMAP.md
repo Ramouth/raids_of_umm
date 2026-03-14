@@ -1,75 +1,131 @@
 # Raids of Umm'Natur — Roadmap
 
-## Completed
-
-- [x] Hex grid, camera, world builder
-- [x] Adventure map — hero movement, pathfinding, object visits
-- [x] Combat system — initiative queue, BFS movement, attack/defend/retreat
-- [x] Combat AI — ranged priority, melee fallback, auto-battle toggle
-- [x] Dungeon state — guard combat, SC recruitment, loot drop
-- [x] Turn manager — day/week cycle, movement reset, income
-- [x] Resource tracking — gold + sand crystals in treasury
-- [x] Special Character system — XP, levelling, stat growth
-- [x] SC skill tree — branching level-up choices, branch-gated nodes
-- [x] Combat result overlay (dungeon + direct combat)
-- [x] Party screen (F key) — view hero army and SC slots
-- [x] Unique SC per dungeon (Ushari at Tomb of Kha'Set, Sekhara at Buried Sanctum)
+> **Guiding principle:** Always have a playable vertical slice.
+> Each milestone produces something you can actually run and feel.
+> Gameplay first — visual polish deliberately last.
 
 ---
 
-## In Progress
+## Completed
 
-*(nothing currently in flight)*
+- [x] Hex grid, camera, world builder (save/load map, F1 alignment editor)
+- [x] Adventure map — hero movement, pathfinding, object visits, turn system
+- [x] Combat — initiative queue, BFS movement, click-move/attack, flanking/pinned
+- [x] Combat AI — ranged priority, melee fallback, auto-battle toggle
+- [x] Dungeon state — guard combat, SC recruitment, loot drop, result overlay
+- [x] Town / Castle — unit recruitment, weekly growth, treasury
+- [x] Resource tracking — gold + sand crystals, mine income
+- [x] Special Character system — XP, levelling, stat growth
+- [x] SC skill tree — branching level-up choices, branch-gated nodes, combat overlay
+- [x] Party screen (F key) — view hero army and SC slots
+- [x] Wondrous items — data layer, ResourceManager, hero inventory, equipment screen
+- [x] Unique SC per dungeon (Ushari / Sekhara)
 
 ---
 
 ## Next — Stable Test Environment
 
-The current test path (WorldBuilder → P → random procedural map) generates a
-different world each run, causing ghost objects and non-reproducible bugs.
-Fix: author a canonical map, load it the same way every time.
+The current entry path (WorldBuilder → P → random procedural map) generates a
+different world each run, causing non-reproducible bugs and ghost objects.
+Fix: author a canonical map, load it consistently through a proper menu.
 
 ### 1. Session Save / Load
-- Save format: single JSON file containing map path + session state
+- Save format: single JSON file — map path + session state
   - Hero: pos, army slots, SC slots, move points
   - Object control: guardDefeated flags, ownership per hex
   - Turn manager: day number, treasury
-- Triggered by Ctrl+S / Ctrl+L in AdventureState
+- Ctrl+S / Ctrl+L in AdventureState
 - WorldMap serialisation already exists; session layer wraps it
 
 ### 2. Main Menu (MainMenuState)
-- Replaces WorldBuilder as the default entry point
+- Default entry point, replaces WorldBuilder as the launcher
 - Four actions: **New Game**, **Continue**, **World Builder**, **Quit**
-- New Game: picks a map file (start with hardcoded default map path)
+- New Game: loads `data/maps/default.json`
 - Continue: loads last session save if one exists
-- Same HUD-drawn button style as rest of UI (no art needed yet)
+- Same HUD-drawn button style as rest of UI — no art needed yet
 
 ### 3. Author the Canonical Test Map
-- Design a fixed map in WorldBuilder, save it as `data/maps/default.json`
+- Design a fixed map in WorldBuilder, save as `data/maps/default.json`
 - All future playtesting uses this map via the menu
-- Eliminates random-map ghost behaviour
+- Eliminates the random-map instability
 
 ---
 
-## Backlog (priority order)
+## Combat Depth (backlog, priority order)
 
-4. **Commander aura mechanic** — passive ring buff to adjacent friendly stacks
-5. **AoE special attack** — engine targeting + UI highlight
-6. **Push / Telekinesis** — move enemy unit on attack
-7. **Unit & spell JSON data** — move hardcoded stats out of C++ into `data/`
-8. **Castle / Town building tree** — recruit higher-tier units, build structures
-9. **Win condition** — clear all dungeons to win
-10. **Multiple dungeon types** — vary guard composition and SC per dungeon template
-11. **Visual / UI overhaul** — integer scaling FBO, SpriteBatcher, pixel-art sprites
-    - SC branch-choice overlay is a thin placeholder designed for this pass
-12. **Save/Load slot UI** — multiple named saves, timestamp display
+These deepen the tactical system. Implement after the stable test environment
+so every fight is reproducible.
+
+| # | Feature | Notes |
+|---|---------|-------|
+| 4 | **Attack-type triangle** | Physical (vs defense) · Piercing (50% bypass) · Magical (ignores armor). One JSON field per unit. |
+| 5 | **Commander aura** | Passive ring buff to adjacent friendly stacks |
+| 6 | **AoE special attack** | Engine targeting + UI hex highlight |
+| 7 | **Push / Telekinesis** | Move enemy unit on attack |
+| 8 | **Zone of Control (ZoC)** | Heavy units "stick" — moving past costs an attack-of-opportunity |
+| 9 | **Terrain in combat** | Rubble (+1 def, move cost 2) · High Ground (+2 def) · Pit (−1 def, move cost 2) |
+| 10 | **SC death** | Permanent on loss (items drop) — raises stakes for cursed-item decisions |
+| 11 | **Long Cast (telegraphed)** | Most powerful moves charge one round; affected hexes highlighted |
+| 12 | **Glass Cannon channel** | SC channels nearby stack for a burst; stack skips its turn |
 
 ---
 
-## Deferred / Nice-to-Have
+## Economy & Content
 
-- Fog of war
-- Hero experience and levelling (separate from SC system)
-- Multiplayer / hotseat
-- Sound effects and music
-- Procedural map generator with authored constraints (not raw random)
+| # | Feature |
+|---|---------|
+| 13 | Unit & spell JSON → engine (attack-type, ability tags fully interpreted) |
+| 14 | Castle building tree (Fort → Citadel → Castle, Mage Guild tiers) |
+| 15 | Win condition (clear all dungeons) |
+| 16 | Multiple dungeon types (vary guard composition per dungeon template) |
+| 17 | Multiple heroes (hire at castle, independent armies) |
+
+---
+
+## Phase 2 — Strategy Depth *(after core loop is fun)*
+
+- Fog of war: unexplored tiles hidden, vision radius per hero
+- Scaling difficulty: dungeon encounters grow harder by map region
+- Scenario scripting: win/lose conditions, intro text, timed events
+- Diplomacy / faction system (Scarab Lords vs Sand Wraiths)
+- Campaign: 3-map linear story arc
+
+---
+
+## Phase 3 — Visual Polish *(deliberately deferred)*
+
+> Art that covers broken systems is wasted work.
+
+**Non-negotiable technical baseline before any art work:**
+
+1. **GL_NEAREST everywhere** — audit every `glTexParameteri` in `Texture.cpp`; no blur on pixel art
+2. **Integer display scaling** — render to fixed logical res (e.g. 960×540), scale up by integer factor via offscreen FBO
+3. **SpriteBatcher** — one draw call per texture instead of one per sprite; must land before Phase 3 art begins
+
+**Phase 3 deliverables in order:**
+
+| # | Task |
+|---|------|
+| 1 | Audit + fix all texture filters → GL_NEAREST |
+| 2 | Integer-scale FBO pass |
+| 3 | SpriteBatcher |
+| 4 | Hex edge blending shader (Sand↔Dune soft transitions) |
+| 5 | Sprite per ObjType on adventure map |
+| 6 | Full unit roster sprites (all 7 unit types + SCs) |
+| 7 | Unit hit-flash + death animation |
+| 8 | Pixel-art HUD frame, portrait slots, minimap |
+
+SC branch-choice overlay is an explicit placeholder — designed to be swapped wholesale here.
+
+---
+
+## Asset Queue (PixelLab)
+
+| Asset | Size | Status |
+|-------|------|--------|
+| sand, dune, mountain, rock, oasis, ruins, obsidian, river terrain | 64×64 | ✅ |
+| castle, dungeon, goldmine objects | 64×64–128×128 | ✅ |
+| armoured_warrior, enemy_scout units | 128×128 | ✅ |
+| rider variants (archer, banner, knight, lance) | 128×128 | ✅ |
+| Ushari, Sekhara, Khet SC portraits | 128×128 | ⬜ |
+| remaining unit types (djinn, ancient_guardian, pharaoh_lich, mummy) | 128×128 | ⬜ |
