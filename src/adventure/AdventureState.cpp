@@ -206,6 +206,8 @@ void AdventureState::onEnter() {
 }
 
 void AdventureState::onExit() {
+    if (!m_isDefeated)
+        saveSession();
     std::cout << "[Adventure] Exited\n";
 }
 
