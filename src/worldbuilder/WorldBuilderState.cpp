@@ -7,6 +7,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <cstdio>
+#include <cctype>
 #include <iostream>
 #include <filesystem>
 #include <algorithm>
@@ -230,12 +231,12 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
                 case SDLK_RETURN:
                 case SDLK_SPACE:
                     if      (m_exitPromptHovered == 0) { Application::get().popState(); }
-                    else if (m_exitPromptHovered == 1) { saveMap(); m_showExitPrompt = false; }
+                    else if (m_exitPromptHovered == 1) { openSaveDialog(); m_showExitPrompt = false; }
                     else if (m_exitPromptHovered == 2) { openMapBrowser(); m_showExitPrompt = false; }
                     else                               { m_showExitPrompt = false; }
                     return true;
                 case SDLK_1: Application::get().popState(); return true;
-                case SDLK_2: saveMap(); m_showExitPrompt = false; return true;
+                case SDLK_2: openSaveDialog(); m_showExitPrompt = false; return true;
                 case SDLK_3: openMapBrowser(); m_showExitPrompt = false; return true;
                 case SDLK_4: m_showExitPrompt = false; return true;
                 default: break;
@@ -255,7 +256,7 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             for (int i = 0; i < 4; ++i) {
                 if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh) {
                     if      (i == 0) { Application::get().popState(); }
-                    else if (i == 1) { saveMap(); m_showExitPrompt = false; }
+                    else if (i == 1) { openSaveDialog(); m_showExitPrompt = false; }
                     else if (i == 2) { openMapBrowser(); m_showExitPrompt = false; }
                     else             { m_showExitPrompt = false; }
                     return true;
@@ -263,6 +264,37 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             }
         }
         return true;
+    }
+
+    // ── Save-name dialog modal ───────────────────────────────────────────────
+    if (m_showSaveDialog) {
+        if (e->type == SDL_KEYDOWN) {
+            switch (e->key.keysym.sym) {
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    commitSaveDialog();
+                    return true;
+                case SDLK_ESCAPE:
+                    m_showSaveDialog = false;
+                    SDL_StopTextInput();
+                    return true;
+                case SDLK_BACKSPACE:
+                    if (!m_saveDialogText.empty())
+                        m_saveDialogText.pop_back();
+                    return true;
+                default: break;
+            }
+        }
+        if (e->type == SDL_TEXTINPUT) {
+            // Allow only filename-safe characters
+            for (char c : std::string(e->text.text)) {
+                if (std::isalnum(static_cast<unsigned char>(c)) ||
+                    c == '_' || c == '-' || c == ' ')
+                    m_saveDialogText += c;
+            }
+            return true;
+        }
+        return true;  // swallow everything else
     }
 
     // ── Map browser modal ────────────────────────────────────────────────────
@@ -369,7 +401,11 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
 
         // ── Ctrl+letter shortcuts ─────────────────────────────────────────────
         if (m_ctrlHeld) {
-            if (sym == SDLK_s) { saveMap(); return true; }
+            if (sym == SDLK_s) {
+                if (SDL_GetModState() & KMOD_SHIFT) openSaveDialog();
+                else saveMap();
+                return true;
+            }
             if (sym == SDLK_l) { openMapBrowser(); return true; }
             if (sym == SDLK_n) { newMap();  return true; }
             if (sym == SDLK_o) { devSaveOffsets(); return true; }
@@ -559,7 +595,9 @@ void WorldBuilderState::render() {
                            1.2f * sc, label.c_str(), {0.8f, 0.75f, 0.4f, 0.9f});
         }
 
-        if (m_showExitPrompt)
+        if (m_showSaveDialog)
+            renderSaveDialog(app.width(), app.height());
+        else if (m_showExitPrompt)
             renderExitPrompt(app.width(), app.height());
         else if (m_showMapBrowser)
             renderMapBrowser(app.width(), app.height());
@@ -787,6 +825,76 @@ void WorldBuilderState::renderDevToolHUD() {
                        hasOverride ? "(per-tile override active)" : "(using global default)",
                        grey);
     }
+}
+
+// ── Save-name dialog ──────────────────────────────────────────────────────────
+
+void WorldBuilderState::openSaveDialog() {
+    namespace fs = std::filesystem;
+    // Pre-fill with current filename stem (without extension)
+    m_saveDialogText = fs::path(m_savePath).stem().string();
+    m_showSaveDialog = true;
+    SDL_StartTextInput();
+}
+
+void WorldBuilderState::commitSaveDialog() {
+    std::string name = m_saveDialogText;
+    // Trim trailing spaces
+    while (!name.empty() && name.back() == ' ') name.pop_back();
+    if (name.empty()) name = "untitled";
+
+    namespace fs = std::filesystem;
+    fs::create_directories("data/maps");
+    m_savePath = "data/maps/" + name + ".json";
+    saveMap();
+    m_showSaveDialog = false;
+    SDL_StopTextInput();
+}
+
+void WorldBuilderState::renderSaveDialog(int sw, int sh) {
+    m_hud.begin(sw, sh);
+    m_hud.drawRect(0, 0, static_cast<float>(sw), static_cast<float>(sh),
+                   {0.f, 0.f, 0.f, 0.60f});
+
+    const float scale = sh / 600.0f;
+    const float panW  = sw * 0.46f;
+    const float panH  = 110.f * scale;
+    const float panX  = (sw - panW) / 2.f;
+    const float panY  = sh * 0.38f;
+    const float brd   = 2.f * scale;
+
+    // Panel
+    m_hud.drawRect(panX, panY, panW, panH, {0.07f, 0.05f, 0.02f, 0.97f});
+    m_hud.drawRect(panX,        panY,        panW, brd,  {0.7f,0.6f,0.15f,1.f});
+    m_hud.drawRect(panX,        panY+panH-brd, panW, brd, {0.7f,0.6f,0.15f,1.f});
+    m_hud.drawRect(panX,        panY,        brd, panH, {0.7f,0.6f,0.15f,1.f});
+    m_hud.drawRect(panX+panW-brd, panY,      brd, panH, {0.7f,0.6f,0.15f,1.f});
+
+    // Title
+    m_hud.drawText(panX + 10.f*scale, panY + 8.f*scale,
+                   1.8f*scale, "Save Map As", {0.95f,0.85f,0.40f,1.f});
+
+    // Text field
+    const float fieldX = panX + 10.f*scale;
+    const float fieldY = panY + 36.f*scale;
+    const float fieldW = panW - 20.f*scale;
+    const float fieldH = 28.f*scale;
+
+    m_hud.drawRect(fieldX, fieldY, fieldW, fieldH, {0.12f,0.10f,0.03f,1.f});
+    m_hud.drawRect(fieldX,          fieldY,          fieldW, brd,    {0.8f,0.7f,0.2f,1.f});
+    m_hud.drawRect(fieldX,          fieldY+fieldH-brd, fieldW, brd,  {0.8f,0.7f,0.2f,1.f});
+    m_hud.drawRect(fieldX,          fieldY,          brd, fieldH,    {0.8f,0.7f,0.2f,1.f});
+    m_hud.drawRect(fieldX+fieldW-brd, fieldY,        brd, fieldH,    {0.8f,0.7f,0.2f,1.f});
+
+    // Typed text + blinking cursor
+    std::string display = m_saveDialogText + "_";
+    m_hud.drawText(fieldX + 6.f*scale, fieldY + 8.f*scale,
+                   1.6f*scale, display.c_str(), {1.f,0.95f,0.75f,1.f});
+
+    // Hint
+    m_hud.drawText(panX + 10.f*scale, panY + 74.f*scale,
+                   scale, "Enter = save   ESC = cancel   Backspace = delete",
+                   {0.55f,0.55f,0.45f,0.85f});
 }
 
 // ── Exit prompt ───────────────────────────────────────────────────────────────

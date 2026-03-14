@@ -121,6 +121,13 @@ private:
     bool m_showExitPrompt    = false;
     int  m_exitPromptHovered = -1;  // 0=Exit 1=Save 2=Load 3=Continue
 
+    // ── Save-name dialog ─────────────────────────────────────────────────────
+    void openSaveDialog();
+    void commitSaveDialog();
+    void renderSaveDialog(int sw, int sh);
+    bool        m_showSaveDialog = false;
+    std::string m_saveDialogText;   // current typed filename (no extension)
+
     // ── Map browser overlay (Ctrl+L) ─────────────────────────────────────────
     void openMapBrowser();
     void renderMapBrowser(int sw, int sh);
