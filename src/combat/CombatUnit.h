@@ -2,7 +2,9 @@
 #include "entities/UnitType.h"
 #include "entities/SCDef.h"
 #include "hex/HexCoord.h"
+#include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /*
@@ -37,7 +39,15 @@ struct CombatUnit {
     int                      scXp     = 0;
     int                      killXp   = 0;    // from scDef->killBonusXp
     int                      perTurnXp= 0;    // from scDef->perTurnXp
-    std::vector<std::string> scUnlocked;       // abilities unlocked so far
+    std::vector<std::string> scUnlocked;       // actions unlocked so far
+
+    // Branch choices made during this combat (level → chosen branch id).
+    // Mirrors SpecialCharacter::chosenBranches; written back via SCProgressUpdate.
+    std::map<int, std::string> scChosenBranches;
+
+    // Flexible per-SC stat overrides (aoe_radius, push_range, etc.).
+    // Engine reads these for mechanic-specific logic; unknown keys are ignored.
+    std::unordered_map<std::string, int> scExtraStats;
 
     // Passive item bonuses — zero for ordinary stacks.
     // Populated at army-build time from SpecialCharacter::equipped[].

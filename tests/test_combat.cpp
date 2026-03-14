@@ -1544,6 +1544,11 @@ SUITE("SC XP — multi-level jump crosses two thresholds in one kill") {
     eng.doAttack(0);
     eng.drainEvents();
 
+    // With tree-based level-up, Lv2 is a choice node — resolve it to reach Lv3.
+    CHECK(eng.hasPendingChoice());
+    eng.resolveScChoice(true, 0, "duelist");
+    eng.drainEvents();
+
     CHECK_EQ(eng.playerArmy().stacks[0].scLevel, ushariDef().maxLevel);  // jumped to 3
 }
 
@@ -1660,18 +1665,27 @@ SUITE("SC XP — level-up emits ScLevelUp event") {
     auto evs = eng.drainEvents();
 
     bool foundLevelUp = false;
+    bool foundChoice  = false;
     int  newLevel     = 0;
     for (const auto& ev : evs) {
         if (ev.type == CombatEvent::Type::ScLevelUp && ev.isPlayer) {
             foundLevelUp = true;
             newLevel     = ev.newLevel;
         }
+        if (ev.type == CombatEvent::Type::ScChoicePending && ev.isPlayer)
+            foundChoice = true;
     }
     CHECK(foundLevelUp);
     CHECK(newLevel == 2);
     CHECK(eng.playerArmy().stacks[0].scLevel == 2);
-    // Ushari's attackGrowth = 1 → attackBonus should be 1 higher than before.
-    CHECK(eng.playerArmy().stacks[0].attackBonus == ushariDef().attackGrowth);
+    // Lv2 is a branch choice — no stat growth until the player picks.
+    CHECK(foundChoice);
+    CHECK(eng.hasPendingChoice());
+    // Resolve: pick duelist (+1 attack).
+    eng.resolveScChoice(true, 0, "duelist");
+    eng.drainEvents();
+    CHECK(!eng.hasPendingChoice());
+    CHECK(eng.playerArmy().stacks[0].attackBonus == 1);  // duelist: +1 attack
 }
 
 #endif // COMBAT_ENGINE_IMPL

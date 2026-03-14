@@ -93,10 +93,35 @@ public:
     // Useful in tests where placeArmies() needs to be overridden.
     void teleportUnit(bool isPlayer, int stackIdx, HexCoord pos);
 
+    // ── SC branch choice ──────────────────────────────────────────────────────
+
+    // True while waiting for the player to resolve a level-up branch choice.
+    // Combat can finish, but XP awards and AI turns are paused until resolved.
+    bool hasPendingChoice() const { return m_pendingChoice; }
+
+    // Resolve the pending branch choice for the given SC stack.
+    // Applies the chosen BranchOption's effects, records the choice on the unit,
+    // then resumes any remaining level-up processing.
+    // No-op if no choice is pending or the indices don't match.
+    void resolveScChoice(bool isPlayer, int stackIdx, const std::string& branchId);
+
 private:
     // Award XP to a SC stack; handles level-up logic and emits ScXpGained /
     // ScLevelUp events.  No-ops if the unit has no SC def or amount <= 0.
     void awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount);
+
+    // Process any pending level-ups for `unit`, driving the skill tree.
+    // Emits ScLevelUp for each level gained; emits ScChoicePending and pauses
+    // if a choice node is reached.
+    void processLevelUps(CombatUnit& unit, const TurnSlot& slot);
+
+    // Apply a list of NodeEffects directly to a CombatUnit.
+    // stat_mod → bonus fields / scExtraStats;  unlock → scUnlocked;
+    // unknown types → logged and skipped (open extension point).
+    void applyNodeEffects(CombatUnit& unit, const std::vector<NodeEffect>& effects);
+
+    // Returns true if `node` passes its requiresBranch gate for `unit`.
+    bool nodePassesBranchGate(const SCLevelNode& node, const CombatUnit& unit) const;
 
     // Assign each stack its spawn position on the CombatMap.
     void placeArmies();
@@ -125,4 +150,9 @@ private:
     std::mt19937          m_rng;
 
     std::vector<CombatEvent> m_events;   // output queue; drained by CombatState
+
+    // Pending branch choice state.
+    bool m_pendingChoice         = false;
+    bool m_pendingChoiceIsPlayer = false;
+    int  m_pendingChoiceStackIdx = -1;
 };

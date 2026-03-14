@@ -310,6 +310,7 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
 
 void CombatEngine::awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount) {
     if (!unit.isSpecialCharacter || !unit.scDef || amount <= 0) return;
+    if (m_pendingChoice) return;  // pause XP while waiting for a branch choice
 
     unit.scXp += amount;
 
@@ -320,24 +321,45 @@ void CombatEngine::awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount)
     xpEv.xpAmount   = amount;
     m_events.push_back(xpEv);
 
-    // Process any level-up thresholds now crossed (handles multi-level jumps).
+    processLevelUps(unit, slot);
+}
+
+void CombatEngine::processLevelUps(CombatUnit& unit, const TurnSlot& slot) {
     while (unit.scLevel < unit.scDef->maxLevel
            && unit.scXp >= unit.scDef->xpThresholds[unit.scLevel - 1]) {
         ++unit.scLevel;
 
-        // Stat growth affects this combat immediately (via bonus fields).
-        unit.attackBonus  += unit.scDef->attackGrowth;
-        unit.defenseBonus += unit.scDef->defenseGrowth;
-        unit.speedBonus   += unit.scDef->speedGrowth;
-        // Heal by levelUpHeal (capped at current max HP for this unit).
+        // Always: heal on level-up (SCDef-level, branch-independent).
         unit.hpLeft = std::min(unit.hpLeft + unit.scDef->levelUpHeal,
                                unit.type->hitPoints);
 
-        // Unlock abilities granted at this level.
-        for (const auto& ab : unit.scDef->abilities)
-            if (ab.level == unit.scLevel)
-                unit.scUnlocked.push_back(ab.key);
+        // Walk tree nodes for this level; apply auto effects or emit a choice.
+        bool hasChoice = false;
+        for (const auto& node : unit.scDef->tree) {
+            if (node.level != unit.scLevel) continue;
+            if (!nodePassesBranchGate(node, unit)) continue;
 
+            if (!node.choices.empty()) {
+                // Choice point — emit event and pause further level-up.
+                CombatEvent choiceEv;
+                choiceEv.type          = CombatEvent::Type::ScChoicePending;
+                choiceEv.isPlayer      = slot.isPlayer;
+                choiceEv.stackIndex    = slot.stackIndex;
+                choiceEv.choiceLevel   = unit.scLevel;
+                choiceEv.branchOptions = node.choices;
+                m_events.push_back(choiceEv);
+
+                m_pendingChoice         = true;
+                m_pendingChoiceIsPlayer = slot.isPlayer;
+                m_pendingChoiceStackIdx = slot.stackIndex;
+                hasChoice = true;
+                break;
+            }
+
+            applyNodeEffects(unit, node.autoEffects);
+        }
+
+        // Emit ScLevelUp after applying effects (or before choice UI).
         CombatEvent lvEv;
         lvEv.type       = CombatEvent::Type::ScLevelUp;
         lvEv.isPlayer   = slot.isPlayer;
@@ -347,7 +369,77 @@ void CombatEngine::awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount)
 
         std::cout << "[CombatEngine] " << unit.type->name
                   << " reached level " << unit.scLevel << "!\n";
+
+        if (hasChoice) break;  // resume after resolveScChoice()
     }
+}
+
+void CombatEngine::resolveScChoice(bool isPlayer, int stackIdx, const std::string& branchId) {
+    if (!m_pendingChoice
+        || isPlayer != m_pendingChoiceIsPlayer
+        || stackIdx != m_pendingChoiceStackIdx) return;
+
+    auto& stacks = isPlayer ? m_player.stacks : m_enemy.stacks;
+    if (stackIdx < 0 || stackIdx >= static_cast<int>(stacks.size())) return;
+    CombatUnit& unit = stacks[stackIdx];
+    if (!unit.scDef) return;
+
+    for (const auto& node : unit.scDef->tree) {
+        if (node.level != unit.scLevel || node.choices.empty()) continue;
+        if (!nodePassesBranchGate(node, unit)) continue;
+
+        for (const auto& opt : node.choices) {
+            if (opt.id != branchId) continue;
+            unit.scChosenBranches[unit.scLevel] = branchId;
+            applyNodeEffects(unit, opt.effects);
+            std::cout << "[CombatEngine] " << unit.type->name
+                      << " chose \"" << opt.name
+                      << "\" at level " << unit.scLevel << "\n";
+            break;
+        }
+        break;
+    }
+
+    m_pendingChoice = false;
+
+    // Resume level-up loop in case XP crossed more than one threshold.
+    TurnSlot slot { isPlayer, stackIdx };
+    processLevelUps(unit, slot);
+}
+
+void CombatEngine::applyNodeEffects(CombatUnit& unit,
+                                    const std::vector<NodeEffect>& effects) {
+    for (const auto& ef : effects) {
+        if (ef.type == "stat_mod") {
+            if      (ef.key == "attack")  unit.attackBonus  += ef.value;
+            else if (ef.key == "defense") unit.defenseBonus += ef.value;
+            else if (ef.key == "hp")      unit.hpLeft = std::min(
+                                              unit.hpLeft + ef.value, unit.type->hitPoints);
+            else if (ef.key == "speed")   unit.speedBonus   += ef.value;
+            else                          unit.scExtraStats[ef.key] += ef.value;
+        } else if (ef.type == "unlock") {
+            auto& ul = unit.scUnlocked;
+            if (std::find(ul.begin(), ul.end(), ef.key) == ul.end())
+                ul.push_back(ef.key);
+        } else if (ef.type == "passive") {
+            std::string tag = "passive:" + ef.key + ":" + std::to_string(ef.value);
+            auto& ul = unit.scUnlocked;
+            if (std::find(ul.begin(), ul.end(), tag) == ul.end())
+                ul.push_back(tag);
+        } else if (ef.type == "aura_mod") {
+            unit.scExtraStats[ef.key] += ef.value;
+        } else {
+            std::cout << "[CombatEngine] Unknown NodeEffect type: \"" << ef.type << "\"\n";
+        }
+    }
+}
+
+bool CombatEngine::nodePassesBranchGate(const SCLevelNode& node,
+                                         const CombatUnit& unit) const {
+    if (node.requiresBranch.empty()) return true;
+    for (const auto& [level, branchId] : unit.scChosenBranches)
+        if (branchId == node.requiresBranch) return true;
+    return false;
 }
 
 void CombatEngine::teleportUnit(bool isPlayer, int stackIdx, HexCoord pos) {

@@ -73,8 +73,9 @@ struct CombatEvent {
         UnitDied,
         UnitDefended,
         BattleEnded,
-        ScXpGained,   // isPlayer, stackIndex, xpAmount
-        ScLevelUp,    // isPlayer, stackIndex, newLevel
+        ScXpGained,      // isPlayer, stackIndex, xpAmount
+        ScLevelUp,       // isPlayer, stackIndex, newLevel
+        ScChoicePending, // isPlayer, stackIndex, choiceLevel, branchOptions
     };
 
     Type         type           = Type::BattleEnded;
@@ -102,4 +103,8 @@ struct CombatEvent {
     // SC progression (ScXpGained / ScLevelUp only)
     int          xpAmount       = 0;   // XP awarded this event
     int          newLevel       = 0;   // level reached (ScLevelUp)
+
+    // Branch choice (ScChoicePending only)
+    int                      choiceLevel  = 0;  // level at which the choice occurs
+    std::vector<BranchOption> branchOptions;    // options for the player to choose from
 };
