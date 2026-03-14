@@ -20,34 +20,20 @@
 - [x] Party screen (F key) — view hero army and SC slots
 - [x] Wondrous items — data layer, ResourceManager, hero inventory, equipment screen
 - [x] Unique SC per dungeon (Ushari / Sekhara)
+- [x] Session save / load — Ctrl+S / Ctrl+L, single JSON (hero, army, SCs, objectControl, treasury, day)
+- [x] Main menu — New Game / Continue / World Builder / Quit; Continue greyed when no save exists
+- [x] ESC exit prompt — Save & Exit / Exit / Cancel (optional save on leaving adventure)
 
 ---
 
 ## Next — Stable Test Environment
 
-The current entry path (WorldBuilder → P → random procedural map) generates a
-different world each run, causing non-reproducible bugs and ghost objects.
-Fix: author a canonical map, load it consistently through a proper menu.
+One item remains before the test environment is solid:
 
-### 1. Session Save / Load
-- Save format: single JSON file — map path + session state
-  - Hero: pos, army slots, SC slots, move points
-  - Object control: guardDefeated flags, ownership per hex
-  - Turn manager: day number, treasury
-- Ctrl+S / Ctrl+L in AdventureState
-- WorldMap serialisation already exists; session layer wraps it
-
-### 2. Main Menu (MainMenuState)
-- Default entry point, replaces WorldBuilder as the launcher
-- Four actions: **New Game**, **Continue**, **World Builder**, **Quit**
-- New Game: loads `data/maps/default.json`
-- Continue: loads last session save if one exists
-- Same HUD-drawn button style as rest of UI — no art needed yet
-
-### 3. Author the Canonical Test Map
+### Author the Canonical Test Map
 - Design a fixed map in WorldBuilder, save as `data/maps/default.json`
-- All future playtesting uses this map via the menu
-- Eliminates the random-map instability
+- New Game will load it automatically; eliminates procedural-map instability
+- Place at least: 1 town, 2 dungeons (Tomb of Kha'Set + Buried Sanctum), 1 gold mine
 
 ---
 
