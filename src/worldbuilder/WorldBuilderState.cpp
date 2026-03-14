@@ -213,6 +213,93 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         m_ctrlHeld = (mod & KMOD_CTRL) != 0;
     }
 
+    // ── Map browser modal ────────────────────────────────────────────────────
+    if (m_showMapBrowser) {
+        const int sw = Application::get().width();
+        const int sh = Application::get().height();
+        const float scale = sh / 600.0f;
+        const float rowH  = 26.f * scale;
+        const float listY = sh * 0.22f + 2 * rowH;  // first file row (after header rows)
+        const float listX = sw * 0.25f;
+        const float listW = sw * 0.50f;
+
+        auto rowIndex = [&](float my) -> int {
+            int rel = static_cast<int>((my - listY) / rowH);
+            int idx = rel + m_browserScroll;
+            // -1 = "Save as default.json" header row, >= 0 = file list
+            int rawRel = static_cast<int>((my - (sh * 0.22f)) / rowH);
+            if (rawRel == 0) return -2;  // "Save as default" button
+            if (rawRel == 1) return -3;  // spacer — ignore
+            if (rel < 0 || idx >= static_cast<int>(m_browserFiles.size())) return -1;
+            return idx;
+        };
+        (void)rowIndex;  // used only in mouse handlers below
+
+        if (e->type == SDL_KEYDOWN && !e->key.repeat) {
+            switch (e->key.keysym.sym) {
+                case SDLK_ESCAPE:
+                    m_showMapBrowser = false;
+                    return true;
+                case SDLK_UP:
+                    if (m_browserScroll > 0) --m_browserScroll;
+                    return true;
+                case SDLK_DOWN:
+                    if (m_browserScroll + BROWSER_ROWS < static_cast<int>(m_browserFiles.size()))
+                        ++m_browserScroll;
+                    return true;
+                default: break;
+            }
+        }
+        if (e->type == SDL_MOUSEWHEEL) {
+            m_browserScroll = std::max(0, std::min(
+                m_browserScroll - e->wheel.y,
+                static_cast<int>(m_browserFiles.size()) - BROWSER_ROWS));
+            return true;
+        }
+        if (e->type == SDL_MOUSEMOTION) {
+            float mx = static_cast<float>(e->motion.x);
+            float my = static_cast<float>(e->motion.y);
+            m_browserHovered = -1;
+            if (mx >= listX && mx <= listX + listW) {
+                // Check "Save as default" button
+                if (my >= sh * 0.22f && my < sh * 0.22f + rowH)
+                    m_browserHovered = -2;
+                else {
+                    int rel = static_cast<int>((my - listY) / rowH);
+                    int idx = rel + m_browserScroll;
+                    if (rel >= 0 && idx < static_cast<int>(m_browserFiles.size()))
+                        m_browserHovered = idx;
+                }
+            }
+            return true;
+        }
+        if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(e->button.x);
+            float my = static_cast<float>(e->button.y);
+            if (mx >= listX && mx <= listX + listW) {
+                if (my >= sh * 0.22f && my < sh * 0.22f + rowH) {
+                    // Save as default.json
+                    m_savePath = "data/maps/default.json";
+                    saveMap();
+                    m_showMapBrowser = false;
+                    return true;
+                }
+                int rel = static_cast<int>((my - listY) / rowH);
+                int idx = rel + m_browserScroll;
+                if (rel >= 0 && idx < static_cast<int>(m_browserFiles.size())) {
+                    m_savePath = m_browserFiles[idx];
+                    loadMap();
+                    m_showMapBrowser = false;
+                    return true;
+                }
+            }
+            // Click outside panel = cancel
+            m_showMapBrowser = false;
+            return true;
+        }
+        return true;  // swallow all other input
+    }
+
     if (e->type == SDL_KEYDOWN) {
         SDL_Keycode sym = e->key.keysym.sym;
 
@@ -231,7 +318,7 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         // ── Ctrl+letter shortcuts ─────────────────────────────────────────────
         if (m_ctrlHeld) {
             if (sym == SDLK_s) { saveMap(); return true; }
-            if (sym == SDLK_l) { loadMap(); return true; }
+            if (sym == SDLK_l) { openMapBrowser(); return true; }
             if (sym == SDLK_n) { newMap();  return true; }
             if (sym == SDLK_o) { devSaveOffsets(); return true; }
         }
@@ -408,6 +495,21 @@ void WorldBuilderState::render() {
         m_palette.render(m_hud, app.height());
         if (m_devToolActive)
             renderDevToolHUD();
+
+        // Current file label in top-right corner
+        {
+            namespace fs = std::filesystem;
+            std::string label = fs::path(m_savePath).stem().string()
+                              + (m_dirty ? "*" : "");
+            float sc = app.height() / 600.0f;
+            float tw = 8.f * 1.2f * sc * label.size();
+            m_hud.drawText(app.width() - tw - 8.f * sc, 6.f * sc,
+                           1.2f * sc, label.c_str(), {0.8f, 0.75f, 0.4f, 0.9f});
+        }
+
+        if (m_showMapBrowser)
+            renderMapBrowser(app.width(), app.height());
+
         glDisable(GL_BLEND);
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
@@ -631,4 +733,84 @@ void WorldBuilderState::renderDevToolHUD() {
                        hasOverride ? "(per-tile override active)" : "(using global default)",
                        grey);
     }
+}
+
+// ── Map browser ───────────────────────────────────────────────────────────────
+
+void WorldBuilderState::openMapBrowser() {
+    namespace fs = std::filesystem;
+    m_browserFiles.clear();
+    fs::create_directories("data/maps");
+    for (const auto& entry : fs::directory_iterator("data/maps")) {
+        if (entry.is_regular_file() && entry.path().extension() == ".json")
+            m_browserFiles.push_back(entry.path().string());
+    }
+    std::sort(m_browserFiles.begin(), m_browserFiles.end());
+    m_browserScroll  = 0;
+    m_browserHovered = -1;
+    m_showMapBrowser = true;
+}
+
+void WorldBuilderState::renderMapBrowser(int sw, int sh) {
+    namespace fs = std::filesystem;
+    const float scale = sh / 600.0f;
+    const float rowH  = 26.f * scale;
+    const float panW  = sw * 0.50f;
+    const float panX  = (sw - panW) / 2.f;
+    const float panY  = sh * 0.15f;
+    const float listY = panY + 2 * rowH;  // two header rows
+    const int   rows  = std::min(BROWSER_ROWS, static_cast<int>(m_browserFiles.size()));
+    const float panH  = (rows + 2) * rowH + rowH;  // header + files + hint
+    const float brd   = 2.f * scale;
+
+    // Veil
+    m_hud.drawRect(0, 0, static_cast<float>(sw), static_cast<float>(sh),
+                   {0.f, 0.f, 0.f, 0.55f});
+
+    // Panel background
+    m_hud.drawRect(panX, panY, panW, panH, {0.08f, 0.06f, 0.02f, 0.97f});
+    m_hud.drawRect(panX, panY, panW, brd,  {0.6f, 0.5f, 0.1f, 1.f});
+    m_hud.drawRect(panX, panY+panH-brd, panW, brd, {0.6f, 0.5f, 0.1f, 1.f});
+    m_hud.drawRect(panX, panY, brd, panH, {0.6f, 0.5f, 0.1f, 1.f});
+    m_hud.drawRect(panX+panW-brd, panY, brd, panH, {0.6f, 0.5f, 0.1f, 1.f});
+
+    // Title row
+    m_hud.drawText(panX + 8.f * scale, panY + 6.f * scale,
+                   1.8f * scale, "Load Map", {0.95f, 0.85f, 0.40f, 1.f});
+
+    // "Save as default.json" button (row 1)
+    bool hovDefault = (m_browserHovered == -2);
+    m_hud.drawRect(panX + 4*scale, panY + rowH + 2*scale, panW - 8*scale, rowH - 4*scale,
+                   hovDefault ? glm::vec4{0.5f,0.4f,0.1f,1.f}
+                              : glm::vec4{0.2f,0.16f,0.04f,1.f});
+    m_hud.drawText(panX + 12.f * scale, panY + rowH + 8.f * scale,
+                   1.4f * scale, "[ Save current map as default.json ]",
+                   {0.9f, 0.8f, 0.3f, 1.f});
+
+    // File rows
+    for (int i = 0; i < rows; ++i) {
+        int idx = i + m_browserScroll;
+        if (idx >= static_cast<int>(m_browserFiles.size())) break;
+
+        float ry = listY + i * rowH;
+        bool  hov = (idx == m_browserHovered);
+        bool  cur = (m_browserFiles[idx] == m_savePath);
+
+        m_hud.drawRect(panX + 4*scale, ry + 2*scale, panW - 8*scale, rowH - 4*scale,
+                       hov ? glm::vec4{0.40f,0.32f,0.08f,1.f}
+                           : glm::vec4{0.13f,0.10f,0.03f,1.f});
+
+        std::string stem = fs::path(m_browserFiles[idx]).stem().string();
+        if (cur) stem = "> " + stem;
+        m_hud.drawText(panX + 12.f * scale, ry + 7.f * scale,
+                       1.4f * scale, stem.c_str(),
+                       cur ? glm::vec4{1.f,0.9f,0.4f,1.f}
+                           : glm::vec4{0.85f,0.80f,0.65f,1.f});
+    }
+
+    // Hint
+    float hintY = listY + rows * rowH + 4.f * scale;
+    m_hud.drawText(panX + 8.f * scale, hintY,
+                   scale, "Click to load   |   ESC = cancel   |   scroll = browse",
+                   {0.55f, 0.55f, 0.45f, 0.85f});
 }

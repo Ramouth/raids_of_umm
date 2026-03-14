@@ -116,6 +116,16 @@ private:
     // Was this state constructed with an explicit file path?
     bool        m_loadOnEnter  = false;
 
+    // ── Map browser overlay (Ctrl+L) ─────────────────────────────────────────
+    void openMapBrowser();
+    void renderMapBrowser(int sw, int sh);
+
+    bool                     m_showMapBrowser    = false;
+    std::vector<std::string> m_browserFiles;     // full paths of data/maps/*.json
+    int                      m_browserHovered    = -1;
+    int                      m_browserScroll     = 0;
+    static constexpr int     BROWSER_ROWS        = 10;
+
     // Key states
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
     bool m_ctrlHeld = false;

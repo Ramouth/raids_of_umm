@@ -42,4 +42,15 @@ private:
                     float& x, float& y, float& w, float& h) const;
 
     void activate(int idx);
+
+    // ── Map picker overlay (shown when New Game is clicked) ───────────────────
+    void openMapPicker();
+    void renderMapPicker(int sw, int sh);
+    void launchMap(const std::string& path);  // "" = procedural
+
+    bool                     m_showMapPicker   = false;
+    std::vector<std::string> m_pickerFiles;    // full paths of data/maps/*.json
+    int                      m_pickerHovered   = -1;
+    int                      m_pickerScroll    = 0;
+    static constexpr int     PICKER_ROWS       = 10;
 };

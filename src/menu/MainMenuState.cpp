@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <filesystem>
+#include <algorithm>
 #include <iostream>
 
 // ── Geometry helper ──────────────────────────────────────────────────────────
@@ -50,26 +51,41 @@ void MainMenuState::buildButtons() {
 
 // ── Input ────────────────────────────────────────────────────────────────────
 
+void MainMenuState::launchMap(const std::string& path) {
+    if (path.empty()) {
+        Application::get().pushState(std::make_unique<AdventureState>());
+        return;
+    }
+    WorldMap map;
+    if (auto err = map.loadJson(path)) {
+        std::cerr << "[Menu] Map load error: " << *err << " — falling back to procedural\n";
+        Application::get().pushState(std::make_unique<AdventureState>());
+    } else {
+        Application::get().pushState(
+            std::make_unique<AdventureState>(std::move(map), path));
+    }
+}
+
+void MainMenuState::openMapPicker() {
+    namespace fs = std::filesystem;
+    m_pickerFiles.clear();
+    if (fs::is_directory("data/maps")) {
+        for (const auto& entry : fs::directory_iterator("data/maps")) {
+            if (entry.is_regular_file() && entry.path().extension() == ".json")
+                m_pickerFiles.push_back(entry.path().string());
+        }
+    }
+    std::sort(m_pickerFiles.begin(), m_pickerFiles.end());
+    m_pickerScroll  = 0;
+    m_pickerHovered = -1;
+    m_showMapPicker = true;
+}
+
 void MainMenuState::activate(int idx) {
     switch (idx) {
-        case 0: {  // New Game
-            WorldMap map;
-            std::string path = "data/maps/default.json";
-            if (std::filesystem::exists(path)) {
-                if (auto err = map.loadJson(path)) {
-                    std::cerr << "[Menu] Map load error: " << *err
-                              << " — falling back to procedural\n";
-                    Application::get().pushState(std::make_unique<AdventureState>());
-                } else {
-                    Application::get().pushState(
-                        std::make_unique<AdventureState>(std::move(map), path));
-                }
-            } else {
-                std::cout << "[Menu] No default map found, generating procedural map.\n";
-                Application::get().pushState(std::make_unique<AdventureState>());
-            }
+        case 0:  // New Game → show map picker
+            openMapPicker();
             break;
-        }
         case 1:  // Continue
             Application::get().pushState(
                 std::make_unique<AdventureState>(AdventureState::LoadSave{}));
@@ -88,6 +104,64 @@ bool MainMenuState::handleEvent(void* sdlEvent) {
     SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
     int sw = Application::get().width();
     int sh = Application::get().height();
+
+    // ── Map picker modal ─────────────────────────────────────────────────────
+    if (m_showMapPicker) {
+        const float scale = sh / 600.0f;
+        const float rowH  = 26.f * scale;
+        const float panW  = sw * 0.50f;
+        const float panX  = (sw - panW) / 2.f;
+        const float panY  = sh * 0.15f;
+        const float listY = panY + rowH;  // rows start after title
+
+        if (e->type == SDL_KEYDOWN && !e->key.repeat) {
+            switch (e->key.keysym.sym) {
+                case SDLK_ESCAPE: m_showMapPicker = false; return true;
+                case SDLK_UP:
+                    if (m_pickerScroll > 0) --m_pickerScroll;
+                    return true;
+                case SDLK_DOWN:
+                    if (m_pickerScroll + PICKER_ROWS <
+                        static_cast<int>(m_pickerFiles.size()) + 1)
+                        ++m_pickerScroll;
+                    return true;
+                default: break;
+            }
+        }
+        if (e->type == SDL_MOUSEWHEEL) {
+            int maxScroll = static_cast<int>(m_pickerFiles.size()) + 1 - PICKER_ROWS;
+            m_pickerScroll = std::max(0, std::min(m_pickerScroll - e->wheel.y, maxScroll));
+            return true;
+        }
+        if (e->type == SDL_MOUSEMOTION) {
+            float mx = static_cast<float>(e->motion.x);
+            float my = static_cast<float>(e->motion.y);
+            m_pickerHovered = -1;
+            if (mx >= panX && mx <= panX + panW) {
+                int rel = static_cast<int>((my - listY) / rowH);
+                int idx = rel + m_pickerScroll;  // 0 = Procedural, 1+ = files
+                if (rel >= 0 && idx <= static_cast<int>(m_pickerFiles.size()))
+                    m_pickerHovered = idx;
+            }
+            return true;
+        }
+        if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(e->button.x);
+            float my = static_cast<float>(e->button.y);
+            if (mx >= panX && mx <= panX + panW) {
+                int rel = static_cast<int>((my - listY) / rowH);
+                int idx = rel + m_pickerScroll;
+                if (rel >= 0 && idx <= static_cast<int>(m_pickerFiles.size())) {
+                    m_showMapPicker = false;
+                    launchMap(idx == 0 ? std::string{} : m_pickerFiles[idx - 1]);
+                    return true;
+                }
+            }
+            m_showMapPicker = false;
+            return true;
+        }
+        return true;
+    }
 
     if (e->type == SDL_KEYDOWN && !e->key.repeat) {
         switch (e->key.keysym.sym) {
@@ -227,4 +301,65 @@ void MainMenuState::render() {
     m_hud.drawText(8.f * scale, sh - 20.f * scale, hintScale,
                    "Arrow keys / mouse to navigate  |  Enter or click to select",
                    { 0.6f, 0.6f, 0.5f, 0.8f });
+
+    if (m_showMapPicker)
+        renderMapPicker(sw, sh);
+}
+
+// ── Map picker ────────────────────────────────────────────────────────────────
+
+void MainMenuState::renderMapPicker(int sw, int sh) {
+    namespace fs = std::filesystem;
+    const float scale = sh / 600.0f;
+    const float rowH  = 26.f * scale;
+    const float panW  = sw * 0.50f;
+    const float panX  = (sw - panW) / 2.f;
+    const float panY  = sh * 0.15f;
+    const float listY = panY + rowH;
+
+    // total items = "Procedural Map" + file list
+    const int total = static_cast<int>(m_pickerFiles.size()) + 1;
+    const int rows  = std::min(PICKER_ROWS, total);
+    const float panH = (rows + 1) * rowH + rowH;  // title + rows + hint
+    const float brd  = 2.f * scale;
+
+    // Veil
+    m_hud.drawRect(0, 0, static_cast<float>(sw), static_cast<float>(sh),
+                   {0.f, 0.f, 0.f, 0.55f});
+
+    // Panel
+    m_hud.drawRect(panX, panY, panW, panH, {0.06f, 0.04f, 0.02f, 0.97f});
+    m_hud.drawRect(panX, panY, panW, brd, {0.6f,0.5f,0.1f,1.f});
+    m_hud.drawRect(panX, panY+panH-brd, panW, brd, {0.6f,0.5f,0.1f,1.f});
+    m_hud.drawRect(panX, panY, brd, panH, {0.6f,0.5f,0.1f,1.f});
+    m_hud.drawRect(panX+panW-brd, panY, brd, panH, {0.6f,0.5f,0.1f,1.f});
+
+    m_hud.drawText(panX + 8.f*scale, panY + 6.f*scale,
+                   1.8f*scale, "Select Map", {0.95f,0.85f,0.40f,1.f});
+
+    for (int i = 0; i < rows; ++i) {
+        int idx = i + m_pickerScroll;  // 0 = Procedural, 1+ = files
+        if (idx > static_cast<int>(m_pickerFiles.size())) break;
+
+        float ry  = listY + i * rowH;
+        bool  hov = (idx == m_pickerHovered);
+
+        m_hud.drawRect(panX + 4*scale, ry + 2*scale, panW - 8*scale, rowH - 4*scale,
+                       hov ? glm::vec4{0.40f,0.32f,0.08f,1.f}
+                           : glm::vec4{0.13f,0.10f,0.03f,1.f});
+
+        std::string label = (idx == 0)
+            ? "[ Procedural Map ]"
+            : fs::path(m_pickerFiles[idx - 1]).stem().string();
+
+        m_hud.drawText(panX + 12.f*scale, ry + 7.f*scale,
+                       1.4f*scale, label.c_str(),
+                       idx == 0 ? glm::vec4{0.6f,0.9f,0.6f,1.f}
+                                : glm::vec4{0.85f,0.80f,0.65f,1.f});
+    }
+
+    float hintY = listY + rows * rowH + 4.f*scale;
+    m_hud.drawText(panX + 8.f*scale, hintY,
+                   scale, "Click to select   |   ESC = cancel   |   scroll = browse",
+                   {0.55f,0.55f,0.45f,0.85f});
 }
