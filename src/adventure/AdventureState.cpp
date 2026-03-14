@@ -50,7 +50,7 @@ CombatArmy AdventureState::buildPlayerArmy() const {
         cu.scDef              = sc.def;
         cu.scLevel            = sc.level;
         cu.scXp               = sc.xp;
-        cu.scUnlocked         = sc.unlockedAbilities;
+        cu.scUnlocked         = sc.unlockedActions;
         if (sc.def) {
             cu.killXp    = sc.def->killBonusXp;
             cu.perTurnXp = sc.def->perTurnXp;
@@ -246,7 +246,7 @@ void AdventureState::onResume() {
             }
             sc->level             = upd.level;
             sc->xp                = upd.xp;
-            sc->unlockedAbilities = upd.unlockedAbilities;
+            sc->unlockedActions = upd.unlockedActions;
             if (levelDelta > 0)
                 std::cout << "[Adventure] " << sc->name
                           << " is now level " << sc->level << "!\n";
@@ -291,7 +291,7 @@ void AdventureState::onResume() {
         }
         sc->level              = upd.level;
         sc->xp                 = upd.xp;
-        sc->unlockedAbilities  = upd.unlockedAbilities;
+        sc->unlockedActions  = upd.unlockedActions;
         if (levelDelta > 0)
             std::cout << "[Adventure] " << sc->name
                       << " is now level " << sc->level << "!\n";

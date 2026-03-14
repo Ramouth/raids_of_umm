@@ -4,6 +4,8 @@
 #include "world/WondrousItem.h"
 #include <string>
 #include <array>
+#include <map>
+#include <unordered_map>
 #include <vector>
 
 /*
@@ -30,11 +32,24 @@ struct SpecialCharacter {
 
     // ── Progression ───────────────────────────────────────────────────────────
     // def points to a static SCDef (from findSCDef). nullptr = no progression.
-    // level/xp/unlockedAbilities are updated by AdventureState after each combat.
+    // level/xp/unlockedActions are updated by AdventureState after each combat.
     const SCDef*             def                = nullptr;
     int                      level              = 1;
     int                      xp                 = 0;
-    std::vector<std::string> unlockedAbilities;
+
+    // Actions this SC has unlocked (via tree nodes or branch choices).
+    // Keys match ACTION_REGISTRY in sc_defs.py / future data/actions.json.
+    std::vector<std::string> unlockedActions;
+
+    // Branch choices made at each level-up choice point.
+    // key = level at which the choice was made, value = BranchOption::id chosen.
+    // Supports multiple choice points per SC without struct changes.
+    std::map<int, std::string> chosenBranches;
+
+    // Flexible per-SC stat overrides / special-mechanic values.
+    // Engine reads e.g. extraStats["aoe_radius"], extraStats["push_range"].
+    // Adding a new SC-specific knob = one JSON/data edit, no struct change.
+    std::unordered_map<std::string, int> extraStats;
 
     bool isEmpty() const { return id.empty(); }
 

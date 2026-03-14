@@ -237,11 +237,11 @@ void PartyState::render() {
         m_hud.drawText(l.rightX + 14.f * l.sc, statY, l.sc * 0.85f, buf, COL_DIM);
 
         // Unlocked abilities
-        if (!sc->unlockedAbilities.empty()) {
+        if (!sc->unlockedActions.empty()) {
             std::string abilLine = "Abilities: ";
-            for (int ai = 0; ai < static_cast<int>(sc->unlockedAbilities.size()); ++ai) {
+            for (int ai = 0; ai < static_cast<int>(sc->unlockedActions.size()); ++ai) {
                 if (ai) abilLine += ", ";
-                abilLine += sc->unlockedAbilities[ai];
+                abilLine += sc->unlockedActions[ai];
             }
             float abilY = statY + 14.f * l.sc;
             m_hud.drawText(l.rightX + 14.f * l.sc, abilY,

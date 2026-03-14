@@ -10,7 +10,7 @@
  * SCProgressUpdate — SC state snapshot written into CombatOutcome and
  * DungeonOutcome so callers can sync the hero's SpecialCharacter after combat.
  *
- * level/xp/unlockedAbilities reflect the SC's state at end-of-battle.
+ * level/xp/unlockedActions reflect the SC's state at end-of-battle.
  * Callers compute the level delta and apply stat growth to combatStats
  * using the SCDef growth tables.
  */
@@ -18,7 +18,7 @@ struct SCProgressUpdate {
     std::string              scId;
     int                      level = 1;
     int                      xp    = 0;
-    std::vector<std::string> unlockedAbilities;
+    std::vector<std::string> unlockedActions;
 };
 
 /*

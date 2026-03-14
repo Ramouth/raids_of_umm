@@ -117,7 +117,7 @@ void DungeonState::onExit() {
     m_outcome->scUpdates.clear();
     for (const auto& sc : m_hero.specials) {
         if (sc.isEmpty() || !sc.def) continue;
-        m_outcome->scUpdates.push_back({ sc.id, sc.level, sc.xp, sc.unlockedAbilities });
+        m_outcome->scUpdates.push_back({ sc.id, sc.level, sc.xp, sc.unlockedActions });
     }
 }
 
@@ -157,7 +157,7 @@ void DungeonState::onResume() {
         }
         sc->level             = upd.level;
         sc->xp                = upd.xp;
-        sc->unlockedAbilities = upd.unlockedAbilities;
+        sc->unlockedActions = upd.unlockedActions;
         if (levelDelta > 0)
             std::cout << "[Dungeon] " << sc->name
                       << " is now level " << sc->level << "!\n";
@@ -252,7 +252,7 @@ CombatArmy DungeonState::buildPlayerArmy() const {
         cu.scDef              = sc.def;
         cu.scLevel            = sc.level;
         cu.scXp               = sc.xp;
-        cu.scUnlocked         = sc.unlockedAbilities;
+        cu.scUnlocked         = sc.unlockedActions;
         if (sc.def) {
             cu.killXp    = sc.def->killBonusXp;
             cu.perTurnXp = sc.def->perTurnXp;
