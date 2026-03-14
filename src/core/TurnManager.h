@@ -29,6 +29,9 @@ public:
     // Empty string = no special event this turn.
     const std::string& lastEvent() const { return m_lastEvent; }
 
+    // Session restore — called by AdventureState::loadSession()
+    void setDay(int d) { m_day = d; }
+
     const std::vector<Faction>& factions()   const { return m_factions; }
     const Faction& playerFaction()           const { return m_factions[Faction::Player]; }
     Faction&       playerFaction()                 { return m_factions[Faction::Player]; }

@@ -44,7 +44,7 @@ public:
 
     // Accept an externally built map (from WorldBuilderState test-play,
     // or a loaded save file). The map is moved in — no copying.
-    explicit AdventureState(WorldMap map);
+    explicit AdventureState(WorldMap map, std::string mapPath = {});
 
     void onEnter()  override;
     void onExit()   override;
@@ -73,6 +73,10 @@ private:
     void renderObjects();
     void renderHero();
     void renderPathPreview();
+
+    // ── Session save / load ──────────────────────────────────────────────────
+    void saveSession();
+    void loadSession();
 
     // ── Members ──────────────────────────────────────────────────────────────
 
@@ -134,7 +138,11 @@ private:
     float m_lastPTime = 0.0f;
 
     // Whether this state owns a procedurally generated map or a provided one.
-    bool m_externalMap = false;
+    bool        m_externalMap = false;
+
+    // Path used to load the map — needed to write into the session save file.
+    // Empty for procedural maps (auto-saved to data/saves/auto_map.json on first save).
+    std::string m_mapPath;
 
     // Pending dungeon result — set before pushing DungeonState, read in onResume().
     std::shared_ptr<DungeonOutcome> m_pendingDungeon;

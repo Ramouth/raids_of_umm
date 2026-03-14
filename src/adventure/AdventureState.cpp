@@ -13,7 +13,10 @@
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <nlohmann/json.hpp>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -123,8 +126,8 @@ void AdventureState::initHeroArmy() {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
-AdventureState::AdventureState(WorldMap map)
-    : m_map(std::move(map)), m_externalMap(true) {}
+AdventureState::AdventureState(WorldMap map, std::string mapPath)
+    : m_map(std::move(map)), m_externalMap(true), m_mapPath(std::move(mapPath)) {}
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -508,6 +511,12 @@ bool AdventureState::handleEvent(void* sdlEvent) {
             case SDLK_ESCAPE: Application::get().popState(); return true;
             case SDLK_SPACE:  endTurn(); return true;
             case SDLK_h:      m_showHUD = !m_showHUD; return true;
+            case SDLK_s:
+                if (e->key.keysym.mod & KMOD_CTRL) { saveSession(); return true; }
+                break;
+            case SDLK_l:
+                if (e->key.keysym.mod & KMOD_CTRL) { loadSession(); return true; }
+                break;
             case SDLK_e:
                 Application::get().pushState(
                     std::make_unique<EquipmentState>(m_hero));
@@ -933,4 +942,243 @@ void AdventureState::renderHero() {
 
     m_spriteRenderer.draw(renderPos, HEX_SIZE,
                           m_cam.viewMatrix(), m_cam.projMatrix());
+}
+
+// ── Session Save / Load ───────────────────────────────────────────────────────
+
+void AdventureState::saveSession() {
+    using json = nlohmann::json;
+    namespace fs = std::filesystem;
+
+    fs::create_directories("data/saves");
+
+    // Procedural maps have no source file — auto-save them alongside the session.
+    if (m_mapPath.empty()) {
+        m_mapPath = "data/saves/auto_map.json";
+        if (auto err = m_map.saveJson(m_mapPath)) {
+            std::cerr << "[Save] Could not save map: " << *err << "\n";
+            m_mapPath.clear();
+        }
+    }
+
+    json j;
+    j["version"] = 1;
+    j["mapPath"] = m_mapPath;
+    j["day"]     = m_turnManager.day();
+
+    // Treasury
+    json treasury = json::array();
+    const ResourcePool& tp = m_turnManager.playerFaction().treasury;
+    for (int i = 0; i < RESOURCE_COUNT; ++i) treasury.push_back(tp.amounts[i]);
+    j["treasury"] = treasury;
+
+    // ── Hero ──────────────────────────────────────────────────────────────────
+    json hero;
+    hero["name"]      = m_hero.name;
+    hero["pos"]       = { {"q", m_hero.pos.q}, {"r", m_hero.pos.r} };
+    hero["movesLeft"] = m_hero.movesLeft;
+    hero["movesMax"]  = m_hero.movesMax;
+
+    json army = json::array();
+    for (const auto& slot : m_hero.army) {
+        if (slot.isEmpty()) army.push_back(nullptr);
+        else army.push_back({ {"unitId", slot.unitType->id}, {"count", slot.count} });
+    }
+    hero["army"] = army;
+
+    json specials = json::array();
+    for (const auto& sc : m_hero.specials) {
+        if (sc.isEmpty()) continue;
+        json s;
+        s["id"]        = sc.id;
+        s["name"]      = sc.name;
+        s["archetype"] = sc.archetype;
+        s["level"]     = sc.level;
+        s["xp"]        = sc.xp;
+        s["unlockedActions"] = sc.unlockedActions;
+        json cb = json::object();
+        for (const auto& [lvl, branch] : sc.chosenBranches)
+            cb[std::to_string(lvl)] = branch;
+        s["chosenBranches"] = cb;
+        s["extraStats"] = sc.extraStats;
+        json eq = json::array();
+        for (const WondrousItem* item : sc.equipped)
+            eq.push_back(item ? json(item->id) : json(nullptr));
+        s["equipped"] = eq;
+        specials.push_back(s);
+    }
+    hero["specials"] = specials;
+
+    json items = json::array();
+    for (const WondrousItem* item : m_hero.items) items.push_back(item->id);
+    hero["items"] = items;
+
+    json wallet = json::array();
+    for (int i = 0; i < RESOURCE_COUNT; ++i) wallet.push_back(m_hero.wallet.amounts[i]);
+    hero["wallet"] = wallet;
+    j["hero"] = hero;
+
+    // ── ObjectControl ─────────────────────────────────────────────────────────
+    json oc = json::array();
+    for (const auto& [coord, ctrl] : m_objectControl) {
+        oc.push_back({ {"q", coord.q}, {"r", coord.r},
+                       {"ownerFaction", ctrl.ownerFaction},
+                       {"guardDefeated", ctrl.guardDefeated},
+                       {"objType", static_cast<int>(ctrl.objType)} });
+    }
+    j["objectControl"] = oc;
+
+    // ── TownStates ────────────────────────────────────────────────────────────
+    json towns = json::array();
+    for (const auto& [coord, ts] : m_townStates) {
+        json t;
+        t["q"] = coord.q;
+        t["r"] = coord.r;
+        t["recruitPool"] = ts.recruitPool;
+        json bldgs = json::array();
+        for (const auto& b : ts.buildings) bldgs.push_back(b);
+        t["buildings"] = bldgs;
+        towns.push_back(t);
+    }
+    j["townStates"] = towns;
+
+    std::ofstream f("data/saves/session.json");
+    if (!f) { std::cerr << "[Save] Cannot open data/saves/session.json\n"; return; }
+    f << j.dump(2) << "\n";
+    std::cout << "[Save] Session saved → data/saves/session.json  (day "
+              << m_turnManager.day() << ")\n";
+}
+
+void AdventureState::loadSession() {
+    using json = nlohmann::json;
+
+    std::ifstream f("data/saves/session.json");
+    if (!f) { std::cerr << "[Load] No save file at data/saves/session.json\n"; return; }
+
+    json j;
+    try { j = json::parse(f); }
+    catch (const std::exception& ex) {
+        std::cerr << "[Load] JSON parse error: " << ex.what() << "\n";
+        return;
+    }
+
+    auto& rm = Application::get().resources();
+
+    // ── Map ───────────────────────────────────────────────────────────────────
+    std::string mapPath = j.value("mapPath", std::string{});
+    if (!mapPath.empty()) {
+        WorldMap newMap;
+        if (auto err = newMap.loadJson(mapPath)) {
+            std::cerr << "[Load] Map load error: " << *err << "\n";
+            return;
+        }
+        m_map = std::move(newMap);
+        m_mapPath    = mapPath;
+        m_externalMap = true;
+    }
+
+    // ── TurnManager ───────────────────────────────────────────────────────────
+    // Re-init to rebuild factions, then restore saved day + treasury.
+    m_turnManager.init(0);
+    m_turnManager.setDay(j.value("day", 1));
+    if (j.contains("treasury")) {
+        ResourcePool tp;
+        const auto& arr = j["treasury"];
+        for (int i = 0; i < RESOURCE_COUNT && i < static_cast<int>(arr.size()); ++i)
+            tp.amounts[i] = arr[i].get<int>();
+        m_turnManager.playerFaction().treasury = tp;
+    }
+
+    // ── Hero ──────────────────────────────────────────────────────────────────
+    const auto& jh = j["hero"];
+    m_hero        = Hero{};
+    m_hero.name   = jh.value("name", std::string{"Hero"});
+    m_hero.pos    = { jh["pos"]["q"].get<int>(), jh["pos"]["r"].get<int>() };
+    m_hero.movesLeft = jh.value("movesLeft", 8);
+    m_hero.movesMax  = jh.value("movesMax",  8);
+
+    // Army
+    int slotIdx = 0;
+    for (const auto& slot : jh.value("army", json::array())) {
+        if (slotIdx >= Hero::ARMY_SLOTS) break;
+        if (!slot.is_null()) {
+            const UnitType* ut = rm.unit(slot["unitId"].get<std::string>());
+            if (ut) m_hero.army[slotIdx] = { ut, slot["count"].get<int>() };
+        }
+        ++slotIdx;
+    }
+
+    // Special Characters
+    for (const auto& js : jh.value("specials", json::array())) {
+        SpecialCharacter sc = SpecialCharacter::make(
+            js["id"].get<std::string>(),
+            js["name"].get<std::string>(),
+            js["archetype"].get<std::string>());
+        sc.level = js.value("level", 1);
+        sc.xp    = js.value("xp", 0);
+        if (js.contains("unlockedActions"))
+            sc.unlockedActions = js["unlockedActions"].get<std::vector<std::string>>();
+        if (js.contains("chosenBranches"))
+            for (const auto& [k, v] : js["chosenBranches"].items())
+                sc.chosenBranches[std::stoi(k)] = v.get<std::string>();
+        if (js.contains("extraStats"))
+            for (const auto& [k, v] : js["extraStats"].items())
+                sc.extraStats[k] = v.get<int>();
+        if (js.contains("equipped")) {
+            int i = 0;
+            for (const auto& eq : js["equipped"]) {
+                if (i >= 4) break;
+                if (!eq.is_null())
+                    sc.equipped[i] = rm.item(eq.get<std::string>());
+                ++i;
+            }
+        }
+        m_hero.specials.push_back(sc);
+    }
+
+    // Items
+    for (const auto& id : jh.value("items", json::array()))
+        if (const WondrousItem* item = rm.item(id.get<std::string>()))
+            m_hero.items.push_back(item);
+
+    // Wallet
+    if (jh.contains("wallet")) {
+        const auto& wa = jh["wallet"];
+        for (int i = 0; i < RESOURCE_COUNT && i < static_cast<int>(wa.size()); ++i)
+            m_hero.wallet.amounts[i] = wa[i].get<int>();
+    }
+
+    // ── ObjectControl ─────────────────────────────────────────────────────────
+    m_objectControl.clear();
+    for (const auto& oc : j.value("objectControl", json::array())) {
+        HexCoord c{ oc["q"].get<int>(), oc["r"].get<int>() };
+        ObjectControl ctrl;
+        ctrl.ownerFaction  = oc.value("ownerFaction",  0);
+        ctrl.guardDefeated = oc.value("guardDefeated", false);
+        ctrl.objType       = static_cast<ObjType>(oc.value("objType", 0));
+        m_objectControl[c] = ctrl;
+    }
+
+    // ── TownStates ────────────────────────────────────────────────────────────
+    m_townStates.clear();
+    for (const auto& ts : j.value("townStates", json::array())) {
+        HexCoord c{ ts["q"].get<int>(), ts["r"].get<int>() };
+        TownState state;
+        if (ts.contains("recruitPool"))
+            state.recruitPool = ts["recruitPool"].get<std::unordered_map<std::string, int>>();
+        if (ts.contains("buildings"))
+            for (const auto& b : ts["buildings"])
+                state.buildings.insert(b.get<std::string>());
+        m_townStates[c] = state;
+    }
+
+    // Recentre camera on restored hero position.
+    float hx, hz;
+    m_hero.pos.toWorld(HEX_SIZE, hx, hz);
+    m_cam.setPosition({hx, hz});
+    m_heroRenderPos = { hx, 0.0f, hz };
+    m_heroTargetPos = m_heroRenderPos;
+
+    std::cout << "[Load] Session loaded — day " << m_turnManager.day()
+              << "  hero@(" << m_hero.pos.q << "," << m_hero.pos.r << ")\n";
 }
