@@ -213,6 +213,58 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         m_ctrlHeld = (mod & KMOD_CTRL) != 0;
     }
 
+    // ── Exit prompt modal ────────────────────────────────────────────────────
+    if (m_showExitPrompt) {
+        const int sw = Application::get().width();
+        const int sh = Application::get().height();
+        const float scale = sh / 600.0f;
+        const float bw = 130.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+        const float totalW = 4 * bw + 3 * gap;
+        const float bx0 = (sw - totalW) / 2.f;
+        const float by  = sh * 0.55f;
+        auto btnX = [&](int i) { return bx0 + i * (bw + gap); };
+
+        if (e->type == SDL_KEYDOWN && !e->key.repeat) {
+            switch (e->key.keysym.sym) {
+                case SDLK_ESCAPE: m_showExitPrompt = false; return true;
+                case SDLK_RETURN:
+                case SDLK_SPACE:
+                    if      (m_exitPromptHovered == 0) { Application::get().popState(); }
+                    else if (m_exitPromptHovered == 1) { saveMap(); m_showExitPrompt = false; }
+                    else if (m_exitPromptHovered == 2) { openMapBrowser(); m_showExitPrompt = false; }
+                    else                               { m_showExitPrompt = false; }
+                    return true;
+                case SDLK_1: Application::get().popState(); return true;
+                case SDLK_2: saveMap(); m_showExitPrompt = false; return true;
+                case SDLK_3: openMapBrowser(); m_showExitPrompt = false; return true;
+                case SDLK_4: m_showExitPrompt = false; return true;
+                default: break;
+            }
+        }
+        if (e->type == SDL_MOUSEMOTION) {
+            float mx = static_cast<float>(e->motion.x);
+            float my = static_cast<float>(e->motion.y);
+            m_exitPromptHovered = -1;
+            for (int i = 0; i < 4; ++i)
+                if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh)
+                    m_exitPromptHovered = i;
+        }
+        if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(e->button.x);
+            float my = static_cast<float>(e->button.y);
+            for (int i = 0; i < 4; ++i) {
+                if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh) {
+                    if      (i == 0) { Application::get().popState(); }
+                    else if (i == 1) { saveMap(); m_showExitPrompt = false; }
+                    else if (i == 2) { openMapBrowser(); m_showExitPrompt = false; }
+                    else             { m_showExitPrompt = false; }
+                    return true;
+                }
+            }
+        }
+        return true;
+    }
+
     // ── Map browser modal ────────────────────────────────────────────────────
     if (m_showMapBrowser) {
         const int sw = Application::get().width();
@@ -304,7 +356,7 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         SDL_Keycode sym = e->key.keysym.sym;
 
         // ── Application ─────────────────────────────────────────────────────
-        if (sym == SDLK_ESCAPE) { Application::get().quit(); return true; }
+        if (sym == SDLK_ESCAPE) { m_showExitPrompt = true; return true; }
 
         // ── F1: toggle alignment dev tool ────────────────────────────────────
         // Use scancode (physical key) — more reliable than keycode on Linux/Wayland.
@@ -507,7 +559,9 @@ void WorldBuilderState::render() {
                            1.2f * sc, label.c_str(), {0.8f, 0.75f, 0.4f, 0.9f});
         }
 
-        if (m_showMapBrowser)
+        if (m_showExitPrompt)
+            renderExitPrompt(app.width(), app.height());
+        else if (m_showMapBrowser)
             renderMapBrowser(app.width(), app.height());
 
         glDisable(GL_BLEND);
@@ -733,6 +787,59 @@ void WorldBuilderState::renderDevToolHUD() {
                        hasOverride ? "(per-tile override active)" : "(using global default)",
                        grey);
     }
+}
+
+// ── Exit prompt ───────────────────────────────────────────────────────────────
+
+void WorldBuilderState::renderExitPrompt(int sw, int sh) {
+    m_hud.begin(sw, sh);
+    m_hud.drawRect(0, 0, static_cast<float>(sw), static_cast<float>(sh),
+                   {0.f, 0.f, 0.f, 0.55f});
+
+    const float scale = sh / 600.0f;
+    float bannerH = 38.f * scale, bannerY = sh * 0.44f;
+    m_hud.drawRect(0, bannerY, static_cast<float>(sw), bannerH,
+                   {0.10f, 0.08f, 0.02f, 0.95f});
+    float titleW = 8.f * 2.0f * scale * 16;
+    m_hud.drawText((sw - titleW) / 2.f, bannerY + 10.f * scale, 2.0f * scale,
+                   "Exit to main menu?", {0.95f, 0.85f, 0.50f, 1.0f});
+
+    static const char* labels[] = { "Exit", "Save", "Load", "Continue" };
+    const float bw = 130.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+    const float totalW = 4 * bw + 3 * gap;
+    const float bx0 = (sw - totalW) / 2.f;
+    const float by  = sh * 0.55f;
+
+    for (int i = 0; i < 4; ++i) {
+        float bx = bx0 + i * (bw + gap);
+        bool  hov = (i == m_exitPromptHovered);
+
+        m_hud.drawRect(bx+2, by+2, bw, bh, {0.f,0.f,0.f,0.5f});
+        m_hud.drawRect(bx, by, bw, bh,
+                       hov ? glm::vec4{0.75f,0.60f,0.15f,1.f}
+                           : glm::vec4{0.30f,0.23f,0.06f,1.f});
+
+        float brd = 2.f * scale;
+        glm::vec4 border = hov ? glm::vec4{1.f,0.9f,0.4f,1.f}
+                               : glm::vec4{0.55f,0.45f,0.10f,1.f};
+        m_hud.drawRect(bx,        by,        bw,  brd,  border);
+        m_hud.drawRect(bx,        by+bh-brd, bw,  brd,  border);
+        m_hud.drawRect(bx,        by,        brd, bh,   border);
+        m_hud.drawRect(bx+bw-brd, by,        brd, bh,   border);
+
+        float ts = 1.6f * scale;
+        float tx = bx + (bw - 8.f * ts * strlen(labels[i])) / 2.f;
+        float ty = by + (bh - 8.f * ts) / 2.f;
+        m_hud.drawText(tx, ty, ts, labels[i], {1.f,0.95f,0.75f,1.f});
+
+        char hint[3] = { static_cast<char>('1' + i), '\0', '\0' };
+        m_hud.drawText(bx + 5.f*scale, ty + 1.f*scale,
+                       1.1f*scale, hint, {0.8f,0.8f,0.4f,0.85f});
+    }
+
+    m_hud.drawText(8.f*scale, static_cast<float>(sh) - 18.f*scale,
+                   scale, "1 = Exit   2 = Save   3 = Load   4 / ESC = Continue",
+                   {0.6f,0.6f,0.5f,0.8f});
 }
 
 // ── Map browser ───────────────────────────────────────────────────────────────

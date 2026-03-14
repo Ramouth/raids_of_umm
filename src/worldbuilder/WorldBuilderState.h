@@ -116,6 +116,11 @@ private:
     // Was this state constructed with an explicit file path?
     bool        m_loadOnEnter  = false;
 
+    // ── Exit prompt (ESC) ────────────────────────────────────────────────────
+    void renderExitPrompt(int sw, int sh);
+    bool m_showExitPrompt    = false;
+    int  m_exitPromptHovered = -1;  // 0=Exit 1=Save 2=Load 3=Continue
+
     // ── Map browser overlay (Ctrl+L) ─────────────────────────────────────────
     void openMapBrowser();
     void renderMapBrowser(int sw, int sh);
