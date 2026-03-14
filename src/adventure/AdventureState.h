@@ -81,6 +81,7 @@ private:
     // ── Session save / load ──────────────────────────────────────────────────
     void saveSession();
     void loadSession();
+    void renderExitPrompt(int sw, int sh);
 
     // ── Members ──────────────────────────────────────────────────────────────
 
@@ -146,6 +147,10 @@ private:
 
     // If true, onEnter calls loadSession() after normal init.
     bool        m_autoLoad    = false;
+
+    // Exit confirmation prompt: shown when ESC is pressed.
+    bool        m_showExitPrompt = false;
+    int         m_exitPromptHovered = -1;  // 0 = Save & Exit, 1 = Exit, 2 = Cancel
 
     // Path used to load the map — needed to write into the session save file.
     // Empty for procedural maps (auto-saved to data/saves/auto_map.json on first save).

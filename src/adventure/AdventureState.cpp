@@ -206,8 +206,6 @@ void AdventureState::onEnter() {
 }
 
 void AdventureState::onExit() {
-    if (!m_isDefeated)
-        saveSession();
     std::cout << "[Adventure] Exited\n";
 }
 
@@ -515,9 +513,61 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         return true;  // swallow all other events while defeated
     }
 
+    // Exit prompt modal — swallows all input while open.
+    if (m_showExitPrompt) {
+        const int sw = Application::get().width();
+        const int sh = Application::get().height();
+        const float scale = sh / 600.0f;
+        const float bw = 160.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+        const float totalW = 3 * bw + 2 * gap;
+        const float bx0 = (sw - totalW) / 2.f;
+        const float by  = sh * 0.55f;
+
+        auto btnX = [&](int i) { return bx0 + i * (bw + gap); };
+
+        if (e->type == SDL_KEYDOWN && !e->key.repeat) {
+            switch (e->key.keysym.sym) {
+                case SDLK_ESCAPE:
+                    m_showExitPrompt = false;
+                    return true;
+                case SDLK_RETURN:
+                case SDLK_SPACE:
+                    if (m_exitPromptHovered == 0) { saveSession(); Application::get().popState(); }
+                    else if (m_exitPromptHovered == 1) { Application::get().popState(); }
+                    else { m_showExitPrompt = false; }
+                    return true;
+                case SDLK_1: saveSession(); Application::get().popState(); return true;
+                case SDLK_2: Application::get().popState(); return true;
+                case SDLK_3: m_showExitPrompt = false; return true;
+                default: break;
+            }
+        }
+        if (e->type == SDL_MOUSEMOTION) {
+            float mx = static_cast<float>(e->motion.x);
+            float my = static_cast<float>(e->motion.y);
+            m_exitPromptHovered = -1;
+            for (int i = 0; i < 3; ++i)
+                if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh)
+                    m_exitPromptHovered = i;
+        }
+        if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(e->button.x);
+            float my = static_cast<float>(e->button.y);
+            for (int i = 0; i < 3; ++i) {
+                if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh) {
+                    if (i == 0) { saveSession(); Application::get().popState(); }
+                    else if (i == 1) { Application::get().popState(); }
+                    else { m_showExitPrompt = false; }
+                    return true;
+                }
+            }
+        }
+        return true;  // swallow everything else
+    }
+
     if (e->type == SDL_KEYDOWN && !e->key.repeat) {
         switch (e->key.keysym.sym) {
-            case SDLK_ESCAPE: Application::get().popState(); return true;
+            case SDLK_ESCAPE: m_showExitPrompt = true; return true;
             case SDLK_SPACE:  endTurn(); return true;
             case SDLK_h:      m_showHUD = !m_showHUD; return true;
             case SDLK_s:
@@ -879,6 +929,9 @@ void AdventureState::render() {
         m_hud.drawText(w * 0.5f - 115 * sc, h * 0.5f + 30 * sc, sc * 1.2f,
                        "Press R to restart  |  ESC to exit", {0.85f, 0.8f, 0.7f, 1.0f});
     }
+
+    if (m_showExitPrompt)
+        renderExitPrompt(app.width(), app.height());
 }
 
 void AdventureState::renderTerrain() {
@@ -954,6 +1007,66 @@ void AdventureState::renderHero() {
 }
 
 // ── Session Save / Load ───────────────────────────────────────────────────────
+
+void AdventureState::renderExitPrompt(int sw, int sh) {
+    m_hud.begin(sw, sh);
+
+    // Veil
+    m_hud.drawRect(0, 0, static_cast<float>(sw), static_cast<float>(sh),
+                   {0.0f, 0.0f, 0.0f, 0.55f});
+
+    const float scale = sh / 600.0f;
+
+    // Banner
+    float bannerH = 38.f * scale;
+    float bannerY = sh * 0.44f;
+    m_hud.drawRect(0, bannerY, static_cast<float>(sw), bannerH,
+                   {0.15f, 0.10f, 0.03f, 0.95f});
+    float titleW = 8.f * 2.0f * scale * 12;  // ~12 chars
+    m_hud.drawText((sw - titleW) / 2.f, bannerY + 10.f * scale, 2.0f * scale,
+                   "Exit to menu?", {0.95f, 0.85f, 0.50f, 1.0f});
+
+    // Three buttons: Save & Exit | Exit | Cancel
+    static const char* labels[] = { "Save & Exit", "Exit", "Cancel" };
+    const float bw = 160.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+    const float totalW = 3 * bw + 2 * gap;
+    const float bx0 = (sw - totalW) / 2.f;
+    const float by  = sh * 0.55f;
+
+    for (int i = 0; i < 3; ++i) {
+        float bx = bx0 + i * (bw + gap);
+        bool hov = (i == m_exitPromptHovered);
+
+        glm::vec4 bg = hov
+            ? glm::vec4{0.75f, 0.60f, 0.15f, 1.0f}
+            : glm::vec4{0.30f, 0.23f, 0.06f, 1.0f};
+
+        m_hud.drawRect(bx + 2, by + 2, bw, bh, {0.f, 0.f, 0.f, 0.5f});  // shadow
+        m_hud.drawRect(bx, by, bw, bh, bg);
+
+        float brd = 2.f * scale;
+        glm::vec4 border = hov ? glm::vec4{1.f, 0.9f, 0.4f, 1.f}
+                               : glm::vec4{0.55f, 0.45f, 0.10f, 1.f};
+        m_hud.drawRect(bx,        by,        bw,  brd,  border);
+        m_hud.drawRect(bx,        by+bh-brd, bw,  brd,  border);
+        m_hud.drawRect(bx,        by,        brd, bh,   border);
+        m_hud.drawRect(bx+bw-brd, by,        brd, bh,   border);
+
+        float ts = 1.6f * scale;
+        float tx = bx + (bw - 8.f * ts * strlen(labels[i])) / 2.f;
+        float ty = by + (bh - 8.f * ts) / 2.f;
+        m_hud.drawText(tx, ty, ts, labels[i], {1.f, 0.95f, 0.75f, 1.f});
+
+        // Key hint
+        char hint[3] = { static_cast<char>('1' + i), '\0', '\0' };
+        m_hud.drawText(bx + 5.f * scale, ty + 1.f * scale,
+                       1.1f * scale, hint, {0.8f, 0.8f, 0.4f, 0.85f});
+    }
+
+    m_hud.drawText(8.f * scale, static_cast<float>(sh) - 18.f * scale,
+                   scale, "1 = Save & Exit   2 = Exit without saving   3 / ESC = Cancel",
+                   {0.6f, 0.6f, 0.5f, 0.8f});
+}
 
 void AdventureState::saveSession() {
     using json = nlohmann::json;
