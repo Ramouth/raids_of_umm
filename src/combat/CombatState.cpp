@@ -100,16 +100,42 @@ void CombatState::onExit() {
         for (const auto& unit : m_engine.playerArmy().stacks) {
             if (!unit.isSpecialCharacter) continue;
             m_outcome->scUpdates.push_back({
-                unit.scId, unit.scLevel, unit.scXp, unit.scUnlocked
+                unit.scId, unit.scLevel, unit.scXp,
+                unit.scUnlocked, unit.scChosenBranches
             });
         }
     }
 }
 
 void CombatState::tickAnimation(float dt) {
-    // 1. Drain any events the engine produced since last tick.
-    for (auto& ev : m_engine.drainEvents())
+    // 1. Drain events. ScChoicePending is intercepted here instead of being
+    //    queued for animation — player choices are modal, not animated.
+    //    Enemy choices are auto-resolved immediately (first branch).
+    for (auto& ev : m_engine.drainEvents()) {
+        if (ev.type == CombatEvent::Type::ScChoicePending) {
+            if (ev.isPlayer) {
+                m_pendingChoiceEvent = ev;  // show overlay
+                static constexpr glm::vec4 COL_CHOICE = {0.9f, 0.8f, 0.2f, 1.0f};
+                // unitName is defined later in this TU; use army directly.
+                const auto& stacks = m_engine.playerArmy().stacks;
+                const char* name = (ev.stackIndex >= 0
+                    && ev.stackIndex < static_cast<int>(stacks.size())
+                    && stacks[ev.stackIndex].type)
+                    ? stacks[ev.stackIndex].type->name.c_str() : "?";
+                char buf[128];
+                std::snprintf(buf, sizeof(buf),
+                              "*** %s: choose a path (level %d) ***", name, ev.choiceLevel);
+                pushLog(buf, COL_CHOICE);
+            } else if (!ev.branchOptions.empty()) {
+                // AI: always pick the first branch.
+                m_engine.resolveScChoice(false, ev.stackIndex, ev.branchOptions[0].id);
+                for (auto& res : m_engine.drainEvents())
+                    m_pendingEvents.push(std::move(res));
+            }
+            continue;  // never enters the animation queue
+        }
         m_pendingEvents.push(std::move(ev));
+    }
 
     // 2. Advance running animation.
     if (m_animating) {
@@ -140,6 +166,9 @@ void CombatState::tickAnimation(float dt) {
     // 5. AI turn: enemy always; friendly when auto-battle is active.
     //    Drain immediately into m_pendingEvents to close the race window
     //    (game loop order: processEvents → update → render).
+    //    Block AI while waiting for a player branch-choice.
+    if (m_pendingChoiceEvent.has_value()) return;
+
     bool aiShouldAct = !m_engine.currentTurn().isPlayer
                     || m_autoBattle;
     if (aiShouldAct) {
@@ -319,6 +348,8 @@ void CombatState::render() {
     renderLog(app.width(), app.height());
     if (m_engine.isOver() && m_pendingEvents.empty() && !m_animating)
         renderXpOverlay(app.width(), app.height());
+    if (m_pendingChoiceEvent.has_value())
+        renderBranchChoice(app.width(), app.height());
 }
 
 // ── XP overlay ────────────────────────────────────────────────────────────────
@@ -396,6 +427,99 @@ void CombatState::renderXpOverlay(int screenW, int screenH) {
     }
 }
 
+// ── Branch choice overlay ─────────────────────────────────────────────────────
+// Thin placeholder — all layout state lives in m_pendingChoiceEvent / m_hoveredBranch.
+// Designed to be replaced wholesale during the UI/graphics overhaul.
+
+void CombatState::renderBranchChoice(int screenW, int screenH) {
+    if (!m_pendingChoiceEvent.has_value()) return;
+    const auto& ev   = *m_pendingChoiceEvent;
+    const auto& opts = ev.branchOptions;
+    if (opts.empty()) return;
+
+    const float scale  = screenH / 600.0f;
+    const float cardW  = 160.f * scale;
+    const float cardH  = 120.f * scale;
+    const float gap    = 16.f  * scale;
+    const int   n      = static_cast<int>(opts.size());
+    const float totalW = n * cardW + (n - 1) * gap;
+    const float startX = (screenW - totalW) / 2.f;
+    const float cardY  = (screenH - cardH) / 2.f + 30.f * scale;
+    const float padX   = 8.f  * scale;
+    const float padY   = 6.f  * scale;
+    const float lineH  = 15.f * scale;
+    const float ts     = scale * 1.2f;
+    const float tsSmall = scale * 1.0f;
+
+    static constexpr glm::vec4 COL_VEIL   = {0.0f,  0.0f,  0.0f,  0.60f};
+    static constexpr glm::vec4 COL_PANEL  = {0.08f, 0.07f, 0.05f, 0.96f};
+    static constexpr glm::vec4 COL_ACCENT = {0.75f, 0.62f, 0.18f, 1.0f};
+    static constexpr glm::vec4 COL_HOVER  = {0.22f, 0.20f, 0.10f, 1.0f};
+    static constexpr glm::vec4 COL_TITLE  = {1.0f,  0.92f, 0.35f, 1.0f};
+    static constexpr glm::vec4 COL_NAME   = {0.95f, 0.90f, 0.75f, 1.0f};
+    static constexpr glm::vec4 COL_DESC   = {0.70f, 0.70f, 0.65f, 1.0f};
+    static constexpr glm::vec4 COL_HINT   = {0.55f, 0.55f, 0.50f, 1.0f};
+
+    m_hud.begin(screenW, screenH);
+
+    // Full-screen dark veil.
+    m_hud.drawRect(0.f, 0.f, static_cast<float>(screenW), static_cast<float>(screenH), COL_VEIL);
+
+    // Title banner above cards.
+    const char* scName = unitName(m_engine, ev.isPlayer, ev.stackIndex);
+    char titleBuf[128];
+    std::snprintf(titleBuf, sizeof(titleBuf),
+                  "LEVEL UP  —  %s  (level %d)", scName, ev.choiceLevel);
+    float titleW = static_cast<float>(strlen(titleBuf)) * 7.f * ts;  // rough estimate
+    m_hud.drawText((screenW - titleW) / 2.f,
+                   cardY - lineH * 2.4f, ts, titleBuf, COL_TITLE);
+
+    // Branch cards.
+    for (int i = 0; i < n; ++i) {
+        float cx = startX + i * (cardW + gap);
+
+        // Card background (highlighted if hovered).
+        glm::vec4 bg = (m_hoveredBranch == i) ? COL_HOVER : COL_PANEL;
+        m_hud.drawRect(cx, cardY, cardW, cardH, bg);
+
+        // Top border accent.
+        glm::vec4 border = (m_hoveredBranch == i) ? COL_TITLE : COL_ACCENT;
+        m_hud.drawRect(cx, cardY, cardW, 2.f * scale, border);
+
+        // Key hint badge (1 or 2).
+        char badge[4];
+        std::snprintf(badge, sizeof(badge), "[%d]", i + 1);
+        m_hud.drawText(cx + padX, cardY + padY, tsSmall, badge, COL_ACCENT);
+
+        // Option name.
+        m_hud.drawText(cx + padX, cardY + padY + lineH * 1.1f,
+                       ts, opts[i].name.c_str(), COL_NAME);
+
+        // Description (naive word-wrap: split at ~22 chars per line).
+        const std::string& desc = opts[i].description;
+        float dy = cardY + padY + lineH * 2.4f;
+        size_t pos = 0;
+        while (pos < desc.size()) {
+            size_t end = std::min(pos + 22u, desc.size());
+            // Break at last space before limit.
+            if (end < desc.size()) {
+                size_t sp = desc.rfind(' ', end);
+                if (sp != std::string::npos && sp > pos) end = sp;
+            }
+            std::string line = desc.substr(pos, end - pos);
+            m_hud.drawText(cx + padX, dy, tsSmall, line.c_str(), COL_DESC);
+            dy  += lineH * 1.05f;
+            pos  = (end < desc.size() && desc[end] == ' ') ? end + 1 : end;
+        }
+    }
+
+    // "Click or press 1/2" hint below cards.
+    const char* hint = "Click a card  or  press 1 / 2  to choose";
+    float hintW = static_cast<float>(strlen(hint)) * 6.f * tsSmall;
+    m_hud.drawText((screenW - hintW) / 2.f,
+                   cardY + cardH + lineH * 0.8f, tsSmall, hint, COL_HINT);
+}
+
 bool CombatState::handleEvent(void* sdlEvent) {
     const SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
 
@@ -408,6 +532,77 @@ bool CombatState::handleEvent(void* sdlEvent) {
             return true;
         }
         return false;
+    }
+
+    // ── Branch choice (modal — consumes all input until resolved) ─────────────
+    if (m_pendingChoiceEvent.has_value()) {
+        const auto& opts = m_pendingChoiceEvent->branchOptions;
+        const float sw = static_cast<float>(Application::get().width());
+        const float sh = static_cast<float>(Application::get().height());
+
+        // Card geometry — must match renderBranchChoice exactly.
+        auto cardGeom = [&](int i, float& cx, float& cy, float& cw, float& ch) {
+            const float scale  = sh / 600.0f;
+            cw = 160.f * scale;
+            ch = 120.f * scale;
+            const float gap    = 16.f  * scale;
+            const int   n      = static_cast<int>(opts.size());
+            const float totalW = n * cw + (n - 1) * gap;
+            cx = (sw - totalW) / 2.f + i * (cw + gap);
+            cy = (sh - ch) / 2.f + 30.f * scale;
+        };
+
+        // Mouse click: hit-test card buttons.
+        if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
+            float mx = static_cast<float>(e->button.x);
+            float my = static_cast<float>(e->button.y);
+            for (int i = 0; i < static_cast<int>(opts.size()); ++i) {
+                float cx, cy, cw, ch;
+                cardGeom(i, cx, cy, cw, ch);
+                if (mx >= cx && mx < cx + cw && my >= cy && my < cy + ch) {
+                    const std::string chosen = opts[i].id;
+                    const bool isPlayer = m_pendingChoiceEvent->isPlayer;
+                    const int  idx      = m_pendingChoiceEvent->stackIndex;
+                    m_pendingChoiceEvent.reset();
+                    m_hoveredBranch = -1;
+                    m_engine.resolveScChoice(isPlayer, idx, chosen);
+                    for (auto& res : m_engine.drainEvents())
+                        m_pendingEvents.push(std::move(res));
+                    return true;
+                }
+            }
+            return true;  // consume click even if outside cards
+        }
+        // Keyboard shortcut: 1/2 keys choose left/right branch.
+        if (e->type == SDL_KEYDOWN) {
+            int pick = -1;
+            if (e->key.keysym.sym == SDLK_1 && opts.size() >= 1) pick = 0;
+            if (e->key.keysym.sym == SDLK_2 && opts.size() >= 2) pick = 1;
+            if (pick >= 0) {
+                const std::string chosen = opts[pick].id;
+                const bool isPlayer = m_pendingChoiceEvent->isPlayer;
+                const int  idx      = m_pendingChoiceEvent->stackIndex;
+                m_pendingChoiceEvent.reset();
+                m_hoveredBranch = -1;
+                m_engine.resolveScChoice(isPlayer, idx, chosen);
+                for (auto& res : m_engine.drainEvents())
+                    m_pendingEvents.push(std::move(res));
+                return true;
+            }
+        }
+        // Mouse move: update hover highlight.
+        if (e->type == SDL_MOUSEMOTION) {
+            float mx = static_cast<float>(e->motion.x);
+            float my = static_cast<float>(e->motion.y);
+            m_hoveredBranch = -1;
+            for (int i = 0; i < static_cast<int>(opts.size()); ++i) {
+                float cx, cy, cw, ch;
+                cardGeom(i, cx, cy, cw, ch);
+                if (mx >= cx && mx < cx + cw && my >= cy && my < cy + ch)
+                    m_hoveredBranch = i;
+            }
+        }
+        return true;  // swallow all other input while modal
     }
 
     // ── Key down ──────────────────────────────────────────────────────────────

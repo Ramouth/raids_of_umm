@@ -62,6 +62,11 @@ private:
     // ── SC XP overlay (shown after battle ends) ───────────────────────────────
     void renderXpOverlay(int screenW, int screenH);
 
+    // ── Branch choice overlay (shown mid-combat on level-up choice point) ─────
+    // Thin placeholder — designed to be replaced wholesale during UI overhaul.
+    // All layout state lives in m_pendingChoiceEvent / m_hoveredBranch.
+    void renderBranchChoice(int screenW, int screenH);
+
     // ── Members ───────────────────────────────────────────────────────────────
     CombatEngine   m_engine;
     CombatRenderer m_renderer;
@@ -103,6 +108,11 @@ private:
     // Never call popState() directly from handleEvent (use-after-free when
     // m_processing is false during processEvents).
     bool m_wantsDismiss = false;
+
+    // Cached ScChoicePending event; set when the engine pauses for a player
+    // branch decision.  Reset after resolveScChoice() is called.
+    std::optional<CombatEvent> m_pendingChoiceEvent;
+    int                        m_hoveredBranch = -1;   // -1=none, 0=left, 1=right
 
     // Written in onExit(); caller reads this after the state is popped.
     std::shared_ptr<CombatOutcome> m_outcome;

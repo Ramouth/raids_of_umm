@@ -2,6 +2,7 @@
 #include "hex/HexCoord.h"
 #include "entities/UnitType.h"
 #include "entities/SpecialCharacter.h"
+#include <map>
 #include <string>
 #include <vector>
 #include <memory>
@@ -15,10 +16,11 @@
  * using the SCDef growth tables.
  */
 struct SCProgressUpdate {
-    std::string              scId;
-    int                      level = 1;
-    int                      xp    = 0;
-    std::vector<std::string> unlockedActions;
+    std::string                scId;
+    int                        level = 1;
+    int                        xp    = 0;
+    std::vector<std::string>   unlockedActions;
+    std::map<int, std::string> chosenBranches;  // level → branch id
 };
 
 /*

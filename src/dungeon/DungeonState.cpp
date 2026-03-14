@@ -117,7 +117,7 @@ void DungeonState::onExit() {
     m_outcome->scUpdates.clear();
     for (const auto& sc : m_hero.specials) {
         if (sc.isEmpty() || !sc.def) continue;
-        m_outcome->scUpdates.push_back({ sc.id, sc.level, sc.xp, sc.unlockedActions });
+        m_outcome->scUpdates.push_back({ sc.id, sc.level, sc.xp, sc.unlockedActions, sc.chosenBranches });
     }
 }
 
@@ -158,6 +158,8 @@ void DungeonState::onResume() {
         sc->level             = upd.level;
         sc->xp                = upd.xp;
         sc->unlockedActions = upd.unlockedActions;
+            for (const auto& [lv, br] : upd.chosenBranches)
+                sc->chosenBranches[lv] = br;
         if (levelDelta > 0)
             std::cout << "[Dungeon] " << sc->name
                       << " is now level " << sc->level << "!\n";

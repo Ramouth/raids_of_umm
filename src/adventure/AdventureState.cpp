@@ -247,6 +247,8 @@ void AdventureState::onResume() {
             sc->level             = upd.level;
             sc->xp                = upd.xp;
             sc->unlockedActions = upd.unlockedActions;
+            for (const auto& [lv, br] : upd.chosenBranches)
+                sc->chosenBranches[lv] = br;
             if (levelDelta > 0)
                 std::cout << "[Adventure] " << sc->name
                           << " is now level " << sc->level << "!\n";
