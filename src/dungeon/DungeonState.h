@@ -53,6 +53,7 @@ private:
     void generateMap();
     void moveHero(const HexCoord& dest);
     void onHeroVisit(const HexCoord& coord);
+    void renderCombatResult(int sw, int sh);
     CombatArmy buildPlayerArmy() const;
     CombatArmy buildEnemyArmy()  const;
 
@@ -82,6 +83,20 @@ private:
     bool m_scRecruited   = false;
     bool m_wantsDismiss  = false;
     std::vector<std::string> m_collectedItems;
+
+    // ── Post-combat result overlay ────────────────────────────────────────────
+    struct CombatResultDisplay {
+        CombatResult result = CombatResult::Ongoing;
+        struct ScGain {
+            std::string name;
+            int oldLevel, newLevel, newXp;
+        };
+        std::vector<ScGain>     scGains;
+        std::vector<std::string> itemNames;
+        bool wantsDismissAfter = false;
+    };
+    bool                m_showCombatResult = false;
+    CombatResultDisplay m_lastCombatResult;
 
     // ── Movement ──────────────────────────────────────────────────────────────
     glm::vec3             m_heroRenderPos { 0.f, 0.f, 0.f };

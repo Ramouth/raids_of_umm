@@ -133,10 +133,22 @@ void DungeonState::onResume() {
         if (s.type && s.count > 0)
             m_hero.addUnit(s.type, s.count);
 
+    // Build result display — capture old levels before syncing SC stats.
+    m_lastCombatResult = {};
+    m_lastCombatResult.result = result.result;
+
     // Sync SC progression earned in combat back to the hero snapshot.
     for (const auto& upd : result.scUpdates) {
         SpecialCharacter* sc = m_hero.findSpecial(upd.scId);
         if (!sc || !sc->def) continue;
+
+        CombatResultDisplay::ScGain gain;
+        gain.name     = sc->name;
+        gain.oldLevel = sc->level;
+        gain.newLevel = upd.level;
+        gain.newXp    = upd.xp;
+        m_lastCombatResult.scGains.push_back(gain);
+
         int levelDelta = upd.level - sc->level;
         for (int i = 0; i < levelDelta; ++i) {
             sc->combatStats.attack    += sc->def->attackGrowth;
@@ -154,14 +166,20 @@ void DungeonState::onResume() {
     switch (result.result) {
         case CombatResult::PlayerWon:
             m_enemyDefeated = true;
-            for (const auto& id : result.itemsFound)
+            for (const auto& id : result.itemsFound) {
                 m_collectedItems.push_back(id);
+                auto& rm = Application::get().resources();
+                if (const WondrousItem* it = rm.item(id))
+                    m_lastCombatResult.itemNames.push_back(it->name);
+                else
+                    m_lastCombatResult.itemNames.push_back(id);
+            }
             std::cout << "[Dungeon] Guard defeated! Approach the figure to recruit.\n";
             break;
 
         case CombatResult::EnemyWon:
             std::cout << "[Dungeon] Hero defeated — exiting dungeon.\n";
-            m_wantsDismiss = true;
+            m_lastCombatResult.wantsDismissAfter = true;
             break;
 
         case CombatResult::Retreated:
@@ -170,6 +188,8 @@ void DungeonState::onResume() {
 
         default: break;
     }
+
+    m_showCombatResult = true;
 }
 
 // ── Game logic ────────────────────────────────────────────────────────────────
@@ -281,6 +301,17 @@ CombatArmy DungeonState::buildEnemyArmy() const {
 bool DungeonState::handleEvent(void* sdlEvent) {
     const SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
 
+    // Dismiss post-combat result overlay on any key or left-click.
+    if (m_showCombatResult) {
+        if (e->type == SDL_KEYDOWN ||
+            (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT)) {
+            m_showCombatResult = false;
+            if (m_lastCombatResult.wantsDismissAfter)
+                m_wantsDismiss = true;
+        }
+        return true;
+    }
+
     if (e->type == SDL_KEYDOWN) {
         switch (e->key.keysym.sym) {
             case SDLK_ESCAPE:
@@ -389,6 +420,90 @@ void DungeonState::update(float dt) {
     }
 }
 
+// ── Post-combat result overlay ─────────────────────────────────────────────────
+
+void DungeonState::renderCombatResult(int sw, int sh) {
+    const float sc     = sh / 600.f;
+    const float lineH  = 20.f * sc;
+    const float padX   = 18.f * sc;
+    const float padY   = 14.f * sc;
+
+    // Count rows: title + result + blank + items + SC gains + prompt
+    int dataRows = static_cast<int>(m_lastCombatResult.itemNames.size())
+                 + static_cast<int>(m_lastCombatResult.scGains.size());
+    const float panelW = 320.f * sc;
+    const float panelH = padY * 2.f + lineH * (4 + dataRows);
+    const float panelX = (sw - panelW) * 0.5f;
+    const float panelY = (sh - panelH) * 0.5f;
+
+    m_hud.begin(sw, sh);
+
+    // Dark veil over dungeon.
+    m_hud.drawRect(0.f, 0.f, static_cast<float>(sw), static_cast<float>(sh),
+                   { 0.f, 0.f, 0.f, 0.55f });
+
+    // Panel background + accent border.
+    m_hud.drawRect(panelX, panelY, panelW, panelH, { 0.05f, 0.04f, 0.10f, 0.95f });
+    m_hud.drawRect(panelX, panelY, panelW, 2.f * sc, { 0.7f, 0.6f, 0.2f, 1.f });
+
+    float y = panelY + padY;
+
+    // Result headline.
+    static constexpr glm::vec4 COL_WIN     = { 0.35f, 1.f,  0.45f, 1.f };
+    static constexpr glm::vec4 COL_LOSE    = { 0.9f,  0.15f,0.1f,  1.f };
+    static constexpr glm::vec4 COL_RET     = { 0.9f,  0.8f, 0.3f,  1.f };
+    static constexpr glm::vec4 COL_LABEL   = { 0.75f, 0.65f,0.95f, 1.f };
+    static constexpr glm::vec4 COL_VALUE   = { 0.95f, 0.90f,0.70f, 1.f };
+    static constexpr glm::vec4 COL_LVUP    = { 1.f,   0.9f, 0.2f,  1.f };
+    static constexpr glm::vec4 COL_PROMPT  = { 0.55f, 0.55f,0.55f, 1.f };
+
+    const char* headline;
+    glm::vec4   hlColor;
+    switch (m_lastCombatResult.result) {
+        case CombatResult::PlayerWon:
+            headline = "VICTORY!"; hlColor = COL_WIN;  break;
+        case CombatResult::EnemyWon:
+            headline = "DEFEATED"; hlColor = COL_LOSE; break;
+        case CombatResult::Retreated:
+            headline = "RETREATED"; hlColor = COL_RET; break;
+        default:
+            headline = "BATTLE OVER"; hlColor = COL_VALUE; break;
+    }
+    m_hud.drawText(panelX + padX, y, sc * 2.0f, headline, hlColor);
+    y += lineH * 1.6f;
+
+    // Items found.
+    if (!m_lastCombatResult.itemNames.empty()) {
+        m_hud.drawText(panelX + padX, y, sc * 1.1f, "Found:", COL_LABEL);
+        y += lineH;
+        for (const auto& name : m_lastCombatResult.itemNames) {
+            m_hud.drawText(panelX + padX * 1.6f, y, sc * 1.0f,
+                           name.c_str(), COL_VALUE);
+            y += lineH;
+        }
+    }
+
+    // SC progression.
+    for (const auto& g : m_lastCombatResult.scGains) {
+        char buf[128];
+        if (g.newLevel > g.oldLevel) {
+            std::snprintf(buf, sizeof(buf), "%s  Lv %d → %d  *** LEVEL UP! ***",
+                          g.name.c_str(), g.oldLevel, g.newLevel);
+            m_hud.drawText(panelX + padX, y, sc * 1.0f, buf, COL_LVUP);
+        } else {
+            std::snprintf(buf, sizeof(buf), "%s  Lv %d  (%d XP)",
+                          g.name.c_str(), g.newLevel, g.newXp);
+            m_hud.drawText(panelX + padX, y, sc * 1.0f, buf, COL_VALUE);
+        }
+        y += lineH;
+    }
+
+    // Dismiss prompt.
+    y += lineH * 0.4f;
+    m_hud.drawText(panelX + padX, y, sc * 0.95f,
+                   "Press any key to continue", COL_PROMPT);
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 
 void DungeonState::render() {
@@ -491,4 +606,7 @@ void DungeonState::render() {
         m_hud.drawText(static_cast<float>(sw) * 0.45f, 5.f * sc, sc * 1.1f,
                        "Dungeon cleared!  ESC to return", { 0.35f, 1.f, 0.45f, 1.f });
     }
+
+    if (m_showCombatResult)
+        renderCombatResult(sw, sh);
 }
