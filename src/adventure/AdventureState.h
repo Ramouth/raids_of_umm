@@ -150,7 +150,7 @@ private:
 
     // Exit confirmation prompt: shown when ESC is pressed.
     bool        m_showExitPrompt = false;
-    int         m_exitPromptHovered = -1;  // 0 = Save & Exit, 1 = Exit, 2 = Cancel
+    int         m_exitPromptHovered = -1;  // 0 = Exit, 1 = Save, 2 = Load, 3 = Continue
 
     // Path used to load the map — needed to write into the session save file.
     // Empty for procedural maps (auto-saved to data/saves/auto_map.json on first save).

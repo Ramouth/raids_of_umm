@@ -518,13 +518,14 @@ bool AdventureState::handleEvent(void* sdlEvent) {
         const int sw = Application::get().width();
         const int sh = Application::get().height();
         const float scale = sh / 600.0f;
-        const float bw = 160.f * scale, bh = 36.f * scale, gap = 10.f * scale;
-        const float totalW = 3 * bw + 2 * gap;
+        const float bw = 130.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+        const float totalW = 4 * bw + 3 * gap;
         const float bx0 = (sw - totalW) / 2.f;
         const float by  = sh * 0.55f;
 
         auto btnX = [&](int i) { return bx0 + i * (bw + gap); };
 
+        // Buttons: 0=Exit  1=Save  2=Load  3=Continue
         if (e->type == SDL_KEYDOWN && !e->key.repeat) {
             switch (e->key.keysym.sym) {
                 case SDLK_ESCAPE:
@@ -532,13 +533,15 @@ bool AdventureState::handleEvent(void* sdlEvent) {
                     return true;
                 case SDLK_RETURN:
                 case SDLK_SPACE:
-                    if (m_exitPromptHovered == 0) { saveSession(); Application::get().popState(); }
-                    else if (m_exitPromptHovered == 1) { Application::get().popState(); }
-                    else { m_showExitPrompt = false; }
+                    if      (m_exitPromptHovered == 0) { Application::get().popState(); }
+                    else if (m_exitPromptHovered == 1) { saveSession(); m_showExitPrompt = false; }
+                    else if (m_exitPromptHovered == 2) { loadSession(); m_showExitPrompt = false; }
+                    else                               { m_showExitPrompt = false; }
                     return true;
-                case SDLK_1: saveSession(); Application::get().popState(); return true;
-                case SDLK_2: Application::get().popState(); return true;
-                case SDLK_3: m_showExitPrompt = false; return true;
+                case SDLK_1: Application::get().popState(); return true;
+                case SDLK_2: saveSession(); m_showExitPrompt = false; return true;
+                case SDLK_3: loadSession(); m_showExitPrompt = false; return true;
+                case SDLK_4: m_showExitPrompt = false; return true;
                 default: break;
             }
         }
@@ -546,18 +549,19 @@ bool AdventureState::handleEvent(void* sdlEvent) {
             float mx = static_cast<float>(e->motion.x);
             float my = static_cast<float>(e->motion.y);
             m_exitPromptHovered = -1;
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 4; ++i)
                 if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh)
                     m_exitPromptHovered = i;
         }
         if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
             float mx = static_cast<float>(e->button.x);
             float my = static_cast<float>(e->button.y);
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 if (mx >= btnX(i) && mx <= btnX(i)+bw && my >= by && my <= by+bh) {
-                    if (i == 0) { saveSession(); Application::get().popState(); }
-                    else if (i == 1) { Application::get().popState(); }
-                    else { m_showExitPrompt = false; }
+                    if      (i == 0) { Application::get().popState(); }
+                    else if (i == 1) { saveSession(); m_showExitPrompt = false; }
+                    else if (i == 2) { loadSession(); m_showExitPrompt = false; }
+                    else             { m_showExitPrompt = false; }
                     return true;
                 }
             }
@@ -1026,14 +1030,14 @@ void AdventureState::renderExitPrompt(int sw, int sh) {
     m_hud.drawText((sw - titleW) / 2.f, bannerY + 10.f * scale, 2.0f * scale,
                    "Exit to menu?", {0.95f, 0.85f, 0.50f, 1.0f});
 
-    // Three buttons: Save & Exit | Exit | Cancel
-    static const char* labels[] = { "Save & Exit", "Exit", "Cancel" };
-    const float bw = 160.f * scale, bh = 36.f * scale, gap = 10.f * scale;
-    const float totalW = 3 * bw + 2 * gap;
+    // Four buttons: Exit | Save | Load | Continue
+    static const char* labels[] = { "Exit", "Save", "Load", "Continue" };
+    const float bw = 130.f * scale, bh = 36.f * scale, gap = 10.f * scale;
+    const float totalW = 4 * bw + 3 * gap;
     const float bx0 = (sw - totalW) / 2.f;
     const float by  = sh * 0.55f;
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         float bx = bx0 + i * (bw + gap);
         bool hov = (i == m_exitPromptHovered);
 
@@ -1064,7 +1068,7 @@ void AdventureState::renderExitPrompt(int sw, int sh) {
     }
 
     m_hud.drawText(8.f * scale, static_cast<float>(sh) - 18.f * scale,
-                   scale, "1 = Save & Exit   2 = Exit without saving   3 / ESC = Cancel",
+                   scale, "1 = Exit   2 = Save   3 = Load   4 / ESC = Continue",
                    {0.6f, 0.6f, 0.5f, 0.8f});
 }
 
