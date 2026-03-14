@@ -546,7 +546,7 @@ void DungeonState::render() {
         m_hexRenderer.drawOutline(m_enemyPos, { 0.9f, 0.15f, 0.15f }, HEX_SIZE * 0.88f);
 
     // SC outline (gold) when recruitable.
-    if (m_enemyDefeated && !m_scRecruited)
+    if (m_enemyDefeated && !m_scRecruited && m_dungeonSC.has_value())
         m_hexRenderer.drawOutline(m_scPos, { 0.95f, 0.80f, 0.15f }, HEX_SIZE * 0.88f);
 
     // Path preview.
@@ -575,7 +575,7 @@ void DungeonState::render() {
         m_enemySprite.draw({ wx, 0.f, wz }, HEX_SIZE * 0.85f, view, proj);
     }
 
-    if (!m_scRecruited) {
+    if (!m_scRecruited && m_dungeonSC.has_value()) {
         float wx, wz;
         m_scPos.toWorld(HEX_SIZE, wx, wz);
         m_scSprite.draw({ wx, 0.f, wz }, HEX_SIZE * 1.05f, view, proj);
@@ -601,7 +601,7 @@ void DungeonState::render() {
     if (!m_enemyDefeated) {
         m_hud.drawText(static_cast<float>(sw) * 0.45f, 5.f * sc, sc * 1.1f,
                        "Defeat the guard to proceed", { 0.95f, 0.50f, 0.30f, 1.f });
-    } else if (!m_scRecruited) {
+    } else if (!m_scRecruited && m_dungeonSC.has_value()) {
         m_hud.drawText(static_cast<float>(sw) * 0.45f, 5.f * sc, sc * 1.1f,
                        "Approach the glowing figure", { 0.95f, 0.85f, 0.25f, 1.f });
     } else {

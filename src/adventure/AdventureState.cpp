@@ -427,18 +427,12 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 
             // Each dungeon has a unique resident SC.
             // Add new entries here as dungeons are added to WorldMap.
-            struct DungeonSCDef { const char* id; const char* name; const char* archetype; };
-            static const std::unordered_map<std::string, DungeonSCDef> kDungeonSCs = {
-                { "Tomb of Kha'Set",  { "ushari",   "Ushari",   "warrior"      } },
-                { "Buried Sanctum",   { "sekhara",  "Sekhara",  "glass_cannon" } },
-            };
-
             std::optional<SpecialCharacter> residentSC;
-            auto scIt = kDungeonSCs.find(obj->name);
-            if (scIt != kDungeonSCs.end()) {
-                const auto& d = scIt->second;
-                residentSC = SpecialCharacter::make(d.id, d.name, d.archetype);
-            }
+            if (obj->name == "Tomb of Kha'Set")
+                residentSC = SpecialCharacter::make("ushari",  "Ushari",  "warrior");
+            else if (obj->name == "Buried Sanctum")
+                residentSC = SpecialCharacter::make("sekhara", "Sekhara", "glass_cannon");
+            std::cout << "[Adventure] Entering dungeon '" << obj->name << "'\n";
 
             Application::get().pushState(
                 std::make_unique<DungeonState>(m_hero, residentSC,
