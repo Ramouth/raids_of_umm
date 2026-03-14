@@ -46,6 +46,10 @@ public:
     // or a loaded save file). The map is moved in — no copying.
     explicit AdventureState(WorldMap map, std::string mapPath = {});
 
+    // "Continue" path: normal init then immediately load data/saves/session.json.
+    struct LoadSave {};
+    explicit AdventureState(LoadSave);
+
     void onEnter()  override;
     void onExit()   override;
     void onResume() override;  // called after CombatState / CastleState pops
@@ -139,6 +143,9 @@ private:
 
     // Whether this state owns a procedurally generated map or a provided one.
     bool        m_externalMap = false;
+
+    // If true, onEnter calls loadSession() after normal init.
+    bool        m_autoLoad    = false;
 
     // Path used to load the map — needed to write into the session save file.
     // Empty for procedural maps (auto-saved to data/saves/auto_map.json on first save).

@@ -129,6 +129,9 @@ void AdventureState::initHeroArmy() {
 AdventureState::AdventureState(WorldMap map, std::string mapPath)
     : m_map(std::move(map)), m_externalMap(true), m_mapPath(std::move(mapPath)) {}
 
+AdventureState::AdventureState(LoadSave)
+    : m_autoLoad(true) {}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 void AdventureState::onEnter() {
@@ -196,6 +199,10 @@ void AdventureState::onEnter() {
     std::cout << "[Adventure] Day " << m_turnManager.day() << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
     std::cout << "  SPACE = end turn  |  R = restart  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor\n";
+    std::cout << "  Ctrl+S = save  |  Ctrl+L = load\n";
+
+    // "Continue" from main menu: restore saved session over the fresh init.
+    if (m_autoLoad) loadSession();
 }
 
 void AdventureState::onExit() {

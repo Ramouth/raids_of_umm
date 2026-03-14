@@ -58,6 +58,7 @@ set(SOURCES
     src/dungeon/DungeonState.cpp
     src/equipment/EquipmentState.cpp
     src/party/PartyState.cpp
+    src/menu/MainMenuState.cpp
 )
 
 add_executable(raids_of_umm ${SOURCES})
@@ -106,6 +107,7 @@ add_executable(raids_tests
     tests/test_camera.cpp
     tests/test_combat.cpp
     tests/test_resourcemanager.cpp
+    tests/test_session.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
@@ -113,6 +115,7 @@ add_executable(raids_tests
     src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
     src/core/ResourceManager.cpp
+    src/core/TurnManager.cpp
     src/hero/Hero.cpp
 )
 
