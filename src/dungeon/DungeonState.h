@@ -13,6 +13,7 @@
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,10 +38,10 @@
  */
 class DungeonState final : public GameState {
 public:
-    DungeonState(Hero                            heroSnapshot,
-                 SpecialCharacter                dungeonSC,
-                 std::vector<std::string>        lootTable,
-                 std::shared_ptr<DungeonOutcome> outcome);
+    DungeonState(Hero                                    heroSnapshot,
+                 std::optional<SpecialCharacter>         dungeonSC,
+                 std::vector<std::string>                lootTable,
+                 std::shared_ptr<DungeonOutcome>         outcome);
 
     void onEnter()  override;
     void onExit()   override;
@@ -68,7 +69,7 @@ private:
     SpriteRenderer m_scSprite;
     HUDRenderer    m_hud;
 
-    SpecialCharacter                m_dungeonSC;
+    std::optional<SpecialCharacter> m_dungeonSC;
     std::vector<std::string>        m_lootTable;
     std::shared_ptr<DungeonOutcome> m_outcome;
     std::shared_ptr<CombatOutcome>  m_pendingCombat;

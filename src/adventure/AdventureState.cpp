@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
+#include <unordered_map>
 
 // ── Army builders ─────────────────────────────────────────────────────────────
 
@@ -422,10 +424,24 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             std::cout << "     Entering dungeon!\n";
             m_pendingDungeon = std::make_shared<DungeonOutcome>();
             m_dungeonCoord   = coord;
-            SpecialCharacter kharim = SpecialCharacter::make(
-                "ushari", "Ushari", "glass_cannon");
+
+            // Each dungeon has a unique resident SC.
+            // Add new entries here as dungeons are added to WorldMap.
+            struct DungeonSCDef { const char* id; const char* name; const char* archetype; };
+            static const std::unordered_map<std::string, DungeonSCDef> kDungeonSCs = {
+                { "Tomb of Kha'Set",  { "ushari",   "Ushari",   "warrior"      } },
+                { "Buried Sanctum",   { "sekhara",  "Sekhara",  "glass_cannon" } },
+            };
+
+            std::optional<SpecialCharacter> residentSC;
+            auto scIt = kDungeonSCs.find(obj->name);
+            if (scIt != kDungeonSCs.end()) {
+                const auto& d = scIt->second;
+                residentSC = SpecialCharacter::make(d.id, d.name, d.archetype);
+            }
+
             Application::get().pushState(
-                std::make_unique<DungeonState>(m_hero, kharim,
+                std::make_unique<DungeonState>(m_hero, residentSC,
                                                std::vector<std::string>{"scarab_amulet"},
                                                m_pendingDungeon));
             break;

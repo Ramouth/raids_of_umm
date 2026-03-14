@@ -13,10 +13,10 @@
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
-DungeonState::DungeonState(Hero                            heroSnapshot,
-                           SpecialCharacter                dungeonSC,
-                           std::vector<std::string>        lootTable,
-                           std::shared_ptr<DungeonOutcome> outcome)
+DungeonState::DungeonState(Hero                                    heroSnapshot,
+                           std::optional<SpecialCharacter>         dungeonSC,
+                           std::vector<std::string>                lootTable,
+                           std::shared_ptr<DungeonOutcome>         outcome)
     : m_hero(std::move(heroSnapshot))
     , m_dungeonSC(std::move(dungeonSC))
     , m_lootTable(std::move(lootTable))
@@ -108,8 +108,8 @@ void DungeonState::onExit() {
         if (!slot.isEmpty())
             m_outcome->survivors.push_back({ slot.unitType, slot.count });
 
-    if (m_scRecruited)
-        m_outcome->scRecruited.push_back(m_dungeonSC);
+    if (m_scRecruited && m_dungeonSC.has_value())
+        m_outcome->scRecruited.push_back(*m_dungeonSC);
 
     m_outcome->itemsFound = std::move(m_collectedItems);
 
@@ -224,9 +224,9 @@ void DungeonState::onHeroVisit(const HexCoord& coord) {
     }
 
     // SC recruitment — only after guard is cleared.
-    if (coord == m_scPos && m_enemyDefeated && !m_scRecruited) {
+    if (coord == m_scPos && m_enemyDefeated && !m_scRecruited && m_dungeonSC.has_value()) {
         m_scRecruited = true;
-        std::cout << "[Dungeon] " << m_dungeonSC.name << " joins your party!\n";
+        std::cout << "[Dungeon] " << m_dungeonSC->name << " joins your party!\n";
     }
 }
 
