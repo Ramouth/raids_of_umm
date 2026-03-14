@@ -1,5 +1,5 @@
-[GL] Renderer : llvmpipe (LLVM 20.1.2, 256 bits)
-[GL] Version  : 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.1
+[GL] Renderer : AMD Radeon Graphics (radeonsi, renoir, ACO, DRM 3.64, 6.17.0-14-generic)
+[GL] Version  : 4.6 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.1
 [ResourceManager] Loaded 7 units, 5 spells.
 [Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
 [Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
@@ -79,11 +79,172 @@
   Click hero to select, then click a tile to move.
   SPACE = end turn  |  R = restart  |  WASD = pan  |  scroll = zoom  |  ESC = back to editor
   Hero selected
-  [Day 1] Hero moved to (0,4) — Moves: 4/8 | Controlled: 0
-  *** Visited Town: Umm'Natur ***
-[Texture] Loaded assets/textures/buildings/castle_interior.png (320x200 ch=4)
-[Castle] Entered Umm'Natur  (treasury: 2000 gold)
-[Castle] Exited — hired 0 unit type(s).
-[Turn] Month 1  Week 1  Day 2  (Day 2 absolute)  | Gold: 2000  | Moves: 8/8
-[Main] Clean exit.
-[Adventure] Exited
+  [Day 1] Hero moved to (2,0) — Moves: 6/8 | Controlled: 0
+  *** Visited Dungeon: Enemy Scout ***
+     Entering dungeon!
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/units/armoured_warrior.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/enemy_scout.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/kharim.png (128x128 ch=4)
+[Dungeon] Entered. Guard at 5,0 | SC at 7,-1
+[CombatEngine] Round 1 start — 4 stacks in initiative order
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/units/rider_archer.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/enemy_scout.png (128x128 ch=4)
+[CombatState] Battle started
+[CombatEngine] Desert Archer attacks Sand Scorpion for 30 damage (3 survivors)
+[CombatEngine] Sand Scorpion moves 10,-4 → 5,-2
+[CombatEngine] Skeleton Warrior moves 10,-3 → 6,-3
+[CombatEngine] Mummy attacks Sand Scorpion for 10 damage (2 survivors)
+[CombatEngine] Sand Scorpion retaliates for 4 damage (Mummy: 3 left)
+[CombatEngine] --- Round 2 ---
+[CombatEngine] Desert Archer attacks Sand Scorpion for 32 damage (0 survivors)
+[CombatEngine] Skeleton Warrior moves 6,-3 → 2,0
+[CombatEngine] Mummy attacks Skeleton Warrior for 12 damage (10 survivors)
+[CombatEngine] Skeleton Warrior retaliates for 16 damage (Mummy: 3 left)
+[CombatEngine] --- Round 3 ---
+[CombatEngine] Desert Archer attacks Skeleton Warrior for 33 damage (5 survivors)
+[CombatEngine] Skeleton Warrior moves 2,0 → 1,1
+[CombatEngine] Mummy attacks Skeleton Warrior for 13 damage (3 survivors)
+[CombatEngine] Skeleton Warrior retaliates for 5 damage (Mummy: 2 left)
+[CombatEngine] --- Round 4 ---
+[CombatEngine] Desert Archer attacks Skeleton Warrior for 27 damage (0 survivors)
+[CombatEngine] Hero wins!
+[CombatState] Battle ended — player won
+[Dungeon] Guard defeated! Approach the figure to recruit.
+[Dungeon] Ushari joins your party!
+[Adventure] Returned from dungeon. Army: 2 stacks.
+[Adventure] Ushari joins your party!
+[Adventure] Found item: Scarab Amulet
+  Hero selected
+  Hero deselected
+  Hero selected
+  [Day 1] Hero moved to (5,-3) — Moves: 3/8 | Controlled: 1
+  *** Visited Dungeon: Tomb of Kha'Set ***
+     Entering dungeon!
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/units/armoured_warrior.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/enemy_scout.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/kharim.png (128x128 ch=4)
+[Dungeon] Entered. Guard at 5,0 | SC at 7,-1
+[CombatEngine] Round 1 start — 5 stacks in initiative order
+[Texture] Loaded assets/textures/terrain/sand/sand.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_bitforge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_cracked.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_grass.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_pebbles.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/sand/sand_plain.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune3.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/dune/dune_ridge.png (128x128 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/rock/rock2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/oasis/oasis2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/ruins/ruins2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/obsidian/obsidian.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/mountain/mountain2.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/river/river.png (64x64 ch=4)
+[Texture] Loaded assets/textures/terrain/wall/wall.png (64x64 ch=3)
+[Texture] Loaded assets/textures/terrain/battle/battle.png (64x64 ch=3)
+[Texture] Loaded assets/textures/units/rider_archer.png (128x128 ch=4)
+[Texture] Loaded assets/textures/units/enemy_scout.png (128x128 ch=4)
+[CombatState] Battle started
+[CombatEngine] Ushari attacks Skeleton Warrior for 20 damage (9 survivors)
+[CombatEngine] Skeleton Warrior retaliates for 24 damage (Ushari: 0 left)
+[CombatEngine] Desert Archer attacks Skeleton Warrior for 33 damage (4 survivors)
+[CombatEngine] Sand Scorpion moves 10,-4 → 5,-2
+[CombatEngine] Skeleton Warrior moves 10,-3 → 6,-3
+[CombatEngine] Mummy attacks Sand Scorpion for 6 damage (4 survivors)
+[CombatEngine] Sand Scorpion retaliates for 15 damage (Mummy: 2 left)
+[CombatEngine] --- Round 2 ---
+[CombatEngine] Desert Archer attacks Sand Scorpion for 31 damage (2 survivors)
+[CombatEngine] Sand Scorpion moves 5,-2 → 1,1
+[CombatEngine] Skeleton Warrior moves 6,-3 → 2,0
+[CombatEngine] Mummy attacks Sand Scorpion for 9 damage (2 survivors)
+[CombatEngine] Sand Scorpion retaliates for 5 damage (Mummy: 2 left)
+[CombatEngine] --- Round 3 ---
+[CombatEngine] Desert Archer attacks Sand Scorpion for 32 damage (0 survivors)
+[CombatEngine] Skeleton Warrior moves 2,0 → 1,1
+[CombatEngine] Mummy moves 0,1 → 2,0
+[CombatEngine] --- Round 4 ---
+[CombatEngine] Skeleton Warrior is PINNED — no retaliation, +50% damage
+[CombatEngine] Desert Archer attacks Skeleton Warrior for 46 damage (0 survivors)
+[CombatEngine] Hero wins!
+[CombatState] Battle ended — player won
+[Dungeon] Guard defeated! Approach the figure to recruit.
+[Dungeon] Ushari joins you
