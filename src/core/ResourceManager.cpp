@@ -112,6 +112,16 @@ std::optional<std::string> ResourceManager::loadUnits(const std::string& path) {
         u.moveRange   = j.value("moveRange",   3);
         u.shots       = j.value("shots",       0);
         u.weeklyGrowth= j.value("weeklyGrowth",0);
+
+        {
+            std::string at = j.value("attackType", "physical");
+            if      (at == "piercing") { u.attackType = AttackType::Piercing; u.defBypassRatio = 0.5f; }
+            else if (at == "magical")  { u.attackType = AttackType::Magical;  u.defBypassRatio = 1.0f; }
+            else                       { u.attackType = AttackType::Physical; u.defBypassRatio = 0.0f; }
+            // Allow JSON to override the default bypass ratio for fine-tuning.
+            if (j.contains("defBypassRatio"))
+                u.defBypassRatio = j.value("defBypassRatio", u.defBypassRatio);
+        }
         u.meshId      = j.value("meshId",      "");
         u.textureId   = j.value("textureId",   "");
 

@@ -191,9 +191,16 @@ void CombatEngine::doAttack(int targetIndex) {
     if (pinned) damage = damage * 3 / 2;
     applyDamage(target, damage);
 
+    // Build attack-type annotation for the log.
+    static const char* kAttackTypeNames[] = { "physical", "piercing", "magical" };
+    const char* atName = kAttackTypeNames[static_cast<int>(attacker.type->attackType)];
+    int rawDef    = target.effectiveDefense();
+    int reducedDef = static_cast<int>(rawDef * (1.0f - attacker.type->defBypassRatio));
+
     std::cout << "[CombatEngine] " << attacker.type->name
               << " attacks " << target.type->name
               << " for " << damage << " damage"
+              << " [" << atName << " | effDef " << rawDef << "→" << reducedDef << "]"
               << " (" << target.count << " survivors)\n";
 
     // ── Damage event ─────────────────────────────────────────────────────────
@@ -296,7 +303,13 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
     if (defender.isDefending)
         effDef += effDef / 4;
 
-    int diff = effAtk - effDef;
+    // Attack-type armor bypass: Physical=0%, Piercing=50% (default), Magical=100%.
+    // defBypassRatio is data-driven per unit so it can be tuned in units.json.
+    int effDefReduced = effDef;
+    if (attacker.type->defBypassRatio > 0.0f)
+        effDefReduced = static_cast<int>(effDef * (1.0f - attacker.type->defBypassRatio));
+
+    int diff = effAtk - effDefReduced;
     double mult;
     if (diff >= 0)
         mult = 1.0 + 0.05 * std::min(diff, 20);

@@ -23,6 +23,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "physical",
       "abilities": ["undead"],
       "meshId": "skeleton_warrior",
       "textureId": "skeleton_warrior"
@@ -50,6 +51,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "physical",
       "abilities": ["undead", "curse_strike"],
       "meshId": "mummy",
       "textureId": "mummy"
@@ -77,6 +79,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "magical",
       "abilities": ["flying", "magic_resistance"],
       "meshId": "djinn",
       "textureId": "djinn"
@@ -104,6 +107,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "physical",
       "abilities": ["poison_strike"],
       "meshId": "sand_scorpion",
       "textureId": "sand_scorpion"
@@ -131,6 +135,7 @@
         "MercuryTears": 0,
         "Amber": 1
       },
+      "attackType": "piercing",
       "abilities": [],
       "meshId": "desert_archer",
       "textureId": "desert_archer"
@@ -158,6 +163,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "physical",
       "abilities": ["no_retaliation_cap", "large_creature"],
       "meshId": "ancient_guardian",
       "textureId": "ancient_guardian"
@@ -185,6 +191,7 @@
         "MercuryTears": 0,
         "Amber": 0
       },
+      "attackType": "magical",
       "abilities": ["undead", "flying", "raise_dead", "aura_of_decay"],
       "meshId": "pharaoh_lich",
       "textureId": "pharaoh_lich"

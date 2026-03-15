@@ -4,6 +4,19 @@
 #include <vector>
 
 /*
+ * AttackType — determines how the attacker's damage interacts with defender DEF.
+ *
+ *   Physical : normal ATK vs DEF formula  (defBypassRatio = 0.0)
+ *   Piercing : arrows / barbs bypass some armor  (defBypassRatio typically 0.5)
+ *   Magical  : ignores armor entirely  (defBypassRatio = 1.0)
+ *
+ * defBypassRatio (0.0–1.0) is loaded from JSON so it can be tuned per unit
+ * without recompiling.  The engine computes:
+ *   effectiveDef = effDef * (1.0 - defBypassRatio)
+ */
+enum class AttackType { Physical, Piercing, Magical };
+
+/*
  * UnitType — immutable data describing a unit species loaded from units.json.
  *
  * All CombatUnit and Army slots point to a const UnitType*.
@@ -25,6 +38,10 @@ struct UnitType {
     int speed        = 4;   // Initiative/movement (higher = acts sooner/more)
     int moveRange    = 3;   // Hex tiles per combat turn
     int shots        = 0;   // 0 = melee only; >0 = ranged unit
+
+    // ── Attack type ──────────────────────────────────────────────────────────
+    AttackType attackType     = AttackType::Physical;
+    float      defBypassRatio = 0.0f;  // 0.0 = none, 0.5 = half, 1.0 = full bypass
 
     // ── Growth & recruitment ─────────────────────────────────────────────────
     int weeklyGrowth = 0;   // Units added to town dwelling per week
