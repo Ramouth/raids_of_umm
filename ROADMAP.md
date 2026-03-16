@@ -6,12 +6,21 @@
 
 ---
 
+## Vision
+
+**Warcraft 3 meets HoMM3 in the Egyptian desert.**
+Solid multiplayer (2–3 factions, two win conditions) built on top of a hand-crafted campaign.
+See `Factions.md` for full faction design and `Factions.md#open-questions` for decisions still needed.
+
+---
+
 ## Completed
 
 - [x] Hex grid, camera, world builder (save/load map, F1 alignment editor)
 - [x] Adventure map — hero movement, pathfinding, object visits, turn system
 - [x] Combat — initiative queue, BFS movement, click-move/attack, flanking/pinned
 - [x] Combat AI — ranged priority, melee fallback, auto-battle toggle
+- [x] Attack-type triangle — Physical / Piercing (50% bypass) / Magical (full bypass); data-driven per unit
 - [x] Dungeon state — guard combat, SC recruitment, loot drop, result overlay
 - [x] Town / Castle — unit recruitment, weekly growth, treasury
 - [x] Resource tracking — gold + sand crystals, mine income
@@ -23,58 +32,82 @@
 - [x] Session save / load — Ctrl+S / Ctrl+L, single JSON (hero, army, SCs, objectControl, treasury, day)
 - [x] Main menu — New Game / Continue / World Builder / Quit; Continue greyed when no save exists
 - [x] ESC exit prompt — Save & Exit / Exit / Cancel (optional save on leaving adventure)
+- [x] Animated sprites — AnimatedSprite + clip state machine across adventure, dungeon, combat
 
 ---
 
-## Next — Stable Test Environment
+## Milestone 0 — Stable Test Environment *(do first)*
 
-One item remains before the test environment is solid:
-
-### Author the Canonical Test Map
+### Author the Canonical Map
 - Design a fixed map in WorldBuilder, save as `data/maps/default.json`
-- New Game will load it automatically; eliminates procedural-map instability
-- Place at least: 1 town, 2 dungeons (Tomb of Kha'Set + Buried Sanctum), 1 gold mine
+- New Game loads it automatically; kills procedural-map instability
+- Must include: 2 towns (one per starting zone), 2 dungeons (Tomb of Kha'Set + Buried Sanctum),
+  2 gold mines, 1 crystal mine, 1 Eye shard artifact
 
 ---
 
-## Combat Depth (backlog, priority order)
+## Milestone 1 — Combat & Economy Foundation
 
-These deepen the tactical system. Implement after the stable test environment
-so every fight is reproducible.
+These must be validated with **heuristic calculations** before building on top of them.
+Target: each match-up produces fights that last 8–15 rounds; no unit is obviously broken.
 
-| # | Feature | Notes |
-|---|---------|-------|
-| 4 | **Attack-type triangle** | Physical (vs defense) · Piercing (50% bypass) · Magical (ignores armor). One JSON field per unit. |
-| 5 | **Commander aura** | Passive ring buff to adjacent friendly stacks |
-| 6 | **AoE special attack** | Engine targeting + UI hex highlight |
-| 7 | **Push / Telekinesis** | Move enemy unit on attack |
-| 8 | **Zone of Control (ZoC)** | Heavy units "stick" — moving past costs an attack-of-opportunity |
-| 9 | **Terrain in combat** | Rubble (+1 def, move cost 2) · High Ground (+2 def) · Pit (−1 def, move cost 2) |
-| 10 | **SC death** | Permanent on loss (items drop) — raises stakes for cursed-item decisions |
-| 11 | **Long Cast (telegraphed)** | Most powerful moves charge one round; affected hexes highlighted |
-| 12 | **Glass Cannon channel** | SC channels nearby stack for a burst; stack skips its turn |
+| # | Item | Status |
+|---|------|--------|
+| 1 | **Unit JSON → engine ability tags** | Full interpretation of `undead`, `poison_strike`, `curse_strike`, `raise_dead`, `flying`, `aura_of_decay` | ⬜ |
+| 2 | **Combat simulation harness** | Headless N-vs-M sim script to generate DPS/survivability tables per unit matchup | ⬜ |
+| 3 | **Economy balance sheet** | Gold income curve vs unit cost; time-to-tier-5 per faction; validated against sim | ⬜ |
+| 4 | **Commander aura** | Passive buff to adjacent stacks (Ushari / Kharim) | ⬜ |
+| 5 | **ZoC (Zone of Control)** | Heavy units lock adjacent enemies — moving past triggers free attack | ⬜ |
+| 6 | **Terrain in combat** | Rubble / High Ground / Pit tiles with move cost + def modifiers | ⬜ |
+| 7 | **SC permadeath** | SC dies in battle → items drop, removed from hero roster permanently | ⬜ |
 
 ---
 
-## Economy & Content
+## Milestone 2 — Dungeon Narrative
 
-| # | Feature |
-|---|---------|
-| 13 | Unit & spell JSON → engine (attack-type, ability tags fully interpreted) |
-| 14 | Castle building tree (Fort → Citadel → Castle, Mage Guild tiers) |
-| 15 | Win condition (clear all dungeons) |
-| 16 | Multiple dungeon types (vary guard composition per dungeon template) |
-| 17 | Multiple heroes (hire at castle, independent armies) |
+Each dungeon tells a self-contained story with SC interaction.
+
+| # | Item |
+|---|------|
+| 1 | Dungeon event sequence — enter → narration panel → optional SC dialogue → encounter |
+| 2 | SC fear / refusal system — certain SCs refuse specific dungeons; affects army composition |
+| 3 | Cutscene overlay — text + portrait, ESC to skip |
+| 4 | Per-dungeon loot table and Guard variant tied to dungeon template JSON |
+| 5 | Eye shard as collectible dungeon reward (tracks toward Pact win) |
 
 ---
 
-## Phase 2 — Strategy Depth *(after core loop is fun)*
+## Milestone 3 — Faction System & Win Conditions
 
-- Fog of war: unexplored tiles hidden, vision radius per hero
-- Scaling difficulty: dungeon encounters grow harder by map region
-- Scenario scripting: win/lose conditions, intro text, timed events
-- Diplomacy / faction system (Scarab Lords vs Sand Wraiths)
-- Campaign: 3-map linear story arc
+| # | Item |
+|---|------|
+| 1 | Three factions defined in JSON (Scarab Lords, Tomb Dynasties, Djinn Courts) |
+| 2 | Faction selection on New Game / lobby |
+| 3 | Win condition: **Military** (destroy all enemy towns) |
+| 4 | Win condition: **Pact of Djangjix** (collect all Eye shards + deliver to Tomb) |
+| 5 | Faction-specific unit unlocks in Castle (unit availability gated by faction) |
+| 6 | Multiple heroes (hire second hero at castle) |
+
+---
+
+## Milestone 4 — Fog of War & Map Exploration
+
+*(after canonical map and unit JSON are locked)*
+
+- Unexplored tiles fully hidden, vision radius per hero (3 hex default)
+- Mines / dungeons only visible once explored
+- Enemy hero positions visible only within vision range
+- Fog data stored in session save
+
+---
+
+## Milestone 5 — Campaign
+
+- Act I: one mission per faction (tutorial-pace, guided objectives)
+- Act II: three missions; faction paths diverge at end
+- Act III: convergence mission — Tomb of Djangjix, SC-driven narrative finale
+- Branching: linear within acts (WC3-style), choice at act boundary
+- Campaign save separate from skirmish save
 
 ---
 
