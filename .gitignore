@@ -2,11 +2,20 @@ build/
 local_deps/
 *.deb
 
-# PixelLab scripts and API credentials
-generate_*.py
+# PixelLab API credentials
 assets/pixellab
 assets/pixellab_api.txt
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Misc generated files
+assets/bowman
+
 # Logs
 game.log
-game.log
+
+# Session saves (runtime data, not source)
+data/saves/
