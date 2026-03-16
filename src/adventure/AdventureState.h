@@ -8,6 +8,7 @@
 #include "combat/CombatEvent.h"
 #include "render/HexRenderer.h"
 #include "render/SpriteRenderer.h"
+#include "render/AnimatedSprite.h"
 #include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
 #include "render/RenderOffsets.h"
@@ -90,7 +91,7 @@ private:
     Camera2D       m_cam;
 
     HexRenderer    m_hexRenderer;
-    SpriteRenderer m_spriteRenderer;           // hero
+    AnimatedSprite m_heroSprite;               // hero — walk/idle clips
     SpriteRenderer m_dungeonSpriteRenderer;    // ObjType::Dungeon
     SpriteRenderer m_buildingSpriteRenderer;   // ObjType::Town
     SpriteRenderer m_goldMineSpriteRenderer;   // ObjType::GoldMine

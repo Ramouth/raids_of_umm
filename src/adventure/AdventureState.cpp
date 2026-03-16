@@ -140,8 +140,11 @@ void AdventureState::onEnter() {
 
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
-    m_spriteRenderer.init();
-    m_spriteRenderer.loadSprite("assets/textures/units/armoured_warrior.png");
+    m_heroSprite.init();
+    m_heroSprite.loadSprite("assets/textures/units/armoured_warrior.png", 1);
+    m_heroSprite.addClip("idle", {0, 1, 6.0f,  true});
+    m_heroSprite.addClip("walk", {0, 1, 8.0f,  true});
+    m_heroSprite.play("idle");
     m_dungeonSpriteRenderer.init();
     m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
     m_buildingSpriteRenderer.init();
@@ -773,11 +776,12 @@ void AdventureState::update(float dt) {
         m_heroTargetPos = { hx, 0.0f, hz };
     } else {
         // Hero arrived at final destination
+        m_isWalking = false;
         if (m_hasPendingVisit) {
             onHeroVisit(m_pendingVisit);
             m_hasPendingVisit = false;
         }
-        
+
         // Check for battle terrain
         MapTile* currentTile = m_map.tileAt(m_hero.pos);
         if (currentTile && currentTile->terrain == Terrain::Battle) {
@@ -788,6 +792,10 @@ void AdventureState::update(float dt) {
                                               m_pendingCombat));
         }
     }
+
+    // Advance hero sprite animation and switch walk/idle clip.
+    m_heroSprite.play(m_isWalking ? "walk" : "idle");
+    m_heroSprite.update(dt);
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -1060,8 +1068,8 @@ void AdventureState::renderHero() {
         renderPos.y += bob;
     }
 
-    m_spriteRenderer.draw(renderPos, HEX_SIZE,
-                          m_cam.viewMatrix(), m_cam.projMatrix());
+    m_heroSprite.draw(renderPos, HEX_SIZE,
+                      m_cam.viewMatrix(), m_cam.projMatrix());
 }
 
 // ── Session Save / Load ───────────────────────────────────────────────────────

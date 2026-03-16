@@ -2,7 +2,7 @@
 #include "CombatEngine.h"
 #include "CombatMap.h"
 #include "render/HexRenderer.h"
-#include "render/SpriteRenderer.h"
+#include "render/AnimatedSprite.h"
 #include "render/Camera2D.h"
 #include "render/Shader.h"
 #include "hex/HexCoord.h"
@@ -53,6 +53,13 @@ public:
     // Call once after the GL context is ready (from CombatState::onEnter).
     void init();
 
+    // Advance all unit sprite animations.  Call every update() tick.
+    void update(float dt);
+
+    // Trigger a named clip on a specific unit's sprite (e.g. "attack", "die", "idle").
+    // Safe to call with an unknown unit — falls back to the fallback sprites.
+    void playClip(const CombatUnit& unit, const std::string& clip);
+
     // Draw the full combat screen each frame.
     void render(int screenW, int screenH,
                 const CombatEngine& engine,
@@ -71,16 +78,16 @@ private:
     void renderActionPanel(int screenW, int screenH);
     void drawRect2D(float x, float y, float w, float h, const glm::vec4& color);
 
-    // Returns the sprite for a unit, falling back to a default if not found.
-    SpriteRenderer* spriteFor(const CombatUnit& unit);
+    // Returns the animated sprite for a unit, falling back to a default if not found.
+    AnimatedSprite* spriteFor(const CombatUnit& unit);
 
     // ── 3D hex + sprite rendering ─────────────────────────────────────────────
     HexRenderer m_hexRenderer;
 
-    // Per-unit-type sprites keyed by unit id or SC id.
-    std::unordered_map<std::string, std::unique_ptr<SpriteRenderer>> m_sprites;
-    SpriteRenderer m_fallbackPlayerSprite;  // used when unit id has no dedicated sprite
-    SpriteRenderer m_fallbackEnemySprite;
+    // Per-unit-type animated sprites keyed by unit id or SC id.
+    std::unordered_map<std::string, std::unique_ptr<AnimatedSprite>> m_sprites;
+    AnimatedSprite m_fallbackPlayerSprite;  // used when unit id has no dedicated sprite
+    AnimatedSprite m_fallbackEnemySprite;
 
     // ── 2D UI overlay ─────────────────────────────────────────────────────────
     GLuint m_uiVao = 0;

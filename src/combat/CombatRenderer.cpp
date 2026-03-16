@@ -23,15 +23,38 @@ void CombatRenderer::init() {
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures("assets");  // loads sand.png if present
 
-    // ── Unit sprites — one SpriteRenderer per unit/SC id ─────────────────────
+    // ── Unit sprites — one AnimatedSprite per unit/SC id ─────────────────────
+    // Helper: init a sprite with the standard single-frame combat clips.
+    auto makeUnitSprite = [](const char* path) {
+        auto s = std::make_unique<AnimatedSprite>();
+        s->init();
+        s->loadSprite(path, 1);
+        s->addClip("idle",   {0, 1, 6.0f,  true });
+        s->addClip("walk",   {0, 1, 8.0f,  true });
+        s->addClip("attack", {0, 1, 12.0f, false});
+        s->addClip("die",    {0, 1, 8.0f,  false});
+        s->play("idle");
+        return s;
+    };
+
     // Fallbacks for any unit without a dedicated sprite.
     m_fallbackPlayerSprite.init();
-    m_fallbackPlayerSprite.loadSprite("assets/textures/units/armoured_warrior.png");
-    m_fallbackEnemySprite.init();
-    m_fallbackEnemySprite.loadSprite("assets/textures/units/enemy_scout.png");
+    m_fallbackPlayerSprite.loadSprite("assets/textures/units/armoured_warrior.png", 1);
+    m_fallbackPlayerSprite.addClip("idle",   {0, 1, 6.0f,  true });
+    m_fallbackPlayerSprite.addClip("walk",   {0, 1, 8.0f,  true });
+    m_fallbackPlayerSprite.addClip("attack", {0, 1, 12.0f, false});
+    m_fallbackPlayerSprite.addClip("die",    {0, 1, 8.0f,  false});
+    m_fallbackPlayerSprite.play("idle");
 
-    // All known unit sprites. Missing files are silent no-ops (SpriteRenderer::draw
-    // returns immediately when m_tex == 0, falling back to tinted hex outline).
+    m_fallbackEnemySprite.init();
+    m_fallbackEnemySprite.loadSprite("assets/textures/units/enemy_scout.png", 1);
+    m_fallbackEnemySprite.addClip("idle",   {0, 1, 6.0f,  true });
+    m_fallbackEnemySprite.addClip("walk",   {0, 1, 8.0f,  true });
+    m_fallbackEnemySprite.addClip("attack", {0, 1, 12.0f, false});
+    m_fallbackEnemySprite.addClip("die",    {0, 1, 8.0f,  false});
+    m_fallbackEnemySprite.play("idle");
+
+    // All known unit sprites. Missing files are silent no-ops.
     static const std::pair<const char*, const char*> kUnitSprites[] = {
         // Units from units.json
         { "mummy",            "assets/textures/units/mummy.png"           },
@@ -53,12 +76,8 @@ void CombatRenderer::init() {
         { "rider_knight",     "assets/textures/units/rider_knight.png"    },
         { "rider_lance",      "assets/textures/units/rider_lance.png"     },
     };
-    for (const auto& [id, path] : kUnitSprites) {
-        auto sr = std::make_unique<SpriteRenderer>();
-        sr->init();
-        sr->loadSprite(path);
-        m_sprites[id] = std::move(sr);
-    }
+    for (const auto& [id, path] : kUnitSprites)
+        m_sprites[id] = makeUnitSprite(path);
 
     // ── 2D UI overlay ─────────────────────────────────────────────────────────
     m_uiShader = Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
@@ -167,9 +186,22 @@ void CombatRenderer::render(int screenW, int screenH,
     glDisable(GL_BLEND);
 }
 
+// ── Animation update ──────────────────────────────────────────────────────────
+
+void CombatRenderer::update(float dt) {
+    for (auto& [id, s] : m_sprites)
+        s->update(dt);
+    m_fallbackPlayerSprite.update(dt);
+    m_fallbackEnemySprite.update(dt);
+}
+
+void CombatRenderer::playClip(const CombatUnit& unit, const std::string& clip) {
+    spriteFor(unit)->play(clip);
+}
+
 // ── Sprite lookup ─────────────────────────────────────────────────────────────
 
-SpriteRenderer* CombatRenderer::spriteFor(const CombatUnit& unit) {
+AnimatedSprite* CombatRenderer::spriteFor(const CombatUnit& unit) {
     // SC portrait takes priority
     if (unit.isSpecialCharacter && !unit.scId.empty()) {
         auto it = m_sprites.find(unit.scId);

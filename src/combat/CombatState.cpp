@@ -149,6 +149,17 @@ void CombatState::tickAnimation(float dt) {
         if (m_animTimer >= m_animDuration) {
             m_animating   = false;
             m_anim.active = false;
+            // Return moving/attacking unit to idle when their animation ends.
+            auto& army = m_currentEvent.isPlayer ? m_engine.playerArmy()
+                                                 : m_engine.enemyArmy();
+            int idx = m_currentEvent.stackIndex;
+            if (idx >= 0 && idx < static_cast<int>(army.stacks.size())) {
+                const auto& u = army.stacks[idx];
+                if (!u.isDead() &&
+                    (m_currentEvent.type == CombatEvent::Type::UnitMoved ||
+                     m_currentEvent.type == CombatEvent::Type::UnitAttacked))
+                    m_renderer.playClip(u, "idle");
+            }
         }
         return;  // still animating — don't start a new event or let AI act
     }
@@ -280,6 +291,13 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
         default: break;
     }
 
+    // Helper to look up a unit safely from an event
+    auto unitFromEvent = [&](bool isPlayer, int idx) -> const CombatUnit* {
+        const CombatArmy& army = isPlayer ? m_engine.playerArmy() : m_engine.enemyArmy();
+        if (idx < 0 || idx >= static_cast<int>(army.stacks.size())) return nullptr;
+        return &army.stacks[idx];
+    };
+
     switch (ev.type) {
         case CombatEvent::Type::UnitMoved: {
             m_animDuration    = MOVE_ANIM_DURATION;
@@ -292,11 +310,15 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
             m_animFrom      = { fx, 0.f, fz };
             m_animTo        = { tx, 0.f, tz };
             m_anim.worldPos = m_animFrom;
+            if (const CombatUnit* u = unitFromEvent(ev.isPlayer, ev.stackIndex))
+                m_renderer.playClip(*u, "walk");
             break;
         }
         case CombatEvent::Type::UnitAttacked:
             m_animDuration = ATTACK_ANIM_DURATION;
             m_anim.active  = false;
+            if (const CombatUnit* u = unitFromEvent(ev.isPlayer, ev.stackIndex))
+                m_renderer.playClip(*u, "attack");
             break;
         case CombatEvent::Type::UnitDamaged:
             m_animDuration = DAMAGE_ANIM_DURATION;
@@ -305,6 +327,8 @@ void CombatState::startEventAnimation(const CombatEvent& ev) {
         case CombatEvent::Type::UnitDied:
             m_animDuration = DEATH_ANIM_DURATION;
             m_anim.active  = false;
+            if (const CombatUnit* u = unitFromEvent(ev.isPlayer, ev.stackIndex))
+                m_renderer.playClip(*u, "die");
             break;
         default:
             m_animDuration = FLASH_ANIM_DURATION;
@@ -322,6 +346,7 @@ void CombatState::update(float dt) {
     }
 
     tickAnimation(dt);
+    m_renderer.update(dt);
 
     // Camera pan (normalised so diagonal isn't faster)
     float dx = 0.f, dz = 0.f;
