@@ -1,5 +1,5 @@
 #pragma once
-#include "factions/Faction.h"
+#include "world/Faction.h"
 #include "world/ObjectControl.h"
 #include "world/TownState.h"
 #include <string>

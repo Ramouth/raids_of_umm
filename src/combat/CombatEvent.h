@@ -1,7 +1,7 @@
 #pragma once
 #include "hex/HexCoord.h"
-#include "entities/UnitType.h"
-#include "entities/SpecialCharacter.h"
+#include "world/UnitType.h"
+#include "world/SpecialCharacter.h"
 #include <map>
 #include <string>
 #include <vector>

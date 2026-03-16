@@ -1,5 +1,5 @@
 #pragma once
-#include "entities/UnitType.h"
+#include "world/UnitType.h"
 #include "hex/HexCoord.h"
 #include <vector>
 

@@ -3,7 +3,7 @@
 #include "DungeonOutcome.h"
 #include "combat/CombatEvent.h"
 #include "combat/CombatArmy.h"
-#include "entities/SpecialCharacter.h"
+#include "world/SpecialCharacter.h"
 #include "hero/Hero.h"
 #include "world/WorldMap.h"
 #include "render/HexRenderer.h"

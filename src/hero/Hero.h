@@ -2,9 +2,9 @@
 #include "hex/HexCoord.h"
 #include "world/Resources.h"
 #include "world/WondrousItem.h"
-#include "entities/UnitType.h"
-#include "entities/SpecialCharacter.h"
-#include "factions/Faction.h"
+#include "world/UnitType.h"
+#include "world/SpecialCharacter.h"
+#include "world/Faction.h"
 #include <string>
 #include <array>
 #include <vector>

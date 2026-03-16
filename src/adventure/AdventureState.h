@@ -90,9 +90,12 @@ private:
     Camera2D       m_cam;
 
     HexRenderer    m_hexRenderer;
-    SpriteRenderer m_spriteRenderer;
-    SpriteRenderer m_dungeonSpriteRenderer;
-    SpriteRenderer m_buildingSpriteRenderer;
+    SpriteRenderer m_spriteRenderer;           // hero
+    SpriteRenderer m_dungeonSpriteRenderer;    // ObjType::Dungeon
+    SpriteRenderer m_buildingSpriteRenderer;   // ObjType::Town
+    SpriteRenderer m_goldMineSpriteRenderer;   // ObjType::GoldMine
+    SpriteRenderer m_crystalMineSpriteRenderer;// ObjType::CrystalMine
+    SpriteRenderer m_artifactSpriteRenderer;   // ObjType::Artifact
     HUDRenderer    m_hud;
 
     // Session state — object ownership/defeat flags live here, NOT in WorldMap.
@@ -147,6 +150,11 @@ private:
 
     // If true, onEnter calls loadSession() after normal init.
     bool        m_autoLoad    = false;
+
+    // Transient notification banner (e.g. artifact pickup). Fades after m_notifyDuration.
+    std::string m_notification;
+    float       m_notifyTimer    = 0.0f;
+    static constexpr float NOTIFY_DURATION = 3.5f;
 
     // Exit confirmation prompt: shown when ESC is pressed.
     bool        m_showExitPrompt = false;

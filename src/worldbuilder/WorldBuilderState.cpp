@@ -32,6 +32,10 @@ void WorldBuilderState::onEnter() {
     m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
     m_goldMineSpriteRenderer.init();
     m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
+    m_crystalMineSpriteRenderer.init();
+    m_crystalMineSpriteRenderer.loadSprite("assets/textures/objects/crystal_mine.png");
+    m_artifactSpriteRenderer.init();
+    m_artifactSpriteRenderer.loadSprite("assets/textures/objects/artifact.png");
 
     if (m_loadOnEnter) {
         loadMap();
@@ -641,11 +645,15 @@ void WorldBuilderState::renderObjects() {
                 m_dungeonSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE, view, proj);
                 break;
             case ObjType::GoldMine:
-            case ObjType::CrystalMine:
                 m_goldMineSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.4f, view, proj);
                 break;
-            case ObjType::Town:
+            case ObjType::CrystalMine:
+                m_crystalMineSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.4f, view, proj);
+                break;
             case ObjType::Artifact:
+                m_artifactSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.2f, view, proj);
+                break;
+            case ObjType::Town:
             default:
                 m_townSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.8f, view, proj);
                 break;

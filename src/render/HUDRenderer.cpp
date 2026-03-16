@@ -186,7 +186,7 @@ void HUDRenderer::render(int screenW, int screenH,
                           int day, int month, int weekOfMonth,
                           int movesLeft, int movesMax,
                           int visitedCount, int heroQ, int heroR,
-                          bool infiniteMoves, int gold) {
+                          bool infiniteMoves, int gold, int crystal) {
     m_sw = screenW;
     m_sh = screenH;
 
@@ -262,7 +262,7 @@ void HUDRenderer::render(int screenW, int screenH,
     float ty2 = hudY - 28 * sc;   // Moves
     float ty3 = hudY - 12 * sc;   // Position / Visited / Gold
 
-    char line1[80], line2[64], line3[80];
+    char line1[80], line2[64], line3[64], line4[80];
 
     // "MONTH 2  WEEK 3  DAY 5"
     std::snprintf(line1, sizeof(line1), "MONTH %d   WEEK %d   DAY %d",
@@ -274,19 +274,25 @@ void HUDRenderer::render(int screenW, int screenH,
     else
         std::snprintf(line2, sizeof(line2), "MOVES %d/%d", movesLeft, movesMax);
 
-    // "POS (q,r)  VISITED n  GOLD n"
-    std::snprintf(line3, sizeof(line3), "POS (%d,%d)   VISITED %d   GOLD %d",
-                  heroQ, heroR, visitedCount, gold);
+    // "POS (q,r)  VISITED n"
+    std::snprintf(line3, sizeof(line3), "POS (%d,%d)   VISITED %d",
+                  heroQ, heroR, visitedCount);
 
-    // Text background band — tall enough for three rows
-    float bandH = 52 * sc;
+    // "GOLD n  CRYSTAL n"
+    std::snprintf(line4, sizeof(line4), "GOLD %d   CRYSTAL %d", gold, crystal);
+
+    // Text background band — tall enough for four rows
+    float bandH = 66 * sc;
+    float ty4   = hudY - 24 * sc;
     drawRect(hudX, hudY - bandH - 2 * sc, hudW, bandH, {0.0f, 0.0f, 0.0f, 0.55f});
 
     glm::vec4 textCol = {1.0f, 0.95f, 0.7f, 1.0f};
     glm::vec4 warnCol = {1.0f, 0.35f, 0.2f, 1.0f};
+    glm::vec4 resCol  = {0.75f, 0.85f, 0.95f, 1.0f};
     drawText(tx, ty1, ts, line1, textCol);
     drawText(tx, ty2, ts, line2, infiniteMoves ? warnCol : textCol);
-    drawText(tx, ty3, ts, line3, {0.75f, 0.85f, 0.95f, 1.0f});
+    drawText(tx, ty3, ts, line3, resCol);
+    drawText(tx, ty4, ts, line4, {0.95f, 0.82f, 0.30f, 1.0f});
 
     glDisable(GL_BLEND);
     glEnable(GL_CULL_FACE);

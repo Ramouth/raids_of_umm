@@ -146,6 +146,12 @@ void AdventureState::onEnter() {
     m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
     m_buildingSpriteRenderer.init();
     m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
+    m_goldMineSpriteRenderer.init();
+    m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
+    m_crystalMineSpriteRenderer.init();
+    m_crystalMineSpriteRenderer.loadSprite("assets/textures/objects/crystal_mine.png");
+    m_artifactSpriteRenderer.init();
+    m_artifactSpriteRenderer.loadSprite("assets/textures/objects/artifact.png");
     m_hud.init();
 
     if (!m_externalMap)
@@ -457,7 +463,9 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             std::cout << "     +2 Sand Crystal per turn secured!\n";
             break;
         case ObjType::Artifact:
-            std::cout << "     Artifact added to hero's backpack!\n";
+            m_notification  = "Found: " + obj->name + "!";
+            m_notifyTimer   = NOTIFY_DURATION;
+            std::cout << "     Artifact collected: " << obj->name << "\n";
             break;
         case ObjType::COUNT:
             break;  // sentinel, never a real object
@@ -709,6 +717,9 @@ bool AdventureState::handleEvent(void* sdlEvent) {
 // ── Update ────────────────────────────────────────────────────────────────────
 
 void AdventureState::update(float dt) {
+    if (m_notifyTimer > 0.0f)
+        m_notifyTimer -= dt;
+
     float speed = CAM_SPEED * m_cam.zoom() / 12.0f;
     float dx = 0.0f, dz = 0.0f;
     if (m_keyW) dz -= speed * dt;
@@ -810,7 +821,8 @@ void AdventureState::render() {
                      m_hero.movesLeft, m_hero.movesMax,
                      static_cast<int>(m_objectControl.size()),
                      m_hero.pos.q, m_hero.pos.r, m_infiniteMoves,
-                     m_turnManager.playerFaction().treasury[Resource::Gold]);
+                     m_turnManager.playerFaction().treasury[Resource::Gold],
+                     m_turnManager.playerFaction().treasury[Resource::SandCrystal]);
 
         // ── Army panel (bottom-right) ─────────────────────────────────────────
         int sw = app.width(), sh = app.height();
@@ -936,6 +948,25 @@ void AdventureState::render() {
 
     if (m_showExitPrompt)
         renderExitPrompt(app.width(), app.height());
+
+    // Notification banner (artifact pickup etc.) — fades over NOTIFY_DURATION seconds.
+    if (m_notifyTimer > 0.0f && !m_notification.empty()) {
+        int w = app.width(), h = app.height();
+        m_hud.begin(w, h);
+        float sc    = h / 600.0f;
+        float alpha = std::min(1.0f, m_notifyTimer / 0.5f); // fade out in last 0.5s
+        float bannerW = 320 * sc;
+        float bannerH = 36 * sc;
+        float bx = (w - bannerW) * 0.5f;
+        float by = h * 0.25f;
+        m_hud.drawRect(bx, by, bannerW, bannerH, {0.0f, 0.0f, 0.0f, 0.75f * alpha});
+        m_hud.drawRect(bx, by, bannerW, 2 * sc,  {0.95f, 0.75f, 0.2f, alpha});
+        m_hud.drawRect(bx, by + bannerH - 2 * sc, bannerW, 2 * sc, {0.95f, 0.75f, 0.2f, alpha});
+        float textX = bx + 10 * sc;
+        float textY = by + 10 * sc;
+        m_hud.drawText(textX, textY, sc * 1.4f, m_notification.c_str(),
+                       {1.0f, 0.92f, 0.55f, alpha});
+    }
 }
 
 void AdventureState::renderTerrain() {
@@ -974,15 +1005,38 @@ void AdventureState::renderObjects() {
         obj.pos.toWorld(HEX_SIZE, wx, wz);
         wx += off.dx;  wz += off.dz;
 
-        if (obj.type == ObjType::Dungeon) {
-            // Hide entrance sprite once the dungeon is cleared.
-            auto it = m_objectControl.find(obj.pos);
-            if (it != m_objectControl.end() && it->second.guardDefeated) continue;
-            m_dungeonSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
-                                         m_cam.viewMatrix(), m_cam.projMatrix());
-        } else {
-            m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
-                                          m_cam.viewMatrix(), m_cam.projMatrix());
+        switch (obj.type) {
+            case ObjType::Dungeon: {
+                // Hide entrance sprite once the dungeon is cleared.
+                auto it = m_objectControl.find(obj.pos);
+                if (it != m_objectControl.end() && it->second.guardDefeated) continue;
+                m_dungeonSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
+                                             m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
+            }
+            case ObjType::Town:
+                m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
+                                              m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
+            case ObjType::GoldMine:
+                m_goldMineSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
+                                              m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
+            case ObjType::CrystalMine:
+                m_crystalMineSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
+                                                 m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
+            case ObjType::Artifact: {
+                auto it = m_objectControl.find(obj.pos);
+                if (it != m_objectControl.end() && it->second.ownerFaction == 1) continue;
+                m_artifactSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.2f,
+                                              m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
+            }
+            default:
+                m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
+                                              m_cam.viewMatrix(), m_cam.projMatrix());
+                break;
         }
     }
 }

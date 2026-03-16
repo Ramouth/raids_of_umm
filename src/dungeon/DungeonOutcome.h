@@ -1,6 +1,6 @@
 #pragma once
 #include "combat/CombatEvent.h"   // SurvivorStack
-#include "entities/SpecialCharacter.h"
+#include "world/SpecialCharacter.h"
 #include <string>
 #include <vector>
 

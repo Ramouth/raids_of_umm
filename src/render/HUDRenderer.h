@@ -17,7 +17,7 @@ public:
                 int day, int month, int weekOfMonth,
                 int movesLeft, int movesMax,
                 int visitedCount, int heroQ, int heroR,
-                bool infiniteMoves = false, int gold = 0);
+                bool infiniteMoves = false, int gold = 0, int crystal = 0);
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawTexturedRect(float x, float y, float w, float h, GLuint texId);
     void drawText(float x, float y, float scale, const char* text, const glm::vec4& color);

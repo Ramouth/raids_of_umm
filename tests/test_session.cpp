@@ -1,6 +1,10 @@
 #include "test_runner.h"
 #include "core/TurnManager.h"
+#include "core/ResourceManager.h"
+#include "hero/Hero.h"
 #include "world/Resources.h"
+#include "world/ObjectControl.h"
+#include "world/MapObject.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -35,6 +39,109 @@ SUITE("TurnManager — init then setTreasury round-trip") {
     CHECK_EQ(tm.playerFaction().treasury[Resource::Gold], 3500);
     CHECK_EQ(tm.playerFaction().treasury[Resource::SandCrystal], 42);
     CHECK_EQ(tm.playerFaction().treasury[Resource::BoneDust], 0);
+}
+
+// ── Mine income via nextDay ───────────────────────────────────────────────────
+
+SUITE("TurnManager — nextDay deposits gold mine income to player treasury") {
+    ResourceManager rm;
+    rm.load("data");
+
+    TurnManager tm;
+    tm.init(0);
+
+    Hero hero;
+    TownStateMap towns;
+    ObjectControlMap control;
+    ObjectControl ctrl;
+    ctrl.ownerFaction = Faction::Player;
+    ctrl.objType      = ObjType::GoldMine;
+    control[HexCoord{3, 3}] = ctrl;
+
+    tm.nextDay(hero, control, rm, towns);
+
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Gold], 1000);
+}
+
+SUITE("TurnManager — nextDay skips neutral (unowned) mine") {
+    ResourceManager rm;
+    rm.load("data");
+
+    TurnManager tm;
+    tm.init(0);
+
+    Hero hero;
+    TownStateMap towns;
+    ObjectControlMap control;
+    ObjectControl ctrl;
+    ctrl.ownerFaction = Faction::Neutral;  // 0 = no owner
+    ctrl.objType      = ObjType::GoldMine;
+    control[HexCoord{1, 0}] = ctrl;
+
+    tm.nextDay(hero, control, rm, towns);
+
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Gold], 0);
+}
+
+SUITE("TurnManager — nextDay accumulates income from two owned mines") {
+    ResourceManager rm;
+    rm.load("data");
+
+    TurnManager tm;
+    tm.init(0);
+
+    Hero hero;
+    TownStateMap towns;
+    ObjectControlMap control;
+
+    ObjectControl gold;
+    gold.ownerFaction = Faction::Player;
+    gold.objType      = ObjType::GoldMine;
+    control[HexCoord{2, 0}] = gold;
+
+    ObjectControl crystal;
+    crystal.ownerFaction = Faction::Player;
+    crystal.objType      = ObjType::CrystalMine;
+    control[HexCoord{-2, 1}] = crystal;
+
+    tm.nextDay(hero, control, rm, towns);
+
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Gold],        1000);
+    CHECK_EQ(tm.playerFaction().treasury[Resource::SandCrystal], 2);
+}
+
+SUITE("TurnManager — nextDay advances day counter") {
+    ResourceManager rm;
+    rm.load("data");
+
+    TurnManager tm;
+    tm.init(0);
+
+    Hero hero;
+    TownStateMap towns;
+    ObjectControlMap control;
+
+    int newDay = tm.nextDay(hero, control, rm, towns);
+    CHECK_EQ(newDay, 2);
+    CHECK_EQ(tm.day(), 2);
+}
+
+SUITE("TurnManager — nextDay resets hero moves") {
+    ResourceManager rm;
+    rm.load("data");
+
+    TurnManager tm;
+    tm.init(0);
+
+    Hero hero;
+    hero.movesMax  = 8;
+    hero.movesLeft = 0;
+    TownStateMap towns;
+    ObjectControlMap control;
+
+    tm.nextDay(hero, control, rm, towns);
+
+    CHECK_EQ(hero.movesLeft, hero.movesMax);
 }
 
 #endif  // RESOURCE_MANAGER_IMPL

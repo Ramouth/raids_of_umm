@@ -6,7 +6,7 @@
 #include "render/Texture.h"
 #include "world/TownState.h"
 #include "world/Resources.h"
-#include "entities/UnitType.h"
+#include "world/UnitType.h"
 #include "hero/Hero.h"
 #include <glad/glad.h>
 #include <memory>

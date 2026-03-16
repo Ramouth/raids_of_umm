@@ -101,6 +101,8 @@ private:
     SpriteRenderer m_townSpriteRenderer;
     SpriteRenderer m_dungeonSpriteRenderer;
     SpriteRenderer m_goldMineSpriteRenderer;
+    SpriteRenderer m_crystalMineSpriteRenderer;
+    SpriteRenderer m_artifactSpriteRenderer;
     EditorPalette  m_palette;
 
     EditorTool  m_tool         = EditorTool::PaintTile;

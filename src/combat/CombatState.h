@@ -6,7 +6,7 @@
 #include "CombatMap.h"
 #include "render/Camera2D.h"
 #include "render/HUDRenderer.h"
-#include "entities/SpecialCharacter.h"
+#include "world/SpecialCharacter.h"
 #include "hex/HexCoord.h"
 #include <glm/glm.hpp>
 #include <deque>

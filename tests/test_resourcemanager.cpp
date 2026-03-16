@@ -440,4 +440,39 @@ SUITE("Hero — findSpecial const overload works") {
     CHECK(ch.findSpecial("other")  == nullptr);
 }
 
+// ── Mine income ───────────────────────────────────────────────────────────────
+
+SUITE("ResourceManager — mineIncome returns 1000 gold for GoldMine") {
+    ResourceManager rm;
+    rm.load("data");
+    ResourcePool income = rm.mineIncome(ObjType::GoldMine);
+    CHECK_EQ(income[Resource::Gold], 1000);
+}
+
+SUITE("ResourceManager — mineIncome returns 2 SandCrystal for CrystalMine") {
+    ResourceManager rm;
+    rm.load("data");
+    ResourcePool income = rm.mineIncome(ObjType::CrystalMine);
+    CHECK_EQ(income[Resource::SandCrystal], 2);
+    CHECK_EQ(income[Resource::Gold], 0);
+}
+
+SUITE("ResourceManager — mineIncome returns empty pool for non-mine type") {
+    ResourceManager rm;
+    rm.load("data");
+    ResourcePool income = rm.mineIncome(ObjType::Dungeon);
+    bool allZero = true;
+    for (int i = 0; i < RESOURCE_COUNT; ++i)
+        if (income[static_cast<Resource>(i)] != 0) { allZero = false; break; }
+    CHECK(allZero);
+}
+
+SUITE("ResourceManager — mineIncome GoldMine has zero non-gold resources") {
+    ResourceManager rm;
+    rm.load("data");
+    ResourcePool income = rm.mineIncome(ObjType::GoldMine);
+    CHECK_EQ(income[Resource::SandCrystal], 0);
+    CHECK_EQ(income[Resource::BoneDust],    0);
+}
+
 #endif // RESOURCE_MANAGER_IMPL

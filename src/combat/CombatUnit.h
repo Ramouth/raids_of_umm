@@ -1,6 +1,6 @@
 #pragma once
-#include "entities/UnitType.h"
-#include "entities/SCDef.h"
+#include "world/UnitType.h"
+#include "world/SCDef.h"
 #include "hex/HexCoord.h"
 #include <map>
 #include <string>

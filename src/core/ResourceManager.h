@@ -1,5 +1,5 @@
 #pragma once
-#include "entities/UnitType.h"
+#include "world/UnitType.h"
 #include "world/SpellDef.h"
 #include "world/WondrousItem.h"
 #include "world/MapObject.h"
