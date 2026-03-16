@@ -24,26 +24,40 @@ void CombatRenderer::init() {
     m_hexRenderer.loadTerrainTextures("assets");  // loads sand.png if present
 
     // ── Unit sprites — one AnimatedSprite per unit/SC id ─────────────────────
-    // Helper: init a sprite with the standard single-frame combat clips.
-    auto makeUnitSprite = [](const char* path) {
+    // Helper: init a sprite with single-frame combat clips (used for units without
+    // a dedicated animated sheet — still participates in clip state machine).
+    auto makeUnitSprite = [](const char* path, int frames = 1) {
         auto s = std::make_unique<AnimatedSprite>();
         s->init();
-        s->loadSprite(path, 1);
-        s->addClip("idle",   {0, 1, 6.0f,  true });
-        s->addClip("walk",   {0, 1, 8.0f,  true });
-        s->addClip("attack", {0, 1, 12.0f, false});
-        s->addClip("die",    {0, 1, 8.0f,  false});
+        s->loadSprite(path, frames);
+        s->addClip("idle",   {0, frames, 6.0f,  true });
+        s->addClip("walk",   {0, frames, 8.0f,  true });
+        s->addClip("attack", {0, frames, 12.0f, false});
+        s->addClip("die",    {0, frames, 8.0f,  false});
+        s->play("idle");
+        return s;
+    };
+
+    // Helper for the animated armoured_warrior sheet (idle 0-3, walk 4-7, 64×64 frames).
+    auto makeWarriorSprite = []() {
+        auto s = std::make_unique<AnimatedSprite>();
+        s->init();
+        s->loadSprite("assets/textures/units/armoured_warrior_anim.png", 8);
+        s->addClip("idle",   {0, 4, 6.0f,  true });
+        s->addClip("walk",   {4, 4, 10.0f, true });
+        s->addClip("attack", {4, 4, 12.0f, false});
+        s->addClip("die",    {0, 4, 6.0f,  false});
         s->play("idle");
         return s;
     };
 
     // Fallbacks for any unit without a dedicated sprite.
     m_fallbackPlayerSprite.init();
-    m_fallbackPlayerSprite.loadSprite("assets/textures/units/armoured_warrior.png", 1);
-    m_fallbackPlayerSprite.addClip("idle",   {0, 1, 6.0f,  true });
-    m_fallbackPlayerSprite.addClip("walk",   {0, 1, 8.0f,  true });
-    m_fallbackPlayerSprite.addClip("attack", {0, 1, 12.0f, false});
-    m_fallbackPlayerSprite.addClip("die",    {0, 1, 8.0f,  false});
+    m_fallbackPlayerSprite.loadSprite("assets/textures/units/armoured_warrior_anim.png", 8);
+    m_fallbackPlayerSprite.addClip("idle",   {0, 4, 6.0f,  true });
+    m_fallbackPlayerSprite.addClip("walk",   {4, 4, 10.0f, true });
+    m_fallbackPlayerSprite.addClip("attack", {4, 4, 12.0f, false});
+    m_fallbackPlayerSprite.addClip("die",    {0, 4, 6.0f,  false});
     m_fallbackPlayerSprite.play("idle");
 
     m_fallbackEnemySprite.init();
@@ -54,14 +68,17 @@ void CombatRenderer::init() {
     m_fallbackEnemySprite.addClip("die",    {0, 1, 8.0f,  false});
     m_fallbackEnemySprite.play("idle");
 
-    // All known unit sprites. Missing files are silent no-ops.
+    // Animated warrior sprite (shared by armoured_warrior and skeleton_warrior).
+    m_sprites["armoured_warrior"] = makeWarriorSprite();
+    m_sprites["skeleton_warrior"] = makeWarriorSprite();
+
+    // All other unit sprites (single-frame for now).
     static const std::pair<const char*, const char*> kUnitSprites[] = {
         // Units from units.json
         { "mummy",            "assets/textures/units/mummy.png"           },
         { "djinn",            "assets/textures/units/djinn.png"           },
         { "ancient_guardian", "assets/textures/units/ancient_guardian.png"},
         { "pharaoh_lich",     "assets/textures/units/pharaoh_lich.png"    },
-        { "skeleton_warrior", "assets/textures/units/armoured_warrior.png"},
         { "desert_archer",    "assets/textures/units/rider_archer.png"    },
         { "sand_scorpion",    "assets/textures/units/enemy_scout.png"     },
         // SC portraits
@@ -69,7 +86,6 @@ void CombatRenderer::init() {
         { "sekhara",          "assets/textures/units/sekhara.png"         },
         { "khet",             "assets/textures/units/khet.png"            },
         // Extra sprites present in assets
-        { "armoured_warrior", "assets/textures/units/armoured_warrior.png"},
         { "kharim",           "assets/textures/units/kharim.png"          },
         { "rider_archer",     "assets/textures/units/rider_archer.png"    },
         { "rider_banner",     "assets/textures/units/rider_banner.png"    },

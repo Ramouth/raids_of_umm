@@ -140,10 +140,12 @@ void AdventureState::onEnter() {
 
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
+    // Hero: combined 8-frame sheet — idle(0-3) then walk(4-7), each 64×64.
+    // Full sheet dimensions: 512×64.
     m_heroSprite.init();
-    m_heroSprite.loadSprite("assets/textures/units/armoured_warrior.png", 1);
-    m_heroSprite.addClip("idle", {0, 1, 6.0f,  true});
-    m_heroSprite.addClip("walk", {0, 1, 8.0f,  true});
+    m_heroSprite.loadSprite("assets/textures/units/armoured_warrior_anim.png", 8);
+    m_heroSprite.addClip("idle", {0, 4, 6.0f,  true});
+    m_heroSprite.addClip("walk", {4, 4, 10.0f, true});
     m_heroSprite.play("idle");
     m_dungeonSpriteRenderer.init();
     m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
