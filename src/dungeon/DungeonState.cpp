@@ -65,14 +65,24 @@ void DungeonState::onEnter() {
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures("assets");
 
+    // Hero: same 8-frame sheet as adventure map (idle 0-3, walk 4-7).
     m_heroSprite.init();
-    m_heroSprite.loadSprite("assets/textures/units/armoured_warrior.png");
+    m_heroSprite.loadSprite("assets/textures/units/armoured_warrior_anim.png", 8);
+    m_heroSprite.addClip("idle", {0, 4, 6.0f,  true});
+    m_heroSprite.addClip("walk", {4, 4, 10.0f, true});
+    m_heroSprite.play("idle");
 
+    // Enemy guard: single-frame idle loop for now.
     m_enemySprite.init();
-    m_enemySprite.loadSprite("assets/textures/units/enemy_scout.png");
+    m_enemySprite.loadSprite("assets/textures/units/enemy_scout.png", 1);
+    m_enemySprite.addClip("idle", {0, 1, 6.0f, true});
+    m_enemySprite.play("idle");
 
+    // Dungeon SC portrait: single-frame idle loop for now.
     m_scSprite.init();
-    m_scSprite.loadSprite("assets/textures/units/kharim.png");
+    m_scSprite.loadSprite("assets/textures/units/kharim.png", 1);
+    m_scSprite.addClip("idle", {0, 1, 6.0f, true});
+    m_scSprite.play("idle");
 
     m_hud.init();
 
@@ -404,7 +414,9 @@ void DungeonState::update(float dt) {
     glm::vec3 delta = m_heroTargetPos - m_heroRenderPos;
     float dist = glm::length(delta);
 
+    bool isWalking = false;
     if (dist > 0.001f) {
+        isWalking = true;
         float t = std::min(HERO_MOVE_SPEED * dt / dist, 1.f);
         m_heroRenderPos += delta * t;
     } else if (!m_moveQueue.empty() &&
@@ -414,12 +426,19 @@ void DungeonState::update(float dt) {
         float hx, hz;
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.f, hz };
+        isWalking = true;
     } else {
         if (m_hasPendingVisit) {
             onHeroVisit(m_pendingVisit);
             m_hasPendingVisit = false;
         }
     }
+
+    // Advance all sprite animations.
+    m_heroSprite.play(isWalking ? "walk" : "idle");
+    m_heroSprite.update(dt);
+    m_enemySprite.update(dt);
+    m_scSprite.update(dt);
 }
 
 // ── Post-combat result overlay ─────────────────────────────────────────────────

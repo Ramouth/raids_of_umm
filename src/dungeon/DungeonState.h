@@ -7,7 +7,7 @@
 #include "hero/Hero.h"
 #include "world/WorldMap.h"
 #include "render/HexRenderer.h"
-#include "render/SpriteRenderer.h"
+#include "render/AnimatedSprite.h"
 #include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
 #include "hex/HexCoord.h"
@@ -64,9 +64,9 @@ private:
     Camera2D m_cam;
 
     HexRenderer    m_hexRenderer;
-    SpriteRenderer m_heroSprite;
-    SpriteRenderer m_enemySprite;
-    SpriteRenderer m_scSprite;
+    AnimatedSprite m_heroSprite;
+    AnimatedSprite m_enemySprite;
+    AnimatedSprite m_scSprite;
     HUDRenderer    m_hud;
 
     std::optional<SpecialCharacter> m_dungeonSC;
