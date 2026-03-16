@@ -23,12 +23,42 @@ void CombatRenderer::init() {
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures("assets");  // loads sand.png if present
 
-    // ── Unit sprites (placeholder textures — swap when ResourceManager exists) ─
-    m_playerSprite.init();
-    m_playerSprite.loadSprite("assets/textures/units/rider_archer.png");
+    // ── Unit sprites — one SpriteRenderer per unit/SC id ─────────────────────
+    // Fallbacks for any unit without a dedicated sprite.
+    m_fallbackPlayerSprite.init();
+    m_fallbackPlayerSprite.loadSprite("assets/textures/units/armoured_warrior.png");
+    m_fallbackEnemySprite.init();
+    m_fallbackEnemySprite.loadSprite("assets/textures/units/enemy_scout.png");
 
-    m_enemySprite.init();
-    m_enemySprite.loadSprite("assets/textures/units/enemy_scout.png");
+    // All known unit sprites. Missing files are silent no-ops (SpriteRenderer::draw
+    // returns immediately when m_tex == 0, falling back to tinted hex outline).
+    static const std::pair<const char*, const char*> kUnitSprites[] = {
+        // Units from units.json
+        { "mummy",            "assets/textures/units/mummy.png"           },
+        { "djinn",            "assets/textures/units/djinn.png"           },
+        { "ancient_guardian", "assets/textures/units/ancient_guardian.png"},
+        { "pharaoh_lich",     "assets/textures/units/pharaoh_lich.png"    },
+        { "skeleton_warrior", "assets/textures/units/armoured_warrior.png"},
+        { "desert_archer",    "assets/textures/units/rider_archer.png"    },
+        { "sand_scorpion",    "assets/textures/units/enemy_scout.png"     },
+        // SC portraits
+        { "ushari",           "assets/textures/units/ushari.png"          },
+        { "sekhara",          "assets/textures/units/sekhara.png"         },
+        { "khet",             "assets/textures/units/khet.png"            },
+        // Extra sprites present in assets
+        { "armoured_warrior", "assets/textures/units/armoured_warrior.png"},
+        { "kharim",           "assets/textures/units/kharim.png"          },
+        { "rider_archer",     "assets/textures/units/rider_archer.png"    },
+        { "rider_banner",     "assets/textures/units/rider_banner.png"    },
+        { "rider_knight",     "assets/textures/units/rider_knight.png"    },
+        { "rider_lance",      "assets/textures/units/rider_lance.png"     },
+    };
+    for (const auto& [id, path] : kUnitSprites) {
+        auto sr = std::make_unique<SpriteRenderer>();
+        sr->init();
+        sr->loadSprite(path);
+        m_sprites[id] = std::move(sr);
+    }
 
     // ── 2D UI overlay ─────────────────────────────────────────────────────────
     m_uiShader = Shader("assets/shaders/ui.vert", "assets/shaders/ui.frag");
@@ -113,7 +143,7 @@ void CombatRenderer::render(int screenW, int screenH,
             unit.pos.toWorld(HEX_SIZE, wx, wz);
             pos = { wx, 0.0f, wz };
         }
-        m_playerSprite.draw(pos, HEX_SIZE * 0.85f, view, proj);
+        spriteFor(unit)->draw(pos, HEX_SIZE * 0.85f, view, proj);
     }
     for (int i = 0; i < static_cast<int>(engine.enemyArmy().stacks.size()); ++i) {
         const auto& unit = engine.enemyArmy().stacks[i];
@@ -126,7 +156,7 @@ void CombatRenderer::render(int screenW, int screenH,
             unit.pos.toWorld(HEX_SIZE, wx, wz);
             pos = { wx, 0.0f, wz };
         }
-        m_enemySprite.draw(pos, HEX_SIZE * 0.85f, view, proj);
+        spriteFor(unit)->draw(pos, HEX_SIZE * 0.85f, view, proj);
     }
 
     // ── 2D pass: action panel ─────────────────────────────────────────────────
@@ -135,6 +165,22 @@ void CombatRenderer::render(int screenW, int screenH,
 
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+}
+
+// ── Sprite lookup ─────────────────────────────────────────────────────────────
+
+SpriteRenderer* CombatRenderer::spriteFor(const CombatUnit& unit) {
+    // SC portrait takes priority
+    if (unit.isSpecialCharacter && !unit.scId.empty()) {
+        auto it = m_sprites.find(unit.scId);
+        if (it != m_sprites.end()) return it->second.get();
+    }
+    // Regular unit type sprite
+    if (unit.type) {
+        auto it = m_sprites.find(unit.type->id);
+        if (it != m_sprites.end()) return it->second.get();
+    }
+    return unit.isPlayer ? &m_fallbackPlayerSprite : &m_fallbackEnemySprite;
 }
 
 // ── Tile colour logic ─────────────────────────────────────────────────────────

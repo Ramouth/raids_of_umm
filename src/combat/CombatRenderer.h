@@ -8,6 +8,9 @@
 #include "hex/HexCoord.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 /*
@@ -68,10 +71,16 @@ private:
     void renderActionPanel(int screenW, int screenH);
     void drawRect2D(float x, float y, float w, float h, const glm::vec4& color);
 
+    // Returns the sprite for a unit, falling back to a default if not found.
+    SpriteRenderer* spriteFor(const CombatUnit& unit);
+
     // ── 3D hex + sprite rendering ─────────────────────────────────────────────
-    HexRenderer    m_hexRenderer;
-    SpriteRenderer m_playerSprite;
-    SpriteRenderer m_enemySprite;
+    HexRenderer m_hexRenderer;
+
+    // Per-unit-type sprites keyed by unit id or SC id.
+    std::unordered_map<std::string, std::unique_ptr<SpriteRenderer>> m_sprites;
+    SpriteRenderer m_fallbackPlayerSprite;  // used when unit id has no dedicated sprite
+    SpriteRenderer m_fallbackEnemySprite;
 
     // ── 2D UI overlay ─────────────────────────────────────────────────────────
     GLuint m_uiVao = 0;
