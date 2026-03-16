@@ -196,5 +196,62 @@
       "meshId": "pharaoh_lich",
       "textureId": "pharaoh_lich"
     }
+    ,
+    {
+      "id": "sand_wraith",
+      "name": "Sand Wraith",
+      "description": "Elemental spirits of sandstorm and wind. Semi-corporeal — weapons pass through them as through smoke, but their touch scours flesh from bone.",
+      "tier": 1,
+      "attack": 4,
+      "defense": 2,
+      "minDamage": 1,
+      "maxDamage": 3,
+      "hitPoints": 8,
+      "speed": 9,
+      "moveRange": 6,
+      "shots": 0,
+      "weeklyGrowth": 14,
+      "cost": {
+        "Gold": 70,
+        "BoneDust": 0,
+        "SandCrystal": 0,
+        "DjinnEssence": 1,
+        "AncientRelic": 0,
+        "MercuryTears": 0,
+        "Amber": 0
+      },
+      "attackType": "magical",
+      "abilities": ["flying", "incorporeal"],
+      "meshId": "sand_wraith",
+      "textureId": "sand_wraith"
+    },
+    {
+      "id": "storm_caller",
+      "name": "Storm Caller",
+      "description": "Djinn war-casters who have learned to focus the desert tempest into bolts of raw lightning. Their ranged strikes bypass all earthly armour.",
+      "tier": 4,
+      "attack": 11,
+      "defense": 7,
+      "minDamage": 5,
+      "maxDamage": 10,
+      "hitPoints": 35,
+      "speed": 7,
+      "moveRange": 4,
+      "shots": 12,
+      "weeklyGrowth": 4,
+      "cost": {
+        "Gold": 450,
+        "BoneDust": 0,
+        "SandCrystal": 1,
+        "DjinnEssence": 1,
+        "AncientRelic": 0,
+        "MercuryTears": 0,
+        "Amber": 0
+      },
+      "attackType": "magical",
+      "abilities": ["flying", "chain_lightning"],
+      "meshId": "storm_caller",
+      "textureId": "storm_caller"
+    }
   ]
 }

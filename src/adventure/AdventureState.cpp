@@ -341,7 +341,13 @@ void AdventureState::onResume() {
 }
 
 void AdventureState::initMap() {
-    m_map.generateProcedural(12, /*seed=*/0);
+    // Try the canonical map first; fall back to procedural if missing.
+    if (auto err = m_map.loadJson("data/maps/default.json")) {
+        // Canonical map not found — generate procedurally as fallback.
+        m_map.generateProcedural(12, /*seed=*/0);
+    } else {
+        m_mapPath = "data/maps/default.json";
+    }
 }
 
 // ── Game logic ────────────────────────────────────────────────────────────────

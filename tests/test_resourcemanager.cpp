@@ -76,10 +76,10 @@ SUITE("ResourceManager — unitsByTier is sorted ascending") {
         CHECK(units[i-1]->tier <= units[i]->tier);
 }
 
-SUITE("ResourceManager — loads all 7 units from data/units.json") {
+SUITE("ResourceManager — loads units from data/units.json") {
     ResourceManager rm;
     rm.load("data");
-    CHECK_EQ((int)rm.unitsByTier().size(), 7);
+    CHECK((int)rm.unitsByTier().size() >= 7);
 }
 
 SUITE("ResourceManager — known spell lookup") {

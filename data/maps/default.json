@@ -1,0 +1,1409 @@
+{
+  "version": 1,
+  "name": "The Sands of Umm'Natur",
+  "radius": 7,
+  "tiles": [
+    {
+      "q": -7,
+      "r": 0,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 1,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 5,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 6,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -7,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": -1,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -6,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": -2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": -1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -5,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": -3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": -2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": -1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -4,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": -4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": -3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": -2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": -1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": -3,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": -5,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": -4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": -3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": -2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": -1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 0,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 3,
+      "terrain": "ruins",
+      "passable": true,
+      "moveCost": 1.1,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 4,
+      "terrain": "ruins",
+      "passable": true,
+      "moveCost": 1.1,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -2,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -6,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": -1,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 0,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": -1,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -2,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": -1,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 0,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 0,
+      "r": 7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -2,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": -1,
+      "terrain": "oasis",
+      "passable": true,
+      "moveCost": 1.2,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 0,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 1,
+      "r": 6,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -6,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -5,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -4,
+      "terrain": "ruins",
+      "passable": true,
+      "moveCost": 1.1,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -3,
+      "terrain": "ruins",
+      "passable": true,
+      "moveCost": 1.1,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": -1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 0,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 4,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 2,
+      "r": 5,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": -1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": 3,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 3,
+      "r": 4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": -1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": 2,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 4,
+      "r": 3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": -1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": 1,
+      "terrain": "sand",
+      "passable": true,
+      "moveCost": 1.0,
+      "variant": 0
+    },
+    {
+      "q": 5,
+      "r": 2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -6,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -5,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -4,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -3,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -2,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": -1,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": 0,
+      "terrain": "dune",
+      "passable": true,
+      "moveCost": 1.3,
+      "variant": 0
+    },
+    {
+      "q": 6,
+      "r": 1,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -7,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -6,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -5,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -4,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -3,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -2,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": -1,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    },
+    {
+      "q": 7,
+      "r": 0,
+      "terrain": "mountain",
+      "passable": false,
+      "moveCost": 1.8,
+      "variant": 0
+    }
+  ],
+  "objects": [
+    {
+      "type": "town",
+      "name": "Khemret",
+      "q": -5,
+      "r": 1
+    },
+    {
+      "type": "gold_mine",
+      "name": "Western Gold Mine",
+      "q": -4,
+      "r": -1
+    },
+    {
+      "type": "town",
+      "name": "Tharakh",
+      "q": 5,
+      "r": -1
+    },
+    {
+      "type": "gold_mine",
+      "name": "Eastern Gold Mine",
+      "q": 4,
+      "r": 1
+    },
+    {
+      "type": "dungeon",
+      "name": "Tomb of Kha'Set",
+      "q": -3,
+      "r": 5
+    },
+    {
+      "type": "dungeon",
+      "name": "Buried Sanctum",
+      "q": 3,
+      "r": -5
+    },
+    {
+      "type": "crystal_mine",
+      "name": "Oasis Crystal Mine",
+      "q": 0,
+      "r": -1
+    },
+    {
+      "type": "artifact",
+      "name": "Eye of Djangjix",
+      "q": 0,
+      "r": 0
+    }
+  ]
+}
