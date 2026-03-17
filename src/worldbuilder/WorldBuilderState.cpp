@@ -84,8 +84,8 @@ void WorldBuilderState::onEnter() {
     }
 
     std::cout << "[WorldBuilder] Ready.\n";
-    std::cout << "  Tab=cycle tool  1-6=terrain  O=obj type\n";
-    std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new  P=test-play  ESC=quit\n";
+    std::cout << "  Tab=cycle tool  1-0=terrain(desert)  G/F/H=Grass/Forest/Highland  O=obj type\n";
+    std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new blank map  P=test-play  ESC=quit\n";
     std::cout << "  F1=alignment editor\n";
     renderHUD();
 }
@@ -101,9 +101,10 @@ void WorldBuilderState::onExit() {
 // ── Map operations ────────────────────────────────────────────────────────────
 
 void WorldBuilderState::newMap(int radius) {
-    m_map.generateProcedural(radius);
+    m_map.clear(radius);
+    m_map.setName("Untitled Map");
     m_dirty = false;
-    std::cout << "[WorldBuilder] New procedural map, radius " << radius
+    std::cout << "[WorldBuilder] New blank map, radius " << radius
               << "  (" << m_map.tileCount() << " tiles)\n";
     renderHUD();
 }
@@ -461,6 +462,12 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         if (sym == SDLK_8) { m_paintTerrain = Terrain::River;    m_palette.selectTerrain(Terrain::River);    renderHUD(); return true; }
         if (sym == SDLK_9) { m_paintTerrain = Terrain::Wall;     m_palette.selectTerrain(Terrain::Wall);     renderHUD(); return true; }
         if (sym == SDLK_0) { m_paintTerrain = Terrain::Battle;   m_palette.selectTerrain(Terrain::Battle);   renderHUD(); return true; }
+        // ── Verdant terrain shortcuts (G/F/H — only when dev tool inactive) ─
+        if (!m_devToolActive) {
+            if (sym == SDLK_g) { m_paintTerrain = Terrain::Grass;    m_palette.selectTerrain(Terrain::Grass);    renderHUD(); return true; }
+            if (sym == SDLK_f) { m_paintTerrain = Terrain::Forest;   m_palette.selectTerrain(Terrain::Forest);   renderHUD(); return true; }
+            if (sym == SDLK_h) { m_paintTerrain = Terrain::Highland; m_palette.selectTerrain(Terrain::Highland); renderHUD(); return true; }
+        }
 
         // ── Object type / test-play ──────────────────────────────────────────
         if (sym == SDLK_o && !m_ctrlHeld) { cyclePlaceObjType(+1); return true; }
