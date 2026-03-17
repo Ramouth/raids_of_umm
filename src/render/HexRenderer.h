@@ -47,6 +47,9 @@ public:
     // Returns 0 if no texture was loaded for this terrain.
     GLuint terrainTex(Terrain t, int variant = 0) const;
 
+    // Road overlay texture (assets/textures/terrain/road.png). Returns 0 if not loaded.
+    GLuint roadTex() const { return m_roadTex; }
+
     // How many variants were loaded for this terrain (0 = none, falls back to colour).
     int terrainVariantCount(Terrain t) const;
 
@@ -82,6 +85,7 @@ private:
     GLuint  m_lineVao = 0;
     GLuint  m_lineVbo = 0;
     GLuint  m_whiteTex = 0;
+    GLuint  m_roadTex  = 0;
     GLuint  m_terrainTex[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS] = {};
     int     m_variantCount[TERRAIN_COUNT] = {};
 

@@ -988,9 +988,11 @@ void AdventureState::render() {
 void AdventureState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
-        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
-        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
-        if (tile.road) color = glm::mix(color, roadColor(), 0.55f);
+        GLuint tex      = tile.road ? m_hexRenderer.roadTex()
+                                    : m_hexRenderer.terrainTex(tile.terrain);
+        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f)
+                        : tile.road  ? glm::mix(terrainColor(tile.terrain), roadColor(), 0.55f)
+                                     : terrainColor(tile.terrain);
         float h         = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
     }

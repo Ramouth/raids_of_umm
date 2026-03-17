@@ -68,6 +68,7 @@ HexRenderer::~HexRenderer() {
     if (m_lineVbo) glDeleteBuffers(1, &m_lineVbo);
     if (m_lineVao) glDeleteVertexArrays(1, &m_lineVao);
     if (m_whiteTex) glDeleteTextures(1, &m_whiteTex);
+    if (m_roadTex)  glDeleteTextures(1, &m_roadTex);
     for (auto& row : m_terrainTex)
         for (GLuint& t : row)
             if (t) { glDeleteTextures(1, &t); t = 0; }
@@ -156,6 +157,11 @@ void HexRenderer::loadTerrainTextures(const std::string& assetRoot) {
             }
         }
     }
+
+    // Road overlay texture — single file, not terrain-type-based.
+    fs::path roadPath = fs::path(assetRoot) / "textures" / "terrain" / "road.png";
+    if (fs::is_regular_file(roadPath))
+        m_roadTex = loadTexturePNG(roadPath.string());
 }
 
 GLuint HexRenderer::terrainTex(Terrain t, int variant) const {
