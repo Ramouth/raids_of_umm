@@ -72,6 +72,8 @@ HexRenderer::~HexRenderer() {
     for (auto& row : m_terrainTex)
         for (GLuint& t : row)
             if (t) { glDeleteTextures(1, &t); t = 0; }
+    for (GLuint& t : m_grassSandEdgeTex)
+        if (t) { glDeleteTextures(1, &t); t = 0; }
 }
 
 void HexRenderer::init() {
@@ -174,6 +176,30 @@ GLuint HexRenderer::terrainTex(Terrain t, int variant) const {
 
 int HexRenderer::terrainVariantCount(Terrain t) const {
     return m_variantCount[static_cast<int>(t)];
+}
+
+void HexRenderer::loadEdgeTiles(const std::string& assetRoot) {
+    namespace fs = std::filesystem;
+    // File names per direction: 0=E 1=NE 2=NW 3=W 4=SW 5=SE
+    static const char* const FILENAMES[EDGE_DIR_COUNT] = {
+        "gs_left_right.png",   // 0: E  — grass left, sand right
+        "gs_edge_ne.png",      // 1: NE — grass lower-left, sand upper-right
+        "gs_edge_nw.png",      // 2: NW — grass lower-right, sand upper-left
+        "gs_edge_w.png",       // 3: W  — grass right, sand left
+        "gs_diag_topright.png",// 4: SW — grass upper-right, sand lower-left
+        "gs_diag_topleft.png", // 5: SE — grass upper-left, sand lower-right
+    };
+    fs::path dir = fs::path(assetRoot) / "textures" / "terrain" / "grass_sand_edge";
+    for (int i = 0; i < EDGE_DIR_COUNT; ++i) {
+        fs::path p = dir / FILENAMES[i];
+        if (fs::is_regular_file(p))
+            m_grassSandEdgeTex[i] = loadTexturePNG(p.string());
+    }
+}
+
+GLuint HexRenderer::grassSandEdgeTex(int dir) const {
+    if (dir < 0 || dir >= EDGE_DIR_COUNT) return 0;
+    return m_grassSandEdgeTex[dir];
 }
 
 void HexRenderer::buildWhiteTexture() {

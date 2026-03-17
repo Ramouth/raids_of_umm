@@ -171,6 +171,7 @@ void AdventureState::onEnter() {
 
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
+    m_hexRenderer.loadEdgeTiles();
     // Hero: combined 8-frame sheet — idle(0-3) then walk(4-7), each 64×64.
     // Full sheet dimensions: 512×64.
     m_heroSprite.init();
@@ -1231,13 +1232,26 @@ void AdventureState::renderTerrain() {
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, 0, {off.dx, off.dz});
     }
 
-    // Pass 2: textured overlay with feathered alpha so adjacent variants
-    // blend through the shared dither base rather than hard-cutting.
+    // Helper: first sand/dune neighbour direction, -1 if none.
+    auto sandNeighborDir = [&](const HexCoord& coord) -> int {
+        static constexpr int PRIORITY[6] = {0, 5, 4, 1, 2, 3};
+        for (int i : PRIORITY) {
+            const MapTile* nb = m_map.tileAt(coord.neighbor(i));
+            if (nb && (nb->terrain == Terrain::Sand || nb->terrain == Terrain::Dune))
+                return i;
+        }
+        return -1;
+    };
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthFunc(GL_LEQUAL);
+
+    // Pass 2: soft-edge textured overlay (skip grass tiles that get edge tiles in Pass 3).
     for (const auto& [coord, tile] : m_map) {
         if (!m_visible.count(coord)) continue;
+        if (tile.terrain == Terrain::Grass && !tile.road && sandNeighborDir(coord) >= 0)
+            continue;
         GLuint tex = tile.road ? m_hexRenderer.roadTex()
                                : m_hexRenderer.terrainTex(tile.terrain);
         if (!tex) continue;
@@ -1245,6 +1259,19 @@ void AdventureState::renderTerrain() {
         float h = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true);
     }
+
+    // Pass 3: HoMM3-style directional grass↔sand edge tiles.
+    for (const auto& [coord, tile] : m_map) {
+        if (!m_visible.count(coord)) continue;
+        if (tile.terrain != Terrain::Grass || tile.road) continue;
+        int dir = sandNeighborDir(coord);
+        if (dir < 0) continue;
+        GLuint edgeTex = m_hexRenderer.grassSandEdgeTex(dir);
+        if (!edgeTex) continue;
+        float h = terrainHeight(tile.terrain);
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, edgeTex, {0.0f, 0.0f});
+    }
+
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
 

@@ -25,6 +25,7 @@ void WorldBuilderState::onEnter() {
     m_cam = Camera2D(app.width(), app.height());
     m_hexRenderer.init();
     m_hexRenderer.loadTerrainTextures();
+    m_hexRenderer.loadEdgeTiles();
     m_hud.init();
     m_townSpriteRenderer.init();
     m_townSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
@@ -488,15 +489,17 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     }
 
     if (e->type == SDL_MOUSEWHEEL) {
-        if (m_palette.containsPoint(e->wheel.x)) {
-            m_palette.scroll(-e->wheel.y * 3);
+        int delta = (e->wheel.direction == SDL_MOUSEWHEEL_FLIPPED) ? -e->wheel.y : e->wheel.y;
+        if (m_palette.containsPoint(m_lastMouseX)) {
+            m_palette.scroll(-delta * 40);
         } else {
-            m_cam.adjustZoom(-e->wheel.y * Camera2D::ZOOM_STEP);
+            m_cam.adjustZoom(-delta * Camera2D::ZOOM_STEP);
         }
         return true;
     }
 
     if (e->type == SDL_MOUSEMOTION) {
+        m_lastMouseX = e->motion.x;
         if (m_palDragging) {
             // Drag-scrolling the palette
             int delta = e->motion.y - m_palDragStartY;
@@ -620,6 +623,18 @@ void WorldBuilderState::render() {
 }
 
 void WorldBuilderState::renderTerrain() {
+    // Helper: return first direction (priority E→SE→SW→NE→NW→W) where a sand/dune
+    // neighbour exists. Returns -1 if no such neighbour.
+    auto sandNeighborDir = [&](const HexCoord& coord) -> int {
+        static constexpr int PRIORITY[6] = {0, 5, 4, 1, 2, 3};
+        for (int i : PRIORITY) {
+            const MapTile* nb = m_map.tileAt(coord.neighbor(i));
+            if (nb && (nb->terrain == Terrain::Sand || nb->terrain == Terrain::Dune))
+                return i;
+        }
+        return -1;
+    };
+
     // Pass 1: solid dither base for every tile (no texture).
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
@@ -627,18 +642,35 @@ void WorldBuilderState::renderTerrain() {
         m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, 0, {off.dx, off.dz});
     }
 
-    // Pass 2: textured overlay with feathered alpha so adjacent variants
-    // blend through the shared dither base rather than hard-cutting.
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthFunc(GL_LEQUAL);
+
+    // Pass 2: soft-edge textured overlay for interior tiles (skip grass on sand border —
+    // those get a dedicated directional edge tile in Pass 3).
     for (const auto& [coord, tile] : m_map) {
+        if (tile.terrain == Terrain::Grass && sandNeighborDir(coord) >= 0)
+            continue;
         GLuint tex = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
         if (!tex) continue;
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true);
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex,
+                                {off.dx, off.dz}, 0, /*softEdge=*/true);
     }
+
+    // Pass 3: HoMM3-style directional grass↔sand edge tiles.
+    for (const auto& [coord, tile] : m_map) {
+        if (tile.terrain != Terrain::Grass) continue;
+        int dir = sandNeighborDir(coord);
+        if (dir < 0) continue;
+        GLuint edgeTex = m_hexRenderer.grassSandEdgeTex(dir);
+        if (!edgeTex) continue;
+        float h = terrainHeight(tile.terrain);
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, edgeTex,
+                                {0.0f, 0.0f});
+    }
+
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
 

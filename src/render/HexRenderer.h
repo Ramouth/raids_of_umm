@@ -53,6 +53,15 @@ public:
     // How many variants were loaded for this terrain (0 = none, falls back to colour).
     int terrainVariantCount(Terrain t) const;
 
+    // Load HoMM3-style directional terrain edge tiles.
+    // Expects assets/textures/terrain/grass_sand_edge/ with files named for each direction.
+    void loadEdgeTiles(const std::string& assetRoot = "assets");
+
+    // Returns the directional edge texture for grass→sand boundary.
+    // dir: 0=E 1=NE 2=NW 3=W 4=SW 5=SE (matches HexCoord::directions() order).
+    // Returns 0 if not loaded.
+    GLuint grassSandEdgeTex(int dir) const;
+
     // Draw a hex shape centred on the axial coordinate.
     // visualScale: size of the drawn hex (< worldHexSize → token, == worldHexSize → terrain tile).
     // height:      Y offset in world units.
@@ -93,6 +102,10 @@ private:
     GLuint  m_roadTex  = 0;
     GLuint  m_terrainTex[TERRAIN_COUNT][MAX_TERRAIN_VARIANTS] = {};
     int     m_variantCount[TERRAIN_COUNT] = {};
+
+    // Grass→sand directional edge tiles, indexed by HexCoord direction (0-5).
+    static constexpr int EDGE_DIR_COUNT = 6;
+    GLuint  m_grassSandEdgeTex[EDGE_DIR_COUNT] = {};
 
     glm::mat4 m_viewProj{1.0f};
     float     m_worldHexSize = 1.0f; // used for toWorld() positioning
