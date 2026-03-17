@@ -18,15 +18,18 @@ uniform vec3      u_CameraPos;
 out vec4 FragColor;
 
 void main() {
-    vec3 texColor = texture(u_Texture, v_TexCoord).rgb;
+    vec4 texSample = texture(u_Texture, v_TexCoord);
+    vec3 texColor  = texSample.rgb;
     vec3 color;
 
     if (u_Textured != 0) {
         // ── Pixel-art terrain tile ────────────────────────────────────────────
-        // Use the authored texture colors directly — the artist-lit pixel art
-        // already encodes its own shading. Diffuse lighting would shift the
-        // carefully chosen palette and wash out the art.
-        color = texColor * v_Color;
+        // Alpha-blend texture over the solid base terrain colour.
+        // Opaque textures (sand, rock — alpha=1.0 everywhere) behave exactly
+        // as before.  Transparent overlay textures (grass, forest) let the
+        // solid terrain colour show through the clear areas, giving a softer
+        // "painted over" look without hard pixel edges.
+        color = mix(v_Color, texColor * v_Color, texSample.a);
 
         // Very faint hex-edge darkening — just enough to read tile boundaries
         // without overwriting the pixel art edge detail.
