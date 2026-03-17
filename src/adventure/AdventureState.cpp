@@ -189,8 +189,8 @@ void AdventureState::onEnter() {
     if (auto err = m_offsets.load("assets/render_offsets.json"))
         std::cerr << "[Adventure] Offsets load warning: " << *err << "\n";
 
-    // Place hero at origin; ensure it's passable.
-    m_hero.pos = {0, 0};
+    // Place hero at Khemret (west starting town).
+    m_hero.pos = {-5, 1};
     if (MapTile* t = m_map.tileAt(m_hero.pos))
         t->passable = true;
 

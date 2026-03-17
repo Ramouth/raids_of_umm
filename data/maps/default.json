@@ -1402,8 +1402,8 @@
     {
       "type": "artifact",
       "name": "Eye of Djangjix",
-      "q": 0,
-      "r": 0
+      "q": -2,
+      "r": 3
     }
   ]
 }

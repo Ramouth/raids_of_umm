@@ -8,9 +8,12 @@
 
 ## Vision
 
-**Warcraft 3 meets HoMM3 in the Egyptian desert.**
-Solid multiplayer (2–3 factions, two win conditions) built on top of a hand-crafted campaign.
-See `Factions.md` for full faction design and `Factions.md#open-questions` for decisions still needed.
+**Six factions race to claim the Crown of Pha'raxh** — an artifact that commands
+all Djinns, sealed inside a fallen empire's capital. Two win conditions: military
+elimination or assembling the Eye of Djangjix shards to unlock the vault.
+
+See `Factions.md` for full faction design and lore.
+See `economy.md` for economy decisions and implementation plan.
 
 ---
 
@@ -33,29 +36,39 @@ See `Factions.md` for full faction design and `Factions.md#open-questions` for d
 - [x] Main menu — New Game / Continue / World Builder / Quit; Continue greyed when no save exists
 - [x] ESC exit prompt — Save & Exit / Exit / Cancel (optional save on leaving adventure)
 - [x] Animated sprites — AnimatedSprite + clip state machine across adventure, dungeon, combat
+- [x] Canonical map — `data/maps/default.json` with 2 towns, 2 dungeons, 2 gold mines, 1 crystal mine, 1 artifact
+- [x] Hero spawns at Khemret (west starting town), not map origin
+- [x] Faction lore — 6 factions fully designed (Factions.md)
+- [x] Economy design — resources, income, building tree approach, Djinn Manifest system (economy.md)
 
 ---
 
-## Milestone 0 — Stable Test Environment *(do first)*
+## Milestone 1 — Economy Foundation
 
-### Author the Canonical Map
-- Design a fixed map in WorldBuilder, save as `data/maps/default.json`
-- New Game loads it automatically; kills procedural-map instability
-- Must include: 2 towns (one per starting zone), 2 dungeons (Tomb of Kha'Set + Buried Sanctum),
-  2 gold mines, 1 crystal mine, 1 Eye shard artifact
+Implement the economy decisions locked in `economy.md`.
+No balance tuning yet — get the plumbing right first.
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | **Rename resources** | Gold, Wood, Stone, Obsidian, Crystal — update `Resources.h` and all refs | ⬜ |
+| 2 | **Starting resources** | 10,000 gold + 5 Wood + 5 Stone + 2 Obsidian + 2 Crystal | ⬜ |
+| 3 | **Town passive income** | +500 gold/day per owned town | ⬜ |
+| 4 | **New mine types** | Sawmill, Quarry, Obsidian Vent — add to `ObjType`, `buildings.json`, map | ⬜ |
+| 5 | **Update unit costs** | Remap old resource names to new; align costs to faction identity | ⬜ |
+| 6 | **Building tree data** | Author full `buildings.json` (costs, prereqs, unit unlocks) — no gating yet | ⬜ |
 
 ---
 
-## Milestone 1 — Combat & Economy Foundation
+## Milestone 2 — Combat Depth
 
 These must be validated with **heuristic calculations** before building on top of them.
 Target: each match-up produces fights that last 8–15 rounds; no unit is obviously broken.
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | **Unit JSON → engine ability tags** | Full interpretation of `undead`, `poison_strike`, `curse_strike`, `raise_dead`, `flying`, `aura_of_decay` | ⬜ |
-| 2 | **Combat simulation harness** | Headless N-vs-M sim script to generate DPS/survivability tables per unit matchup | ⬜ |
-| 3 | **Economy balance sheet** | Gold income curve vs unit cost; time-to-tier-5 per faction; validated against sim | ⬜ |
+| 1 | **Unit ability tags** | Wire `undead`, `poison_strike`, `curse_strike`, `raise_dead`, `flying`, `consumption` into engine | ⬜ |
+| 2 | **Combat simulation harness** | Headless N-vs-M sim script — DPS/survivability tables per matchup | ⬜ |
+| 3 | **Economy balance sheet** | Income curve vs unit cost; time-to-tier-5 per faction; validated against sim | ⬜ |
 | 4 | **Commander aura** | Passive buff to adjacent stacks (Ushari / Kharim) | ⬜ |
 | 5 | **ZoC (Zone of Control)** | Heavy units lock adjacent enemies — moving past triggers free attack | ⬜ |
 | 6 | **Terrain in combat** | Rubble / High Ground / Pit tiles with move cost + def modifiers | ⬜ |
@@ -63,49 +76,58 @@ Target: each match-up produces fights that last 8–15 rounds; no unit is obviou
 
 ---
 
-## Milestone 2 — Dungeon Narrative
+## Milestone 3 — Dungeon Narrative
 
 Each dungeon tells a self-contained story with SC interaction.
 
 | # | Item |
 |---|------|
 | 1 | Dungeon event sequence — enter → narration panel → optional SC dialogue → encounter |
-| 2 | SC fear / refusal system — certain SCs refuse specific dungeons; affects army composition |
+| 2 | SC fear / refusal system — certain SCs refuse specific dungeons |
 | 3 | Cutscene overlay — text + portrait, ESC to skip |
-| 4 | Per-dungeon loot table and Guard variant tied to dungeon template JSON |
-| 5 | Eye shard as collectible dungeon reward (tracks toward Pact win) |
+| 4 | Per-dungeon loot table and guard variant tied to dungeon template JSON |
+| 5 | Eye shard as collectible dungeon reward (tracks toward Crown win) |
 
 ---
 
-## Milestone 3 — Faction System & Win Conditions
+## Milestone 4 — Faction System & Win Conditions
 
 | # | Item |
 |---|------|
-| 1 | Three factions defined in JSON (Scarab Lords, Tomb Dynasties, Djinn Courts) |
-| 2 | Faction selection on New Game / lobby |
+| 1 | Six factions defined in JSON with unit rosters, resource costs, building trees |
+| 2 | Faction selection on New Game |
 | 3 | Win condition: **Military** (destroy all enemy towns) |
-| 4 | Win condition: **Pact of Djangjix** (collect all Eye shards + deliver to Tomb) |
-| 5 | Faction-specific unit unlocks in Castle (unit availability gated by faction) |
+| 4 | Win condition: **Crown of Pha'raxh** (assemble Eye shards → enter vault → claim Crown) |
+| 5 | Faction-specific unit unlocks (building tree gating wired into CastleState) |
 | 6 | Multiple heroes (hire second hero at castle) |
+| 7 | **Djinn Manifest** — Manifest Fragments, Ritual Town, summoning action |
+| 8 | **Sylvan Host corruption mechanic** — SC corruption arc, ability shift |
 
 ---
 
-## Milestone 4 — Fog of War & Map Exploration
+## Milestone 5 — Fog of War & Map Exploration
 
-*(after canonical map and unit JSON are locked)*
+*(after faction unit JSON is locked)*
 
 - Unexplored tiles fully hidden, vision radius per hero (3 hex default)
 - Mines / dungeons only visible once explored
 - Enemy hero positions visible only within vision range
+- **Iron Conclave advantage** — partial fog-of-war reveal in ruins terrain
 - Fog data stored in session save
 
 ---
 
-## Milestone 5 — Campaign
+## Milestone 6 — Campaign
 
 - Act I: one mission per faction (tutorial-pace, guided objectives)
-- Act II: three missions; faction paths diverge at end
-- Act III: convergence mission — Tomb of Djangjix, SC-driven narrative finale
+  - Ivory Compact: march toward Pha'raxh, first contact with The Veined
+  - Shariw: defend ancestral territory as outside factions pour in
+  - Djinn Courts: race to the Crown before it falls into mortal hands
+  - Sylvan Host: enter the ruins, first corruption beat
+  - Iron Conclave: reach the city before anyone starts asking questions
+  - The Veined: surface for the first time; reclaim what was always yours
+- Act II: faction paths collide over dungeon control; SC fear events begin
+- Act III: convergence — Pha'raxh, the vault, the Crown. Faction-driven finale.
 - Branching: linear within acts (WC3-style), choice at act boundary
 - Campaign save separate from skirmish save
 
@@ -130,7 +152,7 @@ Each dungeon tells a self-contained story with SC interaction.
 | 3 | SpriteBatcher |
 | 4 | Hex edge blending shader (Sand↔Dune soft transitions) |
 | 5 | Sprite per ObjType on adventure map |
-| 6 | Full unit roster sprites (all 7 unit types + SCs) |
+| 6 | Full unit roster sprites (all 42 units across 6 factions) |
 | 7 | Unit hit-flash + death animation |
 | 8 | Pixel-art HUD frame, portrait slots, minimap |
 
@@ -146,5 +168,6 @@ SC branch-choice overlay is an explicit placeholder — designed to be swapped w
 | castle, dungeon, goldmine objects | 64×64–128×128 | ✅ |
 | armoured_warrior, enemy_scout units | 128×128 | ✅ |
 | rider variants (archer, banner, knight, lance) | 128×128 | ✅ |
-| Ushari, Sekhara, Khet SC portraits | 128×128 | ⬜ |
-| remaining unit types (djinn, ancient_guardian, pharaoh_lich, mummy) | 128×128 | ⬜ |
+| Ushari, Sekhara SC portraits | 128×128 | ⬜ |
+| new mine type objects (sawmill, quarry, obsidian vent) | 64×64 | ⬜ |
+| unit sprites — all 6 faction rosters | 128×128 | ⬜ |
