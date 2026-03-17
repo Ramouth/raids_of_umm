@@ -19,6 +19,7 @@
 #include "dungeon/DungeonOutcome.h"
 #include <glm/glm.hpp>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 /*
@@ -72,6 +73,11 @@ private:
     void endTurn();
     void wait();
     void onHeroVisit(const HexCoord& coord);
+
+    // ── Fog of war ───────────────────────────────────────────────────────────
+    // Recompute m_visible from 'from' (defaults to m_hero.pos if INT_MIN).
+    // m_explored grows monotonically.
+    void recomputeVisibility(HexCoord from = {INT_MIN, 0});
 
     // ── Rendering helpers ────────────────────────────────────────────────────
     void renderTerrain();
@@ -172,8 +178,14 @@ private:
     // Pending direct combat result — set before pushing CombatState, read in onResume().
     std::shared_ptr<CombatOutcome>  m_pendingCombat;
 
+    // Fog of war — session state, persisted to save file.
+    // m_visible is rebuilt each move; m_explored accumulates forever.
+    std::unordered_set<HexCoord> m_visible;
+    std::unordered_set<HexCoord> m_explored;
+
     RenderOffsetConfig m_offsets;
 
+    static constexpr int   SIGHT_RADIUS    = 4;
     static constexpr float HEX_SIZE        = 1.0f;
     static constexpr float CAM_SPEED       = 8.0f;
     static constexpr float HERO_MOVE_SPEED = 12.0f;     // hexes per second

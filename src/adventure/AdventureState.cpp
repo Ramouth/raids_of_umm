@@ -22,6 +22,37 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <queue>
+
+// ── Fog of war ────────────────────────────────────────────────────────────────
+
+void AdventureState::recomputeVisibility(HexCoord from) {
+    if (from.q == INT_MIN) from = m_hero.pos;  // default: use hero's logical pos
+    m_visible.clear();
+
+    // BFS from hero out to SIGHT_RADIUS.
+    // Mountains are visible but opaque — they don't propagate sight further.
+    std::queue<std::pair<HexCoord, int>> q;
+    q.push({from, 0});
+    m_visible.insert(m_hero.pos);
+
+    while (!q.empty()) {
+        auto [coord, dist] = q.front(); q.pop();
+        if (dist >= SIGHT_RADIUS) continue;
+        for (int d = 0; d < 6; ++d) {
+            HexCoord nb = coord.neighbor(d);
+            if (!m_map.hasTile(nb))    continue;
+            if (m_visible.count(nb))   continue;
+            m_visible.insert(nb);
+            const MapTile* t = m_map.tileAt(nb);
+            bool opaque = t && (t->terrain == Terrain::Mountain || t->terrain == Terrain::Wall);
+            if (!opaque)
+                q.push({nb, dist + 1});
+        }
+    }
+
+    m_explored.insert(m_visible.begin(), m_visible.end());
+}
 
 // ── Army builders ─────────────────────────────────────────────────────────────
 
@@ -206,6 +237,8 @@ void AdventureState::onEnter() {
     m_cam.setPosition({hx, hz});
     m_heroRenderPos = { hx, 0.0f, hz };
     m_heroTargetPos = m_heroRenderPos;
+
+    recomputeVisibility();
 
     std::cout << "[Adventure] Day " << m_turnManager.day() << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
@@ -779,6 +812,7 @@ void AdventureState::update(float dt) {
         m_walkCycle = 0.0f;
         
         ++m_moveQueueIdx;
+        recomputeVisibility(m_moveQueue[m_moveQueueIdx]);
         float hx, hz;
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.0f, hz };
@@ -987,12 +1021,19 @@ void AdventureState::render() {
 
 void AdventureState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
+        bool explored = m_explored.count(coord) > 0;
+        bool visible  = m_visible.count(coord)  > 0;
+        if (!explored) continue;  // unseen = black void
+
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
-        GLuint tex      = tile.road ? m_hexRenderer.roadTex()
-                                    : m_hexRenderer.terrainTex(tile.terrain);
+        // Only bind texture for fully-visible tiles; fogged tiles use flat colour.
+        GLuint tex = visible ? (tile.road ? m_hexRenderer.roadTex()
+                                          : m_hexRenderer.terrainTex(tile.terrain))
+                             : 0;
         glm::vec3 color = (tex != 0) ? glm::vec3(1.0f)
                         : tile.road  ? glm::mix(terrainColor(tile.terrain), roadColor(), 0.55f)
                                      : terrainColor(tile.terrain);
+        if (!visible) color *= 0.30f;  // explored-but-fogged = dark shroud
         float h         = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
     }
@@ -1019,6 +1060,15 @@ void AdventureState::renderPathPreview() {
 
 void AdventureState::renderObjects() {
     for (const auto& obj : m_map.objects()) {
+        // Objects only render when the tile is currently visible, UNLESS the player
+        // owns/controls it — owned assets always show so the player can track resources.
+        bool visible = m_visible.count(obj.pos) > 0;
+        if (!visible) {
+            auto it = m_objectControl.find(obj.pos);
+            bool playerOwned = it != m_objectControl.end() && it->second.ownerFaction == 1;
+            if (!playerOwned) continue;
+        }
+
         RenderOffset off = m_offsets.forObject(obj.pos, obj.type);
         float wx, wz;
         obj.pos.toWorld(HEX_SIZE, wx, wz);
@@ -1227,6 +1277,12 @@ void AdventureState::saveSession() {
     }
     j["objectControl"] = oc;
 
+    // ── Explored tiles ────────────────────────────────────────────────────────
+    json exp = json::array();
+    for (const auto& c : m_explored)
+        exp.push_back({ {"q", c.q}, {"r", c.r} });
+    j["explored"] = std::move(exp);
+
     // ── TownStates ────────────────────────────────────────────────────────────
     json towns = json::array();
     for (const auto& [coord, ts] : m_townStates) {
@@ -1370,6 +1426,12 @@ void AdventureState::loadSession() {
                 state.buildings.insert(b.get<std::string>());
         m_townStates[c] = state;
     }
+
+    // ── Explored tiles ────────────────────────────────────────────────────────
+    m_explored.clear();
+    for (const auto& e : j.value("explored", json::array()))
+        m_explored.insert({ e["q"].get<int>(), e["r"].get<int>() });
+    recomputeVisibility();  // rebuild m_visible from restored hero pos
 
     // Recentre camera on restored hero position.
     float hx, hz;
