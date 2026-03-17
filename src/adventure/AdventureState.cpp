@@ -1216,23 +1216,37 @@ void AdventureState::render() {
 }
 
 void AdventureState::renderTerrain() {
+    // Pass 1: solid dither base for all explored tiles.
+    // Fogged tiles stay here; visible tiles get the texture overlay in Pass 2.
     for (const auto& [coord, tile] : m_map) {
         bool explored = m_explored.count(coord) > 0;
         bool visible  = m_visible.count(coord)  > 0;
-        if (!explored) continue;  // unseen = black void
+        if (!explored) continue;
 
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
-        // Only bind texture for fully-visible tiles; fogged tiles use flat colour.
-        GLuint tex = visible ? (tile.road ? m_hexRenderer.roadTex()
-                                          : m_hexRenderer.terrainTex(tile.terrain))
-                             : 0;
-        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f)
-                        : tile.road  ? glm::mix(terrainColor(tile.terrain), roadColor(), 0.55f)
-                                     : terrainColor(tile.terrain);
-        if (!visible) color *= 0.30f;  // explored-but-fogged = dark shroud
-        float h         = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
+        glm::vec3 color = tile.road ? glm::mix(terrainColor(tile.terrain), roadColor(), 0.55f)
+                                    : terrainColor(tile.terrain);
+        if (!visible) color *= 0.30f;
+        float h = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, 0, {off.dx, off.dz});
     }
+
+    // Pass 2: textured overlay with feathered alpha so adjacent variants
+    // blend through the shared dither base rather than hard-cutting.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthFunc(GL_LEQUAL);
+    for (const auto& [coord, tile] : m_map) {
+        if (!m_visible.count(coord)) continue;
+        GLuint tex = tile.road ? m_hexRenderer.roadTex()
+                               : m_hexRenderer.terrainTex(tile.terrain);
+        if (!tex) continue;
+        RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
+        float h = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true);
+    }
+    glDepthFunc(GL_LESS);
+    glDisable(GL_BLEND);
 
     // Hover outline (yellow).
     if (m_hasHovered) {

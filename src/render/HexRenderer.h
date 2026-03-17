@@ -57,12 +57,17 @@ public:
     // visualScale: size of the drawn hex (< worldHexSize → token, == worldHexSize → terrain tile).
     // height:      Y offset in world units.
     // texId:       GL texture to bind for this tile; 0 = use the white placeholder.
+    // tintMode: 0 = normal alpha-blend over base colour (default)
+    //           1 = multiplicative tint — use with _neutral.png greyscale tiles;
+    //               the tile pattern takes on the hue of `color` exactly.
     void drawTile(const HexCoord& coord,
                   const glm::vec3& color,
                   float visualScale          = 1.0f,
                   float height               = 0.0f,
                   GLuint texId               = 0,
-                  const glm::vec2& xzOffset  = {0.0f, 0.0f});
+                  const glm::vec2& xzOffset  = {0.0f, 0.0f},
+                  int tintMode               = 0,
+                  bool softEdge              = false);
 
     // Draw a wireframe outline.  scale multiplies the unit hex outline.
     // height should match the tile's terrainHeight() so the outline sits on the tile face.

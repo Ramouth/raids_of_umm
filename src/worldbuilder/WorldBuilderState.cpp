@@ -620,13 +620,28 @@ void WorldBuilderState::render() {
 }
 
 void WorldBuilderState::renderTerrain() {
+    // Pass 1: solid dither base for every tile (no texture).
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
-        GLuint tex      = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
-        glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
-        float h         = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
+        float h = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, 0, {off.dx, off.dz});
     }
+
+    // Pass 2: textured overlay with feathered alpha so adjacent variants
+    // blend through the shared dither base rather than hard-cutting.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthFunc(GL_LEQUAL);
+    for (const auto& [coord, tile] : m_map) {
+        GLuint tex = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
+        if (!tex) continue;
+        RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
+        float h = terrainHeight(tile.terrain) + off.dy;
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true);
+    }
+    glDepthFunc(GL_LESS);
+    glDisable(GL_BLEND);
+
     // Always-on grid lines
     for (const auto& [coord, tile] : m_map) {
         float h = terrainHeight(tile.terrain);

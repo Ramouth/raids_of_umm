@@ -200,7 +200,9 @@ void HexRenderer::beginFrame(const glm::mat4& viewProj,
     m_shader.setVec3("u_SunDir",      glm::normalize(sunDir));
     m_shader.setVec3("u_SunColor",    sunColor);
     m_shader.setVec3("u_AmbientColor",ambientColor);
-    m_shader.setInt ("u_Texture", 0);
+    m_shader.setInt ("u_Texture",  0);
+    m_shader.setInt ("u_TintMode", 0);
+    m_shader.setInt ("u_SoftEdge", 0);
     m_shader.setFloat("u_FogDensity", 0.015f);
     m_shader.setVec3("u_FogColor",    {0.76f, 0.69f, 0.50f});
     m_shader.setVec3("u_CameraPos",   cameraPos);
@@ -215,7 +217,9 @@ void HexRenderer::drawTile(const HexCoord& coord,
                             float visualScale,
                             float height,
                             GLuint texId,
-                            const glm::vec2& xzOffset) {
+                            const glm::vec2& xzOffset,
+                            int tintMode,
+                            bool softEdge) {
     // Always use the world hex size for positioning so tokens land on the correct tile
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz);
@@ -237,6 +241,8 @@ void HexRenderer::drawTile(const HexCoord& coord,
     m_shader.setVec3("u_TileColor",    color);
     m_shader.setFloat("u_Height",      0.0f);
     m_shader.setInt  ("u_Textured",    texId != 0 ? 1 : 0);
+    m_shader.setInt  ("u_TintMode",    tintMode);
+    m_shader.setInt  ("u_SoftEdge",    softEdge ? 1 : 0);
 
     glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_SHORT, nullptr);
 
