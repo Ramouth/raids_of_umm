@@ -48,7 +48,8 @@ public:
                 const std::unordered_set<HexCoord>& explored,
                 const std::unordered_set<HexCoord>& visible,
                 const Hero&              hero,
-                const ObjectControlMap&  ctrl);
+                const ObjectControlMap&  ctrl,
+                const std::vector<Hero>& aiHeroes = {});
 
     // Draw the minimap panel in the bottom-right corner.
     // size: side length of the rendered square in screen pixels.

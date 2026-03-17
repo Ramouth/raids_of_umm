@@ -46,8 +46,9 @@ constexpr std::string_view objTypeName(ObjType t) noexcept {
 
 struct MapObjectDef {
     HexCoord    pos;
-    ObjType     type = ObjType::Town;
+    ObjType     type      = ObjType::Town;
     std::string name;
+    int         factionId = 0;  // starting owner (0=neutral, 1=player, 2+=AI)
 
     // Convenience
     std::string_view typeName() const noexcept { return objTypeName(type); }

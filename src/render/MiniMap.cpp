@@ -76,7 +76,8 @@ void MiniMap::update(const WorldMap&                      map,
                      const std::unordered_set<HexCoord>&  explored,
                      const std::unordered_set<HexCoord>&  visible,
                      const Hero&                          hero,
-                     const ObjectControlMap&              ctrl) {
+                     const ObjectControlMap&              ctrl,
+                     const std::vector<Hero>&             aiHeroes) {
     if (!m_tex) return;
 
     // Clear to near-black (unexplored void).
@@ -142,6 +143,16 @@ void MiniMap::update(const WorldMap&                      map,
         // Draw a 1-px dot (radius 0 = single pixel, radius 1 for towns/dungeons).
         int dotR = (obj.type == ObjType::Town || obj.type == ObjType::Dungeon) ? 1 : 0;
         paintSquare(cx, cy, dotR, R, G, B);
+    }
+
+    // --- AI hero dots — orange, radius 1 ---
+    for (const Hero& ai : aiHeroes) {
+        if (visible.count(ai.pos) > 0) {
+            glm::vec2 p = hexToPixel(ai.pos);
+            paintSquare(static_cast<int>(std::round(p.x)),
+                        static_cast<int>(std::round(p.y)),
+                        1, 255, 130, 20);
+        }
     }
 
     // --- Hero dot — bright white, radius 1 ---

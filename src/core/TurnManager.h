@@ -35,6 +35,8 @@ public:
     const std::vector<Faction>& factions()   const { return m_factions; }
     const Faction& playerFaction()           const { return m_factions[Faction::Player]; }
     Faction&       playerFaction()                 { return m_factions[Faction::Player]; }
+    const Faction& faction(int id)           const { return m_factions[id]; }
+    Faction&       faction(int id)                 { return m_factions[id]; }
 
 private:
     int                  m_day = 1;

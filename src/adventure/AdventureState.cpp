@@ -220,16 +220,32 @@ void AdventureState::onEnter() {
     if (auto err = m_offsets.load("assets/render_offsets.json"))
         std::cerr << "[Adventure] Offsets load warning: " << *err << "\n";
 
+    // Pre-populate ownership from map factionId fields.
+    initFactions();
+
     // Place hero at Khemret (west starting town).
     m_hero.pos = {-5, 1};
     if (MapTile* t = m_map.tileAt(m_hero.pos))
         t->passable = true;
 
-    // Always place a test enemy scout 2 hexes east so combat can be tested immediately.
-    HexCoord scoutPos{2, 0};
-    if (MapTile* t = m_map.tileAt(scoutPos))
-        t->passable = true;
-    m_map.placeObject({ scoutPos, ObjType::Dungeon, "Enemy Scout" });
+    // Spawn one AI hero at each AI-owned starting town.
+    m_aiHeroes.clear();
+    for (const auto& obj : m_map.objects()) {
+        if (obj.type != ObjType::Town || obj.factionId != Faction::AI) continue;
+        Hero aiHero;
+        aiHero.name      = "Raider";
+        aiHero.factionId = Faction::AI;
+        aiHero.pos       = obj.pos;
+        aiHero.movesMax  = 8;
+        aiHero.movesLeft = 8;
+        auto& rm2 = Application::get().resources();
+        if (rm2.loaded()) {
+            if (const UnitType* t = rm2.unit("skeleton_warrior")) aiHero.addUnit(t, 10);
+            if (const UnitType* t = rm2.unit("desert_archer"))    aiHero.addUnit(t,  5);
+        }
+        m_aiHeroes.push_back(std::move(aiHero));
+        std::cout << "[AI] Hero 'Raider' spawned at (" << obj.pos.q << "," << obj.pos.r << ")\n";
+    }
 
     // Centre camera on hero.
     float hx, hz;
@@ -240,7 +256,7 @@ void AdventureState::onEnter() {
 
     recomputeVisibility();
     m_miniMap.init(m_map);
-    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
 
     std::cout << "[Adventure] Day " << m_turnManager.day() << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
@@ -282,6 +298,9 @@ void AdventureState::onResume() {
     if (m_pendingCombat) {
         CombatOutcome result = std::move(*m_pendingCombat);
         m_pendingCombat.reset();
+        std::cout << "[Debug] onResume: combatAIIdx=" << m_combatAIHeroIdx
+                  << " result=" << static_cast<int>(result.result)
+                  << " aiHeroes=" << m_aiHeroes.size() << "\n";
 
         // Sync hero army from survivors (skip SC units — they live in specials, not army).
         for (auto& slot : m_hero.army) slot = {};
@@ -312,10 +331,23 @@ void AdventureState::onResume() {
                           << " is now level " << sc->level << "!\n";
         }
 
-        if (result.result == CombatResult::EnemyWon) {
+        if (m_combatAIHeroIdx >= 0) {
+            // Hero vs AI hero fight — handle outcomes.
+            if (result.result == CombatResult::PlayerWon) {
+                std::cout << "[Adventure] AI hero '" << m_aiHeroes[m_combatAIHeroIdx].name
+                          << "' defeated!\n";
+                m_aiHeroes.erase(m_aiHeroes.begin() + m_combatAIHeroIdx);
+                checkWinConditions();
+            } else if (result.result == CombatResult::EnemyWon) {
+                std::cout << "[Adventure] Hero defeated in combat.\n";
+                m_isDefeated = true;
+            }
+            m_combatAIHeroIdx = -1;
+        } else if (result.result == CombatResult::EnemyWon) {
             std::cout << "[Adventure] Hero defeated in combat.\n";
             m_isDefeated = true;
         }
+        m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
         return;
     }
 
@@ -373,6 +405,107 @@ void AdventureState::onResume() {
                     std::cout << "[Adventure] Found item: " << it->name << "\n";
         }
     }
+}
+
+// ── Multi-faction / AI ────────────────────────────────────────────────────────
+
+void AdventureState::initFactions() {
+    // Pre-populate ObjectControl from map objects that declare a starting owner.
+    for (const auto& obj : m_map.objects()) {
+        if (obj.factionId <= 0) continue;
+        auto& ctrl        = m_objectControl[obj.pos];
+        ctrl.objType      = obj.type;
+        ctrl.ownerFaction = obj.factionId;
+    }
+    // Seed TownState for AI towns (player town seeded earlier in onEnter).
+    auto& rm = Application::get().resources();
+    for (const auto& obj : m_map.objects()) {
+        if (obj.type != ObjType::Town || obj.factionId != Faction::AI) continue;
+        TownState& ts = m_townStates[obj.pos];
+        if (rm.loaded()) {
+            for (const UnitType* u : rm.unitsByTier())
+                if (u->weeklyGrowth > 0)
+                    ts.recruitPool[u->id] = u->weeklyGrowth;
+        }
+        std::cout << "[AI] Town '" << obj.name << "' seeded.\n";
+    }
+}
+
+CombatArmy AdventureState::buildAIHeroArmy(const Hero& aiHero) const {
+    CombatArmy army;
+    army.ownerName = aiHero.name;
+    army.isPlayer  = false;
+    for (const auto& slot : aiHero.army)
+        if (!slot.isEmpty())
+            army.stacks.push_back(CombatUnit::make(slot.unitType, slot.count, false));
+    if (army.stacks.empty()) {
+        static const UnitType s_guard = []() {
+            UnitType t; t.id = "ai_guard"; t.name = "Raider Guard";
+            t.hitPoints = 8; t.attack = 5; t.defense = 4;
+            t.minDamage = 1; t.maxDamage = 3; t.speed = 4; t.moveRange = 3;
+            return t;
+        }();
+        army.stacks.push_back(CombatUnit::make(&s_guard, 6, false));
+    }
+    return army;
+}
+
+void AdventureState::runAITurn() {
+    for (int i = 0; i < static_cast<int>(m_aiHeroes.size()); ++i) {
+        Hero& ai = m_aiHeroes[i];
+        ai.resetMoves();
+
+        // Find nearest capturable object not already owned by this faction.
+        HexCoord target  = {INT_MIN, 0};
+        int      bestDist = INT_MAX;
+        for (const auto& obj : m_map.objects()) {
+            if (obj.type == ObjType::Dungeon || obj.type == ObjType::Artifact) continue;
+            auto it = m_objectControl.find(obj.pos);
+            int own = (it != m_objectControl.end()) ? it->second.ownerFaction : 0;
+            if (own == Faction::AI) continue;  // already ours
+            int dq = obj.pos.q - ai.pos.q;
+            int dr = obj.pos.r - ai.pos.r;
+            int dist = dq*dq + dr*dr;
+            if (dist < bestDist) { bestDist = dist; target = obj.pos; }
+        }
+        if (target.q == INT_MIN) continue;
+
+        auto path = m_map.findPath(ai.pos, target);
+        if (path.size() < 2) continue;
+
+        int steps = std::min(ai.movesMax, static_cast<int>(path.size()) - 1);
+        ai.pos       = path[steps];
+        ai.movesLeft = 0;
+        std::cout << "[AI] " << ai.name << " -> (" << ai.pos.q << "," << ai.pos.r << ")\n";
+
+        // Walked onto player's hex — trigger hero fight.
+        if (ai.pos == m_hero.pos) {
+            m_pendingHeroFight = true;
+            m_combatAIHeroIdx  = i;
+            return;
+        }
+
+        // Capture any capturable object on the landing tile.
+        const MapObjectDef* obj = m_map.objectAt(ai.pos);
+        if (obj && obj->type != ObjType::Dungeon && obj->type != ObjType::Artifact) {
+            auto& ctrl        = m_objectControl[ai.pos];
+            ctrl.objType      = obj->type;
+            ctrl.ownerFaction = Faction::AI;
+            std::cout << "[AI] Captured " << obj->typeName() << " '" << obj->name << "'\n";
+        }
+    }
+}
+
+void AdventureState::checkWinConditions() {
+    if (m_isDefeated || m_isVictory) return;
+    if (!m_aiHeroes.empty()) return;  // still have live AI heroes
+    // All AI heroes dead — faction collapses, neutralize their remaining assets.
+    for (auto& [coord, ctrl] : m_objectControl)
+        if (ctrl.ownerFaction == Faction::AI)
+            ctrl.ownerFaction = Faction::Neutral;
+    m_isVictory = true;
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
+    std::cout << "[Adventure] *** VICTORY! All enemy factions eliminated! ***\n";
 }
 
 void AdventureState::initMap() {
@@ -450,6 +583,15 @@ void AdventureState::moveHero(const HexCoord& dest) {
 }
 
 void AdventureState::onHeroVisit(const HexCoord& coord) {
+    // Check for AI hero on this tile — triggers hero vs hero combat.
+    for (int i = 0; i < static_cast<int>(m_aiHeroes.size()); ++i) {
+        if (m_aiHeroes[i].pos == coord) {
+            m_pendingHeroFight = true;
+            m_combatAIHeroIdx  = i;
+            return;
+        }
+    }
+
     const MapObjectDef* obj = m_map.objectAt(coord);
     if (!obj) return;
 
@@ -519,6 +661,8 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
 }
 
 void AdventureState::endTurn() {
+    runAITurn();  // AI moves before day advances
+
     m_turnManager.nextDay(m_hero, m_objectControl,
                           Application::get().resources(), m_townStates);
 
@@ -537,6 +681,9 @@ void AdventureState::endTurn() {
 
     if (!m_turnManager.lastEvent().empty())
         std::cout << "[Turn] >>> " << m_turnManager.lastEvent() << " <<<\n";
+
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
+    checkWinConditions();
 }
 
 void AdventureState::wait() {
@@ -551,8 +698,8 @@ void AdventureState::wait() {
 bool AdventureState::handleEvent(void* sdlEvent) {
     SDL_Event* e = static_cast<SDL_Event*>(sdlEvent);
 
-    // Defeat screen: only allow restart or quit.
-    if (m_isDefeated) {
+    // Defeat / Victory screen: only allow restart or quit.
+    if (m_isDefeated || m_isVictory) {
         if (e->type == SDL_KEYDOWN && !e->key.repeat) {
             switch (e->key.keysym.sym) {
                 case SDLK_r:
@@ -564,7 +711,7 @@ bool AdventureState::handleEvent(void* sdlEvent) {
                 default: break;
             }
         }
-        return true;  // swallow all other events while defeated
+        return true;  // swallow all other events
     }
 
     // Exit prompt modal — swallows all input while open.
@@ -775,6 +922,21 @@ bool AdventureState::handleEvent(void* sdlEvent) {
 // ── Update ────────────────────────────────────────────────────────────────────
 
 void AdventureState::update(float dt) {
+    // Trigger hero vs AI hero combat (set by runAITurn or onHeroVisit).
+    if (m_pendingHeroFight
+        && m_combatAIHeroIdx >= 0
+        && m_combatAIHeroIdx < static_cast<int>(m_aiHeroes.size())
+        && !m_isDefeated && !m_isVictory) {
+        m_pendingHeroFight = false;
+        Hero& aiHero = m_aiHeroes[m_combatAIHeroIdx];
+        CombatArmy playerArmy = buildPlayerArmy();
+        CombatArmy enemyArmy  = buildAIHeroArmy(aiHero);
+        m_pendingCombat = std::make_shared<CombatOutcome>();
+        Application::get().pushState(
+            std::make_unique<CombatState>(playerArmy, enemyArmy, m_pendingCombat));
+        return;
+    }
+
     if (m_notifyTimer > 0.0f)
         m_notifyTimer -= dt;
 
@@ -827,7 +989,7 @@ void AdventureState::update(float dt) {
         
         ++m_moveQueueIdx;
         recomputeVisibility(m_moveQueue[m_moveQueueIdx]);
-        m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
+        m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
         float hx, hz;
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.0f, hz };
@@ -1000,13 +1162,23 @@ void AdventureState::render() {
     if (m_isDefeated) {
         int w = app.width(), h = app.height();
         m_hud.begin(w, h);
-        // Dark translucent veil.
         m_hud.drawRect(0, 0, static_cast<float>(w), static_cast<float>(h),
                        {0.0f, 0.0f, 0.0f, 0.65f});
         float sc = h / 600.0f;
-        // y-DOWN: smaller y = higher on screen; larger y = lower.
         m_hud.drawText(w * 0.5f - 90 * sc, h * 0.5f - 20 * sc, sc * 3.0f,
                        "DEFEATED", {0.9f, 0.15f, 0.1f, 1.0f});
+        m_hud.drawText(w * 0.5f - 115 * sc, h * 0.5f + 30 * sc, sc * 1.2f,
+                       "Press R to restart  |  ESC to exit", {0.85f, 0.8f, 0.7f, 1.0f});
+    }
+
+    if (m_isVictory) {
+        int w = app.width(), h = app.height();
+        m_hud.begin(w, h);
+        m_hud.drawRect(0, 0, static_cast<float>(w), static_cast<float>(h),
+                       {0.0f, 0.0f, 0.0f, 0.55f});
+        float sc = h / 600.0f;
+        m_hud.drawText(w * 0.5f - 80 * sc, h * 0.5f - 20 * sc, sc * 3.0f,
+                       "VICTORY!", {0.95f, 0.85f, 0.15f, 1.0f});
         m_hud.drawText(w * 0.5f - 115 * sc, h * 0.5f + 30 * sc, sc * 1.2f,
                        "Press R to restart  |  ESC to exit", {0.85f, 0.8f, 0.7f, 1.0f});
     }
@@ -1154,6 +1326,17 @@ void AdventureState::renderHero() {
 
     m_heroSprite.draw(renderPos, HEX_SIZE,
                       m_cam.viewMatrix(), m_cam.projMatrix());
+
+    // ── AI heroes ────────────────────────────────────────────────────────────
+    for (const Hero& ai : m_aiHeroes) {
+        if (!m_visible.count(ai.pos)) continue;
+        float ax, az;
+        ai.pos.toWorld(HEX_SIZE, ax, az);
+        glm::vec3 aiPos{ax, 0.0f, az};
+        // Orange outline distinguishes the AI hero from the player.
+        m_hexRenderer.drawOutline(ai.pos, {1.0f, 0.5f, 0.05f}, HEX_SIZE * 0.65f);
+        m_heroSprite.draw(aiPos, HEX_SIZE, m_cam.viewMatrix(), m_cam.projMatrix());
+    }
 }
 
 // ── Session Save / Load ───────────────────────────────────────────────────────
@@ -1456,7 +1639,7 @@ void AdventureState::loadSession() {
         m_explored.insert({ e["q"].get<int>(), e["r"].get<int>() });
     recomputeVisibility();  // rebuild m_visible from restored hero pos
     m_miniMap.init(m_map);
-    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl, m_aiHeroes);
 
     // Recentre camera on restored hero position.
     float hx, hz;

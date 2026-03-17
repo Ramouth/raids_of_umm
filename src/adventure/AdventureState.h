@@ -75,6 +75,16 @@ private:
     void wait();
     void onHeroVisit(const HexCoord& coord);
 
+    // ── Multi-faction / AI ───────────────────────────────────────────────────
+    // Pre-populate m_objectControl and m_townStates from map factionId fields.
+    void initFactions();
+    // Build a CombatArmy from an AI hero's army slots.
+    CombatArmy buildAIHeroArmy(const Hero& aiHero) const;
+    // Run all AI heroes' turns (called at end of player turn).
+    void runAITurn();
+    // Check and set m_isVictory / m_isDefeated.
+    void checkWinConditions();
+
     // ── Fog of war ───────────────────────────────────────────────────────────
     // Recompute m_visible from 'from' (defaults to m_hero.pos if INT_MIN).
     // m_explored grows monotonically.
@@ -186,6 +196,17 @@ private:
 
     RenderOffsetConfig m_offsets;
     MiniMap            m_miniMap;
+
+    // AI heroes — one per enemy faction on the map.
+    std::vector<Hero> m_aiHeroes;
+
+    // Which AI hero index we are currently fighting (-1 = none / dungeon fight).
+    int  m_combatAIHeroIdx  = -1;
+    // Flag set by runAITurn() when an AI hero walked onto the player's hex.
+    bool m_pendingHeroFight = false;
+
+    // Set when all enemy factions are eliminated.
+    bool m_isVictory = false;
 
     static constexpr int   SIGHT_RADIUS    = 4;
     static constexpr float HEX_SIZE        = 1.0f;

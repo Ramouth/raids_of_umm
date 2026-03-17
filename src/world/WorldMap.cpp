@@ -194,6 +194,7 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
                 {"type", objTypeToStr(obj.type)},
                 {"name", obj.name}
             });
+            if (obj.factionId) objs.back()["factionId"] = obj.factionId;
         }
         j["objects"] = std::move(objs);
 
@@ -242,8 +243,9 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
         for (const auto& o : j.at("objects")) {
             MapObjectDef obj;
             obj.pos  = { o.at("q").get<int>(), o.at("r").get<int>() };
-            obj.type = objTypeFromStr(o.value("type", "town"));
-            obj.name = o.value("name", "");
+            obj.type     = objTypeFromStr(o.value("type", "town"));
+            obj.name     = o.value("name", "");
+            obj.factionId = o.value("factionId", 0);
             m_objects.push_back(std::move(obj));
         }
 

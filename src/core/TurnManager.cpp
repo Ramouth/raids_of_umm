@@ -21,6 +21,16 @@ void TurnManager::init(int startingGold) {
     player.treasury[Resource::Obsidian] = 2;
     player.treasury[Resource::Crystal]  = 2;
     m_factions.push_back(std::move(player));
+
+    Faction ai;
+    ai.id   = Faction::AI;
+    ai.name = "Raider Horde";
+    ai.treasury[Resource::Gold]     = startingGold;
+    ai.treasury[Resource::Wood]     = 5;
+    ai.treasury[Resource::Stone]    = 5;
+    ai.treasury[Resource::Obsidian] = 2;
+    ai.treasury[Resource::Crystal]  = 2;
+    m_factions.push_back(std::move(ai));
 }
 
 void TurnManager::applyMineIncome(const ObjectControlMap& control,

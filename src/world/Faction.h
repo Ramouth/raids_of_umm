@@ -6,6 +6,7 @@
 struct Faction {
     static constexpr int Neutral = 0;
     static constexpr int Player  = 1;
+    static constexpr int AI      = 2;
 
     int          id   = Neutral;
     std::string  name;
