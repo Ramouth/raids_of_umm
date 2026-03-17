@@ -11,7 +11,7 @@ struct Hero;
 class TurnManager {
 public:
     // Create neutral + player factions; seed player treasury.
-    void init(int startingGold = 2000);
+    void init(int startingGold = 10000);
 
     // Advance one day: reset hero moves, apply mine income, tick weekly/monthly events.
     // Returns new day number.

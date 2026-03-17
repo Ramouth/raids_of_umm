@@ -16,11 +16,14 @@
  */
 
 enum class ObjType : uint8_t {
-    Town        = 0,
-    Dungeon     = 1,
-    GoldMine    = 2,
-    CrystalMine = 3,
-    Artifact    = 4,
+    Town         = 0,
+    Dungeon      = 1,
+    GoldMine     = 2,
+    CrystalMine  = 3,
+    Artifact     = 4,
+    Sawmill      = 5,
+    Quarry       = 6,
+    ObsidianVent = 7,
 
     COUNT  // must remain last
 };
@@ -29,12 +32,15 @@ constexpr int OBJ_TYPE_COUNT = static_cast<int>(ObjType::COUNT);
 
 constexpr std::string_view objTypeName(ObjType t) noexcept {
     switch (t) {
-        case ObjType::Town:        return "Town";
-        case ObjType::Dungeon:     return "Dungeon";
-        case ObjType::GoldMine:    return "Gold Mine";
-        case ObjType::CrystalMine: return "Crystal Mine";
-        case ObjType::Artifact:    return "Artifact";
-        default:                   return "Unknown";
+        case ObjType::Town:         return "Town";
+        case ObjType::Dungeon:      return "Dungeon";
+        case ObjType::GoldMine:     return "Gold Mine";
+        case ObjType::CrystalMine:  return "Crystal Mine";
+        case ObjType::Artifact:     return "Artifact";
+        case ObjType::Sawmill:      return "Sawmill";
+        case ObjType::Quarry:       return "Quarry";
+        case ObjType::ObsidianVent: return "Obsidian Vent";
+        default:                    return "Unknown";
     }
 }
 

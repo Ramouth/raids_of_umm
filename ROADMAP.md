@@ -26,7 +26,6 @@ See `economy.md` for economy decisions and implementation plan.
 - [x] Attack-type triangle — Physical / Piercing (50% bypass) / Magical (full bypass); data-driven per unit
 - [x] Dungeon state — guard combat, SC recruitment, loot drop, result overlay
 - [x] Town / Castle — unit recruitment, weekly growth, treasury
-- [x] Resource tracking — gold + sand crystals, mine income
 - [x] Special Character system — XP, levelling, stat growth
 - [x] SC skill tree — branching level-up choices, branch-gated nodes, combat overlay
 - [x] Party screen (F key) — view hero army and SC slots
@@ -40,22 +39,9 @@ See `economy.md` for economy decisions and implementation plan.
 - [x] Hero spawns at Khemret (west starting town), not map origin
 - [x] Faction lore — 6 factions fully designed (Factions.md)
 - [x] Economy design — resources, income, building tree approach, Djinn Manifest system (economy.md)
-
----
-
-## Milestone 1 — Economy Foundation
-
-Implement the economy decisions locked in `economy.md`.
-No balance tuning yet — get the plumbing right first.
-
-| # | Item | Status |
-|---|------|--------|
-| 1 | **Rename resources** | Gold, Wood, Stone, Obsidian, Crystal — update `Resources.h` and all refs | ⬜ |
-| 2 | **Starting resources** | 10,000 gold + 5 Wood + 5 Stone + 2 Obsidian + 2 Crystal | ⬜ |
-| 3 | **Town passive income** | +500 gold/day per owned town | ⬜ |
-| 4 | **New mine types** | Sawmill, Quarry, Obsidian Vent — add to `ObjType`, `buildings.json`, map | ⬜ |
-| 5 | **Update unit costs** | Remap old resource names to new; align costs to faction identity | ⬜ |
-| 6 | **Building tree data** | Author full `buildings.json` (costs, prereqs, unit unlocks) — no gating yet | ⬜ |
+- [x] **Milestone 1 — Economy Foundation** — 5 resources (Gold/Wood/Stone/Obsidian/Crystal), mine income wired, town passive income +500g/day, Sawmill/Quarry/ObsidianVent on map, all unit costs remapped
+- [x] **Road logic** — `MapTile.road` flag, moveCost halved (0.5), visual stone-block texture (PixelLab), 9-tile route Khemret → Tharakh
+- [x] **Fog of War** — BFS radius-4 visibility, black void / dark shroud / full-visible render, progressive reveal per step, objects hidden in fog (owned assets always shown), persisted in session save
 
 ---
 
@@ -105,15 +91,12 @@ Each dungeon tells a self-contained story with SC interaction.
 
 ---
 
-## Milestone 5 — Fog of War & Map Exploration
+## Milestone 5 — Map & Exploration Polish
 
-*(after faction unit JSON is locked)*
-
-- Unexplored tiles fully hidden, vision radius per hero (3 hex default)
-- Mines / dungeons only visible once explored
-- Enemy hero positions visible only within vision range
+- Enemy hero AI — basic wander/capture/attack loop
 - **Iron Conclave advantage** — partial fog-of-war reveal in ruins terrain
-- Fog data stored in session save
+- More mine types on default map; second dungeon variant
+- Fog-of-war sight radius tied to hero stats (upgradeable)
 
 ---
 
@@ -168,6 +151,7 @@ SC branch-choice overlay is an explicit placeholder — designed to be swapped w
 | castle, dungeon, goldmine objects | 64×64–128×128 | ✅ |
 | armoured_warrior, enemy_scout units | 128×128 | ✅ |
 | rider variants (archer, banner, knight, lance) | 128×128 | ✅ |
+| road terrain tile | 128×128 | ✅ |
 | Ushari, Sekhara SC portraits | 128×128 | ⬜ |
 | new mine type objects (sawmill, quarry, obsidian vent) | 64×64 | ⬜ |
 | unit sprites — all 6 faction rosters | 128×128 | ⬜ |

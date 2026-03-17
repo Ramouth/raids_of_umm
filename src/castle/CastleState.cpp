@@ -230,10 +230,11 @@ void CastleState::render() {
         std::snprintf(buf, sizeof(buf), "Gold: %d", m_treasury[Resource::Gold]);
     m_hud.drawText(l.panelX + 10*l.sc, l.tY, l.sc * 1.2f, buf, {1.0f, 0.85f, 0.2f, 1.0f});
 
-    std::snprintf(buf, sizeof(buf), "Bone:%d  Crystal:%d  Amber:%d",
-                  m_treasury[Resource::BoneDust],
-                  m_treasury[Resource::SandCrystal],
-                  m_treasury[Resource::Amber]);
+    std::snprintf(buf, sizeof(buf), "Wood:%d  Stone:%d  Obsidian:%d  Crystal:%d",
+                  m_treasury[Resource::Wood],
+                  m_treasury[Resource::Stone],
+                  m_treasury[Resource::Obsidian],
+                  m_treasury[Resource::Crystal]);
     m_hud.drawText(l.panelX + 10*l.sc, l.tY2, l.sc * 1.0f, buf, {0.75f, 0.75f, 0.65f, 1.0f});
 
     // ── Separator ─────────────────────────────────────────────────────────────

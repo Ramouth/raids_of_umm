@@ -15,7 +15,11 @@ void TurnManager::init(int startingGold) {
     Faction player;
     player.id   = Faction::Player;
     player.name = "Player";
-    player.treasury[Resource::Gold] = startingGold;
+    player.treasury[Resource::Gold]     = startingGold;
+    player.treasury[Resource::Wood]     = 5;
+    player.treasury[Resource::Stone]    = 5;
+    player.treasury[Resource::Obsidian] = 2;
+    player.treasury[Resource::Crystal]  = 2;
     m_factions.push_back(std::move(player));
 }
 

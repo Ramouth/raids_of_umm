@@ -4,24 +4,20 @@
 #include <algorithm>
 
 /*
- * Umm'Natur resource types — desert/Egyptian-themed replacements for HoMM3.
+ * Umm'Natur resource types — natural/geological, faction-agnostic.
  *
- *  Gold         — universal currency
- *  SandCrystal  — replaces wood (construction, training)
- *  BoneDust     — replaces ore  (fortifications, heavy units)
- *  DjinnEssence — replaces gems (spellcasting, arcane items)
- *  AncientRelic — replaces sulfur (siege engines, powerful spells)
- *  MercuryTears — replaces mercury (rare potions, hero advancement)
- *  Amber        — replaces crystal (desert resin, enchantment)
+ *  Gold     — universal currency
+ *  Wood     — construction, siege engines          (+2/day Sawmill)
+ *  Stone    — fortification, heavy units            (+2/day Quarry)
+ *  Obsidian — refined weapons, rare volcanic glass  (+1/day Obsidian Vent)
+ *  Crystal  — magical, arcane components            (+1/day Crystal Cavern)
  */
 enum class Resource : int {
-    Gold         = 0,
-    SandCrystal  = 1,
-    BoneDust     = 2,
-    DjinnEssence = 3,
-    AncientRelic = 4,
-    MercuryTears = 5,
-    Amber        = 6,
+    Gold     = 0,
+    Wood     = 1,
+    Stone    = 2,
+    Obsidian = 3,
+    Crystal  = 4,
 
     COUNT
 };
@@ -30,12 +26,10 @@ constexpr int RESOURCE_COUNT = static_cast<int>(Resource::COUNT);
 
 constexpr std::array<std::string_view, RESOURCE_COUNT> RESOURCE_NAMES = {{
     "Gold",
-    "Sand Crystal",
-    "Bone Dust",
-    "Djinn Essence",
-    "Ancient Relic",
-    "Mercury Tears",
-    "Amber"
+    "Wood",
+    "Stone",
+    "Obsidian",
+    "Crystal"
 }};
 
 inline std::string_view resourceName(Resource r) {

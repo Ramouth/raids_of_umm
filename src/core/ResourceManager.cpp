@@ -7,8 +7,7 @@ using json = nlohmann::json;
 
 // JSON key names for each Resource enum slot (matches data/units.json).
 static const char* kResourceKeys[] = {
-    "Gold", "SandCrystal", "BoneDust",
-    "DjinnEssence", "AncientRelic", "MercuryTears", "Amber"
+    "Gold", "Wood", "Stone", "Obsidian", "Crystal"
 };
 static_assert(sizeof(kResourceKeys) / sizeof(kResourceKeys[0]) == RESOURCE_COUNT,
               "kResourceKeys must match RESOURCE_COUNT");
@@ -195,11 +194,14 @@ std::optional<std::string> ResourceManager::loadBuildings(const std::string& pat
 
     // String → ObjType lookup table.
     static const std::unordered_map<std::string, ObjType> kObjTypeMap = {
-        { "GoldMine",    ObjType::GoldMine    },
-        { "CrystalMine", ObjType::CrystalMine },
-        { "Town",        ObjType::Town        },
-        { "Dungeon",     ObjType::Dungeon     },
-        { "Artifact",    ObjType::Artifact    },
+        { "GoldMine",     ObjType::GoldMine     },
+        { "CrystalMine",  ObjType::CrystalMine  },
+        { "Town",         ObjType::Town         },
+        { "Dungeon",      ObjType::Dungeon      },
+        { "Artifact",     ObjType::Artifact     },
+        { "Sawmill",      ObjType::Sawmill      },
+        { "Quarry",       ObjType::Quarry       },
+        { "ObsidianVent", ObjType::ObsidianVent },
     };
 
     for (const auto& j : root.value("mineIncome", json::array())) {
