@@ -27,6 +27,9 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
         case Terrain::River:    return { 0.30f, 0.55f, 0.85f };  // bright blue water
         case Terrain::Wall:     return { 0.60f, 0.58f, 0.55f };  // pale stone
         case Terrain::Battle:   return { 0.75f, 0.20f, 0.20f };  // blood-red
+        case Terrain::Grass:    return { 0.30f, 0.62f, 0.22f };  // lush Celtic green
+        case Terrain::Forest:   return { 0.12f, 0.38f, 0.12f };  // dark forest green
+        case Terrain::Highland: return { 0.45f, 0.58f, 0.32f };  // muted moorland
         default:                return { 1.00f, 0.00f, 1.00f }; // magenta = unknown
     }
 }
@@ -44,6 +47,7 @@ inline float terrainHeight(Terrain t) noexcept {
         case Terrain::Ruins:    return 0.04f;
         case Terrain::Mountain: return 0.25f;  // tall mountains
         case Terrain::Wall:     return 0.15f;  // walls are tall
+        case Terrain::Highland: return 0.08f;  // gently elevated moorland
         default:                return 0.00f;
     }
 }

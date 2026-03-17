@@ -27,6 +27,11 @@ enum class Terrain : uint8_t {
     Wall     = 8,  // completely impassable
     Battle   = 9,  // combat encounter
 
+    // ── Northern biome ────────────────────────────────────────────────────
+    Grass    = 10, // lush Highland meadow — base terrain for Verdant Reach
+    Forest   = 11, // dense Celtic woodland — slow movement
+    Highland = 12, // rocky moorland — elevated, medium cost
+
     COUNT  // must remain last — used for iteration and bounds checks
 };
 
@@ -55,6 +60,9 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
         case Terrain::River:     return "River";
         case Terrain::Wall:     return "Wall";
         case Terrain::Battle:   return "Battle";
+        case Terrain::Grass:    return "Grass";
+        case Terrain::Forest:   return "Forest";
+        case Terrain::Highland: return "Highland";
         default:                return "Unknown";
     }
 }
@@ -76,6 +84,9 @@ constexpr float terrainDefaultMoveCost(Terrain t) noexcept {
         case Terrain::Wall:     return 0.0f;  // impassable
         case Terrain::Battle:   return 1.0f;  // triggers combat
         case Terrain::Obsidian: return 0.0f;  // impassable
+        case Terrain::Grass:    return 1.0f;  // open meadow — easy movement
+        case Terrain::Forest:   return 1.5f;  // dense woodland — slows movement
+        case Terrain::Highland: return 1.25f; // rocky moorland — slightly slower
         default:                return 1.0f;
     }
 }

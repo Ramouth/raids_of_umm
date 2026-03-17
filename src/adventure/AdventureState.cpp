@@ -182,6 +182,8 @@ void AdventureState::onEnter() {
     m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
     m_buildingSpriteRenderer.init();
     m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
+    m_clanCastleRenderer.init();
+    m_clanCastleRenderer.loadSprite("assets/textures/objects/clan_castle.png");
     m_goldMineSpriteRenderer.init();
     m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
     m_crystalMineSpriteRenderer.init();
@@ -506,12 +508,14 @@ void AdventureState::checkWinConditions() {
 }
 
 void AdventureState::initMap() {
-    // Try the canonical map first; fall back to procedural if missing.
-    if (auto err = m_map.loadJson("data/maps/default.json")) {
-        // Canonical map not found — generate procedurally as fallback.
-        m_map.generateProcedural(12, /*seed=*/0);
-    } else {
+    // Try the Pale Divide campaign map first, then default, then procedural.
+    if (!m_map.loadJson("data/maps/the_pale_divide.json")) {
+        m_mapPath = "data/maps/the_pale_divide.json";
+    } else if (!m_map.loadJson("data/maps/default.json")) {
         m_mapPath = "data/maps/default.json";
+    } else {
+        // Canonical maps not found — generate procedurally as fallback.
+        m_map.generateProcedural(12, /*seed=*/0);
     }
 }
 
@@ -1275,10 +1279,16 @@ void AdventureState::renderObjects() {
                                              m_cam.viewMatrix(), m_cam.projMatrix());
                 break;
             }
-            case ObjType::Town:
-                m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
-                                              m_cam.viewMatrix(), m_cam.projMatrix());
+            case ObjType::Town: {
+                // Use clan castle sprite for Verdant Reach towns (factionId == 1).
+                SpriteRenderer& townRenderer =
+                    (obj.factionId == Faction::Player)
+                    ? m_clanCastleRenderer
+                    : m_buildingSpriteRenderer;
+                townRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
+                                  m_cam.viewMatrix(), m_cam.projMatrix());
                 break;
+            }
             case ObjType::GoldMine:
                 m_goldMineSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
                                               m_cam.viewMatrix(), m_cam.projMatrix());
