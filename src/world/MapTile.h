@@ -38,6 +38,7 @@ struct MapTile {
     bool    passable = true;
     float   moveCost = 1.0f;   // 1.0 = normal cost; Obsidian sets passable=false
     uint8_t variant  = 0;      // texture variant index (0 = default)
+    bool    road     = false;  // road overlay — halves effective moveCost
 };
 
 // ── Helpers (data queries — not presentation) ─────────────────────────────────

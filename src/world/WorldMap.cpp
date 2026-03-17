@@ -49,20 +49,26 @@ static Terrain terrainFromStr(const std::string& s) noexcept {
 
 static const char* objTypeToStr(ObjType t) noexcept {
     switch (t) {
-        case ObjType::Town:        return "town";
-        case ObjType::Dungeon:     return "dungeon";
-        case ObjType::GoldMine:    return "gold_mine";
-        case ObjType::CrystalMine: return "crystal_mine";
-        case ObjType::Artifact:    return "artifact";
-        default:                   return "town";
+        case ObjType::Town:         return "town";
+        case ObjType::Dungeon:      return "dungeon";
+        case ObjType::GoldMine:     return "gold_mine";
+        case ObjType::CrystalMine:  return "crystal_mine";
+        case ObjType::Artifact:     return "artifact";
+        case ObjType::Sawmill:      return "sawmill";
+        case ObjType::Quarry:       return "quarry";
+        case ObjType::ObsidianVent: return "obsidian_vent";
+        default:                    return "town";
     }
 }
 
 static ObjType objTypeFromStr(const std::string& s) noexcept {
-    if (s == "dungeon")      return ObjType::Dungeon;
-    if (s == "gold_mine")    return ObjType::GoldMine;
-    if (s == "crystal_mine") return ObjType::CrystalMine;
-    if (s == "artifact")     return ObjType::Artifact;
+    if (s == "dungeon")       return ObjType::Dungeon;
+    if (s == "gold_mine")     return ObjType::GoldMine;
+    if (s == "crystal_mine")  return ObjType::CrystalMine;
+    if (s == "artifact")      return ObjType::Artifact;
+    if (s == "sawmill")       return ObjType::Sawmill;
+    if (s == "quarry")        return ObjType::Quarry;
+    if (s == "obsidian_vent") return ObjType::ObsidianVent;
     return ObjType::Town;
 }
 
@@ -167,14 +173,16 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
 
         json tiles = json::array();
         for (const auto& [coord, tile] : m_grid) {
-            tiles.push_back({
+            json t = {
                 {"q",        coord.q},
                 {"r",        coord.r},
                 {"terrain",  terrainToStr(tile.terrain)},
                 {"passable", tile.passable},
                 {"moveCost", tile.moveCost},
                 {"variant",  (int)tile.variant}
-            });
+            };
+            if (tile.road) t["road"] = true;  // omit key when false to keep maps compact
+            tiles.push_back(std::move(t));
         }
         j["tiles"] = std::move(tiles);
 
@@ -226,6 +234,8 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
             tile.passable = t.value("passable", true);
             tile.moveCost = t.value("moveCost", 1.0f);
             tile.variant  = static_cast<uint8_t>(t.value("variant", 0));
+            tile.road     = t.value("road", false);
+            if (tile.road) tile.moveCost = std::min(tile.moveCost, 0.5f);
             m_grid.set(coord, tile);
         }
 

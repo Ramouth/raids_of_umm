@@ -257,7 +257,8 @@
       "terrain": "dune",
       "passable": true,
       "moveCost": 1.3,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": -4,
@@ -353,7 +354,8 @@
       "terrain": "dune",
       "passable": true,
       "moveCost": 1.3,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": -3,
@@ -457,7 +459,8 @@
       "terrain": "sand",
       "passable": true,
       "moveCost": 1.0,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": -2,
@@ -569,7 +572,8 @@
       "terrain": "sand",
       "passable": true,
       "moveCost": 1.0,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": -1,
@@ -689,7 +693,8 @@
       "terrain": "sand",
       "passable": true,
       "moveCost": 1.0,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": 0,
@@ -801,7 +806,8 @@
       "terrain": "sand",
       "passable": true,
       "moveCost": 1.0,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": 1,
@@ -913,7 +919,8 @@
       "terrain": "sand",
       "passable": true,
       "moveCost": 1.0,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": 2,
@@ -1009,7 +1016,8 @@
       "terrain": "dune",
       "passable": true,
       "moveCost": 1.3,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": 3,
@@ -1105,7 +1113,8 @@
       "terrain": "dune",
       "passable": true,
       "moveCost": 1.3,
-      "variant": 0
+      "variant": 0,
+      "road": true
     },
     {
       "q": 4,

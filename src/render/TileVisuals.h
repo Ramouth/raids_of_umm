@@ -31,6 +31,11 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
     }
 }
 
+// Packed-earth / stone-block road path overlay color.
+inline glm::vec3 roadColor() noexcept {
+    return { 0.68f, 0.55f, 0.38f };  // worn sandstone road
+}
+
 // Vertical height offset for a terrain tile (visual layering on the map).
 inline float terrainHeight(Terrain t) noexcept {
     switch (t) {
@@ -47,11 +52,14 @@ inline float terrainHeight(Terrain t) noexcept {
 
 inline glm::vec3 objTypeColor(ObjType t) noexcept {
     switch (t) {
-        case ObjType::Town:        return { 0.20f, 0.80f, 0.90f };
-        case ObjType::Dungeon:     return { 0.75f, 0.12f, 0.12f };
-        case ObjType::GoldMine:    return { 0.95f, 0.70f, 0.10f };
-        case ObjType::CrystalMine: return { 0.50f, 0.80f, 0.95f };
-        case ObjType::Artifact:    return { 1.00f, 1.00f, 1.00f };
-        default:                   return { 1.00f, 0.00f, 1.00f };
+        case ObjType::Town:         return { 0.20f, 0.80f, 0.90f };
+        case ObjType::Dungeon:      return { 0.75f, 0.12f, 0.12f };
+        case ObjType::GoldMine:     return { 0.95f, 0.70f, 0.10f };
+        case ObjType::CrystalMine:  return { 0.50f, 0.80f, 0.95f };
+        case ObjType::Artifact:     return { 1.00f, 1.00f, 1.00f };
+        case ObjType::Sawmill:      return { 0.55f, 0.35f, 0.10f };
+        case ObjType::Quarry:       return { 0.65f, 0.60f, 0.55f };
+        case ObjType::ObsidianVent: return { 0.20f, 0.10f, 0.30f };
+        default:                    return { 1.00f, 0.00f, 1.00f };
     }
 }

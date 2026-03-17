@@ -433,7 +433,7 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
     auto& ctrl = m_objectControl[coord];
     ctrl.objType = obj->type;
     // Note: guardDefeated for dungeons is set in onResume() when DungeonOutcome.completed is true.
-    if (obj->type != ObjType::Town && obj->type != ObjType::Dungeon)
+    if (obj->type != ObjType::Dungeon)
         ctrl.ownerFaction = 1;
     std::cout << "  *** Visited " << obj->typeName() << ": " << obj->name << " ***\n";
 
@@ -838,7 +838,7 @@ void AdventureState::render() {
                      static_cast<int>(m_objectControl.size()),
                      m_hero.pos.q, m_hero.pos.r, m_infiniteMoves,
                      m_turnManager.playerFaction().treasury[Resource::Gold],
-                     m_turnManager.playerFaction().treasury[Resource::SandCrystal]);
+                     m_turnManager.playerFaction().treasury[Resource::Crystal]);
 
         // ── Army panel (bottom-right) ─────────────────────────────────────────
         int sw = app.width(), sh = app.height();
@@ -990,6 +990,7 @@ void AdventureState::renderTerrain() {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         GLuint tex      = m_hexRenderer.terrainTex(tile.terrain);
         glm::vec3 color = (tex != 0) ? glm::vec3(1.0f) : terrainColor(tile.terrain);
+        if (tile.road) color = glm::mix(color, roadColor(), 0.55f);
         float h         = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, h, tex, {off.dx, off.dz});
     }
