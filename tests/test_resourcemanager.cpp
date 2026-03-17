@@ -39,8 +39,8 @@ SUITE("ResourceManager — unit cost is parsed") {
     rm.load("data");
     const UnitType* u = rm.unit("skeleton_warrior");
     CHECK(u != nullptr);
-    CHECK_EQ(u->cost[Resource::Gold], 60);
-    CHECK_EQ(u->cost[Resource::BoneDust], 0);
+    CHECK_EQ(u->cost[Resource::Gold],  60);
+    CHECK_EQ(u->cost[Resource::Stone], 0);
 }
 
 SUITE("ResourceManager — abilities are parsed") {
@@ -449,12 +449,12 @@ SUITE("ResourceManager — mineIncome returns 1000 gold for GoldMine") {
     CHECK_EQ(income[Resource::Gold], 1000);
 }
 
-SUITE("ResourceManager — mineIncome returns 2 SandCrystal for CrystalMine") {
+SUITE("ResourceManager — mineIncome returns 2 Crystal for CrystalMine") {
     ResourceManager rm;
     rm.load("data");
     ResourcePool income = rm.mineIncome(ObjType::CrystalMine);
-    CHECK_EQ(income[Resource::SandCrystal], 2);
-    CHECK_EQ(income[Resource::Gold], 0);
+    CHECK_EQ(income[Resource::Crystal], 2);
+    CHECK_EQ(income[Resource::Gold],    0);
 }
 
 SUITE("ResourceManager — mineIncome returns empty pool for non-mine type") {
@@ -471,8 +471,8 @@ SUITE("ResourceManager — mineIncome GoldMine has zero non-gold resources") {
     ResourceManager rm;
     rm.load("data");
     ResourcePool income = rm.mineIncome(ObjType::GoldMine);
-    CHECK_EQ(income[Resource::SandCrystal], 0);
-    CHECK_EQ(income[Resource::BoneDust],    0);
+    CHECK_EQ(income[Resource::Wood],  0);
+    CHECK_EQ(income[Resource::Stone], 0);
 }
 
 #endif // RESOURCE_MANAGER_IMPL

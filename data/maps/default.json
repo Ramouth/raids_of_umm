@@ -1404,6 +1404,24 @@
       "name": "Eye of Djangjix",
       "q": -2,
       "r": 3
+    },
+    {
+      "type": "sawmill",
+      "name": "Northern Sawmill",
+      "q": 2,
+      "r": -1
+    },
+    {
+      "type": "quarry",
+      "name": "Desert Quarry",
+      "q": -3,
+      "r": -2
+    },
+    {
+      "type": "obsidian_vent",
+      "name": "Obsidian Vent",
+      "q": 3,
+      "r": 1
     }
   ]
 }

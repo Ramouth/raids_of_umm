@@ -6,14 +6,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 SUITE("Resource — enum values are contiguous from 0") {
-    CHECK_EQ((int)Resource::Gold,         0);
-    CHECK_EQ((int)Resource::SandCrystal,  1);
-    CHECK_EQ((int)Resource::BoneDust,     2);
-    CHECK_EQ((int)Resource::DjinnEssence, 3);
-    CHECK_EQ((int)Resource::AncientRelic, 4);
-    CHECK_EQ((int)Resource::MercuryTears, 5);
-    CHECK_EQ((int)Resource::Amber,        6);
-    CHECK_EQ(RESOURCE_COUNT,              7);
+    CHECK_EQ((int)Resource::Gold,     0);
+    CHECK_EQ((int)Resource::Wood,     1);
+    CHECK_EQ((int)Resource::Stone,    2);
+    CHECK_EQ((int)Resource::Obsidian, 3);
+    CHECK_EQ((int)Resource::Crystal,  4);
+    CHECK_EQ(RESOURCE_COUNT,          5);
 }
 
 SUITE("Resource — resourceName covers all values") {
@@ -39,15 +37,15 @@ SUITE("ResourcePool — default construction is all zeros") {
 
 SUITE("ResourcePool — operator[] read / write") {
     ResourcePool p;
-    p[Resource::Gold]        = 1000;
-    p[Resource::SandCrystal] = 5;
-    p[Resource::Amber]       = 3;
+    p[Resource::Gold]    = 1000;
+    p[Resource::Wood]    = 5;
+    p[Resource::Crystal] = 3;
 
-    CHECK_EQ(p[Resource::Gold],        1000);
-    CHECK_EQ(p[Resource::SandCrystal], 5);
-    CHECK_EQ(p[Resource::Amber],       3);
+    CHECK_EQ(p[Resource::Gold],    1000);
+    CHECK_EQ(p[Resource::Wood],    5);
+    CHECK_EQ(p[Resource::Crystal], 3);
     // Unset resources remain zero
-    CHECK_EQ(p[Resource::BoneDust],    0);
+    CHECK_EQ(p[Resource::Stone],   0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,14 +54,14 @@ SUITE("ResourcePool — operator[] read / write") {
 
 SUITE("ResourcePool — operator+") {
     ResourcePool a, b;
-    a[Resource::Gold]   = 500;
-    a[Resource::Amber]  = 2;
-    b[Resource::Gold]   = 300;
-    b[Resource::Amber]  = 1;
+    a[Resource::Gold]    = 500;
+    a[Resource::Obsidian] = 2;
+    b[Resource::Gold]    = 300;
+    b[Resource::Obsidian] = 1;
 
     ResourcePool sum = a + b;
-    CHECK_EQ(sum[Resource::Gold],  800);
-    CHECK_EQ(sum[Resource::Amber], 3);
+    CHECK_EQ(sum[Resource::Gold],    800);
+    CHECK_EQ(sum[Resource::Obsidian], 3);
     // Original pools unchanged
     CHECK_EQ(a[Resource::Gold],  500);
     CHECK_EQ(b[Resource::Gold],  300);
@@ -82,11 +80,11 @@ SUITE("ResourcePool — operator+=") {
     ResourcePool a, b;
     a[Resource::Gold] = 400;
     b[Resource::Gold] = 100;
-    b[Resource::Amber] = 2;
+    b[Resource::Obsidian] = 2;
 
     a += b;
-    CHECK_EQ(a[Resource::Gold],  500);
-    CHECK_EQ(a[Resource::Amber], 2);
+    CHECK_EQ(a[Resource::Gold],    500);
+    CHECK_EQ(a[Resource::Obsidian], 2);
 }
 
 SUITE("ResourcePool — operator-=") {
@@ -105,9 +103,9 @@ SUITE("ResourcePool — operator-=") {
 SUITE("ResourcePool — canAfford: sufficient funds") {
     ResourcePool treasury, cost;
     treasury[Resource::Gold]    = 1000;
-    treasury[Resource::Amber]   = 5;
+    treasury[Resource::Obsidian] = 5;
     cost[Resource::Gold]        = 500;
-    cost[Resource::Amber]       = 3;
+    cost[Resource::Obsidian]    = 3;
     CHECK(treasury.canAfford(cost));
 }
 
@@ -121,9 +119,9 @@ SUITE("ResourcePool — canAfford: exact funds") {
 SUITE("ResourcePool — canAfford: insufficient one resource") {
     ResourcePool treasury, cost;
     treasury[Resource::Gold]    = 1000;
-    treasury[Resource::Amber]   = 1;   // only 1 but need 3
+    treasury[Resource::Obsidian] = 1;   // only 1 but need 3
     cost[Resource::Gold]        = 500;
-    cost[Resource::Amber]       = 3;
+    cost[Resource::Obsidian]    = 3;
     CHECK(!treasury.canAfford(cost));
 }
 
@@ -146,13 +144,13 @@ SUITE("ResourcePool — canAfford: empty cost is always affordable") {
 
 SUITE("ResourcePool — clampPositive removes negatives") {
     ResourcePool p;
-    p[Resource::Gold]       =  500;
-    p[Resource::SandCrystal] = -3;  // deficit from overspending
-    p[Resource::Amber]       = -1;
+    p[Resource::Gold]    =  500;
+    p[Resource::Wood]    = -3;  // deficit from overspending
+    p[Resource::Obsidian] = -1;
 
     p.clampPositive();
 
-    CHECK_EQ(p[Resource::Gold],        500);  // positive unchanged
-    CHECK_EQ(p[Resource::SandCrystal], 0);    // clamped
-    CHECK_EQ(p[Resource::Amber],       0);    // clamped
+    CHECK_EQ(p[Resource::Gold],    500);  // positive unchanged
+    CHECK_EQ(p[Resource::Wood],    0);    // clamped
+    CHECK_EQ(p[Resource::Obsidian], 0);   // clamped
 }

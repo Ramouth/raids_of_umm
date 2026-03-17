@@ -34,11 +34,12 @@ SUITE("TurnManager — init then setTreasury round-trip") {
     TurnManager tm;
     tm.init(0);
     tm.playerFaction().treasury[Resource::Gold] = 3500;
-    tm.playerFaction().treasury[Resource::SandCrystal] = 42;
+    tm.playerFaction().treasury[Resource::Wood]  = 42;
 
     CHECK_EQ(tm.playerFaction().treasury[Resource::Gold], 3500);
-    CHECK_EQ(tm.playerFaction().treasury[Resource::SandCrystal], 42);
-    CHECK_EQ(tm.playerFaction().treasury[Resource::BoneDust], 0);
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Wood], 42);
+    // Stone is seeded to 5 by init; verify it wasn't disturbed
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Stone], 5);
 }
 
 // ── Mine income via nextDay ───────────────────────────────────────────────────
@@ -106,8 +107,9 @@ SUITE("TurnManager — nextDay accumulates income from two owned mines") {
 
     tm.nextDay(hero, control, rm, towns);
 
-    CHECK_EQ(tm.playerFaction().treasury[Resource::Gold],        1000);
-    CHECK_EQ(tm.playerFaction().treasury[Resource::SandCrystal], 2);
+    // init(0) seeds Crystal=2; CrystalMine adds 2/day → total 4
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Gold],    1000);
+    CHECK_EQ(tm.playerFaction().treasury[Resource::Crystal], 4);
 }
 
 SUITE("TurnManager — nextDay advances day counter") {
@@ -158,7 +160,7 @@ SUITE("Session JSON — parse hero fields") {
         "version": 1,
         "mapPath": "data/maps/default.json",
         "day": 7,
-        "treasury": [1500, 10, 0, 0, 0, 0, 0],
+        "treasury": [1500, 10, 0, 0, 0],
         "hero": {
             "name": "Hero",
             "pos": {"q": 3, "r": -1},
@@ -180,7 +182,7 @@ SUITE("Session JSON — parse hero fields") {
                 "equipped": [null, null, null, null]
             }],
             "items": ["scarab_amulet"],
-            "wallet": [200, 5, 0, 0, 0, 0, 0]
+            "wallet": [200, 5, 0, 0, 0]
         },
         "objectControl": [
             {"q": 5, "r": 2, "ownerFaction": 1, "guardDefeated": true, "objType": 1}
@@ -242,7 +244,7 @@ SUITE("Session JSON — missing optional fields use defaults") {
         "version": 1,
         "mapPath": "",
         "day": 1,
-        "treasury": [2000, 0, 0, 0, 0, 0, 0],
+        "treasury": [2000, 0, 0, 0, 0],
         "hero": {
             "name": "Hero",
             "pos": {"q": 0, "r": 0},
@@ -251,7 +253,7 @@ SUITE("Session JSON — missing optional fields use defaults") {
             "army": [null,null,null,null,null,null,null],
             "specials": [],
             "items": [],
-            "wallet": [0,0,0,0,0,0,0]
+            "wallet": [0,0,0,0,0]
         },
         "objectControl": [],
         "townStates": []

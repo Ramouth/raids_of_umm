@@ -8,7 +8,7 @@
       "effects": [
         { "stat": "speed", "bonus": 2 }
       ],
-      "cost": { "Gold": 5000, "DjinnEssence": 1 }
+      "cost": { "Gold": 5000, "Crystal": 1 }
     },
     {
       "id": "pharaoh_crown",
@@ -19,7 +19,7 @@
         { "stat": "spellpower", "bonus": 3 },
         { "stat": "knowledge", "bonus": 2 }
       ],
-      "cost": { "Gold": 12000, "AncientRelic": 3, "BoneDust": 2 }
+      "cost": { "Gold": 12000, "Obsidian": 3, "Stone": 2 }
     },
     {
       "id": "ankh_of_protection",
@@ -29,7 +29,7 @@
       "effects": [
         { "stat": "defense", "bonus": 4 }
       ],
-      "cost": { "Gold": 4000, "Amber": 2 }
+      "cost": { "Gold": 4000, "Obsidian": 2 }
     }
   ]
 }

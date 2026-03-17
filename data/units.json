@@ -16,12 +16,10 @@
       "weeklyGrowth": 12,
       "cost": {
         "Gold": 60,
-        "BoneDust": 0,
-        "SandCrystal": 0,
-        "DjinnEssence": 0,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
       },
       "attackType": "physical",
       "abilities": ["undead"],
@@ -44,12 +42,10 @@
       "weeklyGrowth": 5,
       "cost": {
         "Gold": 250,
-        "BoneDust": 1,
-        "SandCrystal": 0,
-        "DjinnEssence": 0,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 1,
+        "Obsidian": 0,
+        "Crystal": 0
       },
       "attackType": "physical",
       "abilities": ["undead", "curse_strike"],
@@ -72,12 +68,10 @@
       "weeklyGrowth": 3,
       "cost": {
         "Gold": 700,
-        "BoneDust": 0,
-        "SandCrystal": 0,
-        "DjinnEssence": 2,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 2
       },
       "attackType": "magical",
       "abilities": ["flying", "magic_resistance"],
@@ -100,12 +94,10 @@
       "weeklyGrowth": 7,
       "cost": {
         "Gold": 135,
-        "BoneDust": 0,
-        "SandCrystal": 1,
-        "DjinnEssence": 0,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
       },
       "attackType": "physical",
       "abilities": ["poison_strike"],
@@ -128,12 +120,10 @@
       "weeklyGrowth": 8,
       "cost": {
         "Gold": 120,
-        "BoneDust": 0,
-        "SandCrystal": 0,
-        "DjinnEssence": 0,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 1
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 1,
+        "Crystal": 0
       },
       "attackType": "piercing",
       "abilities": [],
@@ -156,12 +146,10 @@
       "weeklyGrowth": 1,
       "cost": {
         "Gold": 2000,
-        "BoneDust": 0,
-        "SandCrystal": 0,
-        "DjinnEssence": 0,
-        "AncientRelic": 3,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 3,
+        "Obsidian": 0,
+        "Crystal": 0
       },
       "attackType": "physical",
       "abilities": ["no_retaliation_cap", "large_creature"],
@@ -184,19 +172,16 @@
       "weeklyGrowth": 1,
       "cost": {
         "Gold": 4000,
-        "BoneDust": 2,
-        "SandCrystal": 0,
-        "DjinnEssence": 2,
-        "AncientRelic": 1,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 2,
+        "Obsidian": 0,
+        "Crystal": 2
       },
       "attackType": "magical",
       "abilities": ["undead", "flying", "raise_dead", "aura_of_decay"],
       "meshId": "pharaoh_lich",
       "textureId": "pharaoh_lich"
-    }
-    ,
+    },
     {
       "id": "sand_wraith",
       "name": "Sand Wraith",
@@ -213,12 +198,10 @@
       "weeklyGrowth": 14,
       "cost": {
         "Gold": 70,
-        "BoneDust": 0,
-        "SandCrystal": 0,
-        "DjinnEssence": 1,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 1
       },
       "attackType": "magical",
       "abilities": ["flying", "incorporeal"],
@@ -241,12 +224,10 @@
       "weeklyGrowth": 4,
       "cost": {
         "Gold": 450,
-        "BoneDust": 0,
-        "SandCrystal": 1,
-        "DjinnEssence": 1,
-        "AncientRelic": 0,
-        "MercuryTears": 0,
-        "Amber": 0
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 1
       },
       "attackType": "magical",
       "abilities": ["flying", "chain_lightning"],

@@ -1,6 +1,10 @@
 {
   "mineIncome": [
-    { "type": "GoldMine",    "dailyIncome": { "Gold": 1000 } },
-    { "type": "CrystalMine", "dailyIncome": { "SandCrystal": 2 } }
+    { "type": "Town",         "dailyIncome": { "Gold": 500 } },
+    { "type": "GoldMine",     "dailyIncome": { "Gold": 1000 } },
+    { "type": "CrystalMine",  "dailyIncome": { "Crystal": 2 } },
+    { "type": "Sawmill",      "dailyIncome": { "Wood": 2 } },
+    { "type": "Quarry",       "dailyIncome": { "Stone": 2 } },
+    { "type": "ObsidianVent", "dailyIncome": { "Obsidian": 1 } }
   ]
 }
