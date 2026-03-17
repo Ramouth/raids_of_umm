@@ -298,9 +298,6 @@ void AdventureState::onResume() {
     if (m_pendingCombat) {
         CombatOutcome result = std::move(*m_pendingCombat);
         m_pendingCombat.reset();
-        std::cout << "[Debug] onResume: combatAIIdx=" << m_combatAIHeroIdx
-                  << " result=" << static_cast<int>(result.result)
-                  << " aiHeroes=" << m_aiHeroes.size() << "\n";
 
         // Sync hero army from survivors (skip SC units — they live in specials, not army).
         for (auto& slot : m_hero.army) slot = {};
