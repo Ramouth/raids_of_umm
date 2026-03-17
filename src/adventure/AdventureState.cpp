@@ -239,6 +239,8 @@ void AdventureState::onEnter() {
     m_heroTargetPos = m_heroRenderPos;
 
     recomputeVisibility();
+    m_miniMap.init(m_map);
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
 
     std::cout << "[Adventure] Day " << m_turnManager.day() << " — " << m_map.name() << "\n";
     std::cout << "  Click hero to select, then click a tile to move.\n";
@@ -726,6 +728,18 @@ bool AdventureState::handleEvent(void* sdlEvent) {
             return true;
         }
 
+        // Minimap click-to-pan: check before world-map handling.
+        if (m_miniMap.ready()) {
+            int mapSize = static_cast<int>(app2.height() / 600.0f * 180);
+            HexCoord target = m_miniMap.screenToHex(mx, my, app2.width(), app2.height(), mapSize);
+            if (target.q != INT_MIN) {
+                float wx, wz;
+                target.toWorld(HEX_SIZE, wx, wz);
+                m_cam.setPosition({wx, wz});
+                return true;
+            }
+        }
+
         glm::vec2 wp      = m_cam.screenToWorld(e->button.x, e->button.y);
         HexCoord  clicked = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
 
@@ -813,6 +827,7 @@ void AdventureState::update(float dt) {
         
         ++m_moveQueueIdx;
         recomputeVisibility(m_moveQueue[m_moveQueueIdx]);
+        m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
         float hx, hz;
         m_moveQueue[m_moveQueueIdx].toWorld(HEX_SIZE, hx, hz);
         m_heroTargetPos = { hx, 0.0f, hz };
@@ -998,6 +1013,14 @@ void AdventureState::render() {
 
     if (m_showExitPrompt)
         renderExitPrompt(app.width(), app.height());
+
+    // Minimap — bottom-left corner, always visible
+    if (m_miniMap.ready()) {
+        int sw = app.width(), sh = app.height();
+        int mapSize = static_cast<int>(sh / 600.0f * 180);
+        m_hud.begin(sw, sh);
+        m_miniMap.render(m_hud, sw, sh, mapSize);
+    }
 
     // Notification banner (artifact pickup etc.) — fades over NOTIFY_DURATION seconds.
     if (m_notifyTimer > 0.0f && !m_notification.empty()) {
@@ -1432,6 +1455,8 @@ void AdventureState::loadSession() {
     for (const auto& e : j.value("explored", json::array()))
         m_explored.insert({ e["q"].get<int>(), e["r"].get<int>() });
     recomputeVisibility();  // rebuild m_visible from restored hero pos
+    m_miniMap.init(m_map);
+    m_miniMap.update(m_map, m_explored, m_visible, m_hero, m_objectControl);
 
     // Recentre camera on restored hero position.
     float hx, hz;

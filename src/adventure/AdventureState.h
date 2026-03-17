@@ -12,6 +12,7 @@
 #include "render/HUDRenderer.h"
 #include "render/Camera2D.h"
 #include "render/RenderOffsets.h"
+#include "render/MiniMap.h"
 #include "hex/HexCoord.h"
 #include "world/ObjectControl.h"
 #include "world/TownState.h"
@@ -184,6 +185,7 @@ private:
     std::unordered_set<HexCoord> m_explored;
 
     RenderOffsetConfig m_offsets;
+    MiniMap            m_miniMap;
 
     static constexpr int   SIGHT_RADIUS    = 4;
     static constexpr float HEX_SIZE        = 1.0f;
