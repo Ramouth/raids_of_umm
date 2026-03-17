@@ -17,20 +17,23 @@
 
 inline glm::vec3 terrainColor(Terrain t) noexcept {
     switch (t) {
-        case Terrain::Sand:     return { 0.96f, 0.87f, 0.58f };  // bright sand
-        case Terrain::Dune:     return { 0.85f, 0.72f, 0.45f };  // golden dune
-        case Terrain::Rock:     return { 0.65f, 0.58f, 0.50f };  // warm rock
-        case Terrain::Oasis:    return { 0.35f, 0.75f, 0.55f };  // vibrant green-blue
-        case Terrain::Ruins:    return { 0.78f, 0.70f, 0.58f };  // sun-bleached stone
-        case Terrain::Obsidian: return { 0.22f, 0.20f, 0.25f };  // dark volcanic
-        case Terrain::Mountain: return { 0.50f, 0.45f, 0.42f };  // dusty brown-gray
-        case Terrain::River:    return { 0.30f, 0.55f, 0.85f };  // bright blue water
-        case Terrain::Wall:     return { 0.60f, 0.58f, 0.55f };  // pale stone
-        case Terrain::Battle:   return { 0.75f, 0.20f, 0.20f };  // blood-red
-        case Terrain::Grass:    return { 0.30f, 0.62f, 0.22f };  // lush Celtic green
-        case Terrain::Forest:   return { 0.12f, 0.38f, 0.12f };  // dark forest green
-        case Terrain::Highland: return { 0.45f, 0.58f, 0.32f };  // muted moorland
-        default:                return { 1.00f, 0.00f, 1.00f }; // magenta = unknown
+        // ── Umm'Natur — warm amber/ochre desert palette ───────────────────────
+        case Terrain::Sand:     return { 0.78f, 0.63f, 0.35f };  // warm ochre sand
+        case Terrain::Dune:     return { 0.68f, 0.50f, 0.25f };  // deep amber dune
+        case Terrain::Rock:     return { 0.52f, 0.47f, 0.44f };  // cold weathered stone
+        case Terrain::Oasis:    return { 0.22f, 0.58f, 0.42f };  // deep desert oasis
+        case Terrain::Ruins:    return { 0.80f, 0.72f, 0.58f };  // bleached sandstone
+        case Terrain::Obsidian: return { 0.18f, 0.16f, 0.20f };  // near-black volcanic
+        // ── Structural ────────────────────────────────────────────────────────
+        case Terrain::Mountain: return { 0.40f, 0.38f, 0.40f };  // cold stone peaks
+        case Terrain::River:    return { 0.25f, 0.50f, 0.82f };  // deep blue water
+        case Terrain::Wall:     return { 0.42f, 0.40f, 0.38f };  // dark fortress stone
+        case Terrain::Battle:   return { 0.72f, 0.18f, 0.18f };  // blood-red
+        // ── Verdant Reach — deep blue-green Celtic palette ────────────────────
+        case Terrain::Grass:    return { 0.18f, 0.50f, 0.14f };  // deep Celtic meadow
+        case Terrain::Forest:   return { 0.09f, 0.28f, 0.12f };  // dark ancient forest
+        case Terrain::Highland: return { 0.35f, 0.46f, 0.28f };  // grey-green moorland
+        default:                return { 1.00f, 0.00f, 1.00f };  // magenta = unknown
     }
 }
 

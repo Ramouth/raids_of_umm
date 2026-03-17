@@ -29,7 +29,8 @@ void main() {
         // as before.  Transparent overlay textures (grass, forest) let the
         // solid terrain colour show through the clear areas, giving a softer
         // "painted over" look without hard pixel edges.
-        color = mix(v_Color, texColor * v_Color, texSample.a);
+        // Blend: transparent areas show base terrain colour; opaque areas show texture as-is.
+        color = mix(v_Color, texColor, texSample.a);
 
         // Very faint hex-edge darkening — just enough to read tile boundaries
         // without overwriting the pixel art edge detail.
@@ -37,22 +38,34 @@ void main() {
         color = mix(color, color * 0.70, edgeFactor * 0.30);
 
     } else {
-        // ── Solid-colour (no texture) tile — full lighting model ──────────────
-        vec3 N    = normalize(v_WorldNormal);
-        float NdL = max(dot(N, normalize(u_SunDir)), 0.0);
+        // ── Ordered-dither terrain (LucasArts VGA style) ──────────────────────
+        // Two palette entries: shadow and highlight from base terrain colour.
+        vec3 colDark  = v_Color * 0.65;
+        vec3 colLight = min(v_Color * 1.35, vec3(1.0));
 
-        vec3 albedo      = texColor * v_Color;
-        vec3 diffuse     = albedo * u_SunColor * NdL;
+        // Two-scale Bayer dither: fine grain (4 px) + coarse (8 px).
+        // Mixing scales breaks the uniform grid and gives a painted feel.
+        const int b[16] = int[16](0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5);
+        ivec2 sc      = ivec2(gl_FragCoord.xy);
+        float bFine   = float(b[(sc.x & 3)        | ((sc.y & 3) << 2)])        / 16.0;
+        float bCoarse = float(b[((sc.x >> 1) & 3) | (((sc.y >> 1) & 3) << 2)]) / 16.0;
+        float bayer   = bFine * 0.65 + bCoarse * 0.35;
 
-        vec3 skyColor    = u_AmbientColor * 1.2;
-        vec3 groundColor = u_AmbientColor * 0.4;
-        float hemisphere = N.y * 0.5 + 0.5;
-        vec3 ambient     = albedo * mix(groundColor, skyColor, hemisphere);
+        // Hex-local radial gradient: lighter centre, darker rim.
+        float hexLight = clamp(1.0 - v_EdgeDist * 2.2 + 0.15, 0.0, 1.0);
 
-        color = diffuse + ambient;
+        // World-space sine variation: slow organic brightness shift between hexes
+        // (~3-hex period) so adjacent tiles feel hand-painted, not stamped.
+        float worldVar = sin(v_WorldPos.x * 1.8 + 0.7) * cos(v_WorldPos.z * 2.1 + 1.3)
+                         * 0.5 + 0.5;
 
-        float edgeFactor = smoothstep(0.35, 0.5, v_EdgeDist);
-        color = mix(color, color * 0.6, edgeFactor * 0.5);
+        // Blend: structural (hex gradient) + fine grain (bayer) + slow variation.
+        float blend = hexLight * 0.55 + bayer * 0.30 + worldVar * 0.15;
+        color = (blend >= 0.5) ? colLight : colDark;
+
+        // Crisp tile-boundary darkening reads as grid lines.
+        float edgeFactor = smoothstep(0.40, 0.50, v_EdgeDist);
+        color = mix(color, color * 0.58, edgeFactor * 0.45);
     }
 
     // Distance fog

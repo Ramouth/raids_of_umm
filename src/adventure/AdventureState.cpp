@@ -509,8 +509,8 @@ void AdventureState::checkWinConditions() {
 
 void AdventureState::initMap() {
     // Try the Pale Divide campaign map first, then default, then procedural.
-    if (!m_map.loadJson("data/maps/the_pale_divide.json")) {
-        m_mapPath = "data/maps/the_pale_divide.json";
+    if (!m_map.loadJson("data/maps/cradle_of_umm.json")) {
+        m_mapPath = "data/maps/cradle_of_umm.json";
     } else if (!m_map.loadJson("data/maps/default.json")) {
         m_mapPath = "data/maps/default.json";
     } else {
