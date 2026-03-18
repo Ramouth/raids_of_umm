@@ -33,8 +33,9 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
         case Terrain::Grass:         return { 0.18f, 0.50f, 0.14f };  // deep Celtic meadow
         case Terrain::Forest:        return { 0.09f, 0.28f, 0.12f };  // dark ancient forest
         case Terrain::Highland:      return { 0.35f, 0.46f, 0.28f };  // grey-green moorland
-        case Terrain::GrassSandEdge: return { 0.48f, 0.57f, 0.28f };  // blended grass↔sand border
-        default:                     return { 1.00f, 0.00f, 1.00f };  // magenta = unknown
+        case Terrain::GrassSandEdge:  return { 0.48f, 0.57f, 0.28f };  // blended grass↔sand border
+        case Terrain::GrassSandEdge2: return { 0.30f, 0.52f, 0.18f };  // grass overlay (sand transparent)
+        default:                      return { 1.00f, 0.00f, 1.00f };  // magenta = unknown
     }
 }
 

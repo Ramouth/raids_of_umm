@@ -33,8 +33,9 @@ static const char* terrainToStr(Terrain t) noexcept {
         case Terrain::Grass:         return "grass";
         case Terrain::Forest:        return "forest";
         case Terrain::Highland:      return "highland";
-        case Terrain::GrassSandEdge: return "grass_sand_edge";
-        default:                     return "sand";
+        case Terrain::GrassSandEdge:  return "grass_sand_edge";
+        case Terrain::GrassSandEdge2: return "grass_sand_edge_2";
+        default:                      return "sand";
     }
 }
 
@@ -51,7 +52,8 @@ static Terrain terrainFromStr(const std::string& s) noexcept {
     if (s == "grass")           return Terrain::Grass;
     if (s == "forest")          return Terrain::Forest;
     if (s == "highland")        return Terrain::Highland;
-    if (s == "grass_sand_edge") return Terrain::GrassSandEdge;
+    if (s == "grass_sand_edge")   return Terrain::GrassSandEdge;
+    if (s == "grass_sand_edge_2") return Terrain::GrassSandEdge2;
     return Terrain::Sand;
 }
 

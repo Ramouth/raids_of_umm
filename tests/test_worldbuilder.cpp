@@ -349,16 +349,17 @@ SUITE("WorldMap — variant=0 default is preserved on save/load") {
 
 // ── 5. New terrain types (Grass, Forest, Highland) ───────────────────────────
 
-SUITE("Terrain — COUNT is 14 (10 desert + 3 biome + 1 edge)") {
-    CHECK_EQ(static_cast<int>(Terrain::COUNT), 14);
-    CHECK_EQ(TERRAIN_COUNT, 14);
+SUITE("Terrain — COUNT is 15 (10 desert + 3 biome + 2 edge)") {
+    CHECK_EQ(static_cast<int>(Terrain::COUNT), 15);
+    CHECK_EQ(TERRAIN_COUNT, 15);
 }
 
 SUITE("Terrain — new biome enum values are correct") {
     CHECK_EQ(static_cast<int>(Terrain::Grass),         10);
     CHECK_EQ(static_cast<int>(Terrain::Forest),        11);
     CHECK_EQ(static_cast<int>(Terrain::Highland),      12);
-    CHECK_EQ(static_cast<int>(Terrain::GrassSandEdge), 13);
+    CHECK_EQ(static_cast<int>(Terrain::GrassSandEdge),  13);
+    CHECK_EQ(static_cast<int>(Terrain::GrassSandEdge2), 14);
 }
 
 SUITE("Terrain — makeTile defaults for Grass/Forest/Highland") {
@@ -381,7 +382,7 @@ SUITE("Terrain — terrainName returns correct labels for biome types") {
     CHECK(terrainName(Terrain::Highland) == "Highland");
 }
 
-SUITE("WorldMap — can paint all 14 terrain types without error") {
+SUITE("WorldMap — can paint all 15 terrain types without error") {
     WorldMap map;
     map.clear(5);
     auto dirs = HexCoord::directions();
