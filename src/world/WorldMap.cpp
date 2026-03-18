@@ -191,6 +191,7 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
                 {"moveCost", tile.moveCost},
                 {"variant",  (int)tile.variant}
             };
+            if (tile.rotation) t["rotation"] = (int)tile.rotation;  // omit when 0
             if (tile.road) t["road"] = true;  // omit key when false to keep maps compact
             tiles.push_back(std::move(t));
         }
@@ -244,7 +245,8 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
             tile.terrain  = terrainFromStr(t.value("terrain",  "sand"));
             tile.passable = t.value("passable", true);
             tile.moveCost = t.value("moveCost", 1.0f);
-            tile.variant  = static_cast<uint8_t>(t.value("variant", 0));
+            tile.variant  = static_cast<uint8_t>(t.value("variant",  0));
+            tile.rotation = static_cast<uint8_t>(t.value("rotation", 0));
             tile.road     = t.value("road", false);
             if (tile.road) tile.moveCost = std::min(tile.moveCost, 0.5f);
             m_grid.set(coord, tile);

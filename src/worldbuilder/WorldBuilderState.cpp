@@ -147,7 +147,8 @@ void WorldBuilderState::applyToolAt(const HexCoord& coord) {
     switch (m_tool) {
         case EditorTool::PaintTile: {
             MapTile tile = makeTile(m_paintTerrain);
-            tile.variant = static_cast<uint8_t>(m_palette.selectedVariant());
+            tile.variant  = static_cast<uint8_t>(m_palette.selectedVariant());
+            tile.rotation = static_cast<uint8_t>(m_paintRotation);
             // Preserve any existing object's passability requirement.
             if (m_map.objectAt(coord))
                 tile.passable = true;
@@ -468,6 +469,8 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             if (sym == SDLK_g) { m_paintTerrain = Terrain::Grass;    m_palette.selectTerrain(Terrain::Grass);    renderHUD(); return true; }
             if (sym == SDLK_f) { m_paintTerrain = Terrain::Forest;   m_palette.selectTerrain(Terrain::Forest);   renderHUD(); return true; }
             if (sym == SDLK_h) { m_paintTerrain = Terrain::Highland; m_palette.selectTerrain(Terrain::Highland); renderHUD(); return true; }
+            // R — cycle texture rotation 0→1→2→3→4→5→0 (each step = 60°)
+            if (sym == SDLK_r) { m_paintRotation = (m_paintRotation + 1) % 6; renderHUD(); return true; }
         }
 
         // ── Object type / test-play ──────────────────────────────────────────
@@ -640,7 +643,8 @@ void WorldBuilderState::renderTerrain() {
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, 0, {off.dx, off.dz});
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, 0,
+                                {off.dx, off.dz});
     }
 
     glEnable(GL_BLEND);
@@ -648,15 +652,13 @@ void WorldBuilderState::renderTerrain() {
     glDepthFunc(GL_LEQUAL);
 
     // Pass 2: soft-edge textured overlay for all tiles.
-    // Grass border tiles are drawn here with the user-selected variant so they
-    // look consistent with interior tiles; the edge tile in Pass 3 overlays on top.
     for (const auto& [coord, tile] : m_map) {
         GLuint tex = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
         if (!tex) continue;
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex,
-                                {off.dx, off.dz}, 0, /*softEdge=*/true);
+                                {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation);
     }
 
     // Pass 3 (grass↔sand edge tiles) is intentionally omitted in the editor.
@@ -739,6 +741,7 @@ void WorldBuilderState::renderHUD() {
     const char* toolNames[] = { "PaintTile", "PlaceObject", "Erase", "Select" };
     std::cout << "  [HUD] tool=" << toolNames[static_cast<int>(m_tool)]
               << "  terrain=" << terrainName(m_paintTerrain)
+              << "  rot=" << m_paintRotation << "x60"
               << "  objType=" << objTypeName(m_placeObjType)
               << (m_dirty ? "  *unsaved*" : "")
               << "\n";

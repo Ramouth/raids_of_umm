@@ -1257,7 +1257,7 @@ void AdventureState::renderTerrain() {
         if (!tex) continue;
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true);
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation);
     }
 
     // Pass 3: HoMM3-style directional grass↔sand edge tiles.

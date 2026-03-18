@@ -94,6 +94,7 @@ private:
     EditorTool  m_tool         = EditorTool::PaintTile;
     Terrain     m_paintTerrain = Terrain::Sand;
     ObjType     m_placeObjType = ObjType::Town;
+    int         m_paintRotation = 0;  // 0-5: texture rotation steps (60° each)
 
     HexCoord    m_hovered;
     bool        m_hasHovered   = false;

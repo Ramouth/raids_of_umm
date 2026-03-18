@@ -12,8 +12,9 @@ uniform mat3 u_NormalMatrix;
 
 // Per-instance (hex tile) data passed as uniforms for now;
 // switch to instanced arrays when tile count grows large.
-uniform vec3 u_TileColor;   // base colour tint
-uniform float u_Height;     // Y extrusion (0 = flat desert floor)
+uniform vec3  u_TileColor;   // base colour tint
+uniform float u_Height;      // Y extrusion (0 = flat desert floor)
+uniform int   u_Rotation;    // 0-5: texture rotation in 60-degree steps (CW)
 
 out vec3 v_WorldNormal;
 out vec3 v_WorldPos;
@@ -28,7 +29,14 @@ void main() {
     gl_Position  = u_MVP * vec4(pos, 1.0);
     v_WorldNormal = u_NormalMatrix * a_Normal;
     v_WorldPos    = (u_Model * vec4(pos, 1.0)).xyz;
-    v_TexCoord    = a_TexCoord;
+    // Rotate UV around the hex centre (0.5, 0.5) in 60-degree steps.
+    vec2 uv = a_TexCoord - 0.5;
+    if (u_Rotation > 0) {
+        float angle = float(u_Rotation) * (3.14159265358979 / 3.0);
+        float c = cos(angle), s = sin(angle);
+        uv = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y);
+    }
+    v_TexCoord    = uv + 0.5;
     v_Color       = u_TileColor;
     
     // Calculate distance from center for edge darkening effect

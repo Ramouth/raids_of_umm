@@ -76,7 +76,8 @@ public:
                   GLuint texId               = 0,
                   const glm::vec2& xzOffset  = {0.0f, 0.0f},
                   int tintMode               = 0,
-                  bool softEdge              = false);
+                  bool softEdge              = false,
+                  int rotation               = 0);
 
     // Draw a wireframe outline.  scale multiplies the unit hex outline.
     // height should match the tile's terrainHeight() so the outline sits on the tile face.
