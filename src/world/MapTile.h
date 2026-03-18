@@ -28,9 +28,10 @@ enum class Terrain : uint8_t {
     Battle   = 9,  // combat encounter
 
     // ── Northern biome ────────────────────────────────────────────────────
-    Grass    = 10, // lush Highland meadow — base terrain for Verdant Reach
-    Forest   = 11, // dense Celtic woodland — slow movement
-    Highland = 12, // rocky moorland — elevated, medium cost
+    Grass        = 10, // lush Highland meadow — base terrain for Verdant Reach
+    Forest       = 11, // dense Celtic woodland — slow movement
+    Highland     = 12, // rocky moorland — elevated, medium cost
+    GrassSandEdge = 13, // grass↔sand transition tile (hand-authored blends)
 
     COUNT  // must remain last — used for iteration and bounds checks
 };
@@ -60,10 +61,11 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
         case Terrain::River:     return "River";
         case Terrain::Wall:     return "Wall";
         case Terrain::Battle:   return "Battle";
-        case Terrain::Grass:    return "Grass";
-        case Terrain::Forest:   return "Forest";
-        case Terrain::Highland: return "Highland";
-        default:                return "Unknown";
+        case Terrain::Grass:         return "Grass";
+        case Terrain::Forest:        return "Forest";
+        case Terrain::Highland:      return "Highland";
+        case Terrain::GrassSandEdge: return "Grass-Sand Edge";
+        default:                     return "Unknown";
     }
 }
 
