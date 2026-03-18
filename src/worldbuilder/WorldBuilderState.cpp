@@ -501,9 +501,16 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
     if (e->type == SDL_MOUSEMOTION) {
         m_lastMouseX = e->motion.x;
         if (m_palDragging) {
-            // Drag-scrolling the palette
             int delta = e->motion.y - m_palDragStartY;
-            m_palette.setScrollY(m_palDragScrollY - delta);
+            if (m_palScrollbarDrag) {
+                // Scrollbar-thumb drag: pixel delta maps proportionally to scrollY.
+                // Positive delta (drag down) = scroll further into list.
+                m_palette.setScrollY(m_palDragScrollY +
+                                     m_palette.scrollbarPixelToScrollY(delta));
+            } else {
+                // Content drag: content follows the finger (drag up = scroll down).
+                m_palette.setScrollY(m_palDragScrollY - delta);
+            }
             return true;
         }
         // Palette gets first look — blocks map hover when cursor is over panel
@@ -519,21 +526,27 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
 
     if (e->type == SDL_MOUSEBUTTONDOWN && e->button.button == SDL_BUTTON_LEFT) {
         if (m_palette.containsPoint(e->button.x)) {
-            // Sync the tool immediately on every palette press so that the active
-            // tool always reflects the current palette category — regardless of
-            // whether the mouse-up travelY check later treats this as a drag.
-            syncFromPalette();
-            // Start drag tracking — item selection (card/variant) fires on mouse-up
-            // if drag is small (travelY < 5).
-            m_palDragging    = true;
-            m_palDragStartY  = e->button.y;
-            m_palDragScrollY = m_palette.scrollY();
+            if (e->button.y < EditorPalette::itemListStartY()) {
+                // Header / tab area — fire click immediately; not a scrollable region.
+                m_palette.handleMouseClick(e->button.x, e->button.y);
+                syncFromPalette();
+            } else {
+                // Scrollable item list — start drag tracking; selection fires on
+                // mouse-up only if travel is small (travelY < PALETTE_DRAG_THRESHOLD).
+                m_palDragging      = true;
+                m_palScrollbarDrag = m_palette.isOnScrollbar(e->button.x, e->button.y);
+                m_palDragStartY    = e->button.y;
+                m_palDragScrollY   = m_palette.scrollY();
+            }
             return true;
         }
 
-        // Map click
+        // Map click — recompute from button position and sync hover so the cursor
+        // and the painted tile are always the same hex.
         glm::vec2 wp = m_cam.screenToWorld(e->button.x, e->button.y);
         HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
+        m_hovered    = hc;
+        m_hasHovered = m_map.hasTile(hc);
         if (m_devToolActive) {
             m_devSelected    = hc;
             m_hasDevSelected = m_map.hasTile(hc);
@@ -550,8 +563,8 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             m_palDragging = false;
             int travelY = e->button.y - m_palDragStartY;
             if (travelY < 0) travelY = -travelY;
-            if (travelY < 5) {
-                // Small movement → treat as a click
+            if (travelY < PALETTE_DRAG_THRESHOLD) {
+                // Small movement → treat as a click; selection and sync happen here
                 m_palette.handleMouseClick(e->button.x, e->button.y);
                 syncFromPalette();
             }
@@ -623,18 +636,6 @@ void WorldBuilderState::render() {
 }
 
 void WorldBuilderState::renderTerrain() {
-    // Helper: return first direction (priority E→SE→SW→NE→NW→W) where a sand/dune
-    // neighbour exists. Returns -1 if no such neighbour.
-    auto sandNeighborDir = [&](const HexCoord& coord) -> int {
-        static constexpr int PRIORITY[6] = {0, 5, 4, 1, 2, 3};
-        for (int i : PRIORITY) {
-            const MapTile* nb = m_map.tileAt(coord.neighbor(i));
-            if (nb && (nb->terrain == Terrain::Sand || nb->terrain == Terrain::Dune))
-                return i;
-        }
-        return -1;
-    };
-
     // Pass 1: solid dither base for every tile (no texture).
     for (const auto& [coord, tile] : m_map) {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
@@ -646,11 +647,10 @@ void WorldBuilderState::renderTerrain() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthFunc(GL_LEQUAL);
 
-    // Pass 2: soft-edge textured overlay for interior tiles (skip grass on sand border —
-    // those get a dedicated directional edge tile in Pass 3).
+    // Pass 2: soft-edge textured overlay for all tiles.
+    // Grass border tiles are drawn here with the user-selected variant so they
+    // look consistent with interior tiles; the edge tile in Pass 3 overlays on top.
     for (const auto& [coord, tile] : m_map) {
-        if (tile.terrain == Terrain::Grass && sandNeighborDir(coord) >= 0)
-            continue;
         GLuint tex = m_hexRenderer.terrainTex(tile.terrain, tile.variant);
         if (!tex) continue;
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
@@ -659,17 +659,10 @@ void WorldBuilderState::renderTerrain() {
                                 {off.dx, off.dz}, 0, /*softEdge=*/true);
     }
 
-    // Pass 3: HoMM3-style directional grass↔sand edge tiles.
-    for (const auto& [coord, tile] : m_map) {
-        if (tile.terrain != Terrain::Grass) continue;
-        int dir = sandNeighborDir(coord);
-        if (dir < 0) continue;
-        GLuint edgeTex = m_hexRenderer.grassSandEdgeTex(dir);
-        if (!edgeTex) continue;
-        float h = terrainHeight(tile.terrain);
-        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, edgeTex,
-                                {0.0f, 0.0f});
-    }
+    // Pass 3 (grass↔sand edge tiles) is intentionally omitted in the editor.
+    // Edge-tile rendering is a game-view effect (AdventureState); showing it here
+    // would make grass border tiles appear as a mystery "grass_sand_edge" terrain
+    // type with no corresponding palette entry — confusing to the author.
 
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
@@ -737,7 +730,9 @@ void WorldBuilderState::renderCursor() {
             case EditorTool::Select:      cursorCol = { 1.0f, 1.0f, 1.0f }; break;
         }
     }
-    m_hexRenderer.drawOutline(m_hovered, cursorCol, HEX_SIZE * 0.95f);
+    float cursorH = 0.0f;
+    if (const MapTile* t = m_map.tileAt(m_hovered)) cursorH = terrainHeight(t->terrain);
+    m_hexRenderer.drawOutline(m_hovered, cursorCol, HEX_SIZE * 0.95f, cursorH);
 }
 
 void WorldBuilderState::renderHUD() {

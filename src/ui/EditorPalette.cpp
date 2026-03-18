@@ -125,6 +125,32 @@ int EditorPalette::objCardAtPoint(int x, int y) const {
     return idx;
 }
 
+// ── Scrollbar helpers ─────────────────────────────────────────────────────────
+
+bool EditorPalette::isOnScrollbar(int screenX, int screenY) const {
+    float visH = (float)m_screenH - listStartY();
+    float ch   = contentHeight();
+    if (ch <= visH) return false;  // no scrollbar when content fits
+
+    const float SB_W = 10.0f;
+    const float SB_X = PW - SB_W - 2.0f;
+    if (screenX < (int)SB_X || screenX > (int)PW) return false;
+
+    float sbH = std::max(24.0f, (visH / ch) * visH);
+    float sbY = listStartY() + ((float)m_scrollY / (ch - visH)) * (visH - sbH);
+    return screenY >= (int)sbY && screenY <= (int)(sbY + sbH);
+}
+
+int EditorPalette::scrollbarPixelToScrollY(int pixelDelta) const {
+    float visH = (float)m_screenH - listStartY();
+    float ch   = contentHeight();
+    if (ch <= visH) return 0;
+
+    float sbH  = std::max(24.0f, (visH / ch) * visH);
+    float ratio = (ch - visH) / std::max(1.0f, visH - sbH);  // content units per thumb pixel
+    return static_cast<int>(pixelDelta * ratio);
+}
+
 // ── Mouse events ──────────────────────────────────────────────────────────────
 
 bool EditorPalette::handleMouseMove(int x, int y) {
@@ -325,14 +351,18 @@ void EditorPalette::renderItems(HUDRenderer& hud, int screenH) const {
         hud.drawText(PAD + 4.0f, listStart + 16.0f, 1.3f, "Coming soon...", C_SUB);
     }
 
-    // Scrollbar
+    // Scrollbar — track + thumb
     float ch   = contentHeight();
     float visH = visBottom - listStart;
     if (ch > visH) {
-        float sbH = (visH / ch) * visH;
-        if (sbH < 20.0f) sbH = 20.0f;
+        const float SB_W = 10.0f;
+        const float SB_X = PW - SB_W - 2.0f;
+        // Track
+        hud.drawRect(SB_X, listStart, SB_W, visH, {0.06f, 0.06f, 0.10f, 1.0f});
+        // Thumb
+        float sbH = std::max(24.0f, (visH / ch) * visH);
         float sbY = listStart + ((float)m_scrollY / (ch - visH)) * (visH - sbH);
-        hud.drawRect(PW - 7.0f, sbY, 5.0f, sbH, C_SUB);
+        hud.drawRect(SB_X + 2.0f, sbY, SB_W - 4.0f, sbH, C_AMBER);
     }
 }
 

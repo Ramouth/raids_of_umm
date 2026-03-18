@@ -8,25 +8,11 @@
 #include "render/RenderOffsets.h"
 #include "ui/EditorPalette.h"
 #include "hex/HexCoord.h"
+#include "worldbuilder/EditorTool.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
-
-/*
- * EditorTool — the active editing mode in WorldBuilderState.
- *
- * PaintTile   : left-click sets the hovered tile to m_paintTerrain.
- * PlaceObject : left-click places an object of m_placeObjType.
- * Erase       : left-click removes any object; resets tile to default Sand.
- * Select      : left-click prints tile/object info to console (inspect mode).
- */
-enum class EditorTool : uint8_t {
-    PaintTile   = 0,
-    PlaceObject = 1,
-    Erase       = 2,
-    Select      = 3,
-};
 
 /*
  * WorldBuilderState — the map authoring GameState.
@@ -145,9 +131,11 @@ private:
     bool m_ctrlHeld = false;
 
     // Palette drag-scroll state
-    bool m_palDragging    = false;
-    int  m_palDragStartY  = 0;
-    int  m_palDragScrollY = 0;
+    bool m_palDragging      = false;
+    bool m_palScrollbarDrag = false;  // true when drag started on the scrollbar thumb
+    int  m_palDragStartY    = 0;
+    int  m_palDragScrollY   = 0;
+    int  m_lastMouseX       = 0;  // updated from MOUSEMOTION; used by wheel handler
 
     // Assorted texture IDs (owned here, freed in onExit)
     std::vector<GLuint> m_assortedTexIds;
@@ -166,5 +154,6 @@ private:
     static constexpr float NUDGE_STEP = 0.02f;
     static constexpr float HEX_SIZE   = 1.0f;
     static constexpr float CAM_SPEED  = 8.0f;
+    static constexpr int   PALETTE_DRAG_THRESHOLD = 10;  // px; distinguishes click from scroll
     static constexpr const char* OFFSETS_PATH = "assets/render_offsets.json";
 };

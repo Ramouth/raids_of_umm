@@ -109,6 +109,7 @@ add_executable(raids_tests
     tests/test_combat.cpp
     tests/test_resourcemanager.cpp
     tests/test_session.cpp
+    tests/test_worldbuilder.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp

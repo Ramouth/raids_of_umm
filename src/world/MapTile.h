@@ -36,7 +36,7 @@ enum class Terrain : uint8_t {
 };
 
 constexpr int TERRAIN_COUNT        = static_cast<int>(Terrain::COUNT);
-constexpr int MAX_TERRAIN_VARIANTS = 8;  // max texture variants per terrain type
+constexpr int MAX_TERRAIN_VARIANTS = 20;  // max texture variants per terrain type
 
 struct MapTile {
     Terrain terrain  = Terrain::Sand;

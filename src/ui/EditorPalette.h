@@ -70,6 +70,18 @@ public:
 
     bool containsPoint(int screenX) const { return screenX >= 0 && screenX < (int)PANEL_W; }
 
+    // Y coordinate where the scrollable item list starts (below header + tab bar).
+    // Use this to distinguish header/tab-area clicks from list-area clicks.
+    static constexpr int itemListStartY() { return static_cast<int>(HDR_H + TAB_H); }
+
+    // True when (x,y) is within the scrollbar track on the right edge of the panel.
+    // Use this at MOUSEBUTTONDOWN to decide between content-drag and scrollbar-drag.
+    bool isOnScrollbar(int screenX, int screenY) const;
+
+    // Scroll delta (in scrollY units) for moving the scrollbar thumb by pixelDelta px.
+    // Use this when the user is dragging the scrollbar thumb directly.
+    int scrollbarPixelToScrollY(int pixelDelta) const;
+
     // ── Render ────────────────────────────────────────────────────────────────
 
     void render(HUDRenderer& hud, int screenH) const;
