@@ -134,6 +134,8 @@ void HexRenderer::loadTerrainTextures(const std::string& assetRoot) {
         std::string name(terrainName(t));
         std::transform(name.begin(), name.end(), name.begin(),
                        [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+        // Normalise to filesystem-safe name: spaces and hyphens → underscores.
+        for (char& c : name) if (c == ' ' || c == '-') c = '_';
 
         m_variantCount[i] = 0;
 
