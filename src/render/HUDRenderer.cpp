@@ -15,6 +15,8 @@ struct HUDVertex {
 HUDRenderer::HUDRenderer() {}
 
 HUDRenderer::~HUDRenderer() {
+    if (m_polyVao) glDeleteVertexArrays(1, &m_polyVao);
+    if (m_polyVbo) glDeleteBuffers(1, &m_polyVbo);
     if (m_vao)     glDeleteVertexArrays(1, &m_vao);
     if (m_vbo)     glDeleteBuffers(1, &m_vbo);
     if (m_texVao)  glDeleteVertexArrays(1, &m_texVao);
@@ -82,6 +84,16 @@ void HUDRenderer::init() {
                  static_cast<GLsizeiptr>(idx.size() * sizeof(unsigned int)),
                  idx.data(), GL_STATIC_DRAW);
 
+    glBindVertexArray(0);
+
+    // ── Polygon VAO (up to 32 verts, GL_TRIANGLE_FAN, 2-float positions) ─────
+    glGenVertexArrays(1, &m_polyVao);
+    glGenBuffers(1, &m_polyVbo);
+    glBindVertexArray(m_polyVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_polyVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(HUDVertex) * 32, nullptr, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(HUDVertex), nullptr);
     glBindVertexArray(0);
 }
 
@@ -169,6 +181,76 @@ void HUDRenderer::drawTexturedRectUV(float x, float y, float w, float h,
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
     m_shader.setInt("u_UseTexture", 0);
+}
+
+// ── drawLine ─────────────────────────────────────────────────────────────────
+// Draws a thick line as a rotated quad.
+
+void HUDRenderer::drawLine(float x0, float y0, float x1, float y1,
+                            float lineW, const glm::vec4& color) {
+    float dx = x1 - x0;
+    float dy = y1 - y0;
+    float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 0.001f) return;
+    float nx = -dy / len * (lineW * 0.5f);
+    float ny =  dx / len * (lineW * 0.5f);
+
+    std::array<HUDVertex, 4> v = {{
+        {x0 + nx, y0 + ny},
+        {x1 + nx, y1 + ny},
+        {x1 - nx, y1 - ny},
+        {x0 - nx, y0 - ny},
+    }};
+    glBindVertexArray(m_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(v), v.data());
+    m_shader.setVec4("u_Color", color);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+}
+
+// ── drawFilledHex / drawHexOutline ───────────────────────────────────────────
+// Flat-top hexagon. rx = half-width, ry = half-height of bounding box.
+// Vertices at angles 0°, 60°, 120°, 180°, 240°, 300°.
+
+// Bounding-box-filling flat-top hex.
+// Vertices sit exactly on the bounding box edges so adjacent cells tile
+// without gaps: right/left points at ±rx mid-height, top/bottom flat edges
+// span ±rx/2 at ±ry.  The tiling condition: right-vertex of cell (c,r)
+// coincides with left-vertex of cell (c+1,r), and top/bottom flat edges of
+// adjacent rows share a common y coordinate.
+static void hexVerts(float cx, float cy, float rx, float ry,
+                     std::array<HUDVertex, 8>& v) {
+    float hx = rx * 0.5f;
+    v[0] = {cx,      cy};        // centre (for filled triangle fan)
+    v[1] = {cx + rx, cy};        // right
+    v[2] = {cx + hx, cy + ry};  // bottom-right
+    v[3] = {cx - hx, cy + ry};  // bottom-left
+    v[4] = {cx - rx, cy};        // left
+    v[5] = {cx - hx, cy - ry};  // top-left
+    v[6] = {cx + hx, cy - ry};  // top-right
+    v[7] = v[1];                 // close the fan
+}
+
+void HUDRenderer::drawFilledHex(float cx, float cy, float rx, float ry,
+                                  const glm::vec4& color) {
+    std::array<HUDVertex, 8> v;
+    hexVerts(cx, cy, rx, ry, v);
+    glBindVertexArray(m_polyVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_polyVbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(v), v.data());
+    m_shader.setVec4("u_Color", color);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 8);
+}
+
+void HUDRenderer::drawHexOutline(float cx, float cy, float rx, float ry,
+                                   float lineW, const glm::vec4& color) {
+    std::array<HUDVertex, 8> v;
+    hexVerts(cx, cy, rx, ry, v);
+    // v[1]..v[6] are the 6 corners
+    for (int i = 1; i <= 6; ++i) {
+        int j = (i % 6) + 1;
+        drawLine(v[i].x, v[i].y, v[j].x, v[j].y, lineW, color);
+    }
 }
 
 // ── drawText ─────────────────────────────────────────────────────────────────

@@ -56,21 +56,39 @@ void TileBuilderState::fitToScreen() {
     m_offsetY = (areaH - m_sheet.h * m_zoom) * 0.5f;
 }
 
+// Flat-top staggered-column hex grid.
+// colStep = cellW * 3/4  (columns overlap by 1/4)
+// Odd columns shift DOWN by cellH/2.
+// Inside test for the bounding-box hex: |dx|/rx + |dy|/(2*ry) <= 1
 void TileBuilderState::screenToCell(int mx, int my, int& col, int& row) const {
     col = row = -1;
     if (m_sheet.w <= 0 || m_cellW <= 0 || m_cellH <= 0) return;
-    float cellPxW = m_cellW * m_zoom;
-    float cellPxH = m_cellH * m_zoom;
-    float fx = (mx - m_offsetX) / cellPxW;
-    float fy = (my - m_offsetY) / cellPxH;
-    if (fx < 0 || fy < 0) return;
-    int c = static_cast<int>(fx);
-    int r = static_cast<int>(fy);
-    int maxC = m_sheet.w / m_cellW;
-    int maxR = m_sheet.h / m_cellH;
-    if (c >= maxC || r >= maxR) return;
-    col = c;
-    row = r;
+
+    float colStep = m_cellW * m_zoom * 0.75f;
+    float rowStep = m_cellH * m_zoom;
+    float rx      = m_cellW * m_zoom * 0.5f;
+    float ry      = m_cellH * m_zoom * 0.5f;
+
+    // Approximate column, then check a neighbourhood (columns overlap).
+    int approxCol = static_cast<int>((mx - m_offsetX) / colStep);
+
+    for (int dc = -1; dc <= 2; ++dc) {
+        int c = approxCol + dc;
+        if (c < 0) continue;
+        float cx   = m_offsetX + c * colStep + rx;
+        float yOff = (c % 2) * ry;   // odd col drops by half a cell
+        int approxRow = static_cast<int>((my - m_offsetY - yOff) / rowStep);
+        for (int dr = -1; dr <= 1; ++dr) {
+            int r = approxRow + dr;
+            if (r < 0) continue;
+            float cy = m_offsetY + r * rowStep + yOff + ry;
+            float dx = mx - cx, dy = my - cy;
+            if (std::abs(dy) <= ry &&
+                std::abs(dx) / rx + std::abs(dy) / (2.f * ry) <= 1.f) {
+                col = c; row = r; return;
+            }
+        }
+    }
 }
 
 bool TileBuilderState::inSheetArea(int mx) const {
@@ -130,38 +148,43 @@ void TileBuilderState::renderSheet() {
 
 void TileBuilderState::renderGrid() {
     if (m_cellW <= 0 || m_cellH <= 0) return;
-    int numCols = m_sheet.w / m_cellW;
-    int numRows = m_sheet.h / m_cellH;
+
+    float colStep = m_cellW * m_zoom * 0.75f;   // flat-top: cols overlap by 1/4
+    float rowStep = m_cellH * m_zoom;
+    float rx      = m_cellW * m_zoom * 0.5f;
+    float ry      = m_cellH * m_zoom * 0.5f;
+
+    // Enough columns/rows to cover the whole sheet (plus 1 for odd-col overhang).
+    int numCols = static_cast<int>(m_sheet.w * m_zoom / colStep) + 2;
+    int numRows = static_cast<int>(m_sheet.h * m_zoom / rowStep) + 2;
     if (numCols <= 0 || numRows <= 0) return;
 
-    float cellPxW   = m_cellW * m_zoom;
-    float cellPxH   = m_cellH * m_zoom;
-    float sheetPxW  = m_sheet.w * m_zoom;
-    float sheetPxH  = m_sheet.h * m_zoom;
-    float lineW     = std::max(1.f, m_zoom * 0.4f);
-    glm::vec4 lineC = {0.2f, 0.85f, 0.9f, 0.45f};
+    float lineW     = std::max(1.f, m_zoom * 0.5f);
+    glm::vec4 lineC = {0.2f, 0.85f, 0.9f, 0.40f};
 
-    for (int c = 0; c <= numCols; ++c)
-        m_hud.drawRect(m_offsetX + c * cellPxW, m_offsetY, lineW, sheetPxH, lineC);
-    for (int r = 0; r <= numRows; ++r)
-        m_hud.drawRect(m_offsetX, m_offsetY + r * cellPxH, sheetPxW, lineW, lineC);
+    for (int c = 0; c < numCols; ++c) {
+        float cx   = m_offsetX + c * colStep + rx;
+        float yOff = (c % 2) * ry;   // odd columns drop by half a cell
+        for (int r = 0; r < numRows; ++r) {
+            float cy = m_offsetY + r * rowStep + yOff + ry;
+            m_hud.drawHexOutline(cx, cy, rx, ry, lineW, lineC);
+        }
+    }
 }
 
 void TileBuilderState::renderSelection() {
-    float cellPxW = m_cellW * m_zoom;
-    float cellPxH = m_cellH * m_zoom;
-    float brd     = std::max(2.f, m_zoom * 0.6f);
+    float colStep = m_cellW * m_zoom * 0.75f;
+    float rowStep = m_cellH * m_zoom;
+    float rx      = m_cellW * m_zoom * 0.5f;
+    float ry      = m_cellH * m_zoom * 0.5f;
+    float lineW   = std::max(2.f, m_zoom * 0.8f);
 
     for (const auto& [col, row] : m_selected) {
-        float sx = m_offsetX + col * cellPxW;
-        float sy = m_offsetY + row * cellPxH;
-        // Fill
-        m_hud.drawRect(sx, sy, cellPxW, cellPxH, {0.25f, 0.85f, 0.45f, 0.30f});
-        // Border
-        m_hud.drawRect(sx,            sy,            cellPxW, brd,     {0.3f, 1.f, 0.5f, 0.9f});
-        m_hud.drawRect(sx,            sy+cellPxH-brd, cellPxW, brd,    {0.3f, 1.f, 0.5f, 0.9f});
-        m_hud.drawRect(sx,            sy,            brd,     cellPxH, {0.3f, 1.f, 0.5f, 0.9f});
-        m_hud.drawRect(sx+cellPxW-brd, sy,           brd,     cellPxH, {0.3f, 1.f, 0.5f, 0.9f});
+        float cx   = m_offsetX + col * colStep + rx;
+        float yOff = (col % 2) * ry;
+        float cy   = m_offsetY + row * rowStep + yOff + ry;
+        m_hud.drawFilledHex(cx, cy, rx, ry, {0.25f, 0.85f, 0.45f, 0.28f});
+        m_hud.drawHexOutline(cx, cy, rx, ry, lineW, {0.3f, 1.f, 0.5f, 0.9f});
     }
 }
 
@@ -246,15 +269,12 @@ void TileBuilderState::renderStatusBar() {
 
     char buf[320];
     if (m_sheet.tex) {
-        int numCols = m_cellW > 0 ? m_sheet.w / m_cellW : 0;
-        int numRows = m_cellH > 0 ? m_sheet.h / m_cellH : 0;
         std::snprintf(buf, sizeof(buf),
-            "%s  |  %dx%d  |  Cell %dx%d  |  Grid %dx%d  "
-            "|  +/-=cellW  [/]=cellH  Arrows=pan  Scroll=zoom  R=fit  O=open  ESC=back",
+            "%s  |  %dx%d px  |  Hex cell %dx%d  (ideal H=W*0.866)"
+            "  |  +/-=W  [/]=H  Arrows=pan  Scroll=zoom  R=fit  O=open  ESC=back",
             m_sheetPath.c_str(),
             m_sheet.w, m_sheet.h,
-            m_cellW, m_cellH,
-            numCols, numRows);
+            m_cellW, m_cellH);
     } else {
         std::snprintf(buf, sizeof(buf), "No sheet loaded — O = open a PNG  |  ESC = back");
     }
@@ -370,8 +390,9 @@ void TileBuilderState::commitExport() {
 
     int exported = 0;
     for (const auto& [col, row] : m_selected) {
-        int px0 = col * m_cellW;
-        int py0 = row * m_cellH;
+        // Staggered flat-top hex grid: colStep = cellW*3/4, odd cols shift down cellH/2
+        int px0 = static_cast<int>(std::round(col * m_cellW * 0.75f));
+        int py0 = static_cast<int>(std::round(row * m_cellH + (col % 2) * m_cellH * 0.5f));
         int pw  = std::min(m_cellW, m_sheet.w - px0);
         int ph  = std::min(m_cellH, m_sheet.h - py0);
         if (pw <= 0 || ph <= 0) continue;
@@ -386,6 +407,24 @@ void TileBuilderState::commitExport() {
                 crop[dst+1] = m_sheet.pixels[src+1];
                 crop[dst+2] = m_sheet.pixels[src+2];
                 crop[dst+3] = m_sheet.pixels[src+3];
+            }
+        }
+
+        // Apply hex alpha mask — pixels outside the bounding-box hex → alpha 0.
+        // Hex shape: right/left at ±rx mid-height; top/bottom flat edges at ±ry
+        // spanning ±rx/2.  Inside test: |dy| <= ry AND |dx|/rx + |dy|/(2*ry) <= 1
+        {
+            float crx = pw * 0.5f;
+            float cry = ph * 0.5f;
+            for (int y = 0; y < ph; ++y) {
+                for (int x = 0; x < pw; ++x) {
+                    float dx = (x + 0.5f) - crx;
+                    float dy = (y + 0.5f) - cry;
+                    bool inside = std::abs(dy) <= cry &&
+                                  std::abs(dx) / crx + std::abs(dy) / (2.f * cry) <= 1.f;
+                    if (!inside)
+                        crop[(y * pw + x) * 4 + 3] = 0;
+                }
             }
         }
 

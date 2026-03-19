@@ -25,6 +25,11 @@ public:
                             float u0, float v0, float u1, float v1);
     void drawText(float x, float y, float scale, const char* text, const glm::vec4& color);
 
+    // Hex helpers — flat-top hex, rx/ry = half-width/half-height of bounding box.
+    void drawFilledHex(float cx, float cy, float rx, float ry, const glm::vec4& color);
+    void drawHexOutline(float cx, float cy, float rx, float ry, float lineW, const glm::vec4& color);
+    void drawLine(float x0, float y0, float x1, float y1, float lineW, const glm::vec4& color);
+
     Shader m_shader;
 
     // Rect rendering  (4 verts, GL_TRIANGLE_FAN, 2-float positions)
@@ -39,6 +44,10 @@ public:
     GLuint m_textVao = 0;
     GLuint m_textVbo = 0;
     GLuint m_textIbo = 0;
+
+    // Polygon rendering (up to 32 verts, GL_TRIANGLE_FAN, 2-float positions)
+    GLuint m_polyVao = 0;
+    GLuint m_polyVbo = 0;
 
     // Current screen size, set at the start of render() for use in drawText()
     int m_sw = 0;
