@@ -53,7 +53,6 @@ set(SOURCES
     src/render/RenderOffsets.cpp
     src/ui/EditorPalette.cpp
     src/worldbuilder/WorldBuilderState.cpp
-    src/tilebuilder/TileBuilderState.cpp
     src/core/ResourceManager.cpp
     src/core/TurnManager.cpp
     src/hero/Hero.cpp

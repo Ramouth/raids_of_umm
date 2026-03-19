@@ -6,7 +6,6 @@
 #include <cmath>
 #include <iostream>
 #include <zlib.h>
-#include <filesystem>
 
 // These standard GL constants are not included in this project's stripped GLAD.
 #ifndef GL_NEAREST_MIPMAP_LINEAR
@@ -150,74 +149,3 @@ GLuint loadTexturePNG(const std::string& path) {
     return uploadToGL(w, h, pixels, path, 4);
 }
 
-bool loadPNG(const std::string& path, PNGData& out) {
-    if (!decodePNG(path, out.w, out.h, out.pixels)) return false;
-    out.tex = uploadToGL(out.w, out.h, out.pixels, path, 4);
-    return true;
-}
-
-// ── PNG writer ────────────────────────────────────────────────────────────────
-
-static void writeU32BE(std::vector<uint8_t>& buf, uint32_t v) {
-    buf.push_back((v >> 24) & 0xFF);
-    buf.push_back((v >> 16) & 0xFF);
-    buf.push_back((v >>  8) & 0xFF);
-    buf.push_back((v >>  0) & 0xFF);
-}
-
-static void writePNGChunk(std::vector<uint8_t>& out, const char* type,
-                           const uint8_t* data, uint32_t len) {
-    writeU32BE(out, len);
-    const auto* t = reinterpret_cast<const uint8_t*>(type);
-    out.insert(out.end(), t, t + 4);
-    if (data && len > 0) out.insert(out.end(), data, data + len);
-    uLong crc = crc32(0, t, 4);
-    if (data && len > 0) crc = crc32(crc, data, len);
-    writeU32BE(out, static_cast<uint32_t>(crc));
-}
-
-bool savePNG(const std::string& path, const uint8_t* rgba, int w, int h) {
-    // Build raw data: filter byte 0 (None) per row + RGBA pixels
-    std::vector<uint8_t> raw;
-    raw.reserve(static_cast<size_t>((w * 4 + 1) * h));
-    for (int y = 0; y < h; ++y) {
-        raw.push_back(0);
-        raw.insert(raw.end(), rgba + y * w * 4, rgba + y * w * 4 + w * 4);
-    }
-
-    uLongf compSize = compressBound(static_cast<uLong>(raw.size()));
-    std::vector<uint8_t> comp(compSize);
-    if (compress(comp.data(), &compSize, raw.data(), static_cast<uLong>(raw.size())) != Z_OK) {
-        std::cerr << "[Texture] savePNG: compress failed\n";
-        return false;
-    }
-    comp.resize(compSize);
-
-    uint8_t ihdr[13] = {};
-    auto put32 = [](uint8_t* p, uint32_t v) {
-        p[0]=(v>>24)&0xFF; p[1]=(v>>16)&0xFF; p[2]=(v>>8)&0xFF; p[3]=v&0xFF;
-    };
-    put32(ihdr + 0, static_cast<uint32_t>(w));
-    put32(ihdr + 4, static_cast<uint32_t>(h));
-    ihdr[8] = 8;  // bit depth
-    ihdr[9] = 6;  // RGBA
-
-    std::vector<uint8_t> out;
-    static const uint8_t sig[8] = { 0x89,'P','N','G','\r','\n',0x1a,'\n' };
-    out.insert(out.end(), sig, sig + 8);
-    writePNGChunk(out, "IHDR", ihdr, 13);
-    writePNGChunk(out, "IDAT", comp.data(), static_cast<uint32_t>(comp.size()));
-    writePNGChunk(out, "IEND", nullptr, 0);
-
-    namespace fs = std::filesystem;
-    fs::create_directories(fs::path(path).parent_path());
-    std::ofstream f(path, std::ios::binary);
-    if (!f) {
-        std::cerr << "[Texture] savePNG: cannot write " << path << "\n";
-        return false;
-    }
-    f.write(reinterpret_cast<const char*>(out.data()),
-            static_cast<std::streamsize>(out.size()));
-    std::cout << "[Texture] Saved " << path << " (" << w << "x" << h << ")\n";
-    return true;
-}

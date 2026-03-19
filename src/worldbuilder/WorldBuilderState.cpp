@@ -1,6 +1,5 @@
 #include "WorldBuilderState.h"
 #include "adventure/AdventureState.h"
-#include "tilebuilder/TileBuilderState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include "render/Texture.h"
@@ -472,10 +471,6 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         // ── Object type / test-play / tile builder ──────────────────────────
         if (sym == SDLK_o && !m_ctrlHeld) { cyclePlaceObjType(+1); return true; }
         if (sym == SDLK_p)                { launchPlay();           return true; }
-        if (sym == SDLK_t && !m_devToolActive) {
-            Application::get().pushState(std::make_unique<TileBuilderState>());
-            return true;
-        }
     }
 
     if (e->type == SDL_KEYUP) {
