@@ -7,7 +7,7 @@ each cell as an individual PNG with a proper hex transparency mask,
 plus a JSON tileset descriptor for the game.
 
 Install (Linux):
-    cp scripts/hex_tile_cutter.py ~/.config/GIMP/2.10/plug-ins/
+    cp ~/Documents/Code/raids_of_Umm/scripts/hex_tile_cutter.py ~/.config/GIMP/2.10/plug-ins/
     chmod +x ~/.config/GIMP/2.10/plug-ins/hex_tile_cutter.py
 
 Install (Windows):
