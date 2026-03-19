@@ -20,6 +20,9 @@ public:
                 bool infiniteMoves = false, int gold = 0, int crystal = 0);
     void drawRect(float x, float y, float w, float h, const glm::vec4& color);
     void drawTexturedRect(float x, float y, float w, float h, GLuint texId);
+    // UV-cropped variant: u0/v0 = top-left UV, u1/v1 = bottom-right UV (0..1 range).
+    void drawTexturedRectUV(float x, float y, float w, float h, GLuint texId,
+                            float u0, float v0, float u1, float v1);
     void drawText(float x, float y, float scale, const char* text, const glm::vec4& color);
 
     Shader m_shader;

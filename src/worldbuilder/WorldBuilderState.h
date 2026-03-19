@@ -84,11 +84,7 @@ private:
     Camera2D       m_cam;
     HexRenderer    m_hexRenderer;
     HUDRenderer    m_hud;
-    SpriteRenderer m_townSpriteRenderer;
-    SpriteRenderer m_dungeonSpriteRenderer;
-    SpriteRenderer m_goldMineSpriteRenderer;
-    SpriteRenderer m_crystalMineSpriteRenderer;
-    SpriteRenderer m_artifactSpriteRenderer;
+    SpriteRenderer m_objRenderers[OBJ_TYPE_COUNT];  // indexed by ObjType
     EditorPalette  m_palette;
 
     EditorTool  m_tool         = EditorTool::PaintTile;
@@ -130,6 +126,11 @@ private:
     // Key states
     bool m_keyW=false, m_keyA=false, m_keyS=false, m_keyD=false;
     bool m_ctrlHeld = false;
+
+    // Drag-to-paint state
+    bool     m_leftButtonHeld  = false;
+    HexCoord m_lastPaintedHex;
+    bool     m_hasLastPainted  = false;
 
     // Palette drag-scroll state
     bool m_palDragging      = false;

@@ -179,18 +179,12 @@ void AdventureState::onEnter() {
     m_heroSprite.addClip("idle", {0, 4, 6.0f,  true});
     m_heroSprite.addClip("walk", {4, 4, 10.0f, true});
     m_heroSprite.play("idle");
-    m_dungeonSpriteRenderer.init();
-    m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
-    m_buildingSpriteRenderer.init();
-    m_buildingSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
+    for (int i = 0; i < OBJ_TYPE_COUNT; ++i) {
+        m_objRenderers[i].init();
+        m_objRenderers[i].loadSprite(objTypeSpritePath(static_cast<ObjType>(i)));
+    }
     m_clanCastleRenderer.init();
     m_clanCastleRenderer.loadSprite("assets/textures/objects/clan_castle.png");
-    m_goldMineSpriteRenderer.init();
-    m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
-    m_crystalMineSpriteRenderer.init();
-    m_crystalMineSpriteRenderer.loadSprite("assets/textures/objects/crystal_mine.png");
-    m_artifactSpriteRenderer.init();
-    m_artifactSpriteRenderer.loadSprite("assets/textures/objects/artifact.png");
     m_hud.init();
 
     if (!m_externalMap)
@@ -1311,45 +1305,22 @@ void AdventureState::renderObjects() {
         obj.pos.toWorld(HEX_SIZE, wx, wz);
         wx += off.dx;  wz += off.dz;
 
-        switch (obj.type) {
-            case ObjType::Dungeon: {
-                // Hide entrance sprite once the dungeon is cleared.
-                auto it = m_objectControl.find(obj.pos);
-                if (it != m_objectControl.end() && it->second.guardDefeated) continue;
-                m_dungeonSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
-                                             m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
-            }
-            case ObjType::Town: {
-                // Use clan castle sprite for Verdant Reach towns (factionId == 1).
-                SpriteRenderer& townRenderer =
-                    (obj.factionId == Faction::Player)
-                    ? m_clanCastleRenderer
-                    : m_buildingSpriteRenderer;
-                townRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.8f,
-                                  m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
-            }
-            case ObjType::GoldMine:
-                m_goldMineSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
-                                              m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
-            case ObjType::CrystalMine:
-                m_crystalMineSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
-                                                 m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
-            case ObjType::Artifact: {
-                auto it = m_objectControl.find(obj.pos);
-                if (it != m_objectControl.end() && it->second.ownerFaction == 1) continue;
-                m_artifactSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.2f,
-                                              m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
-            }
-            default:
-                m_buildingSpriteRenderer.draw({ wx, off.dy, wz }, HEX_SIZE * 1.4f,
-                                              m_cam.viewMatrix(), m_cam.projMatrix());
-                break;
+        // Per-type visibility checks before drawing.
+        if (obj.type == ObjType::Dungeon) {
+            auto it = m_objectControl.find(obj.pos);
+            if (it != m_objectControl.end() && it->second.guardDefeated) continue;
         }
+        if (obj.type == ObjType::Artifact) {
+            auto it = m_objectControl.find(obj.pos);
+            if (it != m_objectControl.end() && it->second.ownerFaction == 1) continue;
+        }
+
+        // Town: Verdant Reach uses the clan castle sprite.
+        SpriteRenderer& sr = (obj.type == ObjType::Town && obj.factionId == Faction::Player)
+            ? m_clanCastleRenderer
+            : m_objRenderers[static_cast<int>(obj.type)];
+        sr.draw({ wx, off.dy, wz }, HEX_SIZE * objTypeRenderScale(obj.type),
+                m_cam.viewMatrix(), m_cam.projMatrix());
     }
 }
 

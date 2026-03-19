@@ -1,5 +1,6 @@
 #include "WorldBuilderState.h"
 #include "adventure/AdventureState.h"
+#include "tilebuilder/TileBuilderState.h"
 #include "core/Application.h"
 #include "render/TileVisuals.h"
 #include "render/Texture.h"
@@ -27,16 +28,11 @@ void WorldBuilderState::onEnter() {
     m_hexRenderer.loadTerrainTextures();
     m_hexRenderer.loadEdgeTiles();
     m_hud.init();
-    m_townSpriteRenderer.init();
-    m_townSpriteRenderer.loadSprite("assets/textures/objects/castle.png");
-    m_dungeonSpriteRenderer.init();
-    m_dungeonSpriteRenderer.loadSprite("assets/textures/objects/dungeon.png");
-    m_goldMineSpriteRenderer.init();
-    m_goldMineSpriteRenderer.loadSprite("assets/textures/objects/goldmine.png");
-    m_crystalMineSpriteRenderer.init();
-    m_crystalMineSpriteRenderer.loadSprite("assets/textures/objects/crystal_mine.png");
-    m_artifactSpriteRenderer.init();
-    m_artifactSpriteRenderer.loadSprite("assets/textures/objects/artifact.png");
+    for (int i = 0; i < OBJ_TYPE_COUNT; ++i) {
+        ObjType t = static_cast<ObjType>(i);
+        m_objRenderers[i].init();
+        m_objRenderers[i].loadSprite(objTypeSpritePath(t));
+    }
 
     if (m_loadOnEnter) {
         loadMap();
@@ -86,7 +82,7 @@ void WorldBuilderState::onEnter() {
 
     std::cout << "[WorldBuilder] Ready.\n";
     std::cout << "  Tab=cycle tool  1-0=terrain(desert)  G/F/H=Grass/Forest/Highland  O=obj type\n";
-    std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new blank map  P=test-play  ESC=quit\n";
+    std::cout << "  Ctrl+S=save  Ctrl+L=load  Ctrl+N=new blank map  P=test-play  T=tile builder  ESC=quit\n";
     std::cout << "  F1=alignment editor\n";
     renderHUD();
 }
@@ -473,9 +469,13 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             if (sym == SDLK_r) { m_paintRotation = (m_paintRotation + 1) % 6; renderHUD(); return true; }
         }
 
-        // ── Object type / test-play ──────────────────────────────────────────
+        // ── Object type / test-play / tile builder ──────────────────────────
         if (sym == SDLK_o && !m_ctrlHeld) { cyclePlaceObjType(+1); return true; }
         if (sym == SDLK_p)                { launchPlay();           return true; }
+        if (sym == SDLK_t && !m_devToolActive) {
+            Application::get().pushState(std::make_unique<TileBuilderState>());
+            return true;
+        }
     }
 
     if (e->type == SDL_KEYUP) {
@@ -522,6 +522,15 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
             HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
             m_hasHovered = m_map.hasTile(hc);
             m_hovered    = hc;
+
+            // Drag-to-paint: apply tool while left button held, skipping same hex
+            if (m_leftButtonHeld && !m_devToolActive && m_hasHovered) {
+                if (!m_hasLastPainted || !(m_hovered == m_lastPaintedHex)) {
+                    applyToolAt(m_hovered);
+                    m_lastPaintedHex = m_hovered;
+                    m_hasLastPainted = true;
+                }
+            }
         } else {
             m_hasHovered = false;  // hide map cursor while over palette
         }
@@ -550,6 +559,7 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
         HexCoord  hc = HexCoord::fromWorld(wp.x, wp.y, HEX_SIZE);
         m_hovered    = hc;
         m_hasHovered = m_map.hasTile(hc);
+        m_leftButtonHeld = true;
         if (m_devToolActive) {
             m_devSelected    = hc;
             m_hasDevSelected = m_map.hasTile(hc);
@@ -557,11 +567,15 @@ bool WorldBuilderState::handleEvent(void* sdlEvent) {
                 m_devEdit = m_map.objectAt(hc) ? DevEdit::Object : DevEdit::Terrain;
         } else {
             applyToolAt(hc);
+            m_lastPaintedHex = hc;
+            m_hasLastPainted = true;
         }
         return true;
     }
 
     if (e->type == SDL_MOUSEBUTTONUP && e->button.button == SDL_BUTTON_LEFT) {
+        m_leftButtonHeld = false;
+        m_hasLastPainted = false;
         if (m_palDragging) {
             m_palDragging = false;
             int travelY = e->button.y - m_palDragStartY;
@@ -689,24 +703,8 @@ void WorldBuilderState::renderObjects() {
         obj.pos.toWorld(HEX_SIZE, wx, wz);
         wx += off.dx;  wz += off.dz;
 
-        switch (obj.type) {
-            case ObjType::Dungeon:
-                m_dungeonSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE, view, proj);
-                break;
-            case ObjType::GoldMine:
-                m_goldMineSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.4f, view, proj);
-                break;
-            case ObjType::CrystalMine:
-                m_crystalMineSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.4f, view, proj);
-                break;
-            case ObjType::Artifact:
-                m_artifactSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.2f, view, proj);
-                break;
-            case ObjType::Town:
-            default:
-                m_townSpriteRenderer.draw({wx, off.dy, wz}, HEX_SIZE * 1.8f, view, proj);
-                break;
-        }
+        m_objRenderers[static_cast<int>(obj.type)].draw(
+            {wx, off.dy, wz}, HEX_SIZE * objTypeRenderScale(obj.type), view, proj);
     }
 
     glDisable(GL_BLEND);

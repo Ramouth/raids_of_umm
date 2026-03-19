@@ -109,12 +109,8 @@ private:
 
     HexRenderer    m_hexRenderer;
     AnimatedSprite m_heroSprite;               // hero — walk/idle clips
-    SpriteRenderer m_dungeonSpriteRenderer;    // ObjType::Dungeon
-    SpriteRenderer m_buildingSpriteRenderer;   // ObjType::Town (desert/default)
-    SpriteRenderer m_clanCastleRenderer;       // ObjType::Town (Verdant Reach, factionId==1)
-    SpriteRenderer m_goldMineSpriteRenderer;   // ObjType::GoldMine
-    SpriteRenderer m_crystalMineSpriteRenderer;// ObjType::CrystalMine
-    SpriteRenderer m_artifactSpriteRenderer;   // ObjType::Artifact
+    SpriteRenderer m_objRenderers[OBJ_TYPE_COUNT];  // indexed by ObjType (primary sprite)
+    SpriteRenderer m_clanCastleRenderer;            // Town variant for Verdant Reach (factionId==Player)
     HUDRenderer    m_hud;
 
     // Session state — object ownership/defeat flags live here, NOT in WorldMap.

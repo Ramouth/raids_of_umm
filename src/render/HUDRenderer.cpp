@@ -147,6 +147,30 @@ void HUDRenderer::drawTexturedRect(float x, float y, float w, float h, GLuint te
     m_shader.setInt("u_UseTexture", 0);
 }
 
+void HUDRenderer::drawTexturedRectUV(float x, float y, float w, float h,
+                                      GLuint texId,
+                                      float u0, float v0, float u1, float v1) {
+    struct TexVert { float x, y, u, v; };
+    const std::array<TexVert, 4> verts = {{
+        {x,     y,     u0, v0},
+        {x + w, y,     u1, v0},
+        {x + w, y + h, u1, v1},
+        {x,     y + h, u0, v1},
+    }};
+    glBindVertexArray(m_texVao);
+    glBindBuffer(GL_ARRAY_BUFFER, m_texVbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts.data());
+    m_shader.setInt("u_UseTexture", 1);
+    m_shader.setVec4("u_Color", {1.0f, 1.0f, 1.0f, 1.0f});
+    m_shader.setInt("u_Texture", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texId);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    m_shader.setInt("u_UseTexture", 0);
+}
+
 // ── drawText ─────────────────────────────────────────────────────────────────
 //   x, y  — pixel position of text top-left (y-down)
 //   scale — multiply font pixel size (stb chars are ~6px wide, 9px tall at scale=1)

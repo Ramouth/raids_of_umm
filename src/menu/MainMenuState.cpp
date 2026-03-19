@@ -1,6 +1,7 @@
 #include "MainMenuState.h"
 #include "adventure/AdventureState.h"
 #include "worldbuilder/WorldBuilderState.h"
+#include "tilebuilder/TileBuilderState.h"
 #include "world/WorldMap.h"
 #include "core/Application.h"
 #include <SDL2/SDL.h>
@@ -18,7 +19,7 @@ void MainMenuState::buttonRect(int i, int sw, int sh,
     h =  44.f * scale;
     x = (sw - w) / 2.f;
     // Stack buttons centered vertically, 4 buttons with spacing
-    const float totalH = 4 * h + 3 * 12.f * scale;
+    const float totalH = 5 * h + 4 * 12.f * scale;
     const float startY = (sh - totalH) / 2.f + sh * 0.08f;  // slightly below center
     y = startY + i * (h + 12.f * scale);
 }
@@ -44,6 +45,7 @@ void MainMenuState::buildButtons() {
         { "New Game",     true     },
         { "Continue",     hasSave  },
         { "World Builder",true     },
+        { "Tile Builder", true     },
         { "Quit",         true     },
     };
     m_hovered = -1;
@@ -93,7 +95,10 @@ void MainMenuState::activate(int idx) {
         case 2:  // World Builder
             Application::get().pushState(std::make_unique<WorldBuilderState>());
             break;
-        case 3:  // Quit
+        case 3:  // Tile Builder
+            Application::get().pushState(std::make_unique<TileBuilderState>());
+            break;
+        case 4:  // Quit
             Application::get().quit();
             break;
         default: break;
@@ -182,6 +187,7 @@ bool MainMenuState::handleEvent(void* sdlEvent) {
             case SDLK_2: if (m_buttons[1].enabled) activate(1); return true;
             case SDLK_3: activate(2); return true;
             case SDLK_4: activate(3); return true;
+            case SDLK_5: activate(4); return true;
             default: break;
         }
     }

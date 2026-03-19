@@ -59,6 +59,29 @@ inline float terrainHeight(Terrain t) noexcept {
 
 // ── Map objects ───────────────────────────────────────────────────────────────
 
+inline const char* objTypeSpritePath(ObjType t) noexcept {
+    switch (t) {
+        case ObjType::Town:         return "assets/textures/objects/castle.png";
+        case ObjType::Dungeon:      return "assets/textures/objects/dungeon.png";
+        case ObjType::GoldMine:     return "assets/textures/objects/goldmine.png";
+        case ObjType::CrystalMine:  return "assets/textures/objects/crystal_mine.png";
+        case ObjType::Artifact:     return "assets/textures/objects/artifact.png";
+        case ObjType::Sawmill:      return "assets/textures/objects/sawmill.png";
+        case ObjType::Quarry:       return "assets/textures/objects/quarry.png";
+        case ObjType::ObsidianVent: return "assets/textures/objects/obsidian_vent.png";
+        default:                    return "";
+    }
+}
+
+// HEX_SIZE multiplier for each object's billboard sprite.
+inline float objTypeRenderScale(ObjType t) noexcept {
+    switch (t) {
+        case ObjType::Town:     return 1.8f;
+        case ObjType::Artifact: return 1.2f;
+        default:                return 1.4f;
+    }
+}
+
 inline glm::vec3 objTypeColor(ObjType t) noexcept {
     switch (t) {
         case ObjType::Town:         return { 0.20f, 0.80f, 0.90f };
