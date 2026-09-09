@@ -1,7 +1,8 @@
-# Raids of Umm'Natur — Godot visual slice
+# Raids of Umm'Natur — Godot playable slice
 
-The first migration milestone is a running Godot 4.7 project using the existing
-desert map and sprites. The SDL/OpenGL game remains the gameplay reference.
+Godot 4.7 presents the existing desert map and sprites, with dungeon battles
+powered by the original C++ CombatEngine and CombatAI through GDExtension.
+The SDL/OpenGL game remains available alongside this migration.
 
 ## Run
 
@@ -15,6 +16,12 @@ The launcher finds `godot`, `godot4`, or the local, checksum-verified Godot 4.7.
 binary in `.tools/godot/`. On another machine, install the standard build from
 [Godot's download page](https://godotengine.org/download/) or set `GODOT_BIN` to
 the executable. The .NET build is not required.
+
+The native bridge currently targets **Linux x86-64**. Install a C++17 compiler,
+CMake 3.22+, and Python 3 (for binding generation). The first launch downloads
+checksum-pinned godot-cpp and nlohmann/json sources and compiles them; subsequent
+launches rebuild only changed code. `UMM_BUILD_JOBS=4` controls build parallelism.
+Neither SDL nor OpenGL development libraries are needed for the bridge.
 
 To open the visual editor:
 
@@ -35,14 +42,29 @@ and press F6 to run the scene (F5 runs the project).
 - Hex picking, weighted route previews, click-to-travel, and landmark descriptions.
 - Pan, zoom, overview, hero focus, and an optional hex overlay.
 - A native Godot UI and a map preview visible in the Godot editor.
+- Dungeon entry, an 11×5 battlefield, native initiative and enemy AI, legal-move
+  and attack highlights, stack inspection, defend, retreat, and auto-battle.
+- Ordered move, attack/projectile, damage, retaliation, defend, and death effects.
+- Return to the same map with surviving stack counts; victory awards one Scarab
+  Amulet and clears that dungeon for the current expedition.
 
 Controls: left click to travel; wheel to zoom; right/middle drag or WASD to pan;
 G toggles the grid; Space finds the hero; Home shows the entire map; Escape clears
 the preview. Orders finish before another order is accepted. Close the window to exit.
 
 Movement is free exploration in this visual slice: displayed costs describe the
-route, but do not consume a turn budget. Visiting landmarks displays a description;
-it does not trigger combat, recruitment, income, or loot.
+route, but do not consume a turn budget. Walk onto a dungeon and click **Enter
+dungeon** in the sidebar. Your starting army is 10 desert archers and 3 mummies;
+guards are 12 skeleton warriors and 4 sand scorpions, matching the original game.
+The encounter is configured in `content_source/dungeon_encounter.json`.
+
+In battle, green hexes are legal moves and red hexes are legal attacks. Click a
+stack to inspect it; only the active stack receives orders. Moving ends its turn.
+Press D or click Defend to improve defense for the turn, or enable Auto-battle.
+Orders are locked until all events from the previous action have animated. Retreat
+requires confirmation and preserves surviving counts, but gives no reward. Return
+from the result screen to resume exploration. After defeat, **New expedition**
+explicitly resets your army, loot, and dungeon progress.
 
 ## Working on visuals
 
@@ -61,20 +83,41 @@ the launcher. No source sprite is rewritten or recolored by the migration.
 
 ```sh
 ./scripts/run_godot.sh --headless --script res://tests/smoke.gd
+./scripts/build_godot_combat.sh --test
+./scripts/run_godot.sh --headless --script res://tests/combat_smoke.gd
 ./scripts/run_godot.sh --audio-driver Dummy --script res://tests/smoke.gd -- --capture
+./scripts/run_godot.sh --audio-driver Dummy --script res://tests/combat_smoke.gd -- --capture
 ```
 
-The second command needs a graphical display and writes `artifacts/overview.png`
+The capture commands need a graphical display and write `artifacts/overview.png`
 and `artifacts/detail.png`. The smoke test checks map import, axial coordinates,
 weighted road routing, blocked/unreachable destinations, actual mouse dispatch,
 animated travel, and UI controls. Failures produce a nonzero exit status, including
 a timeout if a script error prevents completion.
 
+The native tests cover bridge validation and presentation acknowledgements, plus
+the existing combat regression suite. The combat integration test loads the real
+extension in Godot, walks to a dungeon, clicks entry and attack controls, tests
+defend and confirmed retreat, and runs victory/defeat through survivor and reward
+handling. Outcome fixtures use deliberately unequal armies, without altering the
+production combat RNG. Combat captures are `artifacts/combat.png` and
+`artifacts/combat_victory.png`.
+
 ## Deliberate limits
 
-This is the visual proof, not the completed game migration. Combat, economy,
+This is a playable combat slice, not the completed game migration. Economy,
 recruitment, equipment, turn budgets, fog of war, saves, and the world builder have
-not been connected. Existing C++ saves are not read or written.
+not been connected. Expedition state is **in memory only**: closing the game resets
+it. Existing C++ saves are not read or written. Loot is collected but not equipped;
+partial stack HP is not carried between battles, matching the original count-only
+survivor handoff. Dungeon interiors, special-character recruitment/progression,
+and spells are not exposed by this battle view.
+
+Combat effects use the existing static sprites with movement tweens, melee lunges,
+projectiles, damage flashes/numbers, and death fades. These are presentation
+animations, not newly authored attack/death sprite sheets. Skeletons and scorpions
+still use the original renderer's warrior/scout stand-ins. Asset consistency and
+combat balance/play-feel tuning remain separate work.
 
 The sawmill, quarry, and obsidian vent have named diamond markers because the
 source art is missing. Other legacy sprites still vary in palette and scale.

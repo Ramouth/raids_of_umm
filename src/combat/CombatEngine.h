@@ -38,6 +38,8 @@ public:
     const CombatArmy& enemyArmy()   const { return m_enemy; }
     const CombatMap&  map()         const { return m_map; }
     int               roundNumber() const { return m_round; }
+    const std::vector<TurnSlot>& turnOrder() const { return m_queue; }
+    int               turnIndex() const { return m_turn; }
 
     // Returns the unit currently acting.
     const CombatUnit& activeUnit() const;

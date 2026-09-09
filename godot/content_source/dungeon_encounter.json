@@ -1,0 +1,7 @@
+{
+  "guards": [
+    {"id": "skeleton_warrior", "count": 12},
+    {"id": "sand_scorpion", "count": 4}
+  ],
+  "reward": "scarab_amulet"
+}

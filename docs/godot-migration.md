@@ -17,11 +17,39 @@ for layered scenery. It does not require terrain art to be confined to hex tiles
 A hex TileMapLayer may be useful later for authored transition tiles, but it is
 not a prerequisite for retaining the logical hex grid.
 
-## Next milestone: connect gameplay
+## Completed: dungeon combat vertical slice
+
+`godot/native` is an isolated CMake build of the existing `CombatEngine`,
+`CombatAI`, and `ResourceManager`. It exports a `UmmCombat` RefCounted GDExtension
+class; no SDL/OpenGL renderer or state class is linked. The only change to the
+shared engine is read-only initiative accessors. Bindings target the stable Godot
+4.5 API, supported by the 4.7 runtime; the library manifest currently covers Linux
+x86-64 only. Dependencies are pinned by revision/version and SHA-256.
+
+The bridge accepts `begin_battle`, `act`, and `acknowledge`. JSON responses contain
+an authoritative snapshot, ordered combat events, and an acknowledgement ticket.
+The bridge validates occupancy, movement and attack range (including exhausted
+ammo), ownership of the active turn, and the pending-animation lock. Godot renders
+events in order before applying the next snapshot and acknowledging its ticket;
+new player or AI actions cannot skip past unfinished effects. Movement animation
+paths avoid occupied cells. Each stack has its own presentation node.
+
+Exploration now enters battles from dungeon cells and resumes in the same scene.
+The expedition stores survivor counts, collected artifacts, and cleared dungeon
+cells in memory. Defeat does not regenerate the army, retreat gives no reward,
+and a victory reward can only be applied once per dungeon. The original starting
+army and dungeon guard composition are retained. This is a single guard encounter,
+not a port of the original dungeon interior or special-character systems.
+
+Check `godot/README.md` for launch, native regression tests, full Godot integration
+tests, and rendered captures. No changes to the original game's renderer are
+required. Dedicated unit attack/death sheets and battle balance remain follow-ups.
+
+## Next milestone: connect the rest of gameplay
 
 1. Extract a separate C++ library target for the existing pure gameplay modules.
-   Start with `HexGrid`, `WorldMap`, `CombatEngine`, `CombatAI`, `Hero`, resources,
-   and turn management. Preserve the existing logic tests.
+   Extend the combat target to `HexGrid`, `WorldMap`, `Hero`, and turn management.
+   Preserve the existing logic tests.
 2. Wrap that library with a small GDExtension interface. Godot sends commands
    such as selecting a hero, requesting a route, moving, and ending a turn.
    C++ returns authoritative state and events; avoid a Godot node per C++ datum.
@@ -31,8 +59,8 @@ not a prerequisite for retaining the logical hex grid.
 4. Replace the preview route finder and unrestricted movement with that interface.
    Define path conventions explicitly: the C++ path includes the start cell,
    while the current Godot animation queue contains only subsequent steps.
-5. Connect one complete loop: exploration, combat, rewards, town recruitment, and
-   save/load. C++ remains the sole authority for costs, combat outcomes, ownership,
+5. Extend exploration/combat/rewards with town recruitment and save/load. C++
+   remains the sole authority for costs, combat outcomes, ownership,
    turn progression, and serialization.
 
 GDScript should orchestrate views and animation. Do not independently reimplement

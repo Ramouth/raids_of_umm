@@ -3,9 +3,13 @@
 set -euo pipefail
 project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 godot_project="$project_root/godot"
-mkdir -p "$godot_project/content/textures" "$godot_project/content/maps"
+mkdir -p "$godot_project/content/textures" "$godot_project/content/maps" "$godot_project/content/data"
 cp -Ru "$project_root/assets/textures/." "$godot_project/content/textures/"
 cp -u "$project_root/data/maps/default.json" "$godot_project/content/maps/default.json"
+for definition in units spells buildings items; do
+    cp -u "$project_root/data/$definition.json" "$godot_project/content/data/$definition.json"
+done
+"$project_root/scripts/build_godot_combat.sh"
 
 if [[ "${1:-}" == "--prepare" ]]; then
     echo "Shared assets staged. Open godot/project.godot in Godot 4.7 or newer."

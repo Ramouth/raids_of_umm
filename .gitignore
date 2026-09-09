@@ -25,3 +25,5 @@ data/saves/
 godot/.godot/
 godot/content/
 godot/artifacts/
+godot/bin/
+godot/native/build/
