@@ -19,3 +19,9 @@ game.log
 
 # Session saves (runtime data, not source)
 data/saves/
+
+# Godot migration: local engine, import cache, and staged copies of source assets
+.tools/
+godot/.godot/
+godot/content/
+godot/artifacts/

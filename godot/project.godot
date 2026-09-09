@@ -1,0 +1,22 @@
+; Open this project after running ./scripts/run_godot.sh --prepare.
+config_version=5
+
+[application]
+config/name="Raids of Umm'Natur — Godot"
+run/main_scene="res://scenes/desert.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/description="The first playable visual slice of the Godot migration."
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.075, 0.06, 0.045, 1)
