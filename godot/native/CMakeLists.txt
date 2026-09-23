@@ -33,6 +33,7 @@ add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/adventure/Scenario.cpp"
     "${UMM_ROOT}/src/adventure/Rivals.cpp"
     "${UMM_ROOT}/src/adventure/Specials.cpp"
+    "${UMM_ROOT}/src/adventure/SessionSave.cpp"
     combat_session.cpp
     adventure_bridge.cpp)
 target_include_directories(umm_combat_core PUBLIC "${UMM_ROOT}/src" "${CMAKE_CURRENT_SOURCE_DIR}")

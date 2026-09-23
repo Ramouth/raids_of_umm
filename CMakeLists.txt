@@ -115,6 +115,7 @@ add_executable(raids_tests
     src/adventure/Scenario.cpp
     src/adventure/Rivals.cpp
     src/adventure/Specials.cpp
+    src/adventure/SessionSave.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp

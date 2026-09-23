@@ -47,6 +47,8 @@ protected:
         ClassDB::bind_method(D_METHOD("accept_offer", "id"), &UmmAdventure::accept_offer);
         ClassDB::bind_method(D_METHOD("transfer", "q", "r", "unit_id", "count", "to_garrison"), &UmmAdventure::transfer);
         ClassDB::bind_method(D_METHOD("station", "id", "stay"), &UmmAdventure::station);
+        ClassDB::bind_method(D_METHOD("save_game", "path", "extra_json"), &UmmAdventure::save_game);
+        ClassDB::bind_method(D_METHOD("load_game", "path"), &UmmAdventure::load_game);
         ClassDB::bind_method(D_METHOD("add_item", "id"), &UmmAdventure::add_item);
         ClassDB::bind_method(D_METHOD("resolve_encounter", "victory"), &UmmAdventure::resolve_encounter);
         ClassDB::bind_method(D_METHOD("set_army", "stacks_json"), &UmmAdventure::set_army);
@@ -63,6 +65,10 @@ public:
                                                   triggers.utf8().get_data()); });
     }
     String accept_offer(const String& id) { return guarded([&] { return bridge_.accept_offer(id.utf8().get_data()); }); }
+    String save_game(const String& path, const String& extra) {
+        return guarded([&] { return bridge_.save(path.utf8().get_data(), AdventureBridge::Json::parse(extra.utf8().get_data())); });
+    }
+    String load_game(const String& path) { return guarded([&] { return bridge_.load(path.utf8().get_data()); }); }
     String station(const String& id, bool stay) { return guarded([&] { return bridge_.station(id.utf8().get_data(), stay); }); }
     String transfer(int q, int r, const String& id, int count, bool to_garrison) {
         return guarded([&] { return bridge_.transfer(q, r, id.utf8().get_data(), count, to_garrison); });

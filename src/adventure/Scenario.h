@@ -62,6 +62,9 @@ public:
     Offer* offer(const std::string& id);
     void run(AdventureSession& s, const Json& actions);
     void say(const std::string& speaker, const std::string& text) { m_lines.push_back({speaker, text}); }
+    // Save/load: fired triggers, quest progress, offers taken (defs come from the file).
+    Json saveState() const;
+    void loadState(const Json& state);
 
 private:
     bool matches(const Json& when, const std::string& event, const Json& detail) const;

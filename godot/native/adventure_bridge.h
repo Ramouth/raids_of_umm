@@ -20,6 +20,9 @@ public:
     Json accept_offer(const std::string& id);
     Json transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison);
     Json station(const std::string& id, bool stay);
+    // Writes the session (+ caller extras, e.g. Godot inventory) to path.
+    Json save(const std::string& path, const Json& extra);
+    Json load(const std::string& path);   // snapshot + "extra"
     Json add_item(const std::string& id);
 
 private:

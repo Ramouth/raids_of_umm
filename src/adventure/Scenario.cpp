@@ -107,6 +107,38 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
     }
 }
 
+Scenario::Json Scenario::saveState() const {
+    Json quests = Json::array();
+    for (const auto& q : m_quests) quests.push_back({{"id", q.id}, {"text", q.text}, {"done", q.done}});
+    Json offers = Json::array();
+    for (const auto& o : m_offers) offers.push_back({{"id", o.id}, {"taken", o.taken}});
+    return {{"fired", Json(std::vector<std::string>(m_fired.begin(), m_fired.end()))},
+            {"quests", quests}, {"offers", offers}};
+}
+
+void Scenario::loadState(const Json& state) {
+    m_fired.clear();
+    for (const auto& id : state.value("fired", Json::array())) m_fired.insert(id.get<std::string>());
+    m_quests.clear();
+    for (const auto& q : state.value("quests", Json::array()))
+        for (const auto& def : m_questDefs)
+            if (def.id == q.value("id", "")) {
+                Quest copy = def;
+                copy.text = q.value("text", def.text);
+                copy.done = q.value("done", false);
+                m_quests.push_back(copy);
+            }
+    m_offers.clear();
+    for (const auto& o : state.value("offers", Json::array()))
+        for (const auto& def : m_offerDefs)
+            if (def.id == o.value("id", "")) {
+                Offer copy = def;
+                copy.taken = o.value("taken", false);
+                m_offers.push_back(copy);
+            }
+    m_lines.clear();
+}
+
 std::vector<Scenario::Line> Scenario::drainLines() {
     std::vector<Line> out;
     out.swap(m_lines);

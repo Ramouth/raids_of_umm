@@ -533,3 +533,39 @@ SUITE("Specials — a governor earns gold in town but no XP") {
     CHECK(!s.station("ushari", false));
     CHECK(s.hasAbility("Drillmaster"));
 }
+
+// ── Save / load ───────────────────────────────────────────────────────────────
+
+SUITE("Save — the demo map round-trips mid-game") {
+    AdventureSession a;
+    CHECK(!a.start("data/maps/old_passage.json", "data", "data/maps/old_passage.encounters.json", 5,
+                   "data/maps/old_passage.triggers.json"));
+    a.setArmy({{"rider_knight", 40}, {"levy_spearman", 10}});
+    a.travel({-6, 3});                               // to the Ridge Pass guards
+    if (a.pendingEncounter()) a.resolveEncounter(true);
+    a.endDay();
+    a.endDay();
+    a.endDay();
+    auto save = a.saveState();
+    CHECK(!save.is_null());
+
+    AdventureSession b;
+    CHECK(!b.loadState(Scenario::Json::parse(save.dump())));
+    CHECK_EQ(b.day(), a.day());
+    CHECK(b.heroPos() == a.heroPos());
+    CHECK_EQ(b.treasury()[Resource::Gold], a.treasury()[Resource::Gold]);
+    CHECK_EQ(b.isEncounter({-6, 3}), a.isEncounter({-6, 3}));
+    CHECK_EQ((int)b.explored().size(), (int)a.explored().size());
+    CHECK(b.passageMine() == a.passageMine());
+    CHECK_EQ((int)b.army().size(), (int)a.army().size());
+    CHECK_EQ(b.specials()[0].xp, a.specials()[0].xp);
+    CHECK_EQ((int)b.scenario().quests().size(), (int)a.scenario().quests().size());
+    CHECK_EQ((int)b.rivals().size(), (int)a.rivals().size());
+    if (!a.rivals().empty()) CHECK(b.rivals()[0].pos == a.rivals()[0].pos);
+    CHECK(b.moves() == a.moves());
+}
+
+SUITE("Save — a map-object session cannot be saved") {
+    auto s = started();
+    CHECK(s.saveState().is_null());
+}

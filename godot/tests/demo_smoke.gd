@@ -26,6 +26,7 @@ func _run() -> void:
     await _passage_wins()
     await _defeat_ends()
     await _rival_raids()
+    await _save_load()
     print("Demo smoke: ", "PASS" if failures == 0 else "%d failures" % failures)
     quit(failures)
 
@@ -228,5 +229,26 @@ func _rival_raids() -> void:
         check(await _auto_battle(scene) == "defeat", "The ambush is lost")
         var top: Control = scene.screens.top()
         check(top != null and not top.victory, "Losing the army to an ambush ends the expedition")
+    scene.queue_free()
+    await process_frame
+
+func _save_load() -> void:
+    var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
+    scene.dialogue.skip_all()
+    scene.travel_to(Vector2i(-8, 4))
+    while scene.hero.moving: await process_frame
+    scene.end_day()
+    await _turn_done(scene)
+    var day: int = scene.state.day
+    var cell: Vector2i = scene.hero.cell
+    var gold: int = scene.state.treasury.Gold
+    check(scene.save_game(), "Quicksave succeeds")
+    scene.end_day()
+    await _turn_done(scene)
+    scene.travel_to(Vector2i(-10, 5))
+    while scene.hero.moving: await process_frame
+    check(scene.load_game(), "Quickload succeeds")
+    check(scene.state.day == day and scene.hero.cell == cell and int(scene.state.treasury.Gold) == gold, "Load restores day, hero and treasury")
+    check(scene.army.size() == WEEK2_ARMY.size(), "Load restores the army")
     scene.queue_free()
     await process_frame

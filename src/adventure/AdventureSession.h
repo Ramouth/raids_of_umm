@@ -172,6 +172,11 @@ public:
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 
+    // ── Save / load (SessionSave.cpp) ────────────────────────────────────────
+    // Only sessions started from files can be saved (the save names them).
+    Scenario::Json saveState() const;
+    std::optional<std::string> loadState(const Scenario::Json& save);
+
     // ── Calendar ─────────────────────────────────────────────────────────────
     // Applies income, weekly growth, resets movement. Returns the event text ("" if none).
     std::string endDay();
@@ -235,6 +240,8 @@ private:
     std::unordered_set<std::string>  m_items;
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::vector<Special>             m_specials;
+    struct StartArgs { std::string map, data, encounters, triggers; uint32_t seed = 0; };
+    std::optional<StartArgs>         m_startArgs;   // set when started from files
     std::vector<Rival>               m_rivals;
     std::vector<RivalMove>           m_rivalMoves;
     bool                             m_pendingAmbush = false;

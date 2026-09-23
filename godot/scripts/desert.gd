@@ -335,6 +335,39 @@ func accept_offer(id: String) -> bool:
     _say(reply)
     return true
 
+const SAVE_PATH := "user://quicksave.json"
+
+func save_game() -> bool:
+    if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return false
+    var extra := {"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])}
+    var reply: Dictionary = JSON.parse_string(adventure.save_game(ProjectSettings.globalize_path(SAVE_PATH), JSON.stringify(extra)))
+    notice.text = "Game saved (F9 to load)." if reply.get("ok", false) else str(reply.get("error", "Could not save."))
+    return reply.get("ok", false)
+
+func load_game() -> bool:
+    if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return false
+    var reply: Dictionary = JSON.parse_string(adventure.load_game(ProjectSettings.globalize_path(SAVE_PATH)))
+    if not reply.get("ok", false):
+        notice.text = str(reply.get("error", "Could not load."))
+        return false
+    var extra: Dictionary = reply.get("extra", {})
+    inventory = extra.get("inventory", [])
+    cleared_dungeons.clear()
+    for c in extra.get("cleared_dungeons", []): cleared_dungeons[Vector2i(c[0], c[1])] = true
+    if dialogue != null: dialogue.skip_all()
+    for id in _rival_sprites: _rival_sprites[id].queue_free()
+    _rival_sprites.clear()
+    state = reply
+    army = reply.army.duplicate(true)
+    state = reply
+    _quest_count = state.get("quests", []).size()
+    _apply_state(state)
+    hero.place_at(_hero_cell())
+    _entered_cell(hero.cell)
+    center_hero()
+    notice.text = "Game loaded: day %d of week %d." % [state.day_of_week, state.week]
+    return true
+
 func toggle_quest_log() -> void:
     quest_log.visible = not quest_log.visible
     if quest_log.visible: quest_log.show_quests(state.get("quests", []))
@@ -382,7 +415,7 @@ func _build_turn_hud() -> void:
     _end_day_button.pressed.connect(end_day)
     sidebar.add_child(_end_day_button)
     sidebar.move_child(_end_day_button, sidebar.get_node("Grid").get_index())
-    $HUD/Layout/Footer.text = "CLICK  travel     •     E  end day     •     WHEEL  zoom     •     RIGHT DRAG / WASD  pan     •     ESC  clear route"
+    $HUD/Layout/Footer.text = "CLICK travel  •  E end day  •  T town  •  R garrison  •  P companions  •  Q quests  •  F5 save  •  F9 load"
 
 func _update_turn_hud() -> void:
     if not is_instance_valid(_calendar_label): return
@@ -474,6 +507,10 @@ func _unhandled_input(event: InputEvent) -> void:
                 toggle_quest_log()
             KEY_P:
                 open_party()
+            KEY_F5:
+                save_game()
+            KEY_F9:
+                load_game()
             KEY_HOME:
                 fit_map()
             KEY_E:

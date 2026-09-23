@@ -38,7 +38,9 @@ std::optional<std::string> AdventureSession::start(const std::string& mapPath,
                                                    const std::string& triggersPath) {
     WorldMap map;
     if (auto err = map.loadJson(mapPath)) return err;
-    return start(std::move(map), dataDir, encountersPath, seed, triggersPath);
+    auto err = start(std::move(map), dataDir, encountersPath, seed, triggersPath);
+    if (!err) m_startArgs = StartArgs{mapPath, dataDir, encountersPath, triggersPath, seed};
+    return err;
 }
 
 std::optional<std::string> AdventureSession::start(WorldMap map, const std::string& dataDir,
@@ -70,6 +72,7 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_rivalMoves.clear();
     m_garrisons.clear();
     m_specials.clear();
+    m_startArgs.reset();
     m_pendingAmbush = false;
     m_lost = false;
     m_lostReason.clear();

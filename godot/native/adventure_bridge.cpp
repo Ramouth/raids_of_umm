@@ -1,4 +1,5 @@
 #include "adventure_bridge.h"
+#include <fstream>
 
 namespace {
 using Json = AdventureBridge::Json;
@@ -199,6 +200,27 @@ Json AdventureBridge::station(const std::string& id, bool stay) {
     Json out = snapshot();
     if (err) { out["ok"] = false; out["error"] = *err; }
     return with_lines(out);
+}
+
+Json AdventureBridge::save(const std::string& path, const Json& extra) {
+    Json state = session_.saveState();
+    if (state.is_null()) return {{"ok", false}, {"error", "This session cannot be saved."}};
+    state["extra"] = extra;
+    std::ofstream f(path);
+    if (!f.is_open()) return {{"ok", false}, {"error", "Cannot write " + path}};
+    f << state.dump();
+    return {{"ok", true}};
+}
+
+Json AdventureBridge::load(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open()) return {{"ok", false}, {"error", "No saved game."}};
+    Json state = Json::parse(f, nullptr, false);
+    if (state.is_discarded()) return {{"ok", false}, {"error", "Save file is damaged."}};
+    if (auto err = session_.loadState(state)) return {{"ok", false}, {"error", *err}};
+    Json out = snapshot();
+    out["extra"] = state.value("extra", Json::object());
+    return out;
 }
 
 Json AdventureBridge::add_item(const std::string& id) {
