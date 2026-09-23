@@ -108,6 +108,30 @@ SUITE("WorldMap — save and load round-trip") {
     CHECK_EQ(loaded.objects().size(), original.objects().size());
 }
 
+SUITE("WorldMap — every object type survives save/load") {
+    const std::string path = "/tmp/raids_test_objtypes.json";
+
+    WorldMap original;
+    original.clear(OBJ_TYPE_COUNT);
+    for (int i = 0; i < OBJ_TYPE_COUNT; ++i) {
+        MapObjectDef obj;
+        obj.pos  = {i, 0};
+        obj.type = static_cast<ObjType>(i);
+        obj.name = std::string(objTypeName(obj.type));
+        original.placeObject(obj);
+    }
+    CHECK(!original.saveJson(path));
+
+    WorldMap loaded;
+    CHECK(!loaded.loadJson(path));
+    CHECK_EQ((int)loaded.objects().size(), OBJ_TYPE_COUNT);
+    for (int i = 0; i < OBJ_TYPE_COUNT; ++i) {
+        const MapObjectDef* obj = loaded.objectAt({i, 0});
+        CHECK(obj != nullptr);
+        if (obj) CHECK(obj->type == static_cast<ObjType>(i));
+    }
+}
+
 SUITE("WorldMap — setTile overwrites existing") {
     WorldMap map;
     map.generateProcedural(3, 1);

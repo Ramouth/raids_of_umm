@@ -69,6 +69,9 @@ inline const char* objTypeSpritePath(ObjType t) noexcept {
         case ObjType::Sawmill:      return "assets/textures/objects/sawmill.png";
         case ObjType::Quarry:       return "assets/textures/objects/quarry.png";
         case ObjType::ObsidianVent: return "assets/textures/objects/obsidian_vent.png";
+        case ObjType::OldMine:      return "assets/textures/objects/old_mine.png";
+        case ObjType::QuestGiver:   return "assets/textures/objects/quest_giver.png";
+        case ObjType::Guard:        return "assets/textures/objects/guard.png";
         default:                    return "";
     }
 }
@@ -92,6 +95,9 @@ inline glm::vec3 objTypeColor(ObjType t) noexcept {
         case ObjType::Sawmill:      return { 0.55f, 0.35f, 0.10f };
         case ObjType::Quarry:       return { 0.65f, 0.60f, 0.55f };
         case ObjType::ObsidianVent: return { 0.20f, 0.10f, 0.30f };
+        case ObjType::OldMine:      return { 0.45f, 0.30f, 0.20f };
+        case ObjType::QuestGiver:   return { 0.30f, 0.90f, 0.40f };
+        case ObjType::Guard:        return { 0.90f, 0.40f, 0.10f };
         default:                    return { 1.00f, 0.00f, 1.00f };
     }
 }

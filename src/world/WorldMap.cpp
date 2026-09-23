@@ -67,6 +67,9 @@ static const char* objTypeToStr(ObjType t) noexcept {
         case ObjType::Sawmill:      return "sawmill";
         case ObjType::Quarry:       return "quarry";
         case ObjType::ObsidianVent: return "obsidian_vent";
+        case ObjType::OldMine:      return "old_mine";
+        case ObjType::QuestGiver:   return "quest_giver";
+        case ObjType::Guard:        return "guard";
         default:                    return "town";
     }
 }
@@ -79,6 +82,9 @@ static ObjType objTypeFromStr(const std::string& s) noexcept {
     if (s == "sawmill")       return ObjType::Sawmill;
     if (s == "quarry")        return ObjType::Quarry;
     if (s == "obsidian_vent") return ObjType::ObsidianVent;
+    if (s == "old_mine")      return ObjType::OldMine;
+    if (s == "quest_giver")   return ObjType::QuestGiver;
+    if (s == "guard")         return ObjType::Guard;
     return ObjType::Town;
 }
 
@@ -308,10 +314,11 @@ std::vector<HexCoord> WorldMap::findPath(const HexCoord& from,
 }
 
 std::vector<HexCoord> WorldMap::findPathWeighted(const HexCoord& from,
-                                                  const HexCoord& to) const {
+                                                  const HexCoord& to,
+                                                  const std::function<bool(const HexCoord&)>& blocked) const {
     return m_grid.findPath(
         from, to,
-        [](const HexCoord&, const MapTile& t) { return t.passable; },
+        [&](const HexCoord& c, const MapTile& t) { return t.passable && !(blocked && blocked(c)); },
         [this](const HexCoord& /*from*/, const HexCoord& to) {
             const MapTile* t = m_grid.get(to);
             return t ? t->moveCost : 1.0f;

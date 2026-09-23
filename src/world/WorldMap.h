@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstdint>
 #include <optional>
+#include <functional>
 
 /*
  * WorldMap — the single source of truth for a map's static data.
@@ -91,8 +92,10 @@ public:
                                    const HexCoord& to) const;
 
     // Path with weighted movement costs (uses MapTile::moveCost).
+    // 'blocked' marks extra impassable cells (e.g. guarded hexes) for this query.
     std::vector<HexCoord> findPathWeighted(const HexCoord& from,
-                                           const HexCoord& to) const;
+                                           const HexCoord& to,
+                                           const std::function<bool(const HexCoord&)>& blocked = {}) const;
 
     // ── Metadata ─────────────────────────────────────────────────────────────
 

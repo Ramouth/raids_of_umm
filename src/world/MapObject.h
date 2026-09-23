@@ -24,6 +24,9 @@ enum class ObjType : uint8_t {
     Sawmill      = 5,
     Quarry       = 6,
     ObsidianVent = 7,
+    OldMine      = 8,   // abandoned mine — may hide the old passage
+    QuestGiver   = 9,   // SC camp that offers quests
+    Guard        = 10,  // neutral guard stack (placeholder until guard data lands)
 
     COUNT  // must remain last
 };
@@ -40,6 +43,9 @@ constexpr std::string_view objTypeName(ObjType t) noexcept {
         case ObjType::Sawmill:      return "Sawmill";
         case ObjType::Quarry:       return "Quarry";
         case ObjType::ObsidianVent: return "Obsidian Vent";
+        case ObjType::OldMine:      return "Old Mine";
+        case ObjType::QuestGiver:   return "Quest Giver";
+        case ObjType::Guard:        return "Guard";
         default:                    return "Unknown";
     }
 }

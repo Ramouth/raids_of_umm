@@ -651,6 +651,13 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
             m_notifyTimer   = NOTIFY_DURATION;
             std::cout << "     Artifact collected: " << obj->name << "\n";
             break;
+        case ObjType::OldMine:
+        case ObjType::QuestGiver:
+        case ObjType::Guard:
+            // Demo placeholders — behaviour lands in later demo steps.
+            m_notification = obj->name + " (not yet implemented)";
+            m_notifyTimer  = NOTIFY_DURATION;
+            break;
         case ObjType::COUNT:
             break;  // sentinel, never a real object
     }
