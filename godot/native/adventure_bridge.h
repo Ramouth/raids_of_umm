@@ -19,6 +19,7 @@ public:
     Json recruit(int q, int r, const std::string& unit_id, int count);
     Json accept_offer(const std::string& id);
     Json transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison);
+    Json station(const std::string& id, bool stay);
     Json add_item(const std::string& id);
 
 private:

@@ -341,6 +341,30 @@
           ]
         }
       ]
+    },
+    {
+      "id": "kharim_joins",
+      "when": {
+        "event": "quests_done",
+        "count": 3
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Kharim",
+              "Three debts paid, three mines struck from my list. You have earned more than a clue, commander."
+            ],
+            [
+              "Kharim",
+              "I am coming with you. Someone must read the walls when we go down."
+            ]
+          ]
+        },
+        {
+          "join": "kharim"
+        }
+      ]
     }
   ]
 }

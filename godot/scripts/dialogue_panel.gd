@@ -6,7 +6,7 @@ extends PanelContainer
 signal drained
 
 const PORTRAITS := {
-    "Ushari": "units/ushari.png", "Kharim": "units/kharim.png",
+    "Ushari": "units/ushari.png", "Kharim": "portraits/kharim.png",
     "Scout": "units/rider_archer.png", "Messenger": "units/levy_spearman.png",
 }
 

@@ -41,15 +41,16 @@ func _ready() -> void:
     sky.size = Vector2(276, 496)
     add_child(sky)
     var art := TextureRect.new()
-    art.texture = load("res://content/textures/objects/castle.png")
-    art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-    art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    var view := "res://content/textures/screens/town_khemret.png"
+    art.texture = load(view if ResourceLoader.exists(view) else "res://content/textures/objects/castle.png")
+    art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    art.position = Vector2(36, 220)
-    art.size = Vector2(276, 276)
+    art.clip_contents = true
+    art.position = Vector2(36, 140)
+    art.size = Vector2(276, 420)
     add_child(art)
     var growth := _label("Recruits gather every 7th day.\nMines and towns pay income each dawn.", 13, Color("c8b08a"))
-    growth.position = Vector2(48, 540)
+    growth.position = Vector2(48, 572)
     growth.size = Vector2(252, 80)
     growth.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     add_child(growth)

@@ -72,6 +72,19 @@ Json AdventureBridge::snapshot() const {
         for (const auto& s : *held) stacks.push_back({{"id", s.id}, {"count", s.count}});
         garrisons.push_back({{"cell", cell(coord)}, {"army", stacks}});
     }
+    Json specials = Json::array();
+    for (const auto& sc : session_.specials()) {
+        Json abilities = Json::array();
+        for (const auto& a : AdventureSession::abilitiesOf(sc.id))
+            abilities.push_back({{"level", a.level}, {"name", a.name}, {"text", a.text},
+                                 {"unlocked", sc.level >= a.level}});
+        specials.push_back({{"id", sc.id}, {"name", sc.name}, {"title", sc.title},
+                            {"level", sc.level}, {"xp", sc.xp},
+                            {"next", AdventureSession::xpForLevel(sc.level + 1)},
+                            {"stationed", sc.stationed ? cell(*sc.stationed) : Json(nullptr)},
+                            {"unpaid", sc.unpaidDays}, {"upkeep", AdventureSession::upkeepFor(sc.level)},
+                            {"abilities", abilities}});
+    }
     Json rivals = Json::array();
     for (const auto& r : session_.rivals()) {
         if (!r.alive || !session_.isVisible(r.pos)) continue;   // hidden in fog
@@ -121,6 +134,8 @@ Json AdventureBridge::snapshot() const {
         {"ruled_out", cells(session_.ruledOut())},
         {"rivals", rivals},
         {"garrisons", garrisons},
+        {"specials", specials},
+        {"upkeep", session_.upkeepPerDay()},
         {"rival_moves", moves},
         {"lost", session_.lost()},
         {"lost_reason", session_.lostReason()},
@@ -177,6 +192,13 @@ Json AdventureBridge::transfer(int q, int r, const std::string& unit_id, int cou
     Json out = snapshot();
     if (err) { out["ok"] = false; out["error"] = *err; }
     return out;
+}
+
+Json AdventureBridge::station(const std::string& id, bool stay) {
+    auto err = session_.station(id, stay);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return with_lines(out);
 }
 
 Json AdventureBridge::add_item(const std::string& id) {

@@ -8,19 +8,27 @@ var heading := ""
 var body := ""
 var stats := ""
 var victory := false
+var illustration := ""   # res:// path shown above the text
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     var box := VBoxContainer.new()
-    box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-    box.custom_minimum_size = Vector2(760, 0)
-    box.position = Vector2(-380, -200)
-    box.add_theme_constant_override("separation", 22)
+    box.custom_minimum_size = Vector2(900, 0)
+    box.position = Vector2(190, 24)
+    box.add_theme_constant_override("separation", 14)
     add_child(box)
+    if not illustration.is_empty() and ResourceLoader.exists(illustration):
+        var art := TextureRect.new()
+        art.name = "Illustration"
+        art.texture = load(illustration)
+        art.custom_minimum_size = Vector2(900, 440)
+        art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        box.add_child(art)
     var eyebrow := _label("THE OLD PASSAGE  ·  " + ("SCENARIO COMPLETE" if victory else "EXPEDITION LOST"), 13, Color("ad854a"))
     box.add_child(eyebrow)
-    box.add_child(_label(heading, 40, Color("f3dfb0") if victory else Color("d98a6a")))
-    box.add_child(_label(body, 18, Color("e8d8b8")))
+    box.add_child(_label(heading, 32, Color("f3dfb0") if victory else Color("d98a6a")))
+    box.add_child(_label(body, 16, Color("e8d8b8")))
     box.add_child(_label(stats, 15, Color("b8a080")))
     var row := HBoxContainer.new()
     row.alignment = BoxContainer.ALIGNMENT_CENTER

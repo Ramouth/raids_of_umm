@@ -67,6 +67,15 @@ func _story() -> void:
     scene.toggle_quest_log()
     scene.dialogue.skip_all()
     check(not scene.dialogue.is_speaking(), "Dialogue can be dismissed")
+    check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari rides with the hero")
+    check(scene.open_party(), "The companions screen opens")
+    var party: Control = scene.screens.top()
+    party._station("ushari", true)
+    check(scene.state.specials[0].stationed != null, "Ushari can govern Khemret")
+    party._station("ushari", false)
+    check(scene.state.specials[0].stationed == null, "Ushari can be recalled")
+    party.find_child("Done", true, false).pressed.emit()
+    await process_frame
     scene.queue_free()
     await process_frame
     # Offers: a tiny map where a camp sells a clue for gold.

@@ -24,6 +24,7 @@ const TownScreen = preload("res://scripts/town_screen.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
+const PartyScreen = preload("res://scripts/party_screen.gd")
 var _garrison_button: Button
 var _town_button: Button
 var dialogue: PanelContainer
@@ -151,6 +152,26 @@ func transfer(site: Vector2i, unit_id: String, count: int, to_garrison: bool) ->
         army = reply.army.duplicate(true)
         _update_expedition()
     return reply
+
+## Called by the party screen. Returns the native reply.
+func station(id: String, stay: bool) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.station(id, stay))
+    if reply.get("ok", false):
+        _apply_state(reply)
+        _say(reply)
+    return reply
+
+func can_govern() -> bool:
+    return _owned_town(hero.cell)
+
+func open_party() -> bool:
+    if hero.moving or is_instance_valid(battle): return false
+    var screen := PartyScreen.new()
+    screen.host = self
+    screens.push(screen, func(_result: Dictionary):
+        _apply_state(state)
+        _update_expedition())
+    return true
 
 func open_garrison() -> bool:
     if hero.moving or is_instance_valid(battle) or not _owned_site(hero.cell): return false
@@ -331,6 +352,12 @@ func _build_turn_hud() -> void:
     _offer_box.name = "Offers"
     sidebar.add_child(_offer_box)
     sidebar.move_child(_offer_box, sidebar.get_node("Spacer").get_index())
+    var party := Button.new()
+    party.name = "Party"
+    party.text = "Companions     P"
+    party.pressed.connect(open_party)
+    sidebar.add_child(party)
+    sidebar.move_child(party, sidebar.get_node("Grid").get_index())
     var quests := Button.new()
     quests.name = "Quests"
     quests.text = "Quest log     Q"
@@ -363,8 +390,9 @@ func _update_turn_hud() -> void:
     var parts: Array[String] = []
     for resource in RESOURCES:
         var line := "%s %d" % [resource, state.treasury[resource]]
-        if int(state.income[resource]) > 0:
-            line += " (+%d)" % state.income[resource]
+        var net := int(state.income[resource]) - (int(state.get("upkeep", 0)) if resource == "Gold" else 0)
+        if net != 0:
+            line += " (%+d)" % net
         parts.append(line)
     _treasury_label.text = "    ".join(parts)
     _moves_label.text = "Movement  %.1f / %.0f" % [state.moves, state.moves_max]
@@ -444,6 +472,8 @@ func _unhandled_input(event: InputEvent) -> void:
                 elif event.keycode == KEY_SPACE: center_hero()
             KEY_Q:
                 toggle_quest_log()
+            KEY_P:
+                open_party()
             KEY_HOME:
                 fit_map()
             KEY_E:
@@ -615,6 +645,11 @@ func _update_expedition() -> void:
     var summary: Array[String] = []
     for stack in army: summary.append("%d %s" % [stack.count, str(stack.id).replace("_", " ")])
     _army_label.text = ", ".join(summary) if not army.is_empty() else "Your army has fallen. Start a new expedition to fight again."
+    var companions: Array[String] = []
+    for sc in state.get("specials", []):
+        companions.append("%s L%d%s" % [sc.name, sc.level, " (governing)" if sc.stationed != null else ""])
+    if not companions.is_empty():
+        _army_label.text += "\nCompanions: " + ", ".join(companions)
     if not inventory.is_empty():
         var loot: Array[String] = []
         for item in inventory: loot.append(item.name)
@@ -732,8 +767,10 @@ var _end_screen: Control
 func _show_end(victory: bool, reason := "") -> void:
     if is_instance_valid(_end_screen): return  # already showing
     var screen := EndScreen.new()
+    screen.theme = $HUD/Layout.theme
     _end_screen = screen
     screen.victory = victory
+    screen.illustration = "res://content/textures/screens/%s.png" % ("victory" if victory else ("sealed" if not reason.is_empty() else ""))
     if not reason.is_empty():
         screen.heading = "The Passage Is Sealed"
         screen.body = reason + " The Shariw have kept their desert's secret. The Compact will have to find another way down."
