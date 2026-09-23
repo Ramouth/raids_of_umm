@@ -110,6 +110,11 @@ add_executable(raids_tests
     tests/test_resourcemanager.cpp
     tests/test_session.cpp
     tests/test_worldbuilder.cpp
+    tests/test_adventure_session.cpp
+    src/adventure/AdventureSession.cpp
+    src/adventure/Scenario.cpp
+    src/adventure/Rivals.cpp
+    src/adventure/Specials.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp
