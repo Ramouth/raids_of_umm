@@ -29,6 +29,7 @@ class AdventureSession;
  *              "join": id                       — a special character joins the hero
  * (event "quests_done" (count) fires as optional quests complete)
  *
+ * when.after: id — only after that trigger has fired (story order).
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
  * made through AdventureSession::acceptOffer().
  */

@@ -569,3 +569,21 @@ SUITE("Save — a map-object session cannot be saved") {
     auto s = started();
     CHECK(s.saveState().is_null());
 }
+
+SUITE("Scenario — 'after' gates a trigger until another has fired") {
+    const std::string path = "/tmp/raids_test_after.json";
+    { std::ofstream f(path); f << R"({"triggers":[
+        {"id":"late","when":{"event":"day","day":2,"after":"early"},"do":[{"say":[["A","late"]]}]},
+        {"id":"early","when":{"event":"day","day":3},"do":[{"say":[["A","early"]]}]}]})"; }
+    AdventureSession s;
+    CHECK(!s.start(testMap(), "data", "", 0, path));
+    s.endDay();                                          // day 2: "late" is gated
+    CHECK(s.scenario().drainLines().empty());
+    s.endDay();                                          // day 3: early fires, then late may
+    auto lines = s.scenario().drainLines();
+    CHECK_EQ((int)lines.size(), 1);
+    s.endDay();
+    lines = s.scenario().drainLines();
+    CHECK_EQ((int)lines.size(), 1);
+    if (!lines.empty()) CHECK(lines[0].text == "late");
+}

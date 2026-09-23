@@ -222,8 +222,10 @@ std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to)
             m_scenario.fire(*this, "capture", {{"name", step.capture}});
             m_scenario.fire(*this, "mines_held", {{"count", minesHeld()}});
         }
-        if (const MapObjectDef* obj = m_map.objectAt(path[i]))
+        if (const MapObjectDef* obj = m_map.objectAt(path[i])) {
             m_scenario.fire(*this, "visit", {{"name", obj->name}});
+            m_scenario.fire(*this, "mines_held", {{"count", minesHeld()}});  // gated triggers may now apply
+        }
         steps.push_back(std::move(step));
     }
     return steps;

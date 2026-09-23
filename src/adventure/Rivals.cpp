@@ -5,6 +5,7 @@
 //   2. the player's hero is close and clearly weaker → attack (ambush)
 //   3. the nearest mine or neutral town not flying the Shariw banner → take it
 //   4. the nearest unsearched old mine whose guards it can beat → search it
+//      (from day 18, searching comes before capturing: the race is on)
 //   5. the nearest guard camp it can beat (breaks chokepoints like the ford)
 //   6. otherwise, or on growth day, ride home to recruit
 // Fights against guards are resolved here with the real CombatEngine. An
@@ -17,10 +18,11 @@
 namespace {
 
 constexpr int    MAX_STACKS      = 5;     // CombatMap::GRID_H
-constexpr double AMBUSH_MARGIN   = 1.3;   // attack the hero only when this much stronger
+constexpr double AMBUSH_MARGIN   = 1.5;   // attack the hero only when this much stronger
 constexpr double SEARCH_MARGIN   = 1.4;   // search an old mine only when this much stronger
 constexpr double CLEAR_MARGIN    = 1.5;   // attack a guard camp only when this much stronger
 constexpr int    AMBUSH_RANGE    = 10;    // hexes
+constexpr int    RACE_DAY        = 18;    // from here, searching old mines beats capturing
 // The Shariw tribes pay their war-chief daily (their economy beyond the map).
 constexpr int    TITHE_GOLD      = 1000;
 constexpr int    TITHE_WOOD      = 2;
@@ -49,7 +51,10 @@ double AdventureSession::power(const std::vector<Stack>& army) const {
         const UnitType* u = m_resources->unit(s.id);
         if (!u) continue;
         double hits = (u->minDamage + u->maxDamage) * 0.5 + 1.0;
-        total += s.count * u->hitPoints * (u->attack + u->defense + 5) * hits * (u->shots > 0 ? 1.3 : 1.0);
+        // Huge single creatures act once a round and waste damage on overkill;
+        // battle_sim shows they fight far below their raw numbers.
+        double big = u->hitPoints >= 100 ? 0.35 : 1.0;
+        total += s.count * u->hitPoints * (u->attack + u->defense + 5) * hits * (u->shots > 0 ? 1.3 : 1.0) * big;
     }
     return total / 100.0;
 }
@@ -186,6 +191,12 @@ void AdventureSession::rivalTurn(Rival& r) {
     if (!goal && !m_pending && strength > AMBUSH_MARGIN * hero && r.pos.distanceTo(m_hero.pos) <= AMBUSH_RANGE) {
         consider(m_hero.pos, "ambush");
     }
+    // From the third week the war-chief hunts the passage before loot.
+    auto searchMines = [&] {
+        for (const auto& [cell, find] : m_mineFinds)
+            if (strength > SEARCH_MARGIN * power(guardsOf(cell))) consider(cell, "search");
+    };
+    if (!goal && day() >= RACE_DAY) searchMines();
     if (!goal) {
         for (const auto& [cell, ctrl] : m_control) {
             if (ctrl.ownerFaction == Faction::AI || !rivalCaptures(ctrl.objType)) continue;
@@ -194,10 +205,7 @@ void AdventureSession::rivalTurn(Rival& r) {
             consider(cell, "capture");
         }
     }
-    if (!goal) {
-        for (const auto& [cell, find] : m_mineFinds)
-            if (strength > SEARCH_MARGIN * power(guardsOf(cell))) consider(cell, "search");
-    }
+    if (!goal) searchMines();
     if (!goal) {
         for (const auto& [cell, enc] : m_encounters) {
             const MapObjectDef* obj = m_map.objectAt(cell);

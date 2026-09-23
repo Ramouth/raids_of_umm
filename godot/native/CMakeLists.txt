@@ -59,3 +59,6 @@ add_test(NAME combat_regression COMMAND combat_regression_tests)
 
 add_executable(battle_sim battle_sim.cpp)
 target_link_libraries(battle_sim PRIVATE umm_combat_core)
+
+add_executable(demo_bot demo_bot.cpp)
+target_link_libraries(demo_bot PRIVATE umm_combat_core)

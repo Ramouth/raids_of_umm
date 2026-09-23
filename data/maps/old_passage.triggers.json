@@ -286,14 +286,15 @@
       "id": "hold_three",
       "when": {
         "event": "mines_held",
-        "count": 3
+        "count": 3,
+        "after": "kharim"
       },
       "do": [
         {
           "say": [
             [
-              "Messenger",
-              "Word from Kharim: three mines under Compact banners! He sends this in thanks."
+              "Kharim",
+              "Three mines under Compact banners! You can hold a desert after all. A promise is a promise."
             ]
           ]
         },

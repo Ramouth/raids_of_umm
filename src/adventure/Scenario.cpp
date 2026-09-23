@@ -67,6 +67,8 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
     for (const auto& trigger : m_triggers) {
         std::string id = trigger.value("id", "");
         if (m_fired.count(id) || !matches(trigger.value("when", Json::object()), event, detail)) continue;
+        std::string after = trigger.value("when", Json::object()).value("after", "");
+        if (!after.empty() && !m_fired.count(after)) continue;   // story order
         m_fired.insert(id);
         run(s, trigger.value("do", Json::array()));
     }
