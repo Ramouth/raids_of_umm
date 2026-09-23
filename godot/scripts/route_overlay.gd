@@ -5,6 +5,7 @@ var hover := Vector2i(9999, 9999)
 var path: Array[Vector2i] = []
 var origin := Vector2i.ZERO
 var show_grid := false
+var reachable := -1  # steps affordable today; -1 = whole route
 
 func _draw() -> void:
     if data == null:
@@ -25,8 +26,12 @@ func _draw() -> void:
         var points := PackedVector2Array([UmmMapData.cell_to_world(origin)])
         for cell in path:
             points.append(UmmMapData.cell_to_world(cell))
+        # Today's stretch is gold; the rest of the route (tomorrow onward) is faded.
+        var today := points.size() if reachable < 0 else reachable + 1
         draw_polyline(points, Color("4a200a"), 6.0)
-        draw_polyline(points, Color("f8c840"), 2.0)
-        for point in points:
-            draw_circle(point, 4.0, Color("fff0a0"))
-        draw_arc(points[-1], 14, 0, TAU, 24, Color("fff0a0"), 2.0)
+        draw_polyline(points, Color("b8a080"), 2.0)
+        if today > 1:
+            draw_polyline(points.slice(0, today), Color("f8c840"), 2.0)
+        for i in points.size():
+            draw_circle(points[i], 4.0, Color("fff0a0") if i < today else Color("9a8468"))
+        draw_arc(points[-1], 14, 0, TAU, 24, Color("fff0a0") if today >= points.size() else Color("c07850"), 2.0)

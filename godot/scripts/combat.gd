@@ -114,7 +114,7 @@ func _panel(rect: Rect2) -> void:
     add_child(panel)
 
 func begin(army: Array, encounter: Dictionary, title: String) -> bool:
-    heading.text = title.to_upper() + "  /  DUNGEON GUARDS"
+    heading.text = title.to_upper()
     if not ClassDB.class_exists("UmmCombat"):
         _log("Native combat is missing. Run scripts/build_godot_combat.sh and restart Godot.")
         return false
@@ -194,7 +194,7 @@ func _refresh() -> void:
         if unit.key == state.get("active", ""): _inspect(unit)
 
 func _inspect(unit: Dictionary) -> void:
-    inspection.text = "%s\n%s · %d remaining\nHP %d  |  ATK %d  |  DEF %d\nSpeed %d%s%s" % [unit.name, "Expedition" if unit.player else "Dungeon guard", unit.count, unit.hp, unit.attack, unit.defense, unit.speed, "\nShots remaining: %d" % unit.shots if unit.ranged else "\nMelee · adjacent targets only", "\nDefending" if unit.defending else ""]
+    inspection.text = "%s\n%s · %d remaining\nHP %d  |  ATK %d  |  DEF %d\nSpeed %d%s%s" % [unit.name, "Expedition" if unit.player else "Enemy", unit.count, unit.hp, unit.attack, unit.defense, unit.speed, "\nShots remaining: %d" % unit.shots if unit.ranged else "\nMelee · adjacent targets only", "\nDefending" if unit.defending else ""]
 
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]

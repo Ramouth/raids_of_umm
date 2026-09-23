@@ -1,3 +1,4 @@
+#include "adventure_bridge.h"
 #include "combat_session.h"
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -30,8 +31,58 @@ public:
     bool acknowledge(int64_t ticket) { return session_.acknowledge(ticket); }
 };
 
+class UmmAdventure : public RefCounted {
+    GDCLASS(UmmAdventure, RefCounted)
+    AdventureBridge bridge_;
+    template <typename F>
+    static String guarded(F&& call) {
+        try { return String::utf8(call().dump().c_str()); }
+        catch (const std::exception& error) {
+            return String::utf8(AdventureBridge::Json({{"ok", false}, {"error", error.what()}}).dump().c_str());
+        }
+    }
+protected:
+    static void _bind_methods() {
+        ClassDB::bind_method(D_METHOD("start", "map_path", "data_dir", "encounters_path", "seed", "triggers_path"), &UmmAdventure::start);
+        ClassDB::bind_method(D_METHOD("accept_offer", "id"), &UmmAdventure::accept_offer);
+        ClassDB::bind_method(D_METHOD("transfer", "q", "r", "unit_id", "count", "to_garrison"), &UmmAdventure::transfer);
+        ClassDB::bind_method(D_METHOD("add_item", "id"), &UmmAdventure::add_item);
+        ClassDB::bind_method(D_METHOD("resolve_encounter", "victory"), &UmmAdventure::resolve_encounter);
+        ClassDB::bind_method(D_METHOD("set_army", "stacks_json"), &UmmAdventure::set_army);
+        ClassDB::bind_method(D_METHOD("recruit", "q", "r", "unit_id", "count"), &UmmAdventure::recruit);
+        ClassDB::bind_method(D_METHOD("snapshot"), &UmmAdventure::snapshot);
+        ClassDB::bind_method(D_METHOD("preview", "q", "r"), &UmmAdventure::preview);
+        ClassDB::bind_method(D_METHOD("travel", "q", "r"), &UmmAdventure::travel);
+        ClassDB::bind_method(D_METHOD("end_day"), &UmmAdventure::end_day);
+    }
+public:
+    String start(const String& map, const String& dir, const String& encounters, int64_t seed, const String& triggers) {
+        return guarded([&] { return bridge_.start(map.utf8().get_data(), dir.utf8().get_data(),
+                                                  encounters.utf8().get_data(), static_cast<uint32_t>(seed),
+                                                  triggers.utf8().get_data()); });
+    }
+    String accept_offer(const String& id) { return guarded([&] { return bridge_.accept_offer(id.utf8().get_data()); }); }
+    String transfer(int q, int r, const String& id, int count, bool to_garrison) {
+        return guarded([&] { return bridge_.transfer(q, r, id.utf8().get_data(), count, to_garrison); });
+    }
+    String add_item(const String& id) { return guarded([&] { return bridge_.add_item(id.utf8().get_data()); }); }
+    String resolve_encounter(bool victory) { return guarded([&] { return bridge_.resolve_encounter(victory); }); }
+    String set_army(const String& stacks) {
+        return guarded([&] { return bridge_.set_army(AdventureBridge::Json::parse(stacks.utf8().get_data())); });
+    }
+    String recruit(int q, int r, const String& id, int count) {
+        return guarded([&] { return bridge_.recruit(q, r, id.utf8().get_data(), count); });
+    }
+    String snapshot() { return guarded([&] { return bridge_.snapshot(); }); }
+    String preview(int q, int r) { return guarded([&] { return bridge_.preview(q, r); }); }
+    String travel(int q, int r) { return guarded([&] { return bridge_.travel(q, r); }); }
+    String end_day() { return guarded([&] { return bridge_.end_day(); }); }
+};
+
 void initialize_umm(ModuleInitializationLevel level) {
-    if (level == MODULE_INITIALIZATION_LEVEL_SCENE) ClassDB::register_class<UmmCombat>();
+    if (level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
+    ClassDB::register_class<UmmCombat>();
+    ClassDB::register_class<UmmAdventure>();
 }
 void uninitialize_umm(ModuleInitializationLevel) {}
 }

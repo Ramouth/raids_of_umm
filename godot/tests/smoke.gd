@@ -18,6 +18,7 @@ func check(condition: bool, message: String) -> void:
 func _run() -> void:
     var map := UmmMapData.new()
     check(map.read("res://content/maps/default.json"), "Existing C++ JSON map loads")
+    check(UmmMapData.new().read("res://content/maps/old_passage.json"), "Demo map loads")
     check(map.tiles.size() == 169, "All 169 canonical tiles import")
     check(map.objects.size() == 11, "All 11 landmarks import")
     check(map.spawn == Vector2i(-5, 1), "Hero starts at Khemret")
@@ -38,6 +39,8 @@ func _run() -> void:
     _check_weighted_routing()
 
     var scene: Node2D = load("res://scenes/desert.tscn").instantiate()
+    # Scene checks below are written against the canonical map, not the demo map.
+    scene.get_node("Map").map_path = "res://content/maps/default.json"
     root.add_child(scene)
     await process_frame
     check(scene.hero.cell == map.spawn, "Playable scene initializes at map spawn")
@@ -62,6 +65,12 @@ func _run() -> void:
         await process_frame
     check(not scene.hero.moving and scene.hero.cell == target, "Hero completes the clicked route")
     check(scene.hero.sprite.animation == "idle", "Hero returns to idle after travelling")
+    check(scene.state.day == 1 and scene.state.moves < scene.state.moves_max, "Travel spends native movement points")
+    check(scene.fog.is_explored(scene.hero.cell), "Fog is lifted around the hero")
+    check(not scene.fog.is_explored(Vector2i(5, -1)), "Distant Tharakh starts hidden in fog")
+    scene.end_day()
+    check(scene.state.day == 2 and is_equal_approx(scene.state.moves, scene.state.moves_max), "End day advances the calendar and restores movement")
+    check(int(scene.state.treasury.Gold) > 2000, "Town income is paid at end of day")
 
     scene.sidebar.get_node("Grid").button_pressed = true
     check(scene.overlay.show_grid, "Grid control changes the world overlay")

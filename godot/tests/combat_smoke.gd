@@ -32,6 +32,8 @@ func _run() -> void:
     capture = "--capture" in OS.get_cmdline_user_args()
     check(ClassDB.class_exists("UmmCombat"), "Real C++ extension loads in Godot")
     scene = load("res://scenes/desert.tscn").instantiate()
+    # Written against the canonical map, not the demo map.
+    scene.get_node("Map").map_path = "res://content/maps/default.json"
     root.add_child(scene)
     await process_frame
     check(not scene.enter_dungeon(), "Cannot enter a dungeon from a town")
@@ -39,6 +41,9 @@ func _run() -> void:
         if scene.data.objects[cell].type == "dungeon":
             dungeon = cell
             break
+    scene.fog.reveal([[dungeon.x, dungeon.y]])  # scouted: the test targets it directly
+    # Fixture army the casualty/retaliation checks below were tuned against.
+    scene.army = [{"id": "desert_archer", "count": 10}, {"id": "mummy", "count": 3}]
     check(scene.travel_to(dungeon), "A real map route reaches a dungeon")
     while scene.hero.moving: await process_frame
     check(scene._enter_button.visible and not scene._enter_button.disabled, "Arrival enables dungeon entry")

@@ -7,8 +7,12 @@ const WATER_SHADER = preload("res://shaders/water.gdshader")
 const OBJECT_TEXTURES := {
     "town": "objects/town.png", "dungeon": "objects/dungeon.png",
     "gold_mine": "objects/goldmine.png", "crystal_mine": "objects/crystal_mine.png",
-    "artifact": "objects/artifact.png",
+    "artifact": "objects/artifact.png", "sawmill": "objects/sawmill.png",
+    "quarry": "objects/quarry.png", "obsidian_vent": "objects/obsidian_vent.png",
+    "old_mine": "objects/old_mine.png", "quest_giver": "objects/quest_giver.png",
+    "guard": "objects/guard.png",
 }
+var anchors: Dictionary = {}  # cell -> object anchor node
 const FEATURE_TEXTURES := {
     "dune": "terrain/dune/dune.png", "mountain": "terrain/mountain/mountain2.png",
     "oasis": "terrain/oasis/oasis1.png", "ruins": "terrain/ruins/ruins1.png",
@@ -18,7 +22,7 @@ const FEATURE_TEXTURES := {
     "wall": "terrain/wall/wall.png",
 }
 
-@export_file("*.json") var map_path := "res://content/maps/default.json"
+@export_file("*.json") var map_path := "res://content/maps/old_passage.json"
 @export_group("Art direction")
 @export var sand_color := Color("c89943")
 @export_range(0.0, 1.0) var sand_detail_opacity := 0.13
@@ -34,6 +38,7 @@ func _ready() -> void:
 func rebuild() -> void:
     for child in get_children():
         child.free()
+    anchors.clear()
     if not data.read(map_path):
         push_error(data.error)
         return
@@ -98,6 +103,21 @@ func rebuild() -> void:
     for cell: Vector2i in data.objects:
         _build_object(scenery, cell, data.objects[cell])
 
+## Beaten guard camps disappear from the map; `guarded` holds the ones still standing.
+func set_cleared_guards(guarded: Dictionary) -> void:
+    for cell: Vector2i in anchors:
+        if data.objects[cell].type == "guard":
+            anchors[cell].visible = guarded.has(cell)
+
+## Old mines Kharim has ruled out get a "dead end" tag and fade.
+func mark_ruled_out(ruled: Dictionary) -> void:
+    for cell: Vector2i in anchors:
+        if data.objects[cell].type != "old_mine": continue
+        var label: Label = anchors[cell].get_node("Label")
+        var dead := ruled.has(cell)
+        label.text = str(data.objects[cell].name) + ("  ·  dead end" if dead else "")
+        anchors[cell].modulate = Color(1, 1, 1, 0.55) if dead else Color.WHITE
+
 func _sprite(relative_path: String) -> Sprite2D:
     var sprite := Sprite2D.new()
     sprite.texture = load("res://content/textures/" + relative_path)
@@ -133,6 +153,7 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
     anchor.name = str(object.get("name", object.type)).validate_node_name()
     anchor.position = UmmMapData.cell_to_world(cell)
     parent.add_child(anchor)
+    anchors[cell] = anchor
     if OBJECT_TEXTURES.has(object.type):
         var sprite := _sprite(OBJECT_TEXTURES[object.type])
         sprite.position.y = -39
@@ -148,6 +169,7 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
         marker.color = Color("685040")
         anchor.add_child(marker)
     var label := Label.new()
+    label.name = "Label"
     label.text = str(object.get("name", object.type))
     label.visible = show_landmark_names
     label.position = Vector2(-95, 7)

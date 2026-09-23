@@ -3,7 +3,7 @@ extends Control
 signal cell_clicked(cell: Vector2i)
 const HEX := Vector2(80, 76)
 const ORIGIN := Vector2(70, 70)
-const ART := {"skeleton_warrior": "armoured_warrior", "desert_archer": "rider_archer", "sand_scorpion": "enemy_scout"}
+const ART := {"dune_stalker": "enemy_scout"}  # units sharing another unit's sprite
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true

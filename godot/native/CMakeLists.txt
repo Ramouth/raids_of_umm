@@ -25,7 +25,16 @@ add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/combat/CombatEngine.cpp"
     "${UMM_ROOT}/src/combat/CombatAI.cpp"
     "${UMM_ROOT}/src/core/ResourceManager.cpp"
-    combat_session.cpp)
+    "${UMM_ROOT}/src/core/TurnManager.cpp"
+    "${UMM_ROOT}/src/hero/Hero.cpp"
+    "${UMM_ROOT}/src/hex/HexGrid.cpp"
+    "${UMM_ROOT}/src/world/WorldMap.cpp"
+    "${UMM_ROOT}/src/adventure/AdventureSession.cpp"
+    "${UMM_ROOT}/src/adventure/Scenario.cpp"
+    "${UMM_ROOT}/src/adventure/Rivals.cpp"
+    "${UMM_ROOT}/src/adventure/Specials.cpp"
+    combat_session.cpp
+    adventure_bridge.cpp)
 target_include_directories(umm_combat_core PUBLIC "${UMM_ROOT}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(umm_combat_core PUBLIC nlohmann_json::nlohmann_json)
 target_compile_options(umm_combat_core PRIVATE -Wall -Wextra -Wpedantic)
@@ -41,9 +50,11 @@ add_executable(combat_bridge_tests tests.cpp)
 target_link_libraries(combat_bridge_tests PRIVATE umm_combat_core)
 add_test(NAME combat_bridge COMMAND combat_bridge_tests "${UMM_ROOT}/data")
 add_executable(combat_regression_tests
-    "${UMM_ROOT}/tests/main.cpp" "${UMM_ROOT}/tests/test_combat.cpp"
-    "${UMM_ROOT}/src/hero/Hero.cpp")
+    "${UMM_ROOT}/tests/main.cpp" "${UMM_ROOT}/tests/test_combat.cpp")
 target_include_directories(combat_regression_tests PRIVATE "${UMM_ROOT}/tests")
 target_compile_definitions(combat_regression_tests PRIVATE COMBAT_ENGINE_IMPL)
 target_link_libraries(combat_regression_tests PRIVATE umm_combat_core)
 add_test(NAME combat_regression COMMAND combat_regression_tests)
+
+add_executable(battle_sim battle_sim.cpp)
+target_link_libraries(battle_sim PRIVATE umm_combat_core)

@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 config/name="Raids of Umm'Natur — Godot"
-run/main_scene="res://scenes/desert.tscn"
+run/main_scene="res://scenes/game.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/description="Desert exploration and native C++ dungeon combat in Godot."
 
