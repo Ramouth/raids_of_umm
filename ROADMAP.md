@@ -45,6 +45,141 @@ See `economy.md` for economy decisions and implementation plan.
 
 ---
 
+## Demo — "The Old Passage" (Godot) ◀ current focus
+
+A 20–30 min handcrafted scenario that shows off the core loop:
+explore → capture mines → recruit → grow SCs → find the passage.
+Built in the Godot slice (`godot/`); turn/economy/fog logic moves into the native
+GDExtension like CombatEngine did, so it stays covered by `raids_tests`.
+
+### Locked decisions
+- **Engine:** Godot. SDL build stays as reference/test host.
+- **Player faction:** Ivory Compact (Gold + Wood emphasis).
+- **Win:** find the old passage hidden in one of 3–4 **Old Mines**. The passage mine is
+  picked at random from the candidates on each New Game. Finding it wins — no resource cost to open.
+- **Lose:** hero's army destroyed, **or a Shariw hero finds the passage first**.
+- **Rival:** one AI faction — the **Shariw** (locals who know the land; also hunting the passage).
+- **Mine defence:** HoMM3-style garrisons — leave troops in a mine.
+- **Mines = resources only (model A).** Units cost specialty resources, HoMM3-style;
+  capturing a mine does not unlock units.
+- **SC upkeep** is a deliberate exception to economy.md Q8 ("no unit upkeep").
+
+### Map — three zones, gated by neutral guards
+Radius ~13 (~547 cells, ~3× current). Linear west → east push.
+
+| Zone | Contents | Guards |
+|------|----------|--------|
+| Home valley (west) | Start town Khemret, Gold Mine, Sawmill (oasis) | none — learn controls |
+| **Ridge Pass** | mountain chokepoint | G1 — first real fight, ~day 3–4 |
+| Contested middle | Quarry, Obsidian Vent, Tharakh (neutral town), Old Mines A + B, small dungeon (fetch item) | light/medium stacks |
+| **Canyon Ford** | river/canyon chokepoint | G3 — hardest guard, needs T4–T5 |
+| Far reach (east) | Crystal Cavern, Kharim's camp, Old Mines C + D, Shariw town | strong stacks |
+
+Story regions (trigger targets): start, Ridge Pass sighted, first Old Mine sighted,
+entering the far reach, wrong Old Mine cleared, passage found.
+
+### Old Mines
+Guarded; clearing one reveals **loot**, **a collapse/trap**, or **the passage**.
+The quest giver sells clues that eliminate candidates — gold buys time.
+
+### Army (Ivory Compact, T1–T5 for the demo — costs provisional)
+| Tier | Unit | Cost driver |
+|------|------|-------------|
+| 1 | Levy Spearman | Gold |
+| 2 | Desert Archer | Gold + Wood |
+| 3 | Armoured Warrior | Gold + Stone |
+| 4 | Rider Archer | Gold + Wood + Obsidian |
+| 5 | Rider Knight | Gold + Stone + Obsidian |
+
+Crystal is unused by the Compact's roster — it feeds high-level SC upkeep instead.
+
+### Special Characters — "more and more special"
+Levels add *rule-breaking* abilities, not just stats:
+
+| Stage | Lv | Gains |
+|-------|----|-------|
+| Recruit | 1–2 | stat bumps, one basic action |
+| Veteran | 3–4 | first branch choice + an adventure-map ability (e.g. +2 sight radius) |
+| Champion | 5–7 | signature combat ability (double strike, revive a stack) |
+| Legend | 8+ | changes how the game plays (cross mountains, double adjacent mine output) |
+
+- **Stationing:** an SC can stay in a town — Governor (+income / cheaper recruits),
+  Warden (defends the town), Mentor (recruits there gain XP). Role follows branch.
+- **Upkeep:** gold/day rising with level (~100 → 300 → 600); Legend stage also costs
+  1 Crystal/week. Same upkeep in town or in the field.
+- **Unpaid:** loyalty drops — 3 days unpaid = abilities off, 7 days = SC leaves.
+- Demo cast: Ushari (starts with hero), Kharim (quest giver — see below), + one found in a dungeon.
+
+### Quest giver (proposal)
+**Kharim** is out in the far reach studying the old maps. He's data-driven via
+`data/quests.json` (condition + reward):
+- **Tribute** — pay N gold → a clue (rules out one Old Mine)
+- **Fetch** — bring back an item from the middle dungeon → a clue
+- **Control** — hold 3 mines at once → Kharim joins as an SC
+
+### Storytelling — Warcraft 3 style
+WC3 is the reference for narrative delivery and hero-centric play.
+- **In-mission transmissions** — portrait + dialogue line pops up while the player keeps
+  control. Carries most of the story; long cutscenes are rare.
+- **Trigger system** — per-map `triggers.json`: *event → condition → action*.
+  Events: enter region, day N, capture object, combat won, item acquired, quest completed.
+  Actions: show dialogue, reveal fog, add/complete quest, spawn stack, give item/resource, win/lose.
+  Quests, clues and the win condition all run through it — new missions are mostly data.
+- **Quest log** — main quest ("Find the old passage") + optional quests (Kharim's tasks),
+  each announced with portrait + sound.
+- **Guard stacks drop items** — neutral guards are WC3 creep camps: clearing one rewards, not just unblocks.
+- **Short intro + outro** — camera pan + one dialogue exchange before control;
+  a closing scene when the passage is found.
+- **Map regions** — the map marks named regions for story beats
+  ("entering the far reach", "first sight of an Old Mine").
+
+### Rival — the Shariw (AI)
+- **Town** in the far reach; capturing it is a major optional objective.
+- **1–2 AI heroes**, priority list: defend town → grab weakly-held mines (incl. yours)
+  → search unsearched Old Mines (the race) → hunt the player if clearly stronger → retreat to recruit.
+- **Same rules as the player** — town recruits weekly, mines pay income. Difficulty via
+  starting bonuses, not cheats.
+- **Enemy turn** after End Day: visible moves animated, fogged moves instant.
+- **Stolen mines** flip ownership + income next day, with a transmission
+  ("Scouts report the Quarry has fallen to the Shariw").
+- Fog needs 3 states (unseen / remembered / visible) — enemy heroes only shown while visible.
+- Scripted escalation via triggers: day 3 scouts sighted, day 5 raid on the Sawmill,
+  day 7 a Shariw hero enters the middle.
+- *Optional:* The Veined as a scripted surprise in a far-reach Old Mine (triggers only, no second AI).
+
+### Screens (Godot screen stack)
+- **Root `Game` scene** owns session state (native `UmmAdventure`, army, inventory).
+  Screens are pushed on top and pop with a result — the SDL `StateMachine` model.
+- Screens: **Adventure** (stays loaded underneath), **Combat**, **Town** (HoMM3-style:
+  buildings, recruit panel, garrison), later **Hero/Party**, **Main menu**.
+- **Underground (after the demo):** maps gain levels (surface / underground), portals link
+  hexes between levels, fog per level, adventure view shows one level at a time.
+  Story hook: *the old passage is the way down.*
+
+### Build order (self-verified by Claude in large batches; user beta-tests)
+
+Story beats live in the Claude Doc "The Old Passage — Story Script" (symbol legend: 💬 dialogue, ⚔️ battle,
+👁️ discovery, 📜 quest, 🔍 clue, 💰 reward, 🚩 capture, 🐍 rival, 🏆 victory, ☠️ defeat).
+Balance tool: `godot/native/build/battle_sim data '<army>' '<guards>' [runs]`.
+| # | Step | Status |
+|---|------|--------|
+| 1 | Map layout on paper (zones, objects, story regions) → author in editor → import to Godot | 🟡 draft generated (`scripts/gen_old_passage_map.py`), needs hand-tuning |
+| 2 | Turns + movement points in Godot (native `AdventureSession` → `UmmAdventure`) | ✅ |
+| 2b | Screen stack: root Game scene; combat moved onto it | ✅ |
+| 3 | Trigger system (`triggers.json`) + dialogue/portrait panel | ✅ |
+| 4 | Port fog of war to Godot | ✅ |
+| 5 | Mine capture + daily income + neutral guard stacks with item drops | ✅ |
+| 6 | Mine garrisons (HoMM3-style) | ✅ |
+| 7 | Town recruitment with resource costs (Ivory Compact T1–T5 in units.json) | ✅ |
+| 8 | SC stationing + upkeep + loyalty | 🟡 native done; Godot party screen next |
+| 9 | Shariw rival: town, AI heroes, enemy turn, hero-vs-hero combat | ✅ |
+| 10 | Old Mines + random passage + race-loss + win/lose + intro/outro scenes | ✅ (outro illustrations in progress) |
+| 11 | Kharim + `quests.json` + quest log | ✅ (quests live in triggers.json) |
+| 12 | SC stage abilities (Veteran map ability, Champion signature) | 🟡 adventure abilities done; SCs in combat ⬜ |
+| 13 | PixelLab art: Old Mine, Kharim + Ushari portraits, Compact + Shariw units/heroes, new mine objects | 🟡 objects + units done (PixelLab + OpenAI) |
+
+---
+
 ## Milestone 2 — Combat Depth
 
 These must be validated with **heuristic calculations** before building on top of them.
