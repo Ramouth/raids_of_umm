@@ -22,7 +22,9 @@
         "Crystal": 0
       },
       "attackType": "physical",
-      "abilities": ["undead"],
+      "abilities": [
+        "undead"
+      ],
       "meshId": "skeleton_warrior",
       "textureId": "skeleton_warrior"
     },
@@ -48,7 +50,10 @@
         "Crystal": 0
       },
       "attackType": "physical",
-      "abilities": ["undead", "curse_strike"],
+      "abilities": [
+        "undead",
+        "curse_strike"
+      ],
       "meshId": "mummy",
       "textureId": "mummy"
     },
@@ -74,7 +79,10 @@
         "Crystal": 2
       },
       "attackType": "magical",
-      "abilities": ["flying", "magic_resistance"],
+      "abilities": [
+        "flying",
+        "magic_resistance"
+      ],
       "meshId": "djinn",
       "textureId": "djinn"
     },
@@ -100,7 +108,9 @@
         "Crystal": 0
       },
       "attackType": "physical",
-      "abilities": ["poison_strike"],
+      "abilities": [
+        "poison_strike"
+      ],
       "meshId": "sand_scorpion",
       "textureId": "sand_scorpion"
     },
@@ -120,15 +130,16 @@
       "weeklyGrowth": 8,
       "cost": {
         "Gold": 120,
-        "Wood": 0,
+        "Wood": 1,
         "Stone": 0,
-        "Obsidian": 1,
+        "Obsidian": 0,
         "Crystal": 0
       },
       "attackType": "piercing",
       "abilities": [],
       "meshId": "desert_archer",
-      "textureId": "desert_archer"
+      "textureId": "desert_archer",
+      "faction": "ivory_compact"
     },
     {
       "id": "ancient_guardian",
@@ -152,7 +163,10 @@
         "Crystal": 0
       },
       "attackType": "physical",
-      "abilities": ["no_retaliation_cap", "large_creature"],
+      "abilities": [
+        "no_retaliation_cap",
+        "large_creature"
+      ],
       "meshId": "ancient_guardian",
       "textureId": "ancient_guardian"
     },
@@ -178,14 +192,19 @@
         "Crystal": 2
       },
       "attackType": "magical",
-      "abilities": ["undead", "flying", "raise_dead", "aura_of_decay"],
+      "abilities": [
+        "undead",
+        "flying",
+        "raise_dead",
+        "aura_of_decay"
+      ],
       "meshId": "pharaoh_lich",
       "textureId": "pharaoh_lich"
     },
     {
       "id": "sand_wraith",
       "name": "Sand Wraith",
-      "description": "Elemental spirits of sandstorm and wind. Semi-corporeal — weapons pass through them as through smoke, but their touch scours flesh from bone.",
+      "description": "Elemental spirits of sandstorm and wind. Semi-corporeal \u2014 weapons pass through them as through smoke, but their touch scours flesh from bone.",
       "tier": 1,
       "attack": 4,
       "defense": 2,
@@ -204,7 +223,10 @@
         "Crystal": 1
       },
       "attackType": "magical",
-      "abilities": ["flying", "incorporeal"],
+      "abilities": [
+        "flying",
+        "incorporeal"
+      ],
       "meshId": "sand_wraith",
       "textureId": "sand_wraith"
     },
@@ -230,9 +252,203 @@
         "Crystal": 1
       },
       "attackType": "magical",
-      "abilities": ["flying", "chain_lightning"],
+      "abilities": [
+        "flying",
+        "chain_lightning"
+      ],
       "meshId": "storm_caller",
       "textureId": "storm_caller"
+    },
+    {
+      "id": "levy_spearman",
+      "name": "Levy Spearman",
+      "description": "Conscripts from the northern provinces. Cheap, numerous, and expected to hold the line long enough for someone better to arrive.",
+      "tier": 1,
+      "faction": "ivory_compact",
+      "attack": 4,
+      "defense": 5,
+      "minDamage": 1,
+      "maxDamage": 3,
+      "hitPoints": 8,
+      "speed": 5,
+      "moveRange": 4,
+      "shots": 0,
+      "weeklyGrowth": 14,
+      "cost": {
+        "Gold": 50,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "levy_spearman",
+      "textureId": "levy_spearman"
+    },
+    {
+      "id": "armoured_warrior",
+      "name": "Armoured Warrior",
+      "description": "Professional heavy infantry in layered steel. The Compact's front line does not break; it is replaced.",
+      "tier": 3,
+      "faction": "ivory_compact",
+      "attack": 8,
+      "defense": 10,
+      "minDamage": 3,
+      "maxDamage": 6,
+      "hitPoints": 28,
+      "speed": 4,
+      "moveRange": 3,
+      "shots": 0,
+      "weeklyGrowth": 6,
+      "cost": {
+        "Gold": 280,
+        "Wood": 0,
+        "Stone": 1,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "armoured_warrior",
+      "textureId": "armoured_warrior"
+    },
+    {
+      "id": "rider_archer",
+      "name": "Rider Archer",
+      "description": "Mounted bowmen who strike and wheel away before the enemy can close.",
+      "tier": 4,
+      "faction": "ivory_compact",
+      "attack": 10,
+      "defense": 7,
+      "minDamage": 4,
+      "maxDamage": 8,
+      "hitPoints": 30,
+      "speed": 8,
+      "moveRange": 6,
+      "shots": 12,
+      "weeklyGrowth": 4,
+      "cost": {
+        "Gold": 500,
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 1,
+        "Crystal": 0
+      },
+      "attackType": "piercing",
+      "abilities": [],
+      "meshId": "rider_archer",
+      "textureId": "rider_archer"
+    },
+    {
+      "id": "rider_knight",
+      "name": "Rider Knight",
+      "description": "Heavy cavalry. A charge that ends arguments.",
+      "tier": 5,
+      "faction": "ivory_compact",
+      "attack": 14,
+      "defense": 12,
+      "minDamage": 8,
+      "maxDamage": 14,
+      "hitPoints": 60,
+      "speed": 8,
+      "moveRange": 6,
+      "shots": 0,
+      "weeklyGrowth": 2,
+      "cost": {
+        "Gold": 900,
+        "Wood": 0,
+        "Stone": 1,
+        "Obsidian": 2,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "rider_knight",
+      "textureId": "rider_knight"
+    },
+    {
+      "id": "shariw_scout",
+      "name": "Shariw'a Scout",
+      "description": "Light desert skirmishers who know every dune. They are gone before the arrows land.",
+      "tier": 1,
+      "faction": "shariw",
+      "attack": 5,
+      "defense": 3,
+      "minDamage": 1,
+      "maxDamage": 3,
+      "hitPoints": 7,
+      "speed": 8,
+      "moveRange": 5,
+      "shots": 10,
+      "weeklyGrowth": 12,
+      "cost": {
+        "Gold": 60,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "piercing",
+      "abilities": [],
+      "meshId": "shariw_scout",
+      "textureId": "shariw_scout"
+    },
+    {
+      "id": "scorpion_rider",
+      "name": "Scorpion Rider",
+      "description": "A Shariw'a warrior astride a giant desert scorpion. The tail strikes first.",
+      "tier": 2,
+      "faction": "shariw",
+      "attack": 7,
+      "defense": 6,
+      "minDamage": 2,
+      "maxDamage": 5,
+      "hitPoints": 20,
+      "speed": 7,
+      "moveRange": 5,
+      "shots": 0,
+      "weeklyGrowth": 7,
+      "cost": {
+        "Gold": 160,
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [
+        "poison_strike"
+      ],
+      "meshId": "scorpion_rider",
+      "textureId": "scorpion_rider"
+    },
+    {
+      "id": "dune_stalker",
+      "name": "Dune Stalker",
+      "description": "Ambushers wrapped in sand-coloured cloth. You see them when they want you to.",
+      "tier": 3,
+      "faction": "shariw",
+      "attack": 9,
+      "defense": 6,
+      "minDamage": 3,
+      "maxDamage": 6,
+      "hitPoints": 26,
+      "speed": 7,
+      "moveRange": 4,
+      "shots": 8,
+      "weeklyGrowth": 5,
+      "cost": {
+        "Gold": 300,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 1,
+        "Crystal": 0
+      },
+      "attackType": "piercing",
+      "abilities": [],
+      "meshId": "dune_stalker",
+      "textureId": "dune_stalker"
     }
   ]
 }

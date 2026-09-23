@@ -1,0 +1,346 @@
+{
+  "quests": [
+    {
+      "id": "main",
+      "title": "The Old Passage",
+      "main": true,
+      "text": "Kharim's letters speak of a passage beneath one of the abandoned mines east of the ridge. Find it before the Shariw do."
+    },
+    {
+      "id": "tribute",
+      "title": "A Scholar's Price",
+      "text": "Kharim will share what his maps show, for 3000 gold."
+    },
+    {
+      "id": "eye",
+      "title": "The Cursed Eye",
+      "text": "Bring Kharim the Cursed Eye of Set from the Collapsed Shrine in the southern ruins."
+    },
+    {
+      "id": "hold",
+      "title": "Hold the Desert",
+      "text": "Hold three mines at once to prove the Compact can protect Kharim's work."
+    }
+  ],
+  "offers": [
+    {
+      "id": "pay_tribute",
+      "label": "Pay Kharim 3000 gold",
+      "at": "Kharim's Camp",
+      "cost": {
+        "Gold": 3000
+      },
+      "quest": "tribute",
+      "then": [
+        {
+          "say": [
+            [
+              "Kharim",
+              "Gold buys ink, and ink buys truth. Listen closely."
+            ]
+          ]
+        },
+        {
+          "clue": true
+        }
+      ]
+    },
+    {
+      "id": "give_eye",
+      "label": "Hand over the Cursed Eye of Set",
+      "at": "Kharim's Camp",
+      "item": "cursed_eye_of_set",
+      "quest": "eye",
+      "then": [
+        {
+          "say": [
+            [
+              "Kharim",
+              "The Eye! The priests who carved it drew the old tunnels in its iris. Here..."
+            ]
+          ]
+        },
+        {
+          "clue": true
+        }
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "intro",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "Khemret is ours, commander. The men are restless; they came for gold, not sand."
+            ],
+            [
+              "Ushari",
+              "Kharim's letter says a passage lies beneath one of the old mines past the ridge. Find it, and the Compact reaches Pha'raxh first."
+            ],
+            [
+              "Ushari",
+              "Recruit in Khemret, take the mines, and keep an eye on the eastern dunes."
+            ]
+          ]
+        },
+        {
+          "quest": "main"
+        }
+      ]
+    },
+    {
+      "id": "ridge",
+      "when": {
+        "event": "see",
+        "name": "Ridge Pass Guard"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "Bones hold the pass. Thirty at least, and scorpions behind them."
+            ],
+            [
+              "Ushari",
+              "We could force it now, but we'd bleed for it. More spears from Khemret first."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "first_mine",
+      "when": {
+        "event": "see_type",
+        "type": "old_mine"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "There: an abandoned shaft, sealed with old stone. Kharim spoke of four such mines."
+            ],
+            [
+              "Ushari",
+              "The dead guard them all. Only one leads down."
+            ]
+          ]
+        },
+        {
+          "quest_text": [
+            "main",
+            "Search the four old mines. One of them hides the passage; the others hold only dust or danger."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tharakh",
+      "when": {
+        "event": "see",
+        "name": "Tharakh"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "Tharakh, commander. Walls half-buried, no banner. Its well still runs; take it and it will feed us recruits."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shariw_warning",
+      "when": {
+        "event": "day",
+        "day": 3
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "Riders on the eastern dunes. Veiled, fast, gone before we could count them."
+            ],
+            [
+              "Ushari",
+              "Shariw. This is their desert. They know about the old mines, and they want them sealed."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "week_two",
+      "when": {
+        "event": "day",
+        "day": 8
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "A week gone. If the Shariw reach the passage first, they will bury it forever. We must move faster."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "canyon",
+      "when": {
+        "event": "see",
+        "name": "Canyon Ford Guard"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "The ford is the only way across the canyon, and the dead are thick there."
+            ],
+            [
+              "Ushari",
+              "Riders and knights, commander. Levies alone won't carry that crossing."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "far_reach",
+      "when": {
+        "event": "enter_q",
+        "q_min": 6
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Messenger",
+              "A rider from Kharim's camp, commander! He has seen your banners and begs you to visit."
+            ]
+          ]
+        },
+        {
+          "reveal": [
+            7,
+            -8,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kharim",
+      "when": {
+        "event": "visit",
+        "name": "Kharim's Camp"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Kharim",
+              "The Compact! At last, someone with enough swords to test my theory."
+            ],
+            [
+              "Kharim",
+              "The histories say Pha'raxh fell in a day. They lie. Its people went down. Beneath."
+            ],
+            [
+              "Kharim",
+              "My maps can rule out the false mines, if you help me. Gold, the Eye of Set from the southern shrine, or proof you can hold this desert."
+            ]
+          ]
+        },
+        {
+          "quest": "tribute"
+        },
+        {
+          "quest": "eye"
+        },
+        {
+          "quest": "hold"
+        },
+        {
+          "offer": "pay_tribute"
+        },
+        {
+          "offer": "give_eye"
+        }
+      ]
+    },
+    {
+      "id": "hold_three",
+      "when": {
+        "event": "mines_held",
+        "count": 3
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Messenger",
+              "Word from Kharim: three mines under Compact banners! He sends this in thanks."
+            ]
+          ]
+        },
+        {
+          "quest": "hold"
+        },
+        {
+          "quest_done": "hold"
+        },
+        {
+          "clue": true
+        }
+      ]
+    },
+    {
+      "id": "eye_found",
+      "when": {
+        "event": "item",
+        "item": "cursed_eye_of_set"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "An eye of red glass, cold as a grave. Kharim will want this."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ain_sharu",
+      "when": {
+        "event": "see",
+        "name": "Ain Sharu"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "Ain Sharu, the Shariw stronghold. Their riders come and go from it like bees from a hive."
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
