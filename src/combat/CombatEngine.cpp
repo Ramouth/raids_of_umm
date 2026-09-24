@@ -872,8 +872,8 @@ void CombatEngine::advance() {
         ++m_round;
         m_turn = 0;
 
-        for (auto& s : m_player.stacks) { s.isDefending = false; s.hasRetaliated = false; }
-        for (auto& s : m_enemy.stacks)  { s.isDefending = false; s.hasRetaliated = false; }
+        for (auto& s : m_player.stacks) s.hasRetaliated = false;
+        for (auto& s : m_enemy.stacks)  s.hasRetaliated = false;
 
         buildQueue();
         std::cout << "[CombatEngine] --- Round " << m_round << " ---\n";
@@ -885,6 +885,7 @@ void CombatEngine::advance() {
         TurnSlot& newSlot = m_queue[m_turn];
         CombatUnit& newActive = newSlot.isPlayer ? m_player.stacks[newSlot.stackIndex]
                                                  : m_enemy.stacks[newSlot.stackIndex];
+        newActive.isDefending = false;   // a defensive stance lasts until the stack's next turn (HoMM3)
         awardScXp(newActive, newSlot, newActive.perTurnXp);
     }
 }

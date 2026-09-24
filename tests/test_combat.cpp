@@ -2338,4 +2338,23 @@ SUITE("Line of sight — judging a shot from a new hex ignores the shooter's old
     CHECK(eng.hasLineOfSight(back, to, &eng.playerArmy().stacks[0]));              // …unless it is the one moving
 }
 
+
+// ── Defend lasts until the stack's next turn ─────────────────────────────────────
+
+SUITE("Defend — the stance carries into the next round until the stack acts again") {
+    const UnitType* slow = aiType("Slow", 2, 1, 10, 5, 5);     // acts last each round
+    const UnitType* fast = aiType("Fast", 9, 1, 10, 5, 5);
+    CombatEngine eng = duelAt(slow, fast, 10, 10, CombatMap::toHex(0, 2), CombatMap::toHex(10, 2));
+    CHECK(!eng.currentTurn().isPlayer);                          // fast enemy first
+    eng.doDefend();                                              // enemy defends… (round 1 ends after our turn)
+    CHECK(eng.currentTurn().isPlayer);
+    eng.doDefend();                                              // we defend as the last actor of round 1
+    CHECK_EQ(eng.roundNumber(), 2);
+    CHECK(!eng.currentTurn().isPlayer);                          // round 2: the enemy acts first…
+    CHECK(eng.playerArmy().stacks[0].isDefending);               // …and our stance still holds against it
+    CHECK(!eng.enemyArmy().stacks[0].isDefending);               // its own stance ended when its turn came
+    eng.doDefend();
+    CHECK(!eng.playerArmy().stacks[0].isDefending);              // our turn: the stance ends
+}
+
 #endif // COMBAT_ENGINE_IMPL

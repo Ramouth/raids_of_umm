@@ -194,7 +194,8 @@ public:
     bool doMoveAlong(const std::vector<HexCoord>& route);
     bool doAttackAlong(const std::vector<HexCoord>& route, int targetIndex);
 
-    // Take a defensive stance (sets isDefending; damage bonus applied during resolve).
+    // Take a defensive stance: +25% defence until this stack's next turn
+    // (it carries into the next round), then the turn passes.
     void doDefend();
 
     // Immediately end combat with the player retreating.

@@ -87,9 +87,19 @@ func _run() -> void:
     check(not battle.issue("defend"), "Rapid follow-up command is blocked during animation")
     await _idle(battle)
     check(battle.history.any(func(line: String): return "damage" in line), "Native damage events reach the combat log")
+    var defender_key: String = battle.state.active
+    battle.defend.mouse_entered.emit()
+    check("Defend" in battle.status.get_parsed_text() and "→" in battle.status.get_parsed_text(), "Hovering Defend explains the stance in numbers")
+    if capture: await _capture("combat_defend_hover")
+    battle.defend.mouse_exited.emit()
     battle.defend.pressed.emit()
     check(battle.busy, "Defend button dispatches a native action")
     await _idle(battle)
+    var still_defending := false
+    for unit in battle.state.units:
+        if unit.key == defender_key: still_defending = unit.defending
+    if battle.state.active != defender_key:
+        check(still_defending and battle.board.actors[defender_key].get_node("Stance").visible, "A defending stack is tagged DEFENDING on the board")
     var destination: Array = battle.state.reachable[0]
     var moving_key: String = battle.state.active
     _click(battle.board, battle.board.cell_point(destination))

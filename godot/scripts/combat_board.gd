@@ -360,6 +360,20 @@ func sync(snapshot: Dictionary) -> void:
             shield.add_child(rim)
             shield.visible = false
             actor.add_child(shield)
+            var stance := Label.new()   # "DEFENDING" tag under the count
+            stance.name = "Stance"
+            stance.text = "DEFENDING"
+            stance.mouse_filter = Control.MOUSE_FILTER_IGNORE
+            stance.position = Vector2(-40, 32)
+            stance.size = Vector2(80, 16)
+            stance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            stance.add_theme_font_size_override("font_size", 11)
+            stance.add_theme_color_override("font_color", Color("9fd8ff"))
+            stance.add_theme_color_override("font_outline_color", Color("16100a"))
+            stance.add_theme_constant_override("outline_size", 5)
+            stance.z_index = 4
+            stance.visible = false
+            actor.add_child(stance)
         var node: Node2D = actors[unit.key]
         node.position = cell_point(unit.cell)
         node.visible = unit.count > 0
@@ -370,6 +384,7 @@ func sync(snapshot: Dictionary) -> void:
         node.get_node("Count").text = _badge(unit.get("companion", false), int(unit.hp), int(unit.unit_hp), int(unit.count))
         if unit.get("companion", false): node.get_node("Count").add_theme_color_override("font_color", COMPANION_COLOR)
         node.get_node("Shield").visible = false
+        node.get_node("Stance").visible = unit.get("defending", false) and int(unit.count) > 0
     # A gold shield marks each stack guarding a companion.
     for unit in state.units:
         var guard: String = unit.get("bodyguard", "")

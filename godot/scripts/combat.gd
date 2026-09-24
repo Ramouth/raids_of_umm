@@ -40,6 +40,8 @@ var _pointer := Vector2.ZERO
 var _stand: Dictionary = {}
 ## Ctrl/Shift+click waypoints: the active stack walks through them in order.
 var waypoints: Array = []
+## Pointer over the Defend button: the status line explains the stance.
+var _defend_hover := false
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -80,7 +82,13 @@ func _ready() -> void:
     warning.scroll_active = false
     inspection = _rich(Vector2(826, 170), Vector2(415, 262), 16)
     inspection.scroll_active = false
-    defend = _button("Defend · D", Vector2(830, 440), _defend)
+    defend = _button("Defend · D   (+25% defence until its next turn)", Vector2(830, 440), _defend)
+    defend.mouse_entered.connect(func():
+        _defend_hover = true
+        _update_status())
+    defend.mouse_exited.connect(func():
+        _defend_hover = false
+        _update_status())
     retreat = _button("Retreat…", Vector2(830, 494), func(): confirm_retreat.popup_centered())
     auto_button = CheckButton.new()
     auto_button.text = "Auto-battle (AI commands your stacks)"
@@ -234,7 +242,7 @@ func _consume(reply: Dictionary) -> void:
             "attack": strike = event
             "damage": _log_damage(event, strike)
             "move": _log("%s moves." % _unit_label(event.unit), DIM, event.unit)
-            "defend": _log("%s defends: +25%% defence until its next turn." % _unit_label(event.unit), DIM, event.unit)
+            "defend": _log("%s defends: +25%% defence until its next turn (the stance carries into the next round)." % _unit_label(event.unit), DIM, event.unit)
         await board.animate(event, animation_speed)
     _set_state(reply.state)
     board.sync(state)
@@ -414,7 +422,7 @@ func _inspect(unit: Dictionary) -> void:
         var guard: String = unit.get("bodyguard", "")
         lines.append("Bodyguard: %s" % (_unit_label(guard) + " takes half of each melee blow" if not guard.is_empty() else "none — keep a stack beside %s" % unit.name))
     var notes: Array[String] = []
-    if unit.defending: notes.append("defending (+25% defence)")
+    if unit.defending: notes.append("DEFENDING: +25% defence until its next turn")
     notes.append("retaliation used this round" if unit.get("retaliated", false) else "will retaliate once this round")
     var acted := false
     for slot in state.get("initiative", []):
@@ -642,6 +650,9 @@ func _update_status() -> void:
             var verb := "Shoot" if preview.ranged else ("Walk up and attack" if not preview.get("path", []).is_empty() else "Attack")
             text = "[b]%s %s[/b]: %s damage, kills %s of %d" % [verb, _unit_label(unit.key), damage, kills, unit.count]
             label = "%s dmg · %s slain" % [damage, kills]
+            if unit.get("defending", false):
+                text += " · [color=#%s]it is defending (+25%% defence)[/color]" % FRIEND.to_html(false)
+                label += " · defending"
             if preview.pinned:
                 text += " · [color=#%s]PINNED: +50%%, no retaliation[/color]" % GOLD.to_html(false)
                 label = "PINNED +50%  ·  " + label
@@ -676,6 +687,7 @@ func _update_status() -> void:
     else:
         kind = "blocked"
         text = "Out of reach — %s moves up to %d hexes, and cannot pass through stacks." % [_unit_name(state.active), active.get("move", 0)]
+    if _defend_hover and my_turn: text = _defend_explanation(active)
     status.text = text
     warning.text = _companion_warnings() if ongoing else ""
     var walking: bool = my_turn and kind == "attack" and not _stand.is_empty() and _stand_matches_cell()
@@ -714,6 +726,26 @@ func _stand_matches_cell() -> bool:
     for preview in state.get("previews", []):
         if preview.cell == _hover_cell: return _stand_matches(preview)
     return false
+
+## Mirrors CombatEngine::damageMultiplier (without armour bypass).
+static func _damage_multiplier(attack: int, defence: int) -> float:
+    var diff := attack - defence
+    if diff >= 0: return 1.0 + 0.05 * mini(diff, 20)
+    return maxf(0.3, 1.0 + 0.025 * diff)
+
+## What Defend would do for `unit`, in numbers, against the hardest-hitting enemy.
+func _defend_explanation(unit: Dictionary) -> String:
+    var defence := int(unit.get("defense", 0))
+    var braced := defence + defence / 4
+    var worst := {}
+    for other in state.get("units", []):
+        if not other.player and int(other.count) > 0 and (worst.is_empty() or int(other.attack) > int(worst.attack)): worst = other
+    var less := ""
+    if not worst.is_empty():
+        var before := _damage_multiplier(int(worst.attack), defence)
+        var after := _damage_multiplier(int(worst.attack), braced)
+        less = " · ~%d%% less damage from %s" % [roundi(100.0 * (1.0 - after / before)), _unit_name(worst.key)]
+    return "[b]Defend[/b]: defence %d → %d%s · lasts until its next turn · retaliation stays ready" % [defence, braced, less]
 
 static func _hex_distance(a: Array, b: Array) -> int:
     var dq: int = int(a[0]) - int(b[0])
