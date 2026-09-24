@@ -40,7 +40,9 @@ Json AdventureSession::saveState() const {
     for (const auto& [c, t] : m_towns) {
         Json pool = Json::object();
         for (const auto& [id, n] : t.recruitPool) pool[id] = n;
-        towns.push_back({{"cell", cellJson(c)}, {"pool", pool}});
+        Json built = Json::array();
+        for (const auto& id : t.buildings) built.push_back(id);
+        towns.push_back({{"cell", cellJson(c)}, {"pool", pool}, {"buildings", built}, {"built_on", t.builtOnDay}});
     }
     Json explored = Json::array();
     for (const auto& c : m_explored) explored.push_back(cellJson(c));
@@ -107,8 +109,15 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             if (auto it = m_control.find(cell); it != m_control.end()) it->second.ownerFaction = c.at(2).get<int>();
         }
         for (auto& [c, t] : m_towns) t.recruitPool.clear();
-        for (const auto& t : save.at("towns"))
-            for (const auto& [id, n] : t.at("pool").items()) m_towns[cellFrom(t.at("cell"))].recruitPool[id] = n.get<int>();
+        for (const auto& t : save.at("towns")) {
+            TownState& town = m_towns[cellFrom(t.at("cell"))];
+            for (const auto& [id, n] : t.at("pool").items()) town.recruitPool[id] = n.get<int>();
+            if (t.contains("buildings")) {       // older saves keep the starting set
+                town.buildings.clear();
+                for (const auto& id : t.at("buildings")) town.buildings.insert(id.get<std::string>());
+            }
+            town.builtOnDay = t.value("built_on", 0);
+        }
         m_explored.clear();
         for (const auto& c : save.at("explored")) m_explored.insert(cellFrom(c));
         std::unordered_set<HexCoord> standing;

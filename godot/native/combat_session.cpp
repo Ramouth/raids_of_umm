@@ -44,6 +44,7 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
         if (++troops > CombatMap::GRID_H)
             throw std::runtime_error("An army must contain between one and five stacks.");
         army.stacks.push_back(CombatUnit::make(type, count, player));
+        army.stacks.back().attackBonus = std::clamp(entry.value("attack_bonus", 0), 0, 20);   // e.g. Drill Yard
     }
     if (troops == 0) throw std::runtime_error("An army must contain between one and five stacks.");
     return army;

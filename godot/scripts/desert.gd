@@ -154,6 +154,26 @@ func recruit(town: Vector2i, unit_id: String, count: int) -> Dictionary:
         _update_expedition()
     return reply
 
+## Called by the town screen: build in the town on `town` (one per day).
+func build(town: Vector2i, building_id: String) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.build(town.x, town.y, building_id))
+    if reply.get("ok", false):
+        state = reply
+        _update_turn_hud()
+        _update_expedition()
+    return reply
+
+## Called by the town screen's marketplace.
+func trade(give: String, get: String, amount: int) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.trade(give, get, amount))
+    if reply.get("ok", false):
+        state = reply
+        _update_turn_hud()
+    return reply
+
+func trade_quote(give: String, get: String, amount: int) -> int:
+    return int(JSON.parse_string(adventure.trade_quote(give, get, amount)).get("received", 0))
+
 ## Called by the garrison screen. Returns the native reply.
 func transfer(site: Vector2i, unit_id: String, count: int, to_garrison: bool) -> Dictionary:
     var reply: Dictionary = JSON.parse_string(adventure.transfer(site.x, site.y, unit_id, count, to_garrison))
@@ -208,6 +228,7 @@ func open_town() -> bool:
     if landmark.get("type", "") == "dwelling":
         screen.view_art = "res://content/textures/" + map_view.object_texture(landmark)
         screen.eyebrow_text = "DWELLING  ·  RECRUITS GATHER WEEKLY"
+        screen.can_build = false
     elif data.ground == "grass" and ResourceLoader.exists("res://content/textures/screens/town_varenhold.png"):
         screen.view_art = "res://content/textures/screens/town_varenhold.png"
     screens.push(screen, func(_result: Dictionary):
@@ -922,6 +943,7 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         _update_expedition())
     # Companions ride in beside the troops (wounded or unpaid ones stay behind).
     var fighters: Array = army.duplicate(true)
+    for stack in fighters: stack["attack_bonus"] = int(state.get("army_attack_bonus", 0))   # e.g. Drill Yard
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})

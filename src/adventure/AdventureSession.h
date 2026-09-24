@@ -131,6 +131,23 @@ public:
     // Recruit into the hero's army. Hero must stand in a town the player owns.
     // Returns an error message, or nullopt on success.
     std::optional<std::string> recruit(const HexCoord& town, const std::string& unitId, int count);
+
+    // ── Town buildings (data/buildings.json) ─────────────────────────────────
+    // One building per town per day, in any town the player holds (no hero
+    // needed, as in HoMM3). A new dwelling brings its first week of recruits.
+    std::optional<std::string> build(const HexCoord& town, const std::string& buildingId);
+    // Why `buildingId` cannot be built in `town` right now ("" = it can).
+    std::string buildBlocker(const HexCoord& town, const std::string& buildingId) const;
+    bool canRecruitHere(const HexCoord& town, const std::string& unitId) const;   // dwelling built?
+    double growthBonus(const HexCoord& town) const;      // best fort: 0, 0.5, 1.0
+    int    townGold(const HexCoord& town) const;         // best hall's income (else the flat town income)
+    bool   hasMarket() const;                            // a marketplace in any town the player holds
+    int    armyAttackBonus() const;                      // e.g. Drill Yard, while its town is held
+    // Marketplace: sell `amount` of `give` for as much `get` as it buys.
+    // Returns the amount received, or an error.
+    struct TradeResult { int received = 0; std::string error; };
+    TradeResult trade(Resource give, Resource get, int amount);
+    static int tradeQuote(Resource give, Resource get, int amount);
     const ResourceManager& resources() const { return *m_resources; }
 
     // ── Story (Scenario hooks and effects) ───────────────────────────────────
@@ -219,7 +236,7 @@ public:
     // Resolves a battle with no player involvement (AI vs guards) using the real
     // engine; `companions` fight on the attacking side.
     AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender,
-                          const std::vector<Companion>& companions = {}) const;
+                          const std::vector<Companion>& companions = {}, int attackerBonus = 0) const;
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 
@@ -255,6 +272,8 @@ public:
 private:
     std::optional<std::string> loadEncounters(const std::string& path);
     void growTown(const HexCoord& c);
+    void ensureBuildings(const HexCoord& c);   // a town the player gains starts with the faction's starting set
+    ResourcePool extraIncome(int faction) const; // beyond TurnManager's flat mine/town income
     void fireSightings(const std::vector<HexCoord>& revealed);
     void spawnRival(const HexCoord& town, int band);
     std::string visitSite(const HexCoord& cell);

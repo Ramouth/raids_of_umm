@@ -1,10 +1,210 @@
 {
   "mineIncome": [
-    { "type": "Town",         "dailyIncome": { "Gold": 500 } },
-    { "type": "GoldMine",     "dailyIncome": { "Gold": 1000 } },
-    { "type": "CrystalMine",  "dailyIncome": { "Crystal": 2 } },
-    { "type": "Sawmill",      "dailyIncome": { "Wood": 2 } },
-    { "type": "Quarry",       "dailyIncome": { "Stone": 2 } },
-    { "type": "ObsidianVent", "dailyIncome": { "Obsidian": 1 } }
+    {
+      "type": "Town",
+      "dailyIncome": {
+        "Gold": 500
+      }
+    },
+    {
+      "type": "GoldMine",
+      "dailyIncome": {
+        "Gold": 1000
+      }
+    },
+    {
+      "type": "CrystalMine",
+      "dailyIncome": {
+        "Crystal": 2
+      }
+    },
+    {
+      "type": "Sawmill",
+      "dailyIncome": {
+        "Wood": 2
+      }
+    },
+    {
+      "type": "Quarry",
+      "dailyIncome": {
+        "Stone": 2
+      }
+    },
+    {
+      "type": "ObsidianVent",
+      "dailyIncome": {
+        "Obsidian": 1
+      }
+    }
+  ],
+  "buildings": [
+    {
+      "id": "village_hall",
+      "faction": "ivory_compact",
+      "name": "Village Hall",
+      "description": "The reeve's hall. 500 gold a day.",
+      "cost": {},
+      "requires": [],
+      "income": 500,
+      "starting": true
+    },
+    {
+      "id": "town_hall",
+      "faction": "ivory_compact",
+      "name": "Town Hall",
+      "description": "Tolls and market dues. 1000 gold a day.",
+      "cost": {
+        "Gold": 2500
+      },
+      "requires": [
+        "village_hall"
+      ],
+      "income": 1000
+    },
+    {
+      "id": "city_hall",
+      "faction": "ivory_compact",
+      "name": "City Hall",
+      "description": "The seat of the march. 2000 gold a day.",
+      "cost": {
+        "Gold": 5000,
+        "Wood": 5,
+        "Stone": 5
+      },
+      "requires": [
+        "town_hall",
+        "marketplace"
+      ],
+      "income": 2000
+    },
+    {
+      "id": "fort",
+      "faction": "ivory_compact",
+      "name": "Fort",
+      "description": "A timber palisade. Needed for the heavier dwellings.",
+      "cost": {},
+      "requires": [],
+      "starting": true
+    },
+    {
+      "id": "citadel",
+      "faction": "ivory_compact",
+      "name": "Citadel",
+      "description": "Stone walls and a keep. Recruits grow 50% faster; knights will come.",
+      "cost": {
+        "Gold": 2500,
+        "Stone": 5
+      },
+      "requires": [
+        "fort"
+      ],
+      "growth": 0.5
+    },
+    {
+      "id": "castle",
+      "faction": "ivory_compact",
+      "name": "Castle",
+      "description": "The march's stronghold. Recruits grow twice as fast.",
+      "cost": {
+        "Gold": 5000,
+        "Wood": 10,
+        "Stone": 10
+      },
+      "requires": [
+        "citadel"
+      ],
+      "growth": 1.0
+    },
+    {
+      "id": "marketplace",
+      "faction": "ivory_compact",
+      "name": "Marketplace",
+      "description": "Trade resources: sell at half value, buy at one and a half.",
+      "cost": {
+        "Gold": 500,
+        "Wood": 5
+      },
+      "requires": [],
+      "market": true
+    },
+    {
+      "id": "muster_field",
+      "faction": "ivory_compact",
+      "name": "Muster Field",
+      "description": "Levy Spearmen gather here.",
+      "cost": {},
+      "requires": [],
+      "unlocks": "levy_spearman",
+      "starting": true
+    },
+    {
+      "id": "archery_butts",
+      "faction": "ivory_compact",
+      "name": "Archery Butts",
+      "description": "Desert Archers train here.",
+      "cost": {},
+      "requires": [],
+      "unlocks": "desert_archer",
+      "starting": true
+    },
+    {
+      "id": "armoury",
+      "faction": "ivory_compact",
+      "name": "Armoury",
+      "description": "Arms and trains Armoured Warriors.",
+      "cost": {
+        "Gold": 1000,
+        "Stone": 5
+      },
+      "requires": [
+        "fort"
+      ],
+      "unlocks": "armoured_warrior"
+    },
+    {
+      "id": "horse_lines",
+      "faction": "ivory_compact",
+      "name": "Horse Lines",
+      "description": "Stables and paddocks for Rider Archers.",
+      "cost": {
+        "Gold": 2000,
+        "Wood": 5,
+        "Obsidian": 2
+      },
+      "requires": [
+        "armoury"
+      ],
+      "unlocks": "rider_archer"
+    },
+    {
+      "id": "knights_hall",
+      "faction": "ivory_compact",
+      "name": "Knights' Hall",
+      "description": "Where the Compact's Rider Knights are sworn.",
+      "cost": {
+        "Gold": 4000,
+        "Stone": 5,
+        "Obsidian": 3
+      },
+      "requires": [
+        "horse_lines",
+        "citadel"
+      ],
+      "unlocks": "rider_knight"
+    },
+    {
+      "id": "drill_yard",
+      "faction": "ivory_compact",
+      "name": "Drill Yard",
+      "description": "Veterans drill the levies. While you hold this town, your troops fight with +1 attack.",
+      "cost": {
+        "Gold": 1500,
+        "Stone": 5
+      },
+      "requires": [
+        "armoury"
+      ],
+      "attackBonus": 1
+    }
   ]
 }

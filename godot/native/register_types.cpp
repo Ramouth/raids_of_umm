@@ -67,6 +67,9 @@ protected:
         ClassDB::bind_method(D_METHOD("claim_chest", "gold"), &UmmAdventure::claim_chest);
         ClassDB::bind_method(D_METHOD("resolve_encounter", "victory"), &UmmAdventure::resolve_encounter);
         ClassDB::bind_method(D_METHOD("set_army", "stacks_json"), &UmmAdventure::set_army);
+        ClassDB::bind_method(D_METHOD("build", "q", "r", "id"), &UmmAdventure::build);
+        ClassDB::bind_method(D_METHOD("trade", "give", "get", "amount"), &UmmAdventure::trade);
+        ClassDB::bind_method(D_METHOD("trade_quote", "give", "get", "amount"), &UmmAdventure::trade_quote);
         ClassDB::bind_method(D_METHOD("companions_fell", "fallen_json", "lost"), &UmmAdventure::companions_fell);
         ClassDB::bind_method(D_METHOD("recruit", "q", "r", "unit_id", "count"), &UmmAdventure::recruit);
         ClassDB::bind_method(D_METHOD("snapshot"), &UmmAdventure::snapshot);
@@ -92,6 +95,13 @@ public:
     String add_item(const String& id) { return guarded([&] { return bridge_.add_item(id.utf8().get_data()); }); }
     String claim_chest(bool gold) { return guarded([&] { return bridge_.claim_chest(gold); }); }
     String resolve_encounter(bool victory) { return guarded([&] { return bridge_.resolve_encounter(victory); }); }
+    String build(int q, int r, const String& id) { return guarded([&] { return bridge_.build(q, r, id.utf8().get_data()); }); }
+    String trade(const String& give, const String& get, int amount) {
+        return guarded([&] { return bridge_.trade(give.utf8().get_data(), get.utf8().get_data(), amount); });
+    }
+    String trade_quote(const String& give, const String& get, int amount) {
+        return guarded([&] { return bridge_.trade_quote(give.utf8().get_data(), get.utf8().get_data(), amount); });
+    }
     String companions_fell(const String& fallen, bool lost) {
         return guarded([&] { return bridge_.companions_fell(AdventureBridge::Json::parse(fallen.utf8().get_data()), lost); });
     }

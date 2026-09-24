@@ -3,6 +3,7 @@
 #include "world/SpellDef.h"
 #include "world/WondrousItem.h"
 #include "world/MapObject.h"
+#include "world/BuildingDef.h"
 #include "world/Resources.h"
 #include <string>
 #include <vector>
@@ -34,6 +35,12 @@ public:
     const SpellDef*      spell(const std::string& id) const;
     const WondrousItem*  item (const std::string& id) const;
 
+    // Town buildings (buildings.json "buildings"), in file order.
+    const BuildingDef* building(const std::string& id) const;
+    std::vector<const BuildingDef*> buildingsFor(const std::string& faction) const;
+    // The dwelling that unlocks recruiting `unitId`, or nullptr if none is needed.
+    const BuildingDef* dwellingFor(const std::string& unitId) const;
+
     // Returns daily income for a capturable mine type (empty pool if unknown).
     ResourcePool mineIncome(ObjType type) const;
 
@@ -49,6 +56,7 @@ private:
     std::unordered_map<std::string, UnitType>     m_units;
     std::unordered_map<std::string, SpellDef>     m_spells;
     std::unordered_map<std::string, WondrousItem> m_items;
+    std::vector<BuildingDef>                      m_buildings;
 
     // Stable pointer views (point into m_units / m_spells / m_items after load).
     std::vector<const UnitType*>     m_unitsByTier;

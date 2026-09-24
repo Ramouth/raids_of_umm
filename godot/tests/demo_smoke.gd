@@ -8,6 +8,7 @@ const WEEK2_ARMY := [{"id": "levy_spearman", "count": 50}, {"id": "desert_archer
 const RIDGE_GUARD := Vector2i(-4, 2)  # the Bridge Wardens on the Coldwater
 
 var failures := 0
+var capture := false
 
 func _initialize() -> void:
     create_timer(120).timeout.connect(func(): push_error("Demo smoke timed out"); quit(1))
@@ -18,7 +19,18 @@ func check(condition: bool, message: String) -> void:
         failures += 1
         push_error("FAIL: " + message)
 
+func _capture(label: String) -> void:
+    if DisplayServer.get_name() == "headless": return
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var folder := ProjectSettings.globalize_path("res://artifacts")
+    DirAccess.make_dir_recursive_absolute(folder)
+    root.get_texture().get_image().save_png(folder.path_join(label + ".png"))
+
 func _run() -> void:
+    capture = "--capture" in OS.get_cmdline_user_args()
+    if capture and DisplayServer.get_name() != "headless":
+        DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
     await _root_scene()
     await _story()
     await _town_recruiting()
@@ -108,6 +120,20 @@ func _town_recruiting() -> void:
     check(scene.army.any(func(s): return s.id == "levy_spearman" and s.count == 30), "Recruits merge into the existing stack")
     check(not town.recruit("rider_knight", 3), "Cannot afford three knights (2700 gold, 2200 left)")
     check(not town.recruit("levy_spearman", 999), "Cannot recruit past the weekly pool")
+    # Buildings: tiers 3-5 wait for their dwellings; one building a day.
+    var warriors: Control = town._cards.get_node("armoured_warrior")
+    check(warriors.find_child("Recruit", true, false).disabled and "Armoury" in warriors.find_child("Recruit", true, false).text, "Armoured Warriors wait for the Armoury")
+    town.show_tab("build")
+    check(town._pages["build"].visible, "The Build tab opens")
+    check(town._buildings.get_node("knights_hall").find_child("Build", true, false) == null, "The Knights' Hall is locked behind its requirements")
+    if capture: await _capture("town_build")
+    check(town.build("armoury"), "The Armoury is built")
+    check("armoury" in town._town().buildings and town._town().built_today, "The town records today's building")
+    check(not town.build("marketplace"), "A second building must wait for tomorrow")
+    town.show_tab("recruit")
+    check(not town._cards.get_node("armoured_warrior").find_child("Recruit", true, false).disabled, "Armoured Warriors can now be recruited")
+    town.show_tab("market")
+    check("Marketplace" in town._quote.text, "The market asks for a Marketplace first")
     town.find_child("Leave", true, false).pressed.emit()
     await process_frame
     check(scene.open_garrison(), "The hero can garrison Varenhold")

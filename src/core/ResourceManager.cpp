@@ -19,6 +19,7 @@ std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_spells.clear();
     m_items.clear();
     m_mineIncome.clear();
+    m_buildings.clear();
     m_unitsByTier.clear();
     m_allSpells.clear();
     m_allItems.clear();
@@ -42,6 +43,22 @@ const UnitType* ResourceManager::unit(const std::string& id) const {
 const SpellDef* ResourceManager::spell(const std::string& id) const {
     auto it = m_spells.find(id);
     return it != m_spells.end() ? &it->second : nullptr;
+}
+
+const BuildingDef* ResourceManager::building(const std::string& id) const {
+    for (const auto& b : m_buildings) if (b.id == id) return &b;
+    return nullptr;
+}
+
+std::vector<const BuildingDef*> ResourceManager::buildingsFor(const std::string& faction) const {
+    std::vector<const BuildingDef*> out;
+    for (const auto& b : m_buildings) if (b.faction == faction) out.push_back(&b);
+    return out;
+}
+
+const BuildingDef* ResourceManager::dwellingFor(const std::string& unitId) const {
+    for (const auto& b : m_buildings) if (b.unlocks == unitId) return &b;
+    return nullptr;
 }
 
 const WondrousItem* ResourceManager::item(const std::string& id) const {
@@ -227,6 +244,31 @@ std::optional<std::string> ResourceManager::loadBuildings(const std::string& pat
         }
         m_mineIncome[static_cast<int>(typeIt->second)] = pool;
     }
+
+    for (const auto& j : root.value("buildings", json::array())) {
+        BuildingDef b;
+        b.id          = j.value("id", "");
+        b.name        = j.value("name", "");
+        b.description = j.value("description", "");
+        b.faction     = j.value("faction", "");
+        if (j.contains("cost") && j["cost"].is_object())
+            for (int i = 0; i < RESOURCE_COUNT; ++i)
+                b.cost[static_cast<Resource>(i)] = j["cost"].value(kResourceKeys[i], 0);
+        b.requires    = j.value("requires", std::vector<std::string>{});
+        b.income      = j.value("income", 0);
+        b.growth      = j.value("growth", 0.0);
+        b.unlocks     = j.value("unlocks", "");
+        b.market      = j.value("market", false);
+        b.attackBonus = j.value("attackBonus", 0);
+        b.starting    = j.value("starting", false);
+        if (b.id.empty()) continue;
+        for (const auto& other : m_buildings)
+            if (other.id == b.id) return "ResourceManager: duplicate building " + b.id;
+        m_buildings.push_back(std::move(b));
+    }
+    for (const auto& b : m_buildings)
+        for (const auto& need : b.requires)
+            if (!building(need)) return "ResourceManager: building " + b.id + " requires unknown " + need;
     return std::nullopt;
 }
 

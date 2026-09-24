@@ -13,11 +13,14 @@
  * recruitPool : unitId → count currently available to recruit.
  *               Seeded with one week's growth on first enter.
  *               Weekly growth fires on days 7, 14, 21 …
- * buildings   : set of built buildingIds — empty for now; unlocks higher growth later.
+ * buildings   : built buildingIds (data/buildings.json) — dwellings gate
+ *               recruiting, halls pay income, forts raise growth.
+ * builtOnDay  : the day this town last built (one building per day).
  */
 struct TownState {
     std::unordered_map<std::string, int> recruitPool;  // unitId → count
-    std::set<std::string>                buildings;    // buildingIds (future)
+    std::set<std::string>                buildings;    // buildingIds
+    int                                  builtOnDay = 0;
 };
 
 using TownStateMap = std::unordered_map<HexCoord, TownState>;

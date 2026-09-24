@@ -151,6 +151,7 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     }
     if (!encountersPath.empty())
         if (auto err = loadEncounters(encountersPath)) return err;
+    for (auto& [coord, town] : m_towns) ensureBuildings(coord);
     for (auto& [coord, town] : m_towns) growTown(coord);  // first week's recruits
     for (const auto& obj : m_map.objects())
         if (obj.type == ObjType::Town && obj.factionId == Faction::AI) spawnRival(obj.pos, 1);
@@ -423,6 +424,7 @@ std::string AdventureSession::enter(const HexCoord& cell) {
     if (it == m_control.end() || it->second.ownerFaction == Faction::Player) return "";
     it->second.ownerFaction = Faction::Player;
     if (it->second.objType == ObjType::Town) {   // new owner, new roster
+        ensureBuildings(cell);
         m_towns[cell].recruitPool.clear();
         growTown(cell);
     }
@@ -583,6 +585,7 @@ std::string AdventureSession::endDay() {
     runRivals();
     TownStateMap none;  // weekly growth is per-roster here, not TurnManager's all-units tick
     payUpkeep();
+    m_turns.playerFaction().treasury += extraIncome(Faction::Player);   // halls, governors
     m_turns.nextDay(m_hero, m_control, *m_resources, none);
     m_movesMax = DEFAULT_MOVES + movesBonus();
     if (dayOfWeek() == 7)
@@ -665,8 +668,137 @@ void AdventureSession::growTown(const HexCoord& c) {
     std::string roster = rosterFor(owner(c));
     if (roster.empty()) return;
     auto& pool = m_towns[c].recruitPool;
+    const double bonus = growthBonus(c);
     for (const UnitType* u : m_resources->unitsByTier())
-        if (u->faction == roster) pool[u->id] += u->weeklyGrowth;
+        if (u->faction == roster && canRecruitHere(c, u->id))
+            pool[u->id] += static_cast<int>(u->weeklyGrowth * (1.0 + bonus) + 0.5);
+}
+
+void AdventureSession::ensureBuildings(const HexCoord& c) {
+    const MapObjectDef* obj = m_map.objectAt(c);
+    if (!obj || obj->type != ObjType::Town) return;
+    const std::string roster = rosterFor(owner(c) == Faction::AI ? Faction::AI : Faction::Player);
+    auto& built = m_towns[c].buildings;
+    for (const BuildingDef* b : m_resources->buildingsFor(roster))
+        if (built.count(b->id)) return;           // already has this faction's buildings
+    for (const BuildingDef* b : m_resources->buildingsFor(roster))
+        if (b->starting) built.insert(b->id);
+}
+
+bool AdventureSession::canRecruitHere(const HexCoord& c, const std::string& unitId) const {
+    const BuildingDef* dwelling = m_resources->dwellingFor(unitId);
+    if (!dwelling) return true;
+    const TownState* t = town(c);
+    return t && t->buildings.count(dwelling->id);
+}
+
+double AdventureSession::growthBonus(const HexCoord& c) const {
+    double best = 0;
+    if (const TownState* t = town(c))
+        for (const auto& id : t->buildings)
+            if (const BuildingDef* b = m_resources->building(id)) best = std::max(best, b->growth);
+    return best;
+}
+
+int AdventureSession::townGold(const HexCoord& c) const {
+    int best = 0;
+    if (const TownState* t = town(c))
+        for (const auto& id : t->buildings)
+            if (const BuildingDef* b = m_resources->building(id)) best = std::max(best, b->income);
+    return best > 0 ? best : m_resources->mineIncome(ObjType::Town)[Resource::Gold];
+}
+
+bool AdventureSession::hasMarket() const {
+    for (const auto& [c, t] : m_towns) {
+        if (owner(c) != Faction::Player) continue;
+        for (const auto& id : t.buildings)
+            if (const BuildingDef* b = m_resources->building(id); b && b->market) return true;
+    }
+    return false;
+}
+
+int AdventureSession::armyAttackBonus() const {
+    int best = 0;
+    for (const auto& [c, t] : m_towns) {
+        if (owner(c) != Faction::Player) continue;
+        for (const auto& id : t.buildings)
+            if (const BuildingDef* b = m_resources->building(id)) best = std::max(best, b->attackBonus);
+    }
+    return best;
+}
+
+std::string AdventureSession::buildBlocker(const HexCoord& c, const std::string& id) const {
+    const TownState* t = town(c);
+    const MapObjectDef* obj = m_map.objectAt(c);
+    if (!t || !obj || obj->type != ObjType::Town) return "There is no town here.";
+    if (owner(c) != Faction::Player) return "This town does not answer to you.";
+    const BuildingDef* b = m_resources->building(id);
+    if (!b || b->faction != rosterFor(Faction::Player)) return "Unknown building.";
+    if (t->buildings.count(id)) return "Already built.";
+    for (const auto& need : b->requires)
+        if (!t->buildings.count(need)) {
+            const BuildingDef* n = m_resources->building(need);
+            return "Needs " + (n ? n->name : need) + ".";
+        }
+    if (t->builtOnDay == day()) return "Already built here today.";
+    if (!m_turns.playerFaction().treasury.canAfford(b->cost)) return "You cannot afford it.";
+    return "";
+}
+
+std::optional<std::string> AdventureSession::build(const HexCoord& c, const std::string& id) {
+    if (std::string why = buildBlocker(c, id); !why.empty()) return why;
+    const BuildingDef* b = m_resources->building(id);
+    TownState& t = m_towns[c];
+    m_turns.playerFaction().treasury -= b->cost;
+    t.buildings.insert(id);
+    t.builtOnDay = day();
+    if (!b->unlocks.empty())                     // a new dwelling: its first week's recruits
+        if (const UnitType* u = m_resources->unit(b->unlocks))
+            t.recruitPool[u->id] += static_cast<int>(u->weeklyGrowth * (1.0 + growthBonus(c)) + 0.5);
+    return std::nullopt;
+}
+
+namespace {
+// Marketplace value of one unit of each resource, in gold.
+int resourceValue(Resource r) {
+    switch (r) {
+        case Resource::Gold:     return 1;
+        case Resource::Wood:     case Resource::Stone:   return 150;
+        default:                 return 400;
+    }
+}
+}
+
+int AdventureSession::tradeQuote(Resource give, Resource get, int amount) {
+    if (give == get || amount <= 0) return 0;
+    // The market buys at half value and sells at one and a half; gold is gold.
+    const double sold = amount * (give == Resource::Gold ? 1.0 : 0.5 * resourceValue(give));
+    const double price = get == Resource::Gold ? 1.0 : 1.5 * resourceValue(get);
+    return static_cast<int>(sold / price);
+}
+
+AdventureSession::TradeResult AdventureSession::trade(Resource give, Resource get, int amount) {
+    if (!hasMarket()) return {0, "You need a Marketplace in a town you hold."};
+    ResourcePool& treasury = m_turns.playerFaction().treasury;
+    if (amount <= 0 || treasury[give] < amount) return {0, "You do not have that much to trade."};
+    const int received = tradeQuote(give, get, amount);
+    if (received <= 0) return {0, "That is not enough to buy even one."};
+    treasury[give] -= amount;
+    treasury[get] += received;
+    return {received, ""};
+}
+
+ResourcePool AdventureSession::extraIncome(int faction) const {
+    ResourcePool extra;
+    if (faction != Faction::Player) return extra;
+    const int flat = m_resources->mineIncome(ObjType::Town)[Resource::Gold];
+    for (const auto& [c, ctrl] : m_control)
+        if (ctrl.objType == ObjType::Town && ctrl.ownerFaction == faction)
+            extra[Resource::Gold] += townGold(c) - flat;       // halls beyond the flat town income
+    for (const auto& sc : m_specials)   // governors
+        if (sc.stationed && owner(*sc.stationed) == Faction::Player && sc.unpaidDays < SULK_DAYS)
+            extra[Resource::Gold] += 100 * sc.level;
+    return extra;
 }
 
 const TownState* AdventureSession::town(const HexCoord& c) const {
@@ -681,6 +813,10 @@ std::optional<std::string> AdventureSession::recruit(const HexCoord& at, const s
     if (m_hero.pos != at)               return "Your hero must be in the town to recruit.";
     const UnitType* u = m_resources->unit(unitId);
     if (!u || count <= 0)               return "Unknown unit.";
+    if (!canRecruitHere(at, unitId)) {
+        const BuildingDef* d = m_resources->dwellingFor(unitId);
+        return "Build the " + (d ? d->name : std::string("dwelling")) + " to recruit them.";
+    }
     int& available = it->second.recruitPool[unitId];
     if (count > available)              return "Not enough recruits available this week.";
     ResourcePool cost;
@@ -701,10 +837,7 @@ ResourcePool AdventureSession::dailyIncome(int faction) const {
     for (const auto& [coord, ctrl] : m_control)
         if (ctrl.ownerFaction == faction)
             total += m_resources->mineIncome(ctrl.objType);
-    if (faction == Faction::Player)
-        for (const auto& sc : m_specials)   // governors
-            if (sc.stationed && owner(*sc.stationed) == Faction::Player && sc.unpaidDays < SULK_DAYS)
-                total[Resource::Gold] += 100 * sc.level;
+    total += extraIncome(faction);
     return total;
 }
 

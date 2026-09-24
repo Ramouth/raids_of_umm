@@ -63,9 +63,30 @@ Json AdventureBridge::snapshot() const {
         if (!t) continue;
         Json pool = Json::object();
         for (const auto& [id, n] : t->recruitPool) pool[id] = n;
+        Json built = Json::array();
+        for (const auto& id : t->buildings) built.push_back(id);
+        Json blockers = Json::object();          // why each unbuilt building cannot go up today
+        Json locked = Json::array();             // units whose dwelling is missing
+        if (obj.type == ObjType::Town && session_.owner(obj.pos) == 1) {
+            for (const BuildingDef* b : session_.resources().buildingsFor(AdventureSession::rosterFor(1)))
+                if (!t->buildings.count(b->id)) blockers[b->id] = session_.buildBlocker(obj.pos, b->id);
+            for (const UnitType* u : session_.resources().unitsByTier())
+                if (u->faction == AdventureSession::rosterFor(1) && !session_.canRecruitHere(obj.pos, u->id))
+                    locked.push_back(u->id);
+        }
         towns.push_back({{"cell", cell(obj.pos)}, {"name", obj.name},
-                         {"owner", session_.owner(obj.pos)}, {"pool", pool}});
+                         {"owner", session_.owner(obj.pos)}, {"pool", pool},
+                         {"buildings", built}, {"blockers", blockers}, {"locked", locked},
+                         {"built_today", t->builtOnDay == session_.day()},
+                         {"gold", obj.type == ObjType::Town ? session_.townGold(obj.pos) : 0},
+                         {"growth_bonus", session_.growthBonus(obj.pos)}});
     }
+    Json building_defs = Json::array();
+    for (const BuildingDef* b : session_.resources().buildingsFor(AdventureSession::rosterFor(1)))
+        building_defs.push_back({{"id", b->id}, {"name", b->name}, {"description", b->description},
+                                 {"cost", pool(b->cost)}, {"requires", b->requires}, {"unlocks", b->unlocks},
+                                 {"income", b->income}, {"growth", b->growth}, {"market", b->market},
+                                 {"attack_bonus", b->attackBonus}});
     Json quests = Json::array();
     for (const auto& q : session_.scenario().quests())
         quests.push_back({{"id", q.id}, {"title", q.title}, {"text", q.text},
@@ -167,6 +188,9 @@ Json AdventureBridge::snapshot() const {
         {"won", session_.won()},
         {"army", army},
         {"towns", towns},
+        {"building_defs", building_defs},
+        {"market", session_.hasMarket()},
+        {"army_attack_bonus", session_.armyAttackBonus()},
         {"quests", quests},
         {"offers", offers},
         {"items", items},
@@ -212,6 +236,36 @@ Json AdventureBridge::companions_fell(const Json& fallen, bool lost) {
     for (const auto& id : fallen) ids.push_back(id.get<std::string>());
     session_.companionsFell(ids, lost);
     return with_lines(snapshot());
+}
+
+Json AdventureBridge::build(int q, int r, const std::string& id) {
+    auto err = session_.build({q, r}, id);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return with_lines(out);
+}
+
+Json AdventureBridge::trade(const std::string& give, const std::string& get, int amount) {
+    auto parse = [](const std::string& name, Resource& out) {
+        static const char* names[] = {"Gold", "Wood", "Stone", "Obsidian", "Crystal"};
+        for (int i = 0; i < RESOURCE_COUNT; ++i) if (name == names[i]) { out = static_cast<Resource>(i); return true; }
+        return false;
+    };
+    Resource from, to;
+    if (!parse(give, from) || !parse(get, to)) return {{"ok", false}, {"error", "Unknown resource."}};
+    auto result = session_.trade(from, to, amount);
+    Json out = snapshot();
+    out["received"] = result.received;
+    if (!result.error.empty()) { out["ok"] = false; out["error"] = result.error; }
+    return out;
+}
+
+Json AdventureBridge::trade_quote(const std::string& give, const std::string& get, int amount) const {
+    static const char* names[] = {"Gold", "Wood", "Stone", "Obsidian", "Crystal"};
+    int a = -1, b = -1;
+    for (int i = 0; i < RESOURCE_COUNT; ++i) { if (give == names[i]) a = i; if (get == names[i]) b = i; }
+    if (a < 0 || b < 0) return {{"ok", false}, {"error", "Unknown resource."}};
+    return {{"ok", true}, {"received", AdventureSession::tradeQuote(static_cast<Resource>(a), static_cast<Resource>(b), amount)}};
 }
 
 Json AdventureBridge::set_army(const Json& stacks) {

@@ -1,3 +1,4 @@
+#include <cstdlib>
 // demo_bot — plays "The Old Passage" (stage 1, the northern marches) through AdventureSession with a simple
 // greedy strategy, to check the demo is winnable and how long it takes.
 // Usage: demo_bot <repo_root> [seeds] [verbose]
@@ -14,7 +15,7 @@ static bool fight(AdventureSession& s) {
     std::vector<Stack> guards;
     for (const auto& g : Scenario::Json::parse(s.encounterAt(at)->guardsJson))
         guards.push_back({g["id"], g["count"]});
-    auto r = s.autoBattle(s.army(), guards, s.battleCompanions());
+    auto r = s.autoBattle(s.army(), guards, s.battleCompanions(), s.armyAttackBonus());
     s.setArmy(r.attacker);
     s.companionsFell(r.fallen, !r.attackerWon);
     s.resolveEncounter(r.attackerWon);
@@ -30,6 +31,17 @@ static void recruitAll(AdventureSession& s) {
     for (const auto& [tier, id] : order)
         for (int n = t->recruitPool.at(id); n > 0; --n)
             if (!s.recruit(s.heroPos(), id, n)) break;
+}
+
+// Every town the bot holds builds the first thing on this list it can afford today.
+static void buildAll(AdventureSession& s) {
+    static const char* order[] = {"town_hall", "armoury", "citadel", "horse_lines", "marketplace",
+                                  "drill_yard", "city_hall", "knights_hall", "castle"};
+    for (const auto& obj : s.map().objects()) {
+        if (obj.type != ObjType::Town || s.owner(obj.pos) != 1) continue;
+        for (const char* id : order)
+            if (s.buildBlocker(obj.pos, id).empty()) { s.build(obj.pos, id); break; }
+    }
 }
 
 int main(int argc, char** argv) {
@@ -104,12 +116,20 @@ int main(int argc, char** argv) {
                 if (s.pendingEncounter()) fight(s);
             }
             if (s.won() || s.lost() || s.army().empty()) break;
+            if (!std::getenv("NO_BUILD")) buildAll(s);
             s.endDay();
             if (s.pendingEncounter()) fight(s);              // ambush
             if (verbose)
                 for (const auto& l : s.scenario().drainLines()) std::cout << "  d" << s.day() << " [" << l.speaker << "] " << l.text << "\n";
             else s.scenario().drainLines();
         }
+        if (std::getenv("SHOW_BUILDS"))
+            for (const auto& obj : s.map().objects())
+                if (obj.type == ObjType::Town && s.town(obj.pos) && s.owner(obj.pos) == 1) {
+                    std::cout << "  " << obj.name << ":";
+                    for (const auto& id : s.town(obj.pos)->buildings) std::cout << " " << id;
+                    std::cout << "\n";
+                }
         std::string result = s.won() ? "WON" : s.lost() ? "SEALED" : s.army().empty() ? "ARMY LOST" : "TIMEOUT";
         std::cout << "seed " << seed << ": " << result << " on day " << s.day()
                   << "  (Ushari L" << (s.specials().empty() ? 0 : s.specials()[0].level) << ", army power "
