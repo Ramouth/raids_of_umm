@@ -99,8 +99,15 @@ std::vector<HexCoord> CombatEngine::attackableTiles() const {
     return result;
 }
 
-namespace {
-bool shootsNow(const CombatUnit& u) { return u.type->isRanged() && u.shotsLeft > 0; }
+bool CombatEngine::isEngaged(const CombatUnit& u) const {
+    const auto& foes = u.isPlayer ? m_enemy.stacks : m_player.stacks;
+    for (const auto& f : foes)
+        if (!f.isDead() && f.pos.distanceTo(u.pos) == 1) return true;
+    return false;
+}
+
+bool CombatEngine::canShoot(const CombatUnit& u) const {
+    return u.type->isRanged() && u.shotsLeft > 0 && !isEngaged(u);
 }
 
 std::vector<HexCoord> CombatEngine::attackHexesFor(int targetIndex) const {
@@ -112,7 +119,7 @@ std::vector<HexCoord> CombatEngine::attackHexesFor(int targetIndex) const {
     const CombatUnit& target = enemies[targetIndex];
     if (target.isDead()) return out;
     if (actor.pos.distanceTo(target.pos) == 1) out.push_back(actor.pos);
-    if (shootsNow(actor)) return out;
+    if (canShoot(actor)) return out;
     for (const HexCoord& h : reachableTiles())
         if (h.distanceTo(target.pos) == 1) out.push_back(h);
     return out;
@@ -124,7 +131,7 @@ bool CombatEngine::canAttackFrom(HexCoord from, int targetIndex) const {
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
     if (enemies[targetIndex].isDead()) return false;
-    if (from == actor.pos && shootsNow(actor)) return true;
+    if (from == actor.pos && canShoot(actor)) return true;
     for (const HexCoord& h : attackHexesFor(targetIndex))
         if (h == from) return true;
     return false;
@@ -132,7 +139,7 @@ bool CombatEngine::canAttackFrom(HexCoord from, int targetIndex) const {
 
 HexCoord CombatEngine::bestAttackHex(int targetIndex) const {
     const CombatUnit& actor = activeUnit();
-    if (shootsNow(actor)) return actor.pos;
+    if (canShoot(actor)) return actor.pos;
     const auto hexes = attackHexesFor(targetIndex);
     if (hexes.empty()) return actor.pos;
     if (hexes.front() == actor.pos) return actor.pos;   // already adjacent: stay
@@ -275,8 +282,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
     if (target.isDead()) return;
 
     // Determine if ranged: unit has shots, has ammo, and target is not adjacent
-    bool isRanged = attacker.type->isRanged()
-                    && attacker.shotsLeft > 0
+    bool isRanged = canShoot(attacker)
                     && attacker.pos.distanceTo(target.pos) > 1;
     if (isRanged) {
         --attacker.shotsLeft;
@@ -439,7 +445,7 @@ bool CombatEngine::canAttack(int targetIndex) const {
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
     if (enemies[targetIndex].isDead()) return false;
-    if (shootsNow(actor)) return true;
+    if (canShoot(actor)) return true;
     return !attackHexesFor(targetIndex).empty();
 }
 
@@ -474,7 +480,10 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
     };
 
     p.valid  = true;
-    p.ranged = actor.type->isRanged() && actor.shotsLeft > 0
+    // Engaged at `from`? (the previewed actor already stands there)
+    bool engaged = false;
+    for (const auto& f : enemies) engaged |= !f.isDead() && f.pos.distanceTo(from) == 1;
+    p.ranged = actor.type->isRanged() && actor.shotsLeft > 0 && !engaged
                && actor.pos.distanceTo(target.pos) > 1;
     p.pinned = !p.ranged && isFlanked(target, friends);
     p.damage = damageRange(actor, target, p.pinned);
@@ -714,6 +723,14 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                       : m_enemy.stacks[slot.stackIndex];
     const HexCoord from = actor.pos;
+    // Who may react is judged before the mover arrives (it may end up adjacent).
+    auto& shooters = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+    std::vector<int> ready;
+    for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
+        const CombatUnit& s = shooters[i];
+        if (!s.isDead() && hasReadiedShot(s) && canShoot(s) && !s.hasReacted
+            && s.pos.distanceTo(to) < s.pos.distanceTo(from)) ready.push_back(i);
+    }
     CombatEvent ev;
     ev.type       = CombatEvent::Type::UnitMoved;
     ev.isPlayer   = slot.isPlayer;
@@ -725,11 +742,9 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     actor.pos = to;
     refreshAuras();
 
-    auto& shooters = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
-    for (int i = 0; i < static_cast<int>(shooters.size()) && !actor.isDead(); ++i) {
+    for (int i : ready) {
+        if (actor.isDead()) break;
         CombatUnit& s = shooters[i];
-        if (s.isDead() || !shootsNow(s) || s.hasReacted) continue;
-        if (s.pos.distanceTo(to) >= s.pos.distanceTo(from)) continue;   // not closing in
         const bool blocked = !hasLineOfSight(s.pos, to);
         --s.shotsLeft;
         s.hasReacted = true;
@@ -756,7 +771,7 @@ std::vector<CombatEngine::ReactionPreview> CombatEngine::reactionsTo(HexCoord to
     const auto& shooters = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
         const CombatUnit& s = shooters[i];
-        if (s.isDead() || !shootsNow(s) || s.hasReacted) continue;
+        if (s.isDead() || !hasReadiedShot(s) || !canShoot(s) || s.hasReacted) continue;
         if (s.pos.distanceTo(to) >= s.pos.distanceTo(actor.pos)) continue;
         CombatUnit moved = actor;
         moved.pos = to;
@@ -825,7 +840,7 @@ std::vector<int> CombatEngine::threatsTo(bool isPlayer, int index) const {
         const CombatUnit& f = foes[i];
         if (f.isDead()) continue;
         // A shooter counts only with a clear line: a blocked shot is half a threat.
-        bool reaches = (shootsNow(f) && hasLineOfSight(f.pos, at)) || f.pos.distanceTo(at) == 1;
+        bool reaches = (canShoot(f) && hasLineOfSight(f.pos, at)) || f.pos.distanceTo(at) == 1;
         if (!reaches)
             for (const HexCoord& h : reachableFor(f))
                 if (h.distanceTo(at) == 1) { reaches = true; break; }

@@ -267,7 +267,7 @@ func _run() -> void:
     # Reaction fire: walking toward their archers draws a volley, and says so first.
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "armoured_warrior", "count": 12}]
-    scene.encounter.guards = [{"id": "brigand", "count": 12}]
+    scene.encounter.guards = [{"id": "brigand", "count": 12, "readied_shot": true}]   # veterans with a readied shot
     scene.encounter.seed = 5
     scene.state.battle_companions = []
     check(scene.enter_dungeon(), "Reaction-fire fixture starts")

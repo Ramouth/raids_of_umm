@@ -1023,6 +1023,7 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         stack["attack_bonus"] = int(bonus.get("attack", 0))
         stack["defense_bonus"] = int(bonus.get("defense", 0))
         stack["speed_bonus"] = int(bonus.get("speed", 0))
+        stack["readied_shot"] = bool(bonus.get("readied_shot", false))   # Marksmen's Tower
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})

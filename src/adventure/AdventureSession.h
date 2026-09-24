@@ -34,7 +34,7 @@
  */
 // Bonuses every troop stack of the hero's army fights with (commander's
 // items, town buildings such as the Drill Yard).
-struct ArmyBonus { int attack = 0, defense = 0, speed = 0; };
+struct ArmyBonus { int attack = 0, defense = 0, speed = 0; bool readiedShot = false; };
 
 class AdventureSession {
 public:

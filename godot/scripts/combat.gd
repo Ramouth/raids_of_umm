@@ -183,7 +183,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
-    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
+    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
     _consume(reply)
     return true
 
@@ -414,7 +414,11 @@ func _inspect(unit: Dictionary) -> void:
         lines.append("Health  %d / %d on the top creature  ·  %d total" % [unit.get("hp_left", unit.unit_hp), unit.unit_hp, unit.hp])
     lines.append("Attack %d  ·  Defence %d  ·  Damage %d–%d each" % [unit.attack, unit.defense, unit.get("min_damage", 0), unit.get("max_damage", 0)])
     lines.append("Speed %d  ·  Moves %d hexes" % [unit.speed, unit.get("move", 0)])
-    if unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting" % [unit.shots, unit.get("shots_max", unit.shots)])
+    if unit.ranged and unit.get("engaged", false):
+        lines.append("[color=#%s]ENGAGED: an enemy is next to it — it cannot shoot, only fight hand to hand[/color]" % FOE.to_html(false))
+    elif unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting" % [unit.shots, unit.get("shots_max", unit.shots)])
+    if unit.get("readied_shot", false) and int(unit.get("shots", 0)) > 0:
+        lines.append("[color=#%s]Readied shot: fires once a round at an enemy moving closer[/color]" % GOLD.to_html(false))
     else: lines.append("Melee  ·  attacks adjacent stacks only")
     if int(unit.get("aura_radius", 0)) > 0:
         lines.append("[color=#%s]Aura: stacks within %d hex get +%d defence while %s stands[/color]" % [GOLD.to_html(false), int(unit.aura_radius), int(unit.aura_defense), unit.name])
@@ -629,7 +633,7 @@ func _update_status() -> void:
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
     elif _hover_cell.is_empty():
-        var how := "shoot" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "strike"
+        var how := "shoot" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 and not active.get("engaged", false) else "strike"
         text = "%s: click enemy = %s · green hex = move · [b]Ctrl+click green = waypoint[/b] · D = defend" % [_unit_name(state.active), how]
         if not waypoints.is_empty():
             text = "Route: %d waypoint%s · click green hex or enemy to go · Esc clears" % [waypoints.size(), "" if waypoints.size() == 1 else "s"]

@@ -80,6 +80,7 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
         s.attackBonus  = attackerBonus.attack;
         s.defenseBonus = attackerBonus.defense;
         s.speedBonus   = attackerBonus.speed;
+        s.readiedShot  = attackerBonus.readiedShot;
     }
     if (!a.stacks.empty())
         for (const auto& c : companions)

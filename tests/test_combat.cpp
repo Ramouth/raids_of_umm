@@ -1762,8 +1762,8 @@ SUITE("CombatAI — second attacker takes the flanking hex") {
 }
 
 SUITE("CombatAI — shooter fires instead of walking, even with a foe adjacent") {
-    // An archer with a melee stack glued to it still has a clean shot at a
-    // distant stack (no retaliation).  It must never walk or defend.
+    // An archer with a melee stack glued to it is engaged (HoMM3): it cannot
+    // shoot the distant stack, and fights the one next to it hand to hand.
     const UnitType* archer = aiType("Archer", 6, 4, 10, 5, 5, 3, 12);
     const UnitType* grunt  = aiType("Grunt", 3, 2, 10, 5, 5);
     int shots = 0;
@@ -1781,7 +1781,9 @@ SUITE("CombatAI — shooter fires instead of walking, even with a foe adjacent")
         HexCoord before = at;
         CombatAI::takeTurn(eng);
         const auto& a = eng.playerArmy().stacks[0];
-        if (a.pos == before && a.shotsLeft == 11) ++shots;
+        CHECK(!eng.canShoot(a) || a.pos != before);
+        if (a.shotsLeft == 12 && eng.enemyArmy().stacks[0].totalHp() < 60
+            && eng.enemyArmy().stacks[1].totalHp() == 60) ++shots;   // struck the adjacent grunts, no arrow spent
     }
     CHECK_EQ(shots, runs);
 }
@@ -2369,6 +2371,7 @@ static CombatEngine reactionDuel(int meleeCount, int archers, HexCoord meleeAt, 
     p.stacks.push_back(CombatUnit::make(melee, meleeCount, true));
     CombatArmy e; e.isPlayer = false;
     e.stacks.push_back(CombatUnit::make(archer, archers, false));
+    e.stacks.back().readiedShot = true;              // an advanced ability (Marksmen's Tower)
     CombatEngine eng(std::move(p), std::move(e));
     eng.setSeed(3);
     eng.teleportUnit(true, 0, meleeAt);
@@ -2439,6 +2442,7 @@ SUITE("Reaction fire — the AI will not walk a fragile stack into a lethal voll
         p.stacks.push_back(CombatUnit::make(melee, 2, true));
         CombatArmy e; e.isPlayer = false;
         e.stacks.push_back(CombatUnit::make(archer, 30, false));
+        e.stacks.back().readiedShot = true;
         e.stacks.push_back(CombatUnit::make(dummy, 5, false));
         CombatEngine eng(std::move(p), std::move(e));
         eng.setSeed(seed);
@@ -2464,6 +2468,57 @@ SUITE("Reaction fire — the AI still closes in when every approach draws fire")
         if (eng.playerArmy().stacks[0].pos.distanceTo(CombatMap::toHex(1, 2)) < before) ++advanced;
     }
     CHECK(advanced >= 8);
+}
+
+
+// ── Engaged shooters and the readied shot as an ability ─────────────────────────
+
+SUITE("Engaged shooters — an enemy next to an archer stops its shots") {
+    const UnitType* archer = aiType("Archer", 6, 4, 10, 5, 5, 3, 12);
+    const UnitType* grunt  = aiType("Grunt", 3, 2, 10, 5, 5);
+    CombatEngine eng = duelAt(archer, grunt, 10, 6, CombatMap::toHex(2, 2), CombatMap::toHex(8, 2));
+    CHECK(eng.canShoot(eng.playerArmy().stacks[0]));
+    eng.teleportUnit(false, 0, CombatMap::toHex(2, 2).neighbor(0));
+    const auto& a = eng.playerArmy().stacks[0];
+    CHECK(eng.isEngaged(a) && !eng.canShoot(a));
+    CHECK(!eng.previewAttack(0).ranged);                    // what it can do is a melee strike
+}
+
+SUITE("Readied shot — plain archers do not react; readied ones do") {
+    const UnitType* melee = aiType("Charger", 9, 3, 10, 5, 5, 4);
+    const UnitType* archer = aiType("Bowman", 1, 5, 10, 5, 5, 3, 12);
+    for (bool readied : {false, true}) {
+        CombatArmy p; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(melee, 10, true));
+        CombatArmy e; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(archer, 2, false));
+        e.stacks.back().readiedShot = readied;
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.teleportUnit(true, 0, CombatMap::toHex(2, 2));
+        eng.teleportUnit(false, 0, CombatMap::toHex(8, 2));
+        const HexCoord closer = CombatMap::toHex(2, 2).neighbor(0).neighbor(0);
+        CHECK_EQ((int)eng.reactionsTo(closer).size(), readied ? 1 : 0);
+        eng.doMove(closer);
+        CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), readied ? 90 : 100);
+    }
+}
+
+SUITE("Readied shot — fires at the charger that ends up next to it, before the strike") {
+    const UnitType* melee = aiType("Charger", 9, 3, 10, 5, 5, 4);
+    const UnitType* archer = aiType("Bowman", 1, 5, 100, 5, 5, 3, 12);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(melee, 10, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(archer, 2, false));
+    e.stacks.back().readiedShot = true;
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord bow = CombatMap::toHex(6, 2);
+    eng.teleportUnit(false, 0, bow);
+    eng.teleportUnit(true, 0, bow.neighbor(3).neighbor(3).neighbor(3));
+    eng.doAttack(0);                                         // walk up next to it and strike
+    CHECK(eng.enemyArmy().stacks[0].hasReacted);             // the shot came first
+    CHECK(eng.playerArmy().stacks[0].totalHp() < 100);
+    CHECK(!eng.canShoot(eng.enemyArmy().stacks[0]));         // and now it is engaged
 }
 
 #endif // COMBAT_ENGINE_IMPL

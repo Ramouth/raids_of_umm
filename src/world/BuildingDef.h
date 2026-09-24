@@ -24,6 +24,7 @@ struct BuildingDef {
     std::string              unlocks;
     bool                     market      = false;
     int                      attackBonus = 0;
+    bool                     readiedShot = false;   // your shooters fire at enemies moving closer
     bool                     starting    = false;   // every town of the faction begins with it
 };
 

@@ -157,3 +157,14 @@ SUITE("Town buildings — each town is itself: own starting set, own daily build
     CHECK_NEAR(s.growthBonus(varen), 0.0, 1e-9);
     CHECK_NEAR(s.growthBonus(hale), 0.5, 1e-9);
 }
+
+SUITE("Town buildings — the Marksmen's Tower gives the army the readied shot") {
+    auto s = townSession();
+    rich(s);
+    CHECK(!s.armyBonus().readiedShot);
+    CHECK(s.buildBlocker(HOME, "marksmens_tower").find("Needs") == 0);   // needs a Citadel
+    CHECK(!s.build(HOME, "citadel"));
+    s.endDay();
+    CHECK(!s.build(HOME, "marksmens_tower"));
+    CHECK(s.armyBonus().readiedShot);
+}

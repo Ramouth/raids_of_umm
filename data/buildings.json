@@ -205,6 +205,21 @@
         "armoury"
       ],
       "attackBonus": 1
+    },
+    {
+      "id": "marksmens_tower",
+      "faction": "ivory_compact",
+      "name": "Marksmen's Tower",
+      "description": "Archers drill the readied shot: while you hold this town, your shooters fire once a round at any enemy that moves closer, before it strikes.",
+      "cost": {
+        "Gold": 2000,
+        "Wood": 5
+      },
+      "requires": [
+        "archery_butts",
+        "citadel"
+      ],
+      "readiedShot": true
     }
   ],
   "towns": {

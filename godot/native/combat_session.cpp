@@ -48,6 +48,7 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
         army.stacks.back().attackBonus  = std::clamp(entry.value("attack_bonus", 0), -20, 20);
         army.stacks.back().defenseBonus = std::clamp(entry.value("defense_bonus", 0), -20, 20);
         army.stacks.back().speedBonus   = std::clamp(entry.value("speed_bonus", 0), -5, 5);
+        army.stacks.back().readiedShot  = entry.value("readied_shot", false);
     }
     if (troops == 0) throw std::runtime_error("An army must contain between one and five stacks.");
     return army;
@@ -172,6 +173,8 @@ Json CombatSession::snapshot() const {
                 }()},
                 {"hp_left", unit.hpLeft}, {"shots", unit.shotsLeft}, {"shots_max", unit.type->shots},
                 {"ranged", unit.type->isRanged()},
+                {"engaged", unit.type->isRanged() && !unit.isDead() && engine_->isEngaged(unit)},
+                {"readied_shot", CombatEngine::hasReadiedShot(unit)},
                 {"attack", unit.effectiveAttack()}, {"defense", unit.effectiveDefense()},
                 {"min_damage", unit.type->minDamage + unit.damageBonus},
                 {"max_damage", unit.type->maxDamage + unit.damageBonus},

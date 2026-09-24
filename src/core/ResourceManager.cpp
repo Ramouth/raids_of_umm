@@ -266,6 +266,7 @@ std::optional<std::string> ResourceManager::loadBuildings(const std::string& pat
         b.unlocks     = j.value("unlocks", "");
         b.market      = j.value("market", false);
         b.attackBonus = j.value("attackBonus", 0);
+        b.readiedShot = j.value("readiedShot", false);
         b.starting    = j.value("starting", false);
         if (b.id.empty()) continue;
         for (const auto& other : m_buildings)

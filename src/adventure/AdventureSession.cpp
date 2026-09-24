@@ -728,7 +728,10 @@ AdventureSession::ArmyBonus AdventureSession::armyBonus() const {
     for (const auto& [c, t] : m_towns) {
         if (owner(c) != Faction::Player) continue;
         for (const auto& id : t.buildings)
-            if (const BuildingDef* b = m_resources->building(id)) out.attack = std::max(out.attack, b->attackBonus);
+            if (const BuildingDef* b = m_resources->building(id)) {
+                out.attack = std::max(out.attack, b->attackBonus);
+                out.readiedShot |= b->readiedShot;
+            }
     }
     for (const auto& [slot, id] : m_equipped)
         if (const WondrousItem* item = m_resources->item(id))

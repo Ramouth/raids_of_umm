@@ -92,7 +92,7 @@ Json AdventureBridge::snapshot() const {
         building_defs.push_back({{"id", b->id}, {"name", b->name}, {"description", b->description},
                                  {"cost", pool(b->cost)}, {"requires", b->requires}, {"unlocks", b->unlocks},
                                  {"income", b->income}, {"growth", b->growth}, {"market", b->market},
-                                 {"attack_bonus", b->attackBonus}});
+                                 {"attack_bonus", b->attackBonus}, {"readied_shot", b->readiedShot}});
     Json quests = Json::array();
     for (const auto& q : session_.scenario().quests())
         quests.push_back({{"id", q.id}, {"title", q.title}, {"text", q.text},
@@ -198,7 +198,7 @@ Json AdventureBridge::snapshot() const {
         {"market", session_.hasMarket()},
         {"army_bonus", [&] {
             auto b = session_.armyBonus();
-            return Json{{"attack", b.attack}, {"defense", b.defense}, {"speed", b.speed}};
+            return Json{{"attack", b.attack}, {"defense", b.defense}, {"speed", b.speed}, {"readied_shot", b.readiedShot}};
         }()},
         {"equipped", [&] {
             Json slots = Json::object();

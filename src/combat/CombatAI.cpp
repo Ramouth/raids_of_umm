@@ -281,7 +281,7 @@ void prepare(Ctx& c) {
     for (int i = 0; i < (int)c.foes.size(); ++i)
         if (c.foes[i].isSpecialCharacter) c.foeThreat[i] *= kCompanionValue;
     if (c.actor.isSpecialCharacter) c.ownThreat *= kCompanionValue;
-    c.shooter = c.actor.type->isRanged() && c.actor.shotsLeft > 0;
+    c.shooter = c.eng.canShoot(c.actor);   // an engaged shooter fights like melee
 
     // Claims: which foe is each ally (melee) currently going for?
     c.claims.assign(c.foes.size(), 0);

@@ -135,15 +135,23 @@ public:
     // Creatures that `damage` would kill in `target` (cascading through the stack).
     static int killsFor(const CombatUnit& target, int damage);
 
-    // ── Reaction fire ────────────────────────────────────────────────────────
-    // When a stack ends a move closer to an enemy shooter (ammo left, no
-    // reaction yet this round), that shooter fires once at it before
-    // anything else happens — before a walk-and-strike lands.  Damage is
-    // kReactionFactor × a normal shot (line of sight still applies).
+    // ── Readied shot (reaction fire) ─────────────────────────────────────────
+    // An advanced ability, not every archer's: a shooter with readiedShot (or
+    // the "readied_shot" ability) fires once per round at an enemy stack that
+    // ends a move closer to it — before a walk-and-strike lands.  It must have
+    // ammo and not already be engaged by someone else; line of sight applies.
     static constexpr double kReactionFactor = 1.0;
     struct ReactionPreview { int shooter = -1; DamageRange damage; bool blocked = false; };
     // Shots the active stack would draw by walking from its hex to `to`.
     std::vector<ReactionPreview> reactionsTo(HexCoord to) const;
+    static bool hasReadiedShot(const CombatUnit& u) { return u.readiedShot || u.type->hasAbility("readied_shot"); }
+
+    // ── Engaged shooters (HoMM3) ─────────────────────────────────────────────
+    // A shooter with a living enemy next to it cannot shoot: it must deal
+    // with that enemy in melee first (and fires no reaction shots).
+    bool isEngaged(const CombatUnit& u) const;
+    // Has ammo and is not engaged.
+    bool canShoot(const CombatUnit& u) const;
 
     // ── Line of sight ────────────────────────────────────────────────────────
     // A shot needs a clear line: any living stack (friend or foe) on a hex
