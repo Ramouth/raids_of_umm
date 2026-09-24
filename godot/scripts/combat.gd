@@ -642,7 +642,11 @@ func _update_status() -> void:
             var verb := "Shoot" if preview.ranged else ("Walk up and attack" if not preview.get("path", []).is_empty() else "Attack")
             text = "[b]%s %s[/b]: %s damage, kills %s of %d" % [verb, _unit_label(unit.key), damage, kills, unit.count]
             label = "%s dmg · %s slain" % [damage, kills]
-            if preview.pinned: text += " · [color=#%s]PINNED: +50%%, no retaliation[/color]" % GOLD.to_html(false)
+            if preview.pinned:
+                text += " · [color=#%s]PINNED: +50%%, no retaliation[/color]" % GOLD.to_html(false)
+                label = "PINNED +50%  ·  " + label
+            elif not preview.ranged and _pin_spots().size() > 0:
+                text += " · [color=#%s]orange-marked sides would PIN it (+50%%)[/color]" % GOLD.to_html(false)
             if preview.get("guarded", false):
                 text += " · [color=#%s]a bodyguard takes %s of the blow[/color]" % [GOLD.to_html(false), _range_text(int(preview.guard_min), int(preview.guard_max))]
                 label += " · shielded"
@@ -678,11 +682,28 @@ func _update_status() -> void:
     board.stand_cell = _stand.from if walking and not _stand.path.is_empty() else []
     board.walk_path = _stand.path if walking else []
     board.move_path = _route_to(_hover_cell) if my_turn and kind == "move" else []
+    board.pin_spots = _pin_spots() if my_turn and kind == "attack" else []
+    board.pin_stand = []
+    board.pin_ally = []
+    if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("pinned", false):
+        # The ally on the far side: the hex mirrored through the target.
+        var mirror := [2 * int(_hover_cell[0]) - int(_stand.from[0]), 2 * int(_hover_cell[1]) - int(_stand.from[1])]
+        var ally := _unit_at(mirror)
+        if not ally.is_empty() and ally.player:
+            board.pin_stand = _stand.from
+            board.pin_ally = mirror
     board.shot_line = []
     if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("ranged", false):
         board.shot_line = [active.cell, _hover_cell]
         board.shot_blocked = _stand.get("blocked", false)
     board.set_hover(kind if my_turn else "", label if my_turn else "")
+
+## Standing hexes (of those legal for this hover) that would pin the target.
+func _pin_spots() -> Array:
+    var out := []
+    for option in _hover_options():
+        if option.get("pinned", false): out.append(option.from)
+    return out
 
 func _stand_matches(preview: Dictionary) -> bool:
     for option in preview.get("options", []):

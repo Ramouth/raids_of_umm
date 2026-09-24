@@ -13,6 +13,7 @@ const PLAYER_COLOR := Color("789b88")
 const ENEMY_COLOR := Color("bc7660")
 const COMPANION_COLOR := Color("f7d580")
 const DANGER_COLOR := Color("ff5a3c")
+const PIN_COLOR := Color("ffb347")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
@@ -40,7 +41,14 @@ var waypoints: Array = []
 var route_reach: Array = []
 ## Route drawn for a plain move hover (cells after the start).
 var move_path: Array = []
+## Flanking: standing hexes that would pin the hovered enemy, and (when the
+## chosen side pins) the stand + the ally opposite, drawn as a pincer.
+var pin_spots: Array = []
+var pin_stand: Array = []
+var pin_ally: Array = []
 var _forecast: Label
+## Drawn above the unit sprites (the pincer must not hide behind them).
+var _overlay: Node2D
 
 static func unit_texture(id: String) -> Texture2D:
     var filename: String = ART.get(id, id)
@@ -59,6 +67,10 @@ static func hex_points(center: Vector2) -> PackedVector2Array:
     return points
 
 func _ready() -> void:
+    _overlay = Node2D.new()
+    _overlay.z_index = 15
+    _overlay.draw.connect(_draw_pincer)
+    add_child(_overlay)
     mouse_default_cursor_shape = Control.CURSOR_ARROW
     gui_input.connect(_clicked)
     mouse_exited.connect(func():
@@ -121,6 +133,9 @@ func _draw() -> void:
         points.append(points[0])
         var outline: Color = {"attack": Color("ff9d7a"), "move": Color("c9f0d2"), "blocked": Color("8a7a66")}.get(hover_kind, Color("e8d8b3"))
         draw_polyline(points, outline, 3.0 if hover_kind == "attack" else 2.0, true)
+    if hover_kind == "attack":
+        _draw_pins()
+    if _overlay: _overlay.queue_redraw()
     if hover_kind == "attack" and not stand_cell.is_empty():
         _draw_walk()
     if hover_kind == "move" and not move_path.is_empty():
@@ -197,6 +212,28 @@ func _draw_waypoints() -> void:
         draw_circle(at, 11.0, COMPANION_COLOR)
         draw_string(font, at + Vector2(-5, 6), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("16100a"))
 
+## Orange markers on every side that would pin the hovered enemy.
+func _draw_pins() -> void:
+    for cell in pin_spots:
+        var centre := cell_point(cell)
+        var points := PackedVector2Array()
+        for p in hex_points(centre): points.append(centre + (p - centre) * 0.72)
+        points.append(points[0])
+        draw_polyline(points, Color(PIN_COLOR, 0.95), 2.5, true)
+
+## Pincer over the sprites: two arrows closing on the target from opposite sides.
+func _draw_pincer() -> void:
+    if hover_kind != "attack" or pin_stand.is_empty() or pin_ally.is_empty() or hover_cell.is_empty(): return
+    var t := cell_point(hover_cell) + Vector2(0, -20)
+    for end in [pin_stand, pin_ally]:
+        var from: Vector2 = cell_point(end) + Vector2(0, -20)
+        var dir := (t - from).normalized()
+        var tip := t - dir * 22.0
+        _overlay.draw_line(from + dir * 14.0, tip, Color("16100a"), 7.0, true)
+        _overlay.draw_line(from + dir * 14.0, tip, PIN_COLOR, 4.0, true)
+        var head := PackedVector2Array([tip + dir * 12, tip + dir.orthogonal() * 9, tip - dir.orthogonal() * 9])
+        _overlay.draw_colored_polygon(head, PIN_COLOR)
+
 ## Line of fire from the active shooter: gold if clear, red and dashed if a stack is in the way.
 func _draw_shot() -> void:
     var a := cell_point(shot_line[0]) + Vector2(0, -24)
@@ -247,10 +284,21 @@ func _place_forecast() -> void:
     _forecast.text = hover_label
     _forecast.size = Vector2.ZERO
     var box := _forecast.get_combined_minimum_size()
-    var at := cell_point(hover_cell) + Vector2(-box.x / 2, -84)
-    # Keep the standing hex visible: if it lies above the target, show the box below.
-    if not stand_cell.is_empty() and cell_point(stand_cell).y < cell_point(hover_cell).y - 10:
-        at.y = cell_point(hover_cell).y + 46
+    # Above, below, right or left of the target: the first spot that covers
+    # neither the standing hex nor a pinning ally (and fits on the board).
+    var t := cell_point(hover_cell)
+    var avoid: Array = []
+    for cell in [stand_cell, pin_stand, pin_ally]:
+        if not cell.is_empty(): avoid.append(cell_point(cell))
+    var spots := [t + Vector2(-box.x / 2, -84), t + Vector2(-box.x / 2, 46),
+                  t + Vector2(44, -box.y / 2 - 20), t + Vector2(-44 - box.x, -box.y / 2 - 20)]
+    var at: Vector2 = spots[0]
+    for spot in spots:
+        var rect := Rect2(spot, box).grow(18)
+        var fits: bool = spot.x >= 0 and spot.y >= 0 and spot.x + box.x <= size.x and spot.y + box.y <= size.y
+        if fits and not avoid.any(func(p: Vector2): return rect.has_point(p)):
+            at = spot
+            break
     _forecast.position = Vector2(clampf(at.x, 2, size.x - box.x - 2), clampf(at.y, 2, size.y - box.y - 2))
 
 func _add_shadow(actor: Node2D, team_color: Color) -> void:

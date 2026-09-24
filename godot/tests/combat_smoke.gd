@@ -177,6 +177,10 @@ func _run() -> void:
         var toward: Vector2 = (battle.board.cell_point(walking.from) - centre).normalized()
         battle._pointer_moved(centre + toward * 20.0)
         check(battle.board.stand_cell == walking.from and battle.board.walk_path == walking.path, "Standing hex and walk path are highlighted")
+        var pinning: Array = []
+        for option in walk_target.options:
+            if option.pinned: pinning.append(option.from)
+        check(battle.board.pin_spots == pinning, "Every side that would pin the target is marked")
         check("attack" in battle.status.get_parsed_text() and "damage, kills" in battle.status.get_parsed_text(), "Forecast is shown for the chosen side")
         if capture: await _capture("combat_hover_strike")
         var mover: String = battle.state.active
@@ -200,6 +204,44 @@ func _run() -> void:
     battle.return_button.pressed.emit()
     await process_frame
     print("Combat integration: move-and-attack side choice PASS")
+
+    # Flanking: once a pin is on offer, the board marks it and draws the pincer.
+    scene.cleared_dungeons.clear()
+    scene.army = [{"id": "rider_knight", "count": 5}, {"id": "armoured_warrior", "count": 6}, {"id": "levy_spearman", "count": 30}]
+    scene.encounter.guards = [{"id": "ancient_treant", "count": 2}]
+    scene.state.battle_companions = []
+    check(scene.enter_dungeon(), "Flanking fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var pin_option := {}
+    var pin_target := {}
+    for turn in range(16):
+        if battle.state.result != "ongoing": break
+        for preview in battle.state.previews:
+            for option in preview.options:
+                if option.pinned:
+                    pin_option = option
+                    pin_target = preview
+        if not pin_option.is_empty(): break
+        battle.issue("ai")   # let the AI position our stacks until a pin is possible
+        await _idle(battle)
+    check(not pin_option.is_empty(), "A pinning side comes up during the fight")
+    if not pin_option.is_empty():
+        var centre: Vector2 = battle.board.cell_point(pin_target.cell)
+        battle._cell_hovered(Vector2i(pin_target.cell[0], pin_target.cell[1]), true)
+        battle._pointer_moved(centre + (battle.board.cell_point(pin_option.from) - centre).normalized() * 20.0)
+        check(battle.board.pin_spots.has(pin_option.from), "The pinning side is marked")
+        check(not battle.board.pin_ally.is_empty(), "The pincer line reaches the ally on the far side")
+        check(battle.board.hover_label.begins_with("PINNED"), "The forecast box says PINNED")
+        if capture: await _capture("combat_pin")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    battle.return_button.pressed.emit()
+    await process_frame
+    print("Combat integration: flanking visuals PASS")
 
     # Waypoints: Shift+click sets a route; the stack walks it exactly.
     scene.cleared_dungeons.clear()
