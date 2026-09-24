@@ -62,7 +62,7 @@ double AdventureSession::power(const std::vector<Stack>& army) const {
 AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stack>& attacker,
                                                           const std::vector<Stack>& defender,
                                                           const std::vector<Companion>& companions,
-                                                          int attackerBonus) const {
+                                                          ArmyBonus attackerBonus) const {
     auto build = [&](const std::vector<Stack>& stacks, bool player) {
         CombatArmy army;
         army.isPlayer = player;
@@ -76,7 +76,11 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
     };
     AutoResult out;
     CombatArmy a = build(attacker, true);
-    for (auto& s : a.stacks) s.attackBonus = attackerBonus;
+    for (auto& s : a.stacks) {
+        s.attackBonus  = attackerBonus.attack;
+        s.defenseBonus = attackerBonus.defense;
+        s.speedBonus   = attackerBonus.speed;
+    }
     if (!a.stacks.empty())
         for (const auto& c : companions)
             if (const UnitType* u = m_resources->unit(c.id))

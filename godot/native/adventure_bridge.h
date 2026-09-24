@@ -16,7 +16,9 @@ public:
     Json end_day();
     Json resolve_encounter(bool victory);
     Json set_army(const Json& stacks);
-    Json build(int q, int r, const std::string& id);                              // one per town per day
+    Json build(int q, int r, const std::string& id);
+    Json equip(const std::string& id);       // commander's paper doll
+    Json unequip(const std::string& slot);                              // one per town per day
     Json trade(const std::string& give, const std::string& get, int amount);     // marketplace
     Json trade_quote(const std::string& give, const std::string& get, int amount) const;
     // Companions who fell in the last battle: wounded, or gone if it was lost.

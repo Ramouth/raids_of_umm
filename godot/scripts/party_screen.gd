@@ -1,5 +1,6 @@
 extends Control
-## Party (P): special characters, their level, XP, stage abilities and upkeep.
+## Companions (P): each companion's level and XP, battle stats at that level,
+## aura, map abilities, upkeep and status (travelling, governing, wounded, unpaid).
 ## In an owned town a companion can be left to govern (+100 gold per level a
 ## day, no XP) or recalled.
 
@@ -81,6 +82,14 @@ func _card(sc: Dictionary) -> Control:
     elif int(sc.unpaid) > 0: status += "  ·  unpaid %d day(s)" % int(sc.unpaid)
     column.add_child(_label("%s  ·  %s" % [sc.name, sc.title], 18, Color("f0c870")))
     column.add_child(_label("Level %d   ·   XP %d / %d   ·   Upkeep %d gold a day   ·   %s" % [sc.level, sc.xp, sc.next, sc.upkeep, status], 13, Color("c8b08a")))
+    var bar := ProgressBar.new()
+    bar.max_value = maxi(1, int(sc.next))
+    bar.value = int(sc.xp)
+    bar.show_percentage = false
+    bar.custom_minimum_size = Vector2(700, 8)
+    column.add_child(bar)
+    var battle := _battle_line(sc)
+    if not battle.is_empty(): column.add_child(_label(battle, 14, Color("9fd4b4")))
     for ability in sc.abilities:
         var mark := "✓" if ability.unlocked else "Lv %d" % int(ability.level)
         var line := _label("%s  %s — %s" % [mark, ability.name, ability.text], 14, Color("e8d8b8") if ability.unlocked else Color("7c7060"))
@@ -100,6 +109,21 @@ func _card(sc: Dictionary) -> Control:
         recall.pressed.connect(func(): _station(str(sc.id), false))
         actions.add_child(recall)
     return row
+
+## "In battle: 85 health · attack 11 · defence 11 · 20–28 damage · speed 7 · aura +3 defence (1 hex)"
+func _battle_line(sc: Dictionary) -> String:
+    var unit: Dictionary = host.unit_defs.get(str(sc.id), {})
+    if unit.is_empty(): return ""
+    var n := maxi(0, int(sc.level) - 1)
+    var grow: Dictionary = unit.get("levelGrowth", {})
+    var dmg := int(grow.get("damage", 0)) * n
+    var line := "In battle: %d health · attack %d · defence %d · %d–%d damage · speed %d" % [
+        int(unit.hitPoints) + int(grow.get("hitPoints", 0)) * n, int(unit.attack) + int(grow.get("attack", 0)) * n,
+        int(unit.defense) + int(grow.get("defense", 0)) * n, int(unit.minDamage) + dmg, int(unit.maxDamage) + dmg, int(unit.speed)]
+    if int(unit.get("shots", 0)) > 0: line += " · ranged (%d shots)" % int(unit.shots)
+    var aura: Dictionary = unit.get("aura", {})
+    if int(aura.get("defense", 0)) > 0: line += " · aura +%d defence (%d hex)" % [int(aura.defense), int(aura.radius)]
+    return line
 
 func _station(id: String, stay: bool) -> void:
     var reply: Dictionary = host.station(id, stay)

@@ -41,6 +41,7 @@ func _run() -> void:
     await _root_scene()
     await _story()
     await _town_recruiting()
+    await _hero_and_companions()
     await _ridge_pass()
     await _passage_wins()
     await _defeat_ends()
@@ -113,6 +114,36 @@ func _story() -> void:
     check(scene.dialogue.is_speaking(), "The clue is delivered as dialogue")
     scene.queue_free()
     await process_frame
+
+## Hero (H): the paper doll helps the whole army; cursed items stay on.
+## Companions (P): battle stats at their level.
+func _hero_and_companions() -> void:
+    var scene := await _scene("res://content/maps/old_passage.json", [{"id": "levy_spearman", "count": 24}])
+    for id in ["greyfang_helm", "barrow_blade", "drowned_crown"]: scene._apply_state(JSON.parse_string(scene.adventure.add_item(id)))
+    check(scene.open_hero(), "The hero screen opens")
+    var sheet: Control = scene.screens.top()
+    check(sheet._pack.get_child_count() == 3, "Three items wait in the backpack")
+    check(sheet.put_on("greyfang_helm") and sheet.put_on("barrow_blade"), "The commander wears a helm and a blade")
+    check(int(scene.state.army_bonus.defense) == 2 and int(scene.state.army_bonus.attack) == 2, "Worn items help every troop stack")
+    check("+2 attack" in sheet._bonus.text, "The screen spells out the army-wide bonus")
+    check(sheet.put_on("drowned_crown"), "The cursed crown goes on")
+    check(not sheet.take_off("trinket1") and "cursed" in sheet._message.text, "The cursed crown will not come off")
+    sheet._describe("drowned_crown")
+    check("Cursed" in sheet._detail.get_parsed_text(), "The item details warn of the curse")
+    if capture: await _capture("hero_screen")
+    sheet.find_child("Done", true, false).pressed.emit()
+    await process_frame
+    check(scene.open_party(), "The companions screen opens")
+    var party: Control = scene.screens.top()
+    await process_frame
+    var shown := false
+    for label in party.find_children("*", "Label", true, false):
+        if (label as Label).text.begins_with("In battle:"): shown = true
+    check(shown, "Each companion card shows their battle stats")
+    if capture: await _capture("companions_screen")
+    party.find_child("Done", true, false).pressed.emit()
+    await process_frame
+    scene.queue_free()
 
 func _town_recruiting() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", [{"id": "levy_spearman", "count": 24}])

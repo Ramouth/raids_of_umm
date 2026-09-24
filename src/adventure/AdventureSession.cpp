@@ -723,14 +723,64 @@ bool AdventureSession::hasMarket() const {
     return false;
 }
 
-int AdventureSession::armyAttackBonus() const {
-    int best = 0;
+AdventureSession::ArmyBonus AdventureSession::armyBonus() const {
+    ArmyBonus out;
     for (const auto& [c, t] : m_towns) {
         if (owner(c) != Faction::Player) continue;
         for (const auto& id : t.buildings)
-            if (const BuildingDef* b = m_resources->building(id)) best = std::max(best, b->attackBonus);
+            if (const BuildingDef* b = m_resources->building(id)) out.attack = std::max(out.attack, b->attackBonus);
     }
-    return best;
+    for (const auto& [slot, id] : m_equipped)
+        if (const WondrousItem* item = m_resources->item(id))
+            for (const auto& e : item->passiveEffects) {
+                if (e.stat == "attack")       out.attack  += e.amount;
+                else if (e.stat == "defense") out.defense += e.amount;
+                else if (e.stat == "speed")   out.speed   += e.amount;
+            }
+    return out;
+}
+
+const std::vector<std::string>& AdventureSession::equipSlots() {
+    static const std::vector<std::string> slots = {"helm", "amulet", "armor", "weapon", "boots", "trinket1", "trinket2"};
+    return slots;
+}
+
+std::vector<std::string> AdventureSession::backpack() const {
+    std::vector<std::string> out;
+    for (const auto& id : m_items) {
+        bool worn = false;
+        for (const auto& [slot, w] : m_equipped) worn |= w == id;
+        if (!worn) out.push_back(id);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+std::optional<std::string> AdventureSession::equip(const std::string& itemId) {
+    if (!m_items.count(itemId)) return "You do not carry that.";
+    for (const auto& [slot, w] : m_equipped) if (w == itemId) return "Already worn.";
+    const WondrousItem* item = m_resources->item(itemId);
+    if (!item) return "Unknown item.";
+    std::vector<std::string> fits;
+    if (item->slot == "trinket") fits = {"trinket1", "trinket2"};
+    else fits = {item->slot};
+    for (const auto& slot : fits)
+        if (!m_equipped.count(slot)) { m_equipped[slot] = itemId; return std::nullopt; }
+    // Full: swap with the first slot, unless what is there is cursed.
+    const std::string& slot = fits.front();
+    const WondrousItem* worn = m_resources->item(m_equipped[slot]);
+    if (worn && worn->cursed) return worn->name + " is cursed and will not come off.";
+    m_equipped[slot] = itemId;
+    return std::nullopt;
+}
+
+std::optional<std::string> AdventureSession::unequip(const std::string& slot) {
+    auto it = m_equipped.find(slot);
+    if (it == m_equipped.end()) return "Nothing is worn there.";
+    const WondrousItem* worn = m_resources->item(it->second);
+    if (worn && worn->cursed) return worn->name + " is cursed and will not come off.";
+    m_equipped.erase(it);
+    return std::nullopt;
 }
 
 std::string AdventureSession::buildBlocker(const HexCoord& c, const std::string& id) const {

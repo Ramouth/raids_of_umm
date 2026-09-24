@@ -85,6 +85,7 @@ Json AdventureSession::saveState() const {
         {"encounters", encounters}, {"finds", finds},
         {"won", m_won}, {"lost", m_lost}, {"lost_reason", m_lostReason},
         {"ruled_out", ruled}, {"items", Json(std::vector<std::string>(m_items.begin(), m_items.end()))},
+        {"equipped", Json(m_equipped)},
         {"garrisons", garrisons}, {"specials", specials}, {"rivals", rivals},
         {"scenario", m_scenario.saveState()},
     };
@@ -135,6 +136,9 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         for (const auto& c : save.at("ruled_out")) m_ruledOut.insert(cellFrom(c));
         m_items.clear();
         for (const auto& id : save.at("items")) m_items.insert(id.get<std::string>());
+        m_equipped.clear();
+        if (save.contains("equipped"))
+            for (const auto& [slot, id] : save.at("equipped").items()) m_equipped[slot] = id.get<std::string>();
         m_garrisons.clear();
         for (const auto& g : save.at("garrisons")) m_garrisons[cellFrom(g.at("cell"))] = stacksFrom(g.at("army"));
         m_specials.clear();

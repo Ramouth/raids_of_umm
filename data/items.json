@@ -34,8 +34,8 @@
       "description": "A shard of volcanic glass bound to your hero's will. Each strike cuts deeper.",
       "passiveEffects": [
         {
-          "stat": "damage",
-          "amount": 3
+          "stat": "attack",
+          "amount": 2
         }
       ]
     },
@@ -103,8 +103,8 @@
       "description": "A bronze sword from a barrow king's grave. Still sharp. Still hungry.",
       "passiveEffects": [
         {
-          "stat": "damage",
-          "amount": 3
+          "stat": "attack",
+          "amount": 2
         }
       ]
     },

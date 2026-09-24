@@ -15,7 +15,8 @@ static bool fight(AdventureSession& s) {
     std::vector<Stack> guards;
     for (const auto& g : Scenario::Json::parse(s.encounterAt(at)->guardsJson))
         guards.push_back({g["id"], g["count"]});
-    auto r = s.autoBattle(s.army(), guards, s.battleCompanions(), s.armyAttackBonus());
+    for (const auto& id : s.backpack()) s.equip(id);   // wear whatever fits a free slot
+    auto r = s.autoBattle(s.army(), guards, s.battleCompanions(), s.armyBonus());
     s.setArmy(r.attacker);
     s.companionsFell(r.fallen, !r.attackerWon);
     s.resolveEncounter(r.attackerWon);

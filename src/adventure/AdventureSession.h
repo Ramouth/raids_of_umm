@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -31,6 +32,10 @@
  * runs the battle and calls resolveEncounter(). One old mine, picked at
  * random per game, hides the passage — clearing it wins the scenario.
  */
+// Bonuses every troop stack of the hero's army fights with (commander's
+// items, town buildings such as the Drill Yard).
+struct ArmyBonus { int attack = 0, defense = 0, speed = 0; };
+
 class AdventureSession {
 public:
     static constexpr int   SIGHT_RADIUS       = 4;   // hero
@@ -142,7 +147,19 @@ public:
     double growthBonus(const HexCoord& town) const;      // best fort: 0, 0.5, 1.0
     int    townGold(const HexCoord& town) const;         // best hall's income (else the flat town income)
     bool   hasMarket() const;                            // a marketplace in any town the player holds
-    int    armyAttackBonus() const;                      // e.g. Drill Yard, while its town is held
+    int    armyAttackBonus() const { return armyBonus().attack; }
+
+    // ── Commander's equipment (HoMM3 paper doll) ─────────────────────────────
+    // Items the commander wears help every troop stack: +attack, +defence,
+    // +speed. Unworn items sit in the backpack. A cursed item cannot be taken
+    // off once worn. Slots: helm, amulet, armor, weapon, boots, trinket1, trinket2.
+    static const std::vector<std::string>& equipSlots();
+    std::optional<std::string> equip(const std::string& itemId);
+    std::optional<std::string> unequip(const std::string& slot);
+    const std::map<std::string, std::string>& equipped() const { return m_equipped; }
+    std::vector<std::string> backpack() const;   // owned, not worn (sorted)
+    using ArmyBonus = ::ArmyBonus;
+    ArmyBonus armyBonus() const;                  // worn items + buildings (e.g. Drill Yard)
     // Marketplace: sell `amount` of `give` for as much `get` as it buys.
     // Returns the amount received, or an error.
     struct TradeResult { int received = 0; std::string error; };
@@ -236,7 +253,7 @@ public:
     // Resolves a battle with no player involvement (AI vs guards) using the real
     // engine; `companions` fight on the attacking side.
     AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender,
-                          const std::vector<Companion>& companions = {}, int attackerBonus = 0) const;
+                          const std::vector<Companion>& companions = {}, ArmyBonus attackerBonus = {}) const;
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 
@@ -310,6 +327,7 @@ private:
     Scenario                         m_scenario;
     std::unordered_set<HexCoord>     m_ruledOut;
     std::unordered_set<std::string>  m_items;
+    std::map<std::string, std::string> m_equipped;   // slot → item id
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::vector<Special>             m_specials;
     HeroProgress                     m_heroProgress;

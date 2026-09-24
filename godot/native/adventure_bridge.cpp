@@ -196,7 +196,19 @@ Json AdventureBridge::snapshot() const {
         {"towns", towns},
         {"building_defs", building_defs},
         {"market", session_.hasMarket()},
-        {"army_attack_bonus", session_.armyAttackBonus()},
+        {"army_bonus", [&] {
+            auto b = session_.armyBonus();
+            return Json{{"attack", b.attack}, {"defense", b.defense}, {"speed", b.speed}};
+        }()},
+        {"equipped", [&] {
+            Json slots = Json::object();
+            for (const auto& slot : AdventureSession::equipSlots()) {
+                auto it = session_.equipped().find(slot);
+                slots[slot] = it == session_.equipped().end() ? Json(nullptr) : Json(it->second);
+            }
+            return slots;
+        }()},
+        {"backpack", session_.backpack()},
         {"quests", quests},
         {"offers", offers},
         {"items", items},
@@ -242,6 +254,20 @@ Json AdventureBridge::companions_fell(const Json& fallen, bool lost) {
     for (const auto& id : fallen) ids.push_back(id.get<std::string>());
     session_.companionsFell(ids, lost);
     return with_lines(snapshot());
+}
+
+Json AdventureBridge::equip(const std::string& id) {
+    auto err = session_.equip(id);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return out;
+}
+
+Json AdventureBridge::unequip(const std::string& slot) {
+    auto err = session_.unequip(slot);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return out;
 }
 
 Json AdventureBridge::build(int q, int r, const std::string& id) {

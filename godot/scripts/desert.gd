@@ -32,6 +32,7 @@ var popup: Control
 var _popup_queue: Array[Dictionary] = []
 const TownScreen = preload("res://scripts/town_screen.gd")
 const MapPopup = preload("res://scripts/map_popup.gd")
+const HeroScreen = preload("res://scripts/hero_screen.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
@@ -206,6 +207,26 @@ func open_party() -> bool:
         _apply_state(state)
         _update_expedition())
     return true
+
+func open_hero() -> bool:
+    if hero.moving or is_instance_valid(battle): return false
+    var screen := HeroScreen.new()
+    screen.host = self
+    screens.push(screen, func(_result: Dictionary):
+        _apply_state(state)
+        _update_expedition())
+    return true
+
+## Called by the hero screen: the commander's paper doll.
+func equip(item_id: String) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.equip(item_id))
+    if reply.get("ok", false): state = reply
+    return reply
+
+func unequip(slot: String) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.unequip(slot))
+    if reply.get("ok", false): state = reply
+    return reply
 
 func open_garrison() -> bool:
     if hero.moving or is_instance_valid(battle) or not _owned_site(hero.cell): return false
@@ -585,6 +606,12 @@ func _build_turn_hud() -> void:
     _offer_box.name = "Offers"
     sidebar.add_child(_offer_box)
     sidebar.move_child(_offer_box, sidebar.get_node("Spacer").get_index())
+    var commander := Button.new()
+    commander.name = "Hero"
+    commander.text = "Hero & items     H"
+    commander.pressed.connect(open_hero)
+    sidebar.add_child(commander)
+    sidebar.move_child(commander, sidebar.get_node("Grid").get_index())
     var party := Button.new()
     party.name = "Party"
     party.text = "Companions     P"
@@ -745,6 +772,8 @@ func _unhandled_input(event: InputEvent) -> void:
                 toggle_quest_log()
             KEY_P:
                 open_party()
+            KEY_H:
+                open_hero()
             KEY_F5:
                 save_game()
             KEY_F9:
@@ -989,7 +1018,11 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         _update_expedition())
     # Companions ride in beside the troops (wounded or unpaid ones stay behind).
     var fighters: Array = army.duplicate(true)
-    for stack in fighters: stack["attack_bonus"] = int(state.get("army_attack_bonus", 0))   # e.g. Drill Yard
+    var bonus: Dictionary = state.get("army_bonus", {})   # commander's items, Drill Yard
+    for stack in fighters:
+        stack["attack_bonus"] = int(bonus.get("attack", 0))
+        stack["defense_bonus"] = int(bonus.get("defense", 0))
+        stack["speed_bonus"] = int(bonus.get("speed", 0))
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})
