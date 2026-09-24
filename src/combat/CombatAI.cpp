@@ -47,6 +47,7 @@ struct Ctx {
     std::vector<std::array<int, kCells>> reach;  // per foe: walking distance to an attack hex
     std::array<bool, kCells> blocked{};          // living stacks except the actor
     double              dangerWeight = 0;
+    double              volleyFloor = 0;             // cheapest volley of any hex that closes in
     double              patience = 1;            // weight of plans vs acting now
     bool                shooter = false;         // actor can shoot this turn
 
@@ -154,6 +155,22 @@ double exposureAt(const Ctx& c, HexCoord h, bool defending, int ignore = -1) {
         }
     }
     return danger;
+}
+
+// Threat lost to enemy shooters firing as we walk to h (reaction fire).
+double reactionLoss(const Ctx& c, HexCoord h) {
+    if (h == c.actor.pos) return 0;
+    double loss = 0;
+    for (const auto& r : c.eng.reactionsTo(h)) loss += lossValue(c, r.damage.avg);
+    return std::max(0.0, loss - c.volleyFloor);
+}
+
+// Fraction of the actor left standing after the volley a walk to h draws.
+double survivesVolley(const Ctx& c, HexCoord h) {
+    if (h == c.actor.pos) return 1;
+    double dmg = 0;
+    for (const auto& r : c.eng.reactionsTo(h)) dmg += r.damage.avg;
+    return std::clamp(1.0 - dmg / std::max(1, c.actor.totalHp()), 0.0, 1.0);
 }
 
 // Value of attacking foe i next turn from hex h (melee), or of shooting it.
@@ -293,6 +310,21 @@ void prepare(Ctx& c) {
     for (const auto& e : c.foes) foeShoots |= !e.isDead() && e.type->isRanged() && e.shotsLeft > 0;
     for (const auto& a : c.own)  weShoot   |= !a.isDead() && a.type->isRanged() && a.shotsLeft > 0;
     if (foeShoots && !weShoot) c.dangerWeight = 0;   // waiting only feeds their archers
+    // Reaction fire: holding back does not escape the enemy's archers (they
+    // shoot on their own turn anyway), so a walk is charged only for the volley
+    // it draws beyond the cheapest way of closing in — the AI picks *how* to
+    // approach, never *whether* to.
+    double floor = -1;
+    for (const HexCoord& h : c.eng.reachableTiles()) {
+        bool closes = false;   // closer to at least one living foe
+        for (const auto& e : c.foes)
+            closes |= !e.isDead() && e.pos.distanceTo(h) < e.pos.distanceTo(c.actor.pos);
+        if (!closes) continue;
+        double loss = 0;
+        for (const auto& r : c.eng.reactionsTo(h)) loss += lossValue(c, r.damage.avg);
+        if (floor < 0 || loss < floor) floor = loss;
+    }
+    c.volleyFloor = std::max(0.0, floor);
 }
 } // namespace
 
@@ -323,7 +355,10 @@ std::vector<CombatAI::Candidate> CombatAI::scoreActions(const CombatEngine& engi
             // stack that only defends deadlocks against another that does too.
             v = std::max(v, 0.15 * gain);
             const bool wipes = p.killsMin >= c.foes[i].count;
-            v += c.patience * positionValue(c, from) - w * exposureAt(c, from, false, wipes ? i : -1);
+            // A volley on the way in weakens (or stops) the strike and what follows.
+            const double alive = survivesVolley(c, from);
+            v = v * alive + c.patience * alive * positionValue(c, from) - w * exposureAt(c, from, false, wipes ? i : -1);
+            v -= reactionLoss(c, from);
             out.push_back({Candidate::Kind::Attack, i, from, v});
         }
     }
@@ -337,8 +372,8 @@ std::vector<CombatAI::Candidate> CombatAI::scoreActions(const CombatEngine& engi
         for (const HexCoord& h : engine.reachableTiles()) {
             // Walking costs a little (less than one hex of approach), so
             // equal-value shuffling loses to holding but advancing does not.
-            double v = c.patience * positionValue(c, h) - w * exposureAt(c, h, false)
-                       - 0.3 * kApproach * c.ownThreat;
+            double v = c.patience * survivesVolley(c, h) * positionValue(c, h) - w * exposureAt(c, h, false)
+                       - 0.3 * kApproach * c.ownThreat - reactionLoss(c, h);
             out.push_back({Candidate::Kind::Move, -1, h, v});
         }
     }

@@ -135,6 +135,16 @@ public:
     // Creatures that `damage` would kill in `target` (cascading through the stack).
     static int killsFor(const CombatUnit& target, int damage);
 
+    // ── Reaction fire ────────────────────────────────────────────────────────
+    // When a stack ends a move closer to an enemy shooter (ammo left, no
+    // reaction yet this round), that shooter fires once at it before
+    // anything else happens — before a walk-and-strike lands.  Damage is
+    // kReactionFactor × a normal shot (line of sight still applies).
+    static constexpr double kReactionFactor = 1.0;
+    struct ReactionPreview { int shooter = -1; DamageRange damage; bool blocked = false; };
+    // Shots the active stack would draw by walking from its hex to `to`.
+    std::vector<ReactionPreview> reactionsTo(HexCoord to) const;
+
     // ── Line of sight ────────────────────────────────────────────────────────
     // A shot needs a clear line: any living stack (friend or foe) on a hex
     // between shooter and target blocks it, and a blocked shot does half damage.
@@ -276,6 +286,10 @@ private:
     // Deal `damage` to a stack (splitting a melee blow on a companion with its
     // bodyguard) and emit the Damaged/Died events.  Returns true if it died.
     bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee);
+
+    // Move the active stack (event + position + auras), then let enemy
+    // shooters react.  Returns false if the stack died on the way in.
+    bool arrive(HexCoord to, const std::vector<HexCoord>& path);
 
     // Recompute every stack's auraBonus from current positions.
     void refreshAuras();

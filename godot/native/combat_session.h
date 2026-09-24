@@ -24,6 +24,7 @@ private:
     std::vector<HexCoord> legal_targets() const;
     Json next_round() const;
     Json previews() const;
+    Json reactions(HexCoord to) const;   // enemy shooters that would fire as the active stack walks to `to`
     Json movement_path(HexCoord from, HexCoord to, bool player, int index) const;
     Json response();
     Json failure(const std::string& error) const;

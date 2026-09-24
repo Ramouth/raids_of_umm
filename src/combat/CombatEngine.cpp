@@ -184,16 +184,7 @@ void CombatEngine::doMove(HexCoord dest) {
               << " moves " << actor.pos.q << "," << actor.pos.r
               << " → " << dest.q << "," << dest.r << "\n";
 
-    CombatEvent ev;
-    ev.type       = CombatEvent::Type::UnitMoved;
-    ev.isPlayer   = slot.isPlayer;
-    ev.stackIndex = slot.stackIndex;
-    ev.from       = actor.pos;   // captured before update
-    ev.to         = dest;
-    m_events.push_back(ev);
-
-    actor.pos = dest;
-    refreshAuras();
+    arrive(dest, {});
     advance();
 }
 
@@ -217,19 +208,7 @@ bool CombatEngine::isLegalRoute(const std::vector<HexCoord>& route) const {
 
 bool CombatEngine::doMoveAlong(const std::vector<HexCoord>& route) {
     if (!isLegalRoute(route)) return false;
-    TurnSlot& slot = m_queue[m_turn];
-    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
-                                      : m_enemy.stacks[slot.stackIndex];
-    CombatEvent ev;
-    ev.type       = CombatEvent::Type::UnitMoved;
-    ev.isPlayer   = slot.isPlayer;
-    ev.stackIndex = slot.stackIndex;
-    ev.from       = actor.pos;
-    ev.to         = route.back();
-    ev.path       = route;
-    m_events.push_back(ev);
-    actor.pos = route.back();
-    refreshAuras();
+    arrive(route.back(), route);
     advance();
     return true;
 }
@@ -241,20 +220,8 @@ bool CombatEngine::doAttackAlong(const std::vector<HexCoord>& route, int targetI
         return true;
     }
     if (!isLegalRoute(route) || !canAttackFrom(route.back(), targetIndex)) return false;
-    TurnSlot& slot = m_queue[m_turn];
-    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
-                                      : m_enemy.stacks[slot.stackIndex];
-    CombatEvent ev;
-    ev.type       = CombatEvent::Type::UnitMoved;
-    ev.isPlayer   = slot.isPlayer;
-    ev.stackIndex = slot.stackIndex;
-    ev.from       = actor.pos;
-    ev.to         = route.back();
-    ev.path       = route;
-    m_events.push_back(ev);
-    actor.pos = route.back();
-    refreshAuras();
-    resolveAttack(targetIndex);
+    if (arrive(route.back(), route)) resolveAttack(targetIndex);
+    else advance();                        // shot down on the way in
     return true;
 }
 
@@ -286,19 +253,9 @@ void CombatEngine::doAttack(int targetIndex) {
 
 bool CombatEngine::doAttackFrom(HexCoord from, int targetIndex) {
     if (!canAttackFrom(from, targetIndex)) return false;
-    TurnSlot& slot = m_queue[m_turn];
-    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
-                                      : m_enemy.stacks[slot.stackIndex];
-    if (from != actor.pos) {
-        CombatEvent ev;
-        ev.type       = CombatEvent::Type::UnitMoved;
-        ev.isPlayer   = slot.isPlayer;
-        ev.stackIndex = slot.stackIndex;
-        ev.from       = actor.pos;
-        ev.to         = from;
-        m_events.push_back(ev);
-        actor.pos = from;
-        refreshAuras();
+    if (from != activeUnit().pos && !arrive(from, {})) {
+        advance();                         // shot down on the way in
+        return true;
     }
     resolveAttack(targetIndex);
     return true;
@@ -752,6 +709,68 @@ bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bo
     return target.isDead();
 }
 
+bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
+    TurnSlot& slot = m_queue[m_turn];
+    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
+                                      : m_enemy.stacks[slot.stackIndex];
+    const HexCoord from = actor.pos;
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::UnitMoved;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    ev.from       = from;
+    ev.to         = to;
+    ev.path       = path;
+    m_events.push_back(ev);
+    actor.pos = to;
+    refreshAuras();
+
+    auto& shooters = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+    for (int i = 0; i < static_cast<int>(shooters.size()) && !actor.isDead(); ++i) {
+        CombatUnit& s = shooters[i];
+        if (s.isDead() || !shootsNow(s) || s.hasReacted) continue;
+        if (s.pos.distanceTo(to) >= s.pos.distanceTo(from)) continue;   // not closing in
+        const bool blocked = !hasLineOfSight(s.pos, to);
+        --s.shotsLeft;
+        s.hasReacted = true;
+        CombatEvent shot;
+        shot.type           = CombatEvent::Type::UnitAttacked;
+        shot.isPlayer       = !slot.isPlayer;
+        shot.stackIndex     = i;
+        shot.targetIsPlayer = slot.isPlayer;
+        shot.targetIndex    = slot.stackIndex;
+        shot.blockedShot    = blocked;
+        shot.isReaction     = true;
+        m_events.push_back(shot);
+        int damage = static_cast<int>(calcDamage(s, actor, m_rng) * kReactionFactor);
+        if (blocked) damage /= 2;
+        hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), false);
+    }
+    return !actor.isDead();
+}
+
+std::vector<CombatEngine::ReactionPreview> CombatEngine::reactionsTo(HexCoord to) const {
+    std::vector<ReactionPreview> out;
+    if (isOver()) return out;
+    const CombatUnit& actor = activeUnit();
+    const auto& shooters = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
+        const CombatUnit& s = shooters[i];
+        if (s.isDead() || !shootsNow(s) || s.hasReacted) continue;
+        if (s.pos.distanceTo(to) >= s.pos.distanceTo(actor.pos)) continue;
+        CombatUnit moved = actor;
+        moved.pos = to;
+        ReactionPreview r;
+        r.shooter = i;
+        r.blocked = !hasLineOfSight(s.pos, to, &actor);
+        DamageRange d = damageRange(s, moved);
+        const double f = kReactionFactor * (r.blocked ? 0.5 : 1.0);
+        r.damage = {std::max(1, int(d.min * f)), std::max(1, int(d.max * f)), std::max(1.0, d.avg * f)};
+        out.push_back(r);
+    }
+    return out;
+}
+
 bool CombatEngine::hasLineOfSight(HexCoord from, HexCoord to, const CombatUnit* mover) const {
     std::unordered_set<HexCoord> occupied;
     for (const auto* army : {&m_player, &m_enemy})
@@ -872,8 +891,8 @@ void CombatEngine::advance() {
         ++m_round;
         m_turn = 0;
 
-        for (auto& s : m_player.stacks) s.hasRetaliated = false;
-        for (auto& s : m_enemy.stacks)  s.hasRetaliated = false;
+        for (auto& s : m_player.stacks) { s.hasRetaliated = false; s.hasReacted = false; }
+        for (auto& s : m_enemy.stacks)  { s.hasRetaliated = false; s.hasReacted = false; }
 
         buildQueue();
         std::cout << "[CombatEngine] --- Round " << m_round << " ---\n";

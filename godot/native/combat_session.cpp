@@ -192,7 +192,12 @@ Json CombatSession::snapshot() const {
         const auto& turn = engine_->currentTurn();
         state["active"] = key(turn.isPlayer, turn.stackIndex);
         state["player_turn"] = turn.isPlayer;
-        for (auto cell : engine_->reachableTiles()) state["reachable"].push_back(hex(cell));
+        state["reaction_fire"] = Json::array();   // hexes whose approach draws enemy shots
+        for (auto cell : engine_->reachableTiles()) {
+            state["reachable"].push_back(hex(cell));
+            Json shots = reactions(cell);
+            if (!shots.empty()) state["reaction_fire"].push_back({{"cell", hex(cell)}, {"shots", shots}});
+        }
         for (auto cell : legal_targets()) state["attackable"].push_back(hex(cell));
         int index = 0;
         for (const auto& slot : engine_->turnOrder()) {
@@ -265,10 +270,20 @@ Json CombatSession::previews() const {
             option["from"] = hex(from);
             option["path"] = from == actor.pos ? Json::array()
                 : movement_path(actor.pos, from, turn.isPlayer, turn.stackIndex);
+            option["reactions"] = from == actor.pos ? Json::array() : reactions(from);
             entry["options"].push_back(std::move(option));
         }
         out.push_back(std::move(entry));
     }
+    return out;
+}
+
+Json CombatSession::reactions(HexCoord to) const {
+    Json out = Json::array();
+    const bool player = engine_->activeUnit().isPlayer;
+    for (const auto& r : engine_->reactionsTo(to))
+        out.push_back({{"key", key(!player, r.shooter)}, {"damage_min", r.damage.min},
+                       {"damage_max", r.damage.max}, {"blocked", r.blocked}});
     return out;
 }
 
@@ -308,14 +323,15 @@ Json CombatSession::response() {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
             {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
-            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard},
+            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction},
             {"from", hex(event.from)}, {"to", hex(event.to)},
             {"kills", event.kills}, {"remaining", event.remaining}};
         if (event.type == CombatEvent::Type::UnitAttacked) {
             // Attacks never move anyone, so the current positions tell shots from strikes.
             const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];
             const auto& target = (event.targetIsPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.targetIndex];
-            item["ranged"] = !event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1;
+            item["ranged"] = event.isReaction
+                || (!event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1);
         }
         if (event.type == CombatEvent::Type::UnitMoved) {
             if (!event.path.empty()) {

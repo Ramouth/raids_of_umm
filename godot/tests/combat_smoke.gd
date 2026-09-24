@@ -48,6 +48,10 @@ func _run() -> void:
     scene.fog.reveal([[dungeon.x, dungeon.y]])  # scouted: the test targets it directly
     # Fixture army the casualty/retaliation checks below were tuned against.
     scene.army = [{"id": "desert_archer", "count": 10}, {"id": "mummy", "count": 3}]
+    # Guards strong enough to reach our line through the archers' reaction volleys.
+    var tuned_guards: Array = scene.encounter.guards.duplicate(true)
+    scene.encounter.guards = [{"id": "skeleton_warrior", "count": 24}, {"id": "sand_scorpion", "count": 8}]
+    scene.encounter.seed = int(OS.get_environment("FIX_SEED")) if OS.has_environment("FIX_SEED") else 1
     check(scene.travel_to(dungeon), "A real map route reaches a dungeon")
     while scene.hero.moving: await process_frame
     check(scene._enter_button.visible and not scene._enter_button.disabled, "Arrival enables dungeon entry")
@@ -107,11 +111,16 @@ func _run() -> void:
     await _idle(battle)
     check(battle.board.actors[moving_key].position == battle.board.cell_point(destination), "Movement animation ends on the authoritative hex")
     # Let the guards close and retaliate, then verify casualties survive return.
-    for turn in range(2):
+    # Guards close in along lines that dodge our archers' reaction volleys, so
+    # this can take a few rounds, but they must arrive (no stalling).
+    var remaining := 13
+    for turn in range(6):
+        if battle.state.result != "ongoing": break
         check(battle.issue("defend"), "Player can hold position while guards advance")
         await _idle(battle)
-    var remaining := 0
-    for stack in battle.state.survivors: remaining += int(stack.count)
+        remaining = 0
+        for stack in battle.state.survivors: remaining += int(stack.count)
+        if remaining < 13 and turn >= 1: break
     check(remaining < 13, "Enemy melee inflicts real expedition casualties")
     check(battle.history.any(func(line: String): return "retaliation" in line), "Retaliation events are presented")
     check(battle.history.any(func(line: String): return "Round 2" in line), "Round changes are logged")
@@ -127,6 +136,8 @@ func _run() -> void:
     battle.return_button.pressed.emit()
     await process_frame
     check(scene.army == survivors, "Returning preserves exact surviving stack counts")
+    scene.encounter.guards = tuned_guards
+    scene.encounter.erase("seed")
     check(scene.inventory.is_empty() and scene.cleared_dungeons.is_empty(), "Retreat grants no loot and leaves dungeon guarded")
     check(scene.is_processing() and scene.hero.cell == dungeon, "Map resumes at the same dungeon")
     print("Combat integration: manual attack, enemy AI, defend, retreat PASS")
@@ -252,6 +263,43 @@ func _run() -> void:
     battle.return_button.pressed.emit()
     await process_frame
     print("Combat integration: flanking visuals PASS")
+
+    # Reaction fire: walking toward their archers draws a volley, and says so first.
+    scene.cleared_dungeons.clear()
+    scene.army = [{"id": "armoured_warrior", "count": 12}]
+    scene.encounter.guards = [{"id": "brigand", "count": 12}]
+    scene.encounter.seed = 5
+    scene.state.battle_companions = []
+    check(scene.enter_dungeon(), "Reaction-fire fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var volley_cell: Array = []
+    for entry in battle.state.get("reaction_fire", []): volley_cell = entry.cell
+    check(not volley_cell.is_empty(), "Moving toward the brigands is marked as drawing fire")
+    if not volley_cell.is_empty():
+        battle._cell_hovered(Vector2i(volley_cell[0], volley_cell[1]), true)
+        check("close in" in battle.status.get_parsed_text(), "The move forecast names the volley and its damage")
+        check(not battle.board.reaction_lines.is_empty(), "Lines run from each reacting shooter")
+        if capture: await _capture("combat_reaction")
+        var hp_before := 0
+        for unit in battle.state.units:
+            if unit.player: hp_before = int(unit.hp)
+        battle._cell_clicked(Vector2i(volley_cell[0], volley_cell[1]))
+        await _idle(battle)
+        check(battle.history.any(func(line: String): return "fires at the approaching" in line), "The log records the reaction shot")
+        var hp_after := hp_before
+        for unit in battle.state.units:
+            if unit.player: hp_after = int(unit.hp)
+        check(hp_after < hp_before, "The volley lands")
+    scene.encounter.erase("seed")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    battle.return_button.pressed.emit()
+    await process_frame
+    print("Combat integration: reaction fire PASS")
 
     # Line of sight: a shot through a stack is shown, forecast and dealt at half.
     scene.cleared_dungeons.clear()

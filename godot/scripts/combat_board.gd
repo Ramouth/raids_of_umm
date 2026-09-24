@@ -44,6 +44,8 @@ var move_path: Array = []
 ## Flanking: standing hexes that would pin the hovered enemy, and (when the
 ## chosen side pins) the stand + the ally opposite, drawn as a pincer.
 var pin_spots: Array = []
+## Reaction fire the hovered move would draw: [[shooter cell, destination, blocked], …].
+var reaction_lines: Array = []
 var pin_stand: Array = []
 var pin_ally: Array = []
 var _forecast: Label
@@ -140,6 +142,13 @@ func _draw() -> void:
         _draw_walk()
     if hover_kind == "move" and not move_path.is_empty():
         _draw_route(move_path)
+    if hover_kind in ["move", "attack"]:
+        for line in reaction_lines:
+            var from := cell_point(line[0])
+            var to := cell_point(line[1])
+            if line[2]: draw_dashed_line(from, to, Color(DANGER_COLOR, 0.8), 2.0, 8.0, true)
+            else: draw_line(from, to, Color(DANGER_COLOR, 0.8), 2.0, true)
+            draw_circle(to.lerp(from, 0.12), 5.0, DANGER_COLOR)
     _draw_waypoints()
     if hover_kind == "attack" and shot_line.size() == 2:
         _draw_shot()
@@ -428,6 +437,7 @@ func animate(event: Dictionary, speed: float) -> void:
             if actor and target:
                 if event.flanked: float_text(target, "PINNED", Color("f7d580"), duration * 2)
                 if event.get("blocked", false): float_text(target, "BLOCKED SHOT ½", Color("ffb08a"), duration * 3)
+                if event.get("reaction", false): float_text(actor, "REACTION SHOT", Color("ff9d7a"), duration * 3)
                 var start := actor.position
                 if start.distance_to(target.position) > 100:
                     var projectile := Polygon2D.new()

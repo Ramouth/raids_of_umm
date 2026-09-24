@@ -27,6 +27,7 @@ struct CombatUnit {
     HexCoord pos;            // position on the combat grid (CombatMap coordinate space)
     int      shotsLeft    = 0;   // remaining ammo; 0 means melee-only
     bool     hasRetaliated = false; // true once this stack retaliates this round
+    bool     hasReacted    = false; // true once this shooter has fired a reaction shot this round
 
     // SC progression — zero/nullptr for ordinary stacks.
     // Set by buildPlayerArmy() when the stack represents a SpecialCharacter.

@@ -215,6 +215,7 @@ func _decode_reply(raw: String) -> Dictionary:
         # Godot's JSON parser makes every number a float. Array equality is
         # type-sensitive, so normalize hex coordinates at this boundary.
         var cells: Array = reply.state.reachable + reply.state.attackable
+        for entry in reply.state.get("reaction_fire", []): cells.append(entry.cell)
         for unit in reply.state.units: cells.append(unit.cell)
         for preview in reply.state.get("previews", []):
             cells.append(preview.cell)
@@ -276,6 +277,7 @@ func _log_damage(event: Dictionary, strike: Dictionary) -> void:
         _log("   » retaliation: %s strikes back at %s: %s." % [_unit_label(strike.unit), _unit_label(victim), outcome], TEXT, strike.unit)
     else:
         var verb := "shoots" if strike.get("ranged", false) else "attacks"
+        if strike.get("reaction", false): verb = "fires at the approaching"
         var pinned := " PINNED (+50%, no retaliation)" if strike.flanked else ""
         if strike.get("blocked", false): pinned += " through the ranks (blocked shot: half damage)"
         _log("%s %s %s%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), pinned, outcome], TEXT, strike.unit)
@@ -650,6 +652,10 @@ func _update_status() -> void:
             var verb := "Shoot" if preview.ranged else ("Walk up and attack" if not preview.get("path", []).is_empty() else "Attack")
             text = "[b]%s %s[/b]: %s damage, kills %s of %d" % [verb, _unit_label(unit.key), damage, kills, unit.count]
             label = "%s dmg · %s slain" % [damage, kills]
+            var incoming: Array = preview.get("reactions", [])
+            if not incoming.is_empty():
+                text = _reaction_text(incoming).trim_prefix(" · ") + " · " + text
+                label = "⚠ volley first · " + label
             if unit.get("defending", false):
                 text += " · [color=#%s]it is defending (+25%% defence)[/color]" % FRIEND.to_html(false)
                 label += " · defending"
@@ -677,6 +683,8 @@ func _update_status() -> void:
         text = "Move here without attacking — this ends %s's turn." % _unit_name(state.active)
         if not waypoints.is_empty():
             text = "Move along your route (%d of %d hexes, %d waypoint%s) — this ends %s's turn." % [_route_to(_hover_cell).size(), _move_range(), waypoints.size(), "" if waypoints.size() == 1 else "s", _unit_name(state.active)]
+        var volley := _reactions_at(_hover_cell)
+        if not volley.is_empty(): text = _reaction_text(volley).trim_prefix(" · ") + " · " + text
         var near: Array[String] = []
         for other in state.get("units", []):
             if not other.player and int(other.count) > 0 and not (other.ranged and int(other.shots) > 0) \
@@ -695,6 +703,12 @@ func _update_status() -> void:
     board.walk_path = _stand.path if walking else []
     board.move_path = _route_to(_hover_cell) if my_turn and kind == "move" else []
     board.pin_spots = _pin_spots() if my_turn and kind == "attack" else []
+    board.reaction_lines = []
+    if my_turn and kind in ["move", "attack"]:
+        var dest: Array = _hover_cell if kind == "move" else (_stand.get("from", []) as Array)
+        var shots: Array = _reactions_at(dest) if kind == "move" else _stand.get("reactions", [])
+        for shot in shots:
+            if units.has(shot.key): board.reaction_lines.append([units[shot.key].cell, dest, shot.blocked])
     board.pin_stand = []
     board.pin_ally = []
     if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("pinned", false):
@@ -734,6 +748,24 @@ static func _damage_multiplier(attack: int, defence: int) -> float:
     return maxf(0.3, 1.0 + 0.025 * diff)
 
 ## What Defend would do for `unit`, in numbers, against the hardest-hitting enemy.
+## Enemy shooters that would fire as the active stack walks to `cell`.
+func _reactions_at(cell: Array) -> Array:
+    for entry in state.get("reaction_fire", []):
+        if entry.cell[0] == cell[0] and entry.cell[1] == cell[1]: return entry.shots
+    return []
+
+## " · ⚠ Brigand ×8 fires as you close in: 12–20" for a list of reaction shots.
+func _reaction_text(shots: Array) -> String:
+    if shots.is_empty(): return ""
+    var parts: Array[String] = []
+    var low := 0
+    var high := 0
+    for shot in shots:
+        parts.append(_unit_label(shot.key) + (" (blocked ½)" if shot.blocked else ""))
+        low += int(shot.damage_min)
+        high += int(shot.damage_max)
+    return " · [color=#%s]⚠ %s fire%s as you close in: %s damage first[/color]" % [FOE.to_html(false), ", ".join(parts), "" if parts.size() > 1 else "s", _range_text(low, high)]
+
 func _defend_explanation(unit: Dictionary) -> String:
     var defence := int(unit.get("defense", 0))
     var braced := defence + defence / 4

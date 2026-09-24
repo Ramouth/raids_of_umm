@@ -2357,4 +2357,113 @@ SUITE("Defend — the stance carries into the next round until the stack acts ag
     CHECK(!eng.playerArmy().stacks[0].isDefending);              // our turn: the stance ends
 }
 
+
+// ── Reaction fire: shooters fire at stacks moving closer ─────────────────────────
+
+// Player: one melee stack; enemy: one shooter far to the right.
+static CombatEngine reactionDuel(int meleeCount, int archers, HexCoord meleeAt, HexCoord archerAt,
+                                 int moveRange = 4) {
+    const UnitType* melee = aiType("Charger", 9, 3, 10, 5, 5, moveRange);
+    const UnitType* archer = aiType("Bowman", 1, 5, 10, 5, 5, 3, 12);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(melee, meleeCount, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(archer, archers, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.setSeed(3);
+    eng.teleportUnit(true, 0, meleeAt);
+    eng.teleportUnit(false, 0, archerAt);
+    return eng;
+}
+
+SUITE("Reaction fire — moving closer draws a shot; the forecast matches") {
+    const HexCoord start = CombatMap::toHex(2, 2), archer = CombatMap::toHex(8, 2);
+    CombatEngine eng = reactionDuel(10, 2, start, archer);
+    CHECK(eng.currentTurn().isPlayer);
+    const HexCoord closer = start.neighbor(0).neighbor(0);
+    auto preview = eng.reactionsTo(closer);
+    CHECK_EQ((int)preview.size(), 1);
+    CHECK_EQ(preview[0].damage.min, 10);                      // 2 bowmen × 5, same atk/def
+    eng.doMove(closer);
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 90);
+    CHECK_EQ(eng.enemyArmy().stacks[0].shotsLeft, 11);
+    CHECK(eng.enemyArmy().stacks[0].hasReacted);
+    bool flagged = false;
+    for (const auto& ev : eng.drainEvents())
+        if (ev.type == CombatEvent::Type::UnitAttacked && ev.isReaction) flagged = !ev.isPlayer;
+    CHECK(flagged);
+}
+
+SUITE("Reaction fire — stepping away or sideways draws nothing") {
+    const HexCoord start = CombatMap::toHex(4, 2), archer = CombatMap::toHex(8, 2);
+    CombatEngine eng = reactionDuel(10, 2, start, archer);
+    CHECK(eng.reactionsTo(start.neighbor(3)).empty());          // away
+    eng.doMove(start.neighbor(3));
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 100);
+    CHECK(!eng.enemyArmy().stacks[0].hasReacted);
+}
+
+SUITE("Reaction fire — once per round, back the next round") {
+    const HexCoord start = CombatMap::toHex(1, 2), archer = CombatMap::toHex(9, 2);
+    CombatEngine eng = reactionDuel(10, 2, start, archer, 2);
+    eng.doMove(start.neighbor(0));                              // shot 1 (round 1)
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 90);
+    CHECK(!eng.currentTurn().isPlayer);
+    eng.doDefend();                                             // the bowmen hold (round ends)
+    CHECK_EQ(eng.roundNumber(), 2);
+    CHECK(!eng.enemyArmy().stacks[0].hasReacted);               // reloaded for the new round
+    eng.doMove(eng.playerArmy().stacks[0].pos.neighbor(0));     // shot 2 (round 2)
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 80);
+}
+
+SUITE("Reaction fire — the shot lands before a walk-and-strike, and can stop it") {
+    const HexCoord archer = CombatMap::toHex(6, 2);
+    const HexCoord start = archer.neighbor(3).neighbor(3).neighbor(3);
+    CombatEngine eng = reactionDuel(1, 10, start, archer);      // one charger (10 hp) vs 10 bowmen (50 dmg)
+    CHECK(eng.canAttack(0));
+    eng.doAttack(0);
+    CHECK(eng.playerArmy().stacks[0].isDead());                 // shot down on the way in
+    CHECK_EQ(eng.enemyArmy().stacks[0].totalHp(), 100);         // no strike landed
+    CHECK(eng.isOver() && eng.result() == CombatResult::EnemyWon);
+}
+
+SUITE("Reaction fire — the AI will not walk a fragile stack into a lethal volley") {
+    // 30 bowmen straight north of two chargers: any step toward them is lethal,
+    // while stepping along the bottom row draws nothing.
+    const UnitType* melee = aiType("Charger", 9, 3, 10, 5, 5, 3);
+    const UnitType* archer = aiType("Bowman", 1, 5, 10, 5, 5, 3, 12);
+    const UnitType* dummy = aiType("Dummy", 1, 1, 10, 5, 5, 1);
+    int spared = 0;
+    for (uint32_t seed = 1; seed <= 10; ++seed) {
+        CombatArmy p; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(melee, 2, true));
+        CombatArmy e; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(archer, 30, false));
+        e.stacks.push_back(CombatUnit::make(dummy, 5, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        eng.teleportUnit(true, 0, CombatMap::toHex(1, 4));
+        eng.teleportUnit(false, 0, CombatMap::toHex(1, 0));
+        eng.teleportUnit(false, 1, CombatMap::toHex(9, 4));
+        CHECK(eng.currentTurn().isPlayer);
+        CombatAI::takeTurn(eng);
+        if (!eng.playerArmy().stacks[0].isDead() && !eng.enemyArmy().stacks[0].hasReacted)
+            ++spared;   // stayed out of the volley
+    }
+    CHECK(spared >= 8);
+}
+
+SUITE("Reaction fire — the AI still closes in when every approach draws fire") {
+    // Guards against our archers must not stall: holding back does not stop the arrows.
+    int advanced = 0;
+    for (uint32_t seed = 1; seed <= 10; ++seed) {
+        CombatEngine eng = reactionDuel(20, 10, CombatMap::toHex(9, 2), CombatMap::toHex(1, 2));
+        eng.setSeed(seed);
+        const int before = eng.playerArmy().stacks[0].pos.distanceTo(CombatMap::toHex(1, 2));
+        CombatAI::takeTurn(eng);
+        if (eng.playerArmy().stacks[0].pos.distanceTo(CombatMap::toHex(1, 2)) < before) ++advanced;
+    }
+    CHECK(advanced >= 8);
+}
+
 #endif // COMBAT_ENGINE_IMPL
