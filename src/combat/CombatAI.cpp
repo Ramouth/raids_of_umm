@@ -17,7 +17,7 @@ constexpr double kSecondTarget     = 0.25;  // hexes threatening two stacks are 
 constexpr double kClaimPenalty     = 0.35;  // per ally already heading for the same target
 constexpr double kCrowdPenalty     = 0.03;  // × own threat, per ally next to the destination
 constexpr double kApproach         = 0.01;  // × own threat, per hex from the nearest enemy
-constexpr double kDangerWeight     = 0.60;  // first-strike danger, fades 25% per round
+constexpr double kDangerWeight     = 0.40;  // exposure to strikes, fades out by round 4
 constexpr double kDefendShield     = 0.10;  // defending takes roughly 10% less damage
 constexpr double kPoolFraction     = 0.08;  // candidates within 8% of the best are eligible
 constexpr double kTemperature      = 0.025; // softmax temperature (fraction of score scale)
@@ -117,27 +117,31 @@ bool strikesFirst(const Ctx& c, int i) {
     return fs > as || (fs == as && c.foes[i].isPlayer);
 }
 
-// Net expected loss of stepping onto h: melee strikes from foes we would newly
-// engage (adjacent to h but not to us now) that act before our next turn,
-// minus the value of our retaliation.  Foes we are already engaged with are a
-// sunk cost — backing away from them only hands them the initiative later.
-double dangerAt(const Ctx& c, HexCoord h) {
+// Can foe e strike a stack standing on h before that stack acts again?
+// Move-and-attack: any melee foe within its move range + 1 (ignoring blockers).
+bool canReach(const CombatUnit& e, HexCoord h) {
+    return e.pos.distanceTo(h) - 1 <= e.type->moveRange;
+}
+
+// Net expected loss of ending our turn on h: strikes from melee foes that act
+// before our next turn and can reach h (move + attack), each splitting its
+// attention between all of our stacks it can reach, minus the value of our
+// retaliation.  Foe `ignore` (a stack we expect to destroy) is skipped.
+double exposureAt(const Ctx& c, HexCoord h, bool defending, int ignore = -1) {
     double danger = 0;
     CombatUnit me = c.actor;
     me.pos = h;
+    me.isDefending = defending;
     for (int i = 0; i < (int)c.foes.size(); ++i) {
         const CombatUnit& e = c.foes[i];
-        if (e.isDead() || e.pos.distanceTo(h) != 1 || !strikesFirst(c, i)) continue;
-        if (e.pos.distanceTo(c.actor.pos) == 1) continue;   // already engaged
+        if (i == ignore || e.isDead() || !strikesFirst(c, i) || !canReach(e, h)) continue;
         // A shooter hurts us wherever we stand (adjacency only swaps its shot
         // for a strike we can answer), so it is never a reason to hold back.
         if (e.type->isRanged() && e.shotsLeft > 0) continue;
-        // The foe splits its attention between every stack of ours next to it.
-        int adjacentOurs = 1;
+        int targets = 1;
         for (int j = 0; j < (int)c.own.size(); ++j)
-            if (j != c.actorIdx && !c.own[j].isDead() && c.own[j].pos.distanceTo(e.pos) == 1)
-                ++adjacentOurs;
-        const double share = 1.0 / adjacentOurs;
+            if (j != c.actorIdx && !c.own[j].isDead() && canReach(e, c.own[j].pos)) ++targets;
+        const double share = 1.0 / targets;
         const double incoming = CombatEngine::damageRange(e, me).avg;
         danger += share * lossValue(c, incoming);
         // Retaliation, unless it is already spent for the round the strike lands in.
@@ -187,7 +191,8 @@ double positionValue(const Ctx& c, HexCoord h) {
         } else {
             const int d = idx >= 0 ? c.reach[i][idx] : kFar;
             if (d >= kFar) continue;
-            const int turns = d == 0 ? 0 : (d + range - 1) / range;
+            // Move-and-attack: anything within one move is struck next turn.
+            const int turns = d <= range ? 0 : (d - range + range - 1) / range;
             v = futureAttackValue(c, i, h, false) * kNextTurn * std::pow(kPerExtraTurn, turns);
             v /= 1.0 + kClaimPenalty * c.claims[i];
         }
@@ -275,7 +280,7 @@ void prepare(Ctx& c) {
     c.patience = std::max(0.4, 1.0 - 0.05 * (c.eng.roundNumber() - 1));
 
     // Caution fades each round so cautious AIs cannot stall a battle forever.
-    c.dangerWeight = kDangerWeight * std::max(0.0, 1.0 - 0.25 * (c.eng.roundNumber() - 1));
+    c.dangerWeight = kDangerWeight * std::max(0.0, 1.0 - 0.34 * (c.eng.roundNumber() - 1));
     bool foeShoots = false, weShoot = false;
     for (const auto& e : c.foes) foeShoots |= !e.isDead() && e.type->isRanged() && e.shotsLeft > 0;
     for (const auto& a : c.own)  weShoot   |= !a.isDead() && a.type->isRanged() && a.shotsLeft > 0;
@@ -291,45 +296,52 @@ std::vector<CombatAI::Candidate> CombatAI::scoreActions(const CombatEngine& engi
     Ctx c(engine);
     prepare(c);
     const HexCoord here = c.actor.pos;
-    const double stay = c.patience * positionValue(c, here);
+    const double w = c.dangerWeight;
 
-    // Attacks from where we stand (shots, or adjacent strikes).
-    bool anyShot = false;
+    // Attacks: a shot or strike from where we stand, or (melee) a walk to any
+    // standing hex next to the target followed by a strike — one candidate
+    // per (standing hex, target) pair.
     for (int i = 0; i < (int)c.foes.size(); ++i) {
         if (!engine.canAttack(i)) continue;
-        const AttackPreview p = engine.previewAttack(i);
-        anyShot |= p.ranged;
-        const double gain = killValue(c, i, p.damage);
-        double v = gain;
-        if (p.retaliation) v -= lossValue(c, p.retaliationDamage.avg);
-        // Like HoMM3 creatures, never refuse a fight outright: an engaged
-        // stack that only defends deadlocks against another that does too.
-        v = std::max(v, 0.15 * gain);
-        v += stay;
-        out.push_back({Candidate::Kind::Attack, i, here, v});
+        std::vector<HexCoord> spots = c.shooter ? std::vector<HexCoord>{here}
+                                                : engine.attackHexesFor(i);
+        for (const HexCoord& from : spots) {
+            const AttackPreview p = engine.previewAttackUnchecked(i, from);
+            if (!p.valid) continue;
+            const double gain = killValue(c, i, p.damage);
+            double v = gain;
+            if (p.retaliation) v -= lossValue(c, p.retaliationDamage.avg);
+            // Like HoMM3 creatures, never refuse a fight outright: an engaged
+            // stack that only defends deadlocks against another that does too.
+            v = std::max(v, 0.15 * gain);
+            const bool wipes = p.killsMin >= c.foes[i].count;
+            v += c.patience * positionValue(c, from) - w * exposureAt(c, from, false, wipes ? i : -1);
+            out.push_back({Candidate::Kind::Attack, i, from, v});
+        }
     }
+    const bool canStrike = !out.empty();
 
     // Moves.  A shooter with a clear shot never walks away from it.
-    if (!(c.shooter && anyShot)) {
+    bool anyShot = false;
+    for (const auto& k : out)
+        anyShot |= c.shooter && c.foes[k.target].pos.distanceTo(here) > 1;
+    if (!anyShot) {
         for (const HexCoord& h : engine.reachableTiles()) {
-            double v = c.patience * positionValue(c, h) - c.dangerWeight * dangerAt(c, h);
+            // Walking costs a little (less than one hex of approach), so
+            // equal-value shuffling loses to holding but advancing does not.
+            double v = c.patience * positionValue(c, h) - w * exposureAt(c, h, false)
+                       - 0.3 * kApproach * c.ownThreat;
             out.push_back({Candidate::Kind::Move, -1, h, v});
         }
     }
 
-    // Hold position: same prospects as staying, a little less damage taken
-    // from engaged foes that strike before our next turn.
-    double shield = 0;
-    for (int i = 0; i < (int)c.foes.size(); ++i) {
-        const CombatUnit& e = c.foes[i];
-        if (!e.isDead() && e.pos.distanceTo(here) == 1 && strikesFirst(c, i))
-            shield += lossValue(c, CombatEngine::damageRange(e, c.actor).avg);
-    }
+    // Hold position: same prospects as staying, a little less damage taken.
     // Defending while a strike is available is only a tie-breaker loser.
-    const bool canStrike = std::any_of(out.begin(), out.end(),
-        [](const Candidate& k) { return k.kind == Candidate::Kind::Attack; });
-    const double defend = canStrike ? stay - kCrowdPenalty * c.ownThreat
-                                    : stay + kDefendShield * shield;
+    const double stay = c.patience * positionValue(c, here);
+    const double exposed = exposureAt(c, here, false);
+    const double shielded = exposureAt(c, here, true);
+    const double defend = canStrike ? stay - w * exposed - kCrowdPenalty * c.ownThreat
+                                    : stay - w * shielded + kDefendShield * std::max(0.0, exposed - shielded);
     out.push_back({Candidate::Kind::Defend, -1, here, defend});
     return out;
 }
@@ -359,7 +371,9 @@ void CombatAI::takeTurn(CombatEngine& engine) {
     if (engine.isOver()) return;
     const Candidate choice = chooseAction(engine);
     switch (choice.kind) {
-    case Candidate::Kind::Attack: engine.doAttack(choice.target); return;
+    case Candidate::Kind::Attack:
+        if (!engine.doAttackFrom(choice.hex, choice.target)) engine.doAttack(choice.target);
+        return;
     case Candidate::Kind::Move:   engine.doMove(choice.hex);      return;
     case Candidate::Kind::Defend: engine.doDefend();              return;
     }

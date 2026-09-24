@@ -4,6 +4,8 @@ signal cell_clicked(cell: Vector2i)
 signal cell_right_clicked(cell: Vector2i)
 ## Emitted when the pointer enters a new hex; inside is false when it leaves the grid.
 signal cell_hovered(cell: Vector2i, inside: bool)
+## Every pointer motion over the board (board-local), for picking the side of attack.
+signal pointer_moved(point: Vector2)
 const HEX := Vector2(80, 76)
 const ORIGIN := Vector2(70, 70)
 const ART := {"dune_stalker": "enemy_scout"}  # units sharing another unit's sprite
@@ -20,6 +22,10 @@ var hover_kind := ""
 var hover_label := ""
 ## A stack highlighted from outside the board (initiative bar hover).
 var highlight_key := ""
+## Move-and-attack preview: the hex the active stack would strike from, and
+## the walk there (cells after the start, ending on stand_cell).
+var stand_cell: Array = []
+var walk_path: Array = []
 var _forecast: Label
 
 static func unit_texture(id: String) -> Texture2D:
@@ -56,6 +62,7 @@ static func cell_at(point: Vector2) -> Array:
 
 func _clicked(event: InputEvent) -> void:
     if event is InputEventMouseMotion:
+        pointer_moved.emit(event.position)
         var cell := cell_at(event.position)
         if cell != hover_cell:
             hover_cell = cell
@@ -95,6 +102,8 @@ func _draw() -> void:
         points.append(points[0])
         var outline: Color = {"attack": Color("ff9d7a"), "move": Color("c9f0d2"), "blocked": Color("8a7a66")}.get(hover_kind, Color("e8d8b3"))
         draw_polyline(points, outline, 3.0 if hover_kind == "attack" else 2.0, true)
+    if hover_kind == "attack" and not stand_cell.is_empty():
+        _draw_walk()
     for unit in state.get("units", []):
         if unit.count <= 0: continue
         var ring := ""
@@ -105,6 +114,27 @@ func _draw() -> void:
         points.append(points[0])
         draw_polyline(points, Color("f7d580") if ring == "active" else Color("ffffff"), 3.0, true)
     _place_forecast()
+
+## Standing hex (sword side) and the dotted walk leading to it.
+func _draw_walk() -> void:
+    var active := {}
+    for unit in state.get("units", []):
+        if unit.key == state.get("active", ""): active = unit
+    var points := hex_points(cell_point(stand_cell))
+    draw_colored_polygon(points, Color(1.0, 0.72, 0.35, 0.35))
+    points.append(points[0])
+    draw_polyline(points, Color("ffd08a"), 3.0, true)
+    if active.is_empty() or walk_path.is_empty(): return
+    var line := PackedVector2Array([cell_point(active.cell)])
+    for cell in walk_path: line.append(cell_point(cell))
+    draw_polyline(line, Color(1.0, 0.85, 0.55, 0.85), 3.0, true)
+    for k in range(1, line.size()):
+        draw_circle(line[k], 5.0, Color("ffd08a"))
+    # Arrowhead from the standing hex toward the target.
+    var target := cell_point(hover_cell)
+    var tip := cell_point(stand_cell).lerp(target, 0.42)
+    var dir := (target - cell_point(stand_cell)).normalized()
+    draw_colored_polygon(PackedVector2Array([tip + dir * 12, tip + dir.orthogonal() * 8, tip - dir.orthogonal() * 8]), Color("ffd08a"))
 
 ## Attack forecast box, kept above every sprite.
 func _place_forecast() -> void:
@@ -127,7 +157,10 @@ func _place_forecast() -> void:
     _forecast.size = Vector2.ZERO
     var box := _forecast.get_combined_minimum_size()
     var at := cell_point(hover_cell) + Vector2(-box.x / 2, -84)
-    _forecast.position = Vector2(clampf(at.x, 2, size.x - box.x - 2), maxf(at.y, 2))
+    # Keep the standing hex visible: if it lies above the target, show the box below.
+    if not stand_cell.is_empty() and cell_point(stand_cell).y < cell_point(hover_cell).y - 10:
+        at.y = cell_point(hover_cell).y + 46
+    _forecast.position = Vector2(clampf(at.x, 2, size.x - box.x - 2), clampf(at.y, 2, size.y - box.y - 2))
 
 func _add_shadow(actor: Node2D, team_color: Color) -> void:
     var points := PackedVector2Array()

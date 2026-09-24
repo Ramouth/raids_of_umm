@@ -58,22 +58,16 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
 }
 
 std::vector<HexCoord> CombatSession::legal_targets() const {
+    // Shots, adjacent strikes and (HoMM3) walk-then-strike targets.
     if (!engine_ || engine_->isOver()) return {};
-    const auto& actor = engine_->activeUnit();
-    const auto& enemies = actor.isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
-    std::vector<HexCoord> result;
-    for (const auto& unit : enemies.stacks) {
-        if (!unit.isDead() && (actor.pos.distanceTo(unit.pos) == 1 ||
-            (actor.type->isRanged() && actor.shotsLeft > 0))) result.push_back(unit.pos);
-    }
-    return result;
+    return engine_->attackableTiles();
 }
 
 Json CombatSession::failure(const std::string& error) const {
     return {{"ok", false}, {"error", error}};
 }
 
-Json CombatSession::command(const std::string& action, int q, int r) {
+Json CombatSession::command(const std::string& action, int q, int r, int fq, int fr) {
     if (!engine_) return failure("No battle has started.");
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
@@ -93,6 +87,15 @@ Json CombatSession::command(const std::string& action, int q, int r) {
             if (std::find(targets.begin(), targets.end(), cell) == targets.end())
                 return failure("That enemy is out of range.");
             engine_->doAttackAt(cell);
+        } else if (action == "strike") {
+            // Move-and-attack from an explicit standing hex (fq, fr).
+            const auto& foes = engine_->currentTurn().isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
+            int target = -1;
+            for (int i = 0; i < static_cast<int>(foes.stacks.size()); ++i)
+                if (!foes.stacks[i].isDead() && foes.stacks[i].pos == cell) target = i;
+            if (target < 0) return failure("There is no enemy there.");
+            if (!engine_->doAttackFrom(HexCoord{fq, fr}, target))
+                return failure("You cannot strike that enemy from there.");
         } else if (action == "defend") {
             engine_->doDefend();
         } else return failure("Unknown combat action.");
@@ -172,20 +175,42 @@ Json CombatSession::next_round() const {
 }
 
 Json CombatSession::previews() const {
-    // Hover forecast for every stack the active unit may attack right now.
+    // Hover forecast for every stack the active unit may attack this turn.
+    // Each entry lists every standing hex it could strike from ("options",
+    // each with its walk path and exact forecast — pinning depends on the
+    // hex) and the one a plain "attack" order would pick ("best").
     Json out = Json::array();
+    const auto& turn = engine_->currentTurn();
     const auto& actor = engine_->activeUnit();
     const auto& enemies = actor.isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
-    for (int i = 0; i < static_cast<int>(enemies.stacks.size()); ++i) {
-        const AttackPreview p = engine_->previewAttack(i);
-        if (!p.valid) continue;
-        out.push_back({{"key", key(!actor.isPlayer, i)}, {"cell", hex(enemies.stacks[i].pos)},
-            {"ranged", p.ranged}, {"pinned", p.pinned},
+    auto forecast = [](const AttackPreview& p) {
+        return Json{{"ranged", p.ranged}, {"pinned", p.pinned},
             {"damage_min", p.damage.min}, {"damage_max", p.damage.max},
             {"kills_min", p.killsMin}, {"kills_max", p.killsMax},
             {"retaliation", p.retaliation},
             {"retaliation_min", p.retaliationDamage.min}, {"retaliation_max", p.retaliationDamage.max},
-            {"retaliation_kills_min", p.retKillsMin}, {"retaliation_kills_max", p.retKillsMax}});
+            {"retaliation_kills_min", p.retKillsMin}, {"retaliation_kills_max", p.retKillsMax}};
+    };
+    for (int i = 0; i < static_cast<int>(enemies.stacks.size()); ++i) {
+        if (!engine_->canAttack(i)) continue;
+        const HexCoord best = engine_->bestAttackHex(i);
+        Json entry = forecast(engine_->previewAttack(i, best));
+        entry["key"] = key(!actor.isPlayer, i);
+        entry["cell"] = hex(enemies.stacks[i].pos);
+        entry["best"] = hex(best);
+        entry["options"] = Json::array();
+        std::vector<HexCoord> spots = engine_->attackHexesFor(i);
+        if (spots.empty()) spots.push_back(actor.pos);   // a shot from where it stands
+        for (const HexCoord& from : spots) {
+            const AttackPreview p = engine_->previewAttackUnchecked(i, from);
+            if (!p.valid) continue;
+            Json option = forecast(p);
+            option["from"] = hex(from);
+            option["path"] = from == actor.pos ? Json::array()
+                : movement_path(actor.pos, from, turn.isPlayer, turn.stackIndex);
+            entry["options"].push_back(std::move(option));
+        }
+        out.push_back(std::move(entry));
     }
     return out;
 }

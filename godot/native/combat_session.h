@@ -10,7 +10,9 @@ class CombatSession {
 public:
     using Json = nlohmann::json;
     Json start(const std::string& data_dir, const Json& army, const Json& encounter);
-    Json command(const std::string& action, int q = 0, int r = 0);
+    // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
+    // the enemy on (q, r) after walking to the standing hex (fq, fr).
+    Json command(const std::string& action, int q = 0, int r = 0, int fq = 0, int fr = 0);
     Json snapshot() const;
     bool acknowledge(int64_t ticket);
 

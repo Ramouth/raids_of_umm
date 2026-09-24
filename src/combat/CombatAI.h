@@ -12,26 +12,27 @@ class CombatEngine;
  * headless auto-resolve (AdventureSession::autoBattle, battle_sim, demo_bot).
  * Depends only on CombatEngine's public interface — no SDL, no GL.
  *
- * The engine's turn is move OR attack, so every candidate action ends the turn:
+ * Rules (HoMM3): a melee stack may walk and strike in one turn; shooters with
+ * ammo shoot or move.  Every candidate ends the turn:
  *
- *   Attack  — strike an adjacent enemy, or shoot any non-adjacent one.
- *             value = threat removed from the target (its damage-per-turn ×
- *                     fraction of its HP destroyed, expected value of the real
- *                     damage formula) + bonus for wiping the stack out
- *                     − threat we lose to its retaliation.
- *   Move    — step to a reachable hex to set up next turn's attack.
- *             value = best (discounted) attack available from that hex,
- *                     where flanking positions (pinned: ×1.5, no retaliation)
- *                     score higher, targets already claimed by allies are
- *                     devalued (spreading), and hexes crowded by allies cost
- *                     a little
- *                     − first-strike danger: melee enemies next to the hex that
- *                       will strike before us (net of our retaliation).
- *   Defend  — hold position (same position value as staying, slightly less
- *             incoming damage).
+ *   Attack  — one candidate per (standing hex, target): shoot from here,
+ *             strike from here, or walk to any legal hex next to the target
+ *             and strike.  value = threat removed from the target (its
+ *             damage-per-turn × fraction of its HP destroyed, expected value
+ *             of the real damage formula, exact pinning for that hex) + bonus
+ *             for wiping the stack − threat lost to retaliation, plus the
+ *             prospects of the hex we end on minus our exposure there.
+ *   Move    — walk without striking: best (discounted) attack set up for next
+ *             turn — flanking hexes score higher, targets already claimed by
+ *             allies are devalued (spreading), crowded hexes cost a little —
+ *             minus exposure.
+ *   Defend  — hold position (defence bonus lowers exposure); never preferred
+ *             over an available strike.
  *
- * Danger weighting fades out over the rounds (and is off when only the other
- * side has shooters), so two cautious AIs can never stall a battle forever.
+ * Exposure = expected strikes from melee foes that act before our next turn
+ * and can reach the hex (move + attack), net of our retaliation.  Its weight
+ * fades out by round 4 (and is off when only the other side has shooters), so
+ * the weaker side may hold for a round or two but never stalls a battle.
  *
  * Randomness: the best action is picked by a softmax over candidates within a
  * few percent of the top score, using engine.aiRng() — deterministic for a

@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <iostream>
 #include <queue>
+#include <unordered_map>
 #include <unordered_set>
+#include <climits>
 
 CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     : m_player(std::move(player))
@@ -85,23 +87,79 @@ std::vector<HexCoord> CombatEngine::reachableTiles() const {
 
 std::vector<HexCoord> CombatEngine::attackableTiles() const {
     if (isOver()) return {};
-
     const CombatUnit& unit = activeUnit();
     const auto& enemies = unit.isPlayer ? m_enemy.stacks : m_player.stacks;
-
     std::vector<HexCoord> result;
-
-    if (unit.type->isRanged()) {
-        // Ranged: can target any living enemy on the field
-        for (const auto& e : enemies)
-            if (!e.isDead()) result.push_back(e.pos);
-    } else {
-        // Melee: only enemies adjacent to the active unit
-        for (const auto& e : enemies)
-            if (!e.isDead() && unit.pos.distanceTo(e.pos) == 1)
-                result.push_back(e.pos);
-    }
+    for (int i = 0; i < static_cast<int>(enemies.size()); ++i)
+        if (canAttack(i)) result.push_back(enemies[i].pos);
     return result;
+}
+
+namespace {
+bool shootsNow(const CombatUnit& u) { return u.type->isRanged() && u.shotsLeft > 0; }
+}
+
+std::vector<HexCoord> CombatEngine::attackHexesFor(int targetIndex) const {
+    std::vector<HexCoord> out;
+    if (isOver()) return out;
+    const CombatUnit& actor = activeUnit();
+    const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return out;
+    const CombatUnit& target = enemies[targetIndex];
+    if (target.isDead()) return out;
+    if (actor.pos.distanceTo(target.pos) == 1) out.push_back(actor.pos);
+    if (shootsNow(actor)) return out;
+    for (const HexCoord& h : reachableTiles())
+        if (h.distanceTo(target.pos) == 1) out.push_back(h);
+    return out;
+}
+
+bool CombatEngine::canAttackFrom(HexCoord from, int targetIndex) const {
+    if (isOver()) return false;
+    const CombatUnit& actor = activeUnit();
+    const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
+    if (enemies[targetIndex].isDead()) return false;
+    if (from == actor.pos && shootsNow(actor)) return true;
+    for (const HexCoord& h : attackHexesFor(targetIndex))
+        if (h == from) return true;
+    return false;
+}
+
+HexCoord CombatEngine::bestAttackHex(int targetIndex) const {
+    const CombatUnit& actor = activeUnit();
+    if (shootsNow(actor)) return actor.pos;
+    const auto hexes = attackHexesFor(targetIndex);
+    if (hexes.empty()) return actor.pos;
+    if (hexes.front() == actor.pos) return actor.pos;   // already adjacent: stay
+    const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    std::vector<CombatUnit> friends = actor.isPlayer ? m_player.stacks : m_enemy.stacks;
+    const int self = currentTurn().stackIndex;
+    // Walking distance from the actor over free hexes (BFS, same rules as reachableTiles).
+    std::unordered_set<HexCoord> occupied;
+    for (const auto* army : {&m_player, &m_enemy})
+        for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
+    std::unordered_map<HexCoord, int> dist{{actor.pos, 0}};
+    std::queue<HexCoord> frontier;
+    frontier.push(actor.pos);
+    while (!frontier.empty()) {
+        HexCoord h = frontier.front(); frontier.pop();
+        for (int dir = 0; dir < 6; ++dir) {
+            HexCoord n = h.neighbor(dir);
+            if (!CombatMap::inBounds(n) || occupied.count(n) || dist.count(n)) continue;
+            dist[n] = dist[h] + 1;
+            frontier.push(n);
+        }
+    }
+    HexCoord best = hexes.front();
+    int bestKey = INT_MAX;
+    for (const HexCoord& h : hexes) {
+        friends[self].pos = h;
+        const bool pin = isFlanked(enemies[targetIndex], friends);
+        const int key = (pin ? 0 : 1000) + (dist.count(h) ? dist[h] : 999);
+        if (key < bestKey) { bestKey = key; best = h; }
+    }
+    return best;
 }
 
 // ── Movement ──────────────────────────────────────────────────────────────────
@@ -152,6 +210,34 @@ bool CombatEngine::doAttackAt(HexCoord targetHex) {
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 void CombatEngine::doAttack(int targetIndex) {
+    if (isOver()) return;
+    if (canAttack(targetIndex)) {
+        doAttackFrom(bestAttackHex(targetIndex), targetIndex);
+        return;
+    }
+    resolveAttack(targetIndex);   // unreachable: legacy strike in place
+}
+
+bool CombatEngine::doAttackFrom(HexCoord from, int targetIndex) {
+    if (!canAttackFrom(from, targetIndex)) return false;
+    TurnSlot& slot = m_queue[m_turn];
+    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
+                                      : m_enemy.stacks[slot.stackIndex];
+    if (from != actor.pos) {
+        CombatEvent ev;
+        ev.type       = CombatEvent::Type::UnitMoved;
+        ev.isPlayer   = slot.isPlayer;
+        ev.stackIndex = slot.stackIndex;
+        ev.from       = actor.pos;
+        ev.to         = from;
+        m_events.push_back(ev);
+        actor.pos = from;
+    }
+    resolveAttack(targetIndex);
+    return true;
+}
+
+void CombatEngine::resolveAttack(int targetIndex) {
     if (isOver()) return;
 
     TurnSlot& slot = m_queue[m_turn];
@@ -363,18 +449,31 @@ bool CombatEngine::canAttack(int targetIndex) const {
     const CombatUnit& actor = activeUnit();
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
-    const CombatUnit& target = enemies[targetIndex];
-    if (target.isDead()) return false;
-    if (actor.pos.distanceTo(target.pos) == 1) return true;
-    return actor.type->isRanged() && actor.shotsLeft > 0;
+    if (enemies[targetIndex].isDead()) return false;
+    if (shootsNow(actor)) return true;
+    return !attackHexesFor(targetIndex).empty();
 }
 
 AttackPreview CombatEngine::previewAttack(int targetIndex) const {
+    if (!canAttack(targetIndex)) return {};
+    return previewAttack(targetIndex, bestAttackHex(targetIndex));
+}
+
+AttackPreview CombatEngine::previewAttack(int targetIndex, HexCoord from) const {
+    if (!canAttackFrom(from, targetIndex)) return {};
+    return previewAttackUnchecked(targetIndex, from);
+}
+
+AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord from) const {
     AttackPreview p;
-    if (!canAttack(targetIndex)) return p;
-    const CombatUnit& actor = activeUnit();
+    if (isOver()) return p;
+    CombatUnit actor = activeUnit();
+    actor.pos = from;
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
-    const auto& friends = actor.isPlayer ? m_player.stacks : m_enemy.stacks;
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())
+        || enemies[targetIndex].isDead()) return p;
+    std::vector<CombatUnit> friends = actor.isPlayer ? m_player.stacks : m_enemy.stacks;
+    friends[currentTurn().stackIndex].pos = from;
     const CombatUnit& target = enemies[targetIndex];
 
     p.valid  = true;

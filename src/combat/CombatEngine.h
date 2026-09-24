@@ -88,16 +88,38 @@ public:
     // Hexes the active unit can move to this turn (within moveRange, not occupied by friendlies).
     std::vector<HexCoord> reachableTiles()  const;
 
-    // Hexes that contain an enemy adjacent to the active unit (melee),
-    // or all living enemy hexes (ranged).
+    // Hexes of every enemy the active unit can attack this turn: anything a
+    // shooter with ammo can see, plus (HoMM3 move-and-attack) any enemy a
+    // melee stack can walk next to within its move range.
     std::vector<HexCoord> attackableTiles() const;
 
-    // True if the active unit could attack the enemy stack at targetIndex now
-    // (adjacent melee, or any range with shots left).
+    // Legal standing hexes for the active unit to strike enemy `targetIndex`
+    // from: its current hex if already adjacent, plus every reachable empty
+    // hex adjacent to the target.  Shooters with ammo never walk-and-strike,
+    // so for them this is only the current hex (when adjacent).
+    std::vector<HexCoord> attackHexesFor(int targetIndex) const;
+
+    // True if the active unit may attack enemy `targetIndex` standing on `from`
+    // (a shooter with ammo may also shoot from its current hex at any range).
+    bool canAttackFrom(HexCoord from, int targetIndex) const;
+
+    // The standing hex doAttack() would pick: current hex if adjacent (or a
+    // shooter with ammo), otherwise a pinning hex if any, then the shortest walk.
+    // Returns the current hex when the target cannot be reached.
+    HexCoord bestAttackHex(int targetIndex) const;
+
+    // True if the active unit could attack the enemy stack at targetIndex this
+    // turn (shot with ammo, adjacent strike, or walk-then-strike).
     bool canAttack(int targetIndex) const;
 
-    // Preview of the active unit attacking enemy stack targetIndex (see AttackPreview).
+    // Preview of the active unit attacking enemy stack targetIndex from
+    // bestAttackHex() (see AttackPreview).
     AttackPreview previewAttack(int targetIndex) const;
+    // Same, standing on `from` (pinning depends on where the attacker stands).
+    AttackPreview previewAttack(int targetIndex, HexCoord from) const;
+    // previewAttack(target, from) without the legality check (no path search):
+    // only for hexes already taken from attackHexesFor()/the current hex.
+    AttackPreview previewAttackUnchecked(int targetIndex, HexCoord from) const;
 
     // Damage bounds for `attacker` striking `defender` with the current stats
     // (defending bonus, item bonuses, bypass).  `pinned` applies the ×1.5.
@@ -119,8 +141,16 @@ public:
 
     // ── Actions (stubs — damage resolution added in next pass) ───────────────
 
-    // Attack target stack in the opposing army by index.
+    // Attack target stack in the opposing army by index.  A melee stack that
+    // is not adjacent first walks to bestAttackHex() (one move + one strike,
+    // then the turn ends).  An unreachable target is struck from where the
+    // unit stands (legacy/test behaviour — UI callers validate with canAttack).
     void doAttack(int targetIndex);
+
+    // Walk to `from` (if different from the current hex), then attack.
+    // Emits UnitMoved before the attack events so animations play in order.
+    // Returns false (no action) unless canAttackFrom(from, targetIndex).
+    bool doAttackFrom(HexCoord from, int targetIndex);
 
     // Find the enemy stack standing on targetHex and attack it.
     // Returns true if an enemy was found and attacked.
@@ -189,6 +219,10 @@ private:
 
     // Check if either side is fully dead and update m_result accordingly.
     void checkWinCondition();
+
+    // Resolve the active unit's attack (and retaliation) from where it stands,
+    // then advance the turn.
+    void resolveAttack(int targetIndex);
 
     // ATK/DEF multiplier shared by calcDamage and damageRange.
     static double damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender);

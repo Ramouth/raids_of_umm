@@ -138,6 +138,65 @@ func _run() -> void:
     check(scene.cleared_dungeons.has(dungeon) and not scene.enter_dungeon(), "Cleared dungeon cannot be farmed for duplicate loot")
     print("Combat integration: victory, survivors, one-time loot PASS")
 
+    # HoMM3 move-and-attack: pick the side with the cursor, walk and strike in one turn.
+    scene.cleared_dungeons.clear()
+    scene.army = [{"id": "rider_knight", "count": 6}, {"id": "armoured_warrior", "count": 4}]
+    scene.encounter.guards = [{"id": "skeleton_warrior", "count": 20}, {"id": "sand_scorpion", "count": 5}]
+    check(scene.enter_dungeon(), "Move-and-attack fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var walk_target := {}
+    for turn in range(8):
+        for preview in battle.state.previews:
+            for option in preview.options:
+                if not option.path.is_empty(): walk_target = preview
+        if not walk_target.is_empty() and walk_target.options.size() >= 2: break
+        walk_target = {}
+        check(battle.issue("defend"), "Hold until a guard comes into striking reach")
+        await _idle(battle)
+    check(not walk_target.is_empty(), "A guard comes within move + strike reach")
+    if not walk_target.is_empty():
+        var target_cell: Array = walk_target.cell
+        var centre: Vector2 = battle.board.cell_point(target_cell)
+        battle._cell_hovered(Vector2i(target_cell[0], target_cell[1]), true)
+        var picked := {}
+        for option in walk_target.options:
+            # Point the cursor at each legal side in turn: that side must be chosen.
+            var toward: Vector2 = (battle.board.cell_point(option.from) - centre).normalized()
+            battle._pointer_moved(centre + toward * 20.0)
+            if battle._stand.from == option.from: picked[str(option.from)] = true
+        check(picked.size() == walk_target.options.size(), "Cursor side picks every legal standing hex")
+        var walking: Dictionary = {}
+        for option in walk_target.options:
+            if not option.path.is_empty(): walking = option
+        var toward: Vector2 = (battle.board.cell_point(walking.from) - centre).normalized()
+        battle._pointer_moved(centre + toward * 20.0)
+        check(battle.board.stand_cell == walking.from and battle.board.walk_path == walking.path, "Standing hex and walk path are highlighted")
+        check("attack" in battle.status.get_parsed_text() and "damage, kills" in battle.status.get_parsed_text(), "Forecast is shown for the chosen side")
+        if capture: await _capture("combat_hover_strike")
+        var mover: String = battle.state.active
+        var hp_before := 0
+        for unit in battle.state.units:
+            if unit.cell == target_cell: hp_before = int(unit.hp)
+        battle._cell_clicked(Vector2i(target_cell[0], target_cell[1]))
+        check(battle.busy, "Clicking the target orders move + attack")
+        await _idle(battle)
+        var mover_cell: Array = []
+        var hp_after := hp_before
+        for unit in battle.state.units:
+            if unit.key == mover: mover_cell = unit.cell
+            if unit.key == walk_target.key: hp_after = int(unit.hp)
+        check(mover_cell == walking.from, "The stack ends on the chosen standing hex")
+        check(hp_after < hp_before, "The strike lands in the same turn as the walk")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    battle.return_button.pressed.emit()
+    await process_frame
+    print("Combat integration: move-and-attack side choice PASS")
+
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "skeleton_warrior", "count": 1}]
     scene.encounter.guards = [{"id": "djinn", "count": 1000}]

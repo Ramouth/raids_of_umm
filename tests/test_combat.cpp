@@ -1699,21 +1699,11 @@ static const UnitType* aiType(const std::string& name, int speed, int dmg, int h
     return &s_aiTypes.back();
 }
 
-static int nearestFoe(const CombatEngine& eng, const CombatUnit& u) {
-    const auto& foes = u.isPlayer ? eng.enemyArmy().stacks : eng.playerArmy().stacks;
-    int best = -1, bestD = 1 << 20;
-    for (int i = 0; i < (int)foes.size(); ++i) {
-        if (foes[i].isDead()) continue;
-        int d = u.pos.distanceTo(foes[i].pos);
-        if (d < bestD) { bestD = d; best = i; }
-    }
-    return best;
-}
-
 SUITE("CombatAI — two melee stacks split up instead of converging on one target") {
     // Two fast enemy stacks start side by side in mid-field; two identical,
     // slow player stacks wait in opposite corners.  The first enemy picks a
-    // corner; the second must see that target as claimed and go for the other.
+    // corner; the second must see that target as claimed and head for the other
+    // (with move-and-attack both may pause just outside the militia's reach).
     const UnitType* pt = aiType("Militia", 3, 3, 10, 4, 4);
     const UnitType* et = aiType("Raider", 6, 3, 10, 4, 4);
     int split = 0;
@@ -1734,8 +1724,11 @@ SUITE("CombatAI — two melee stacks split up instead of converging on one targe
         CHECK(!eng.currentTurn().isPlayer);
         CombatAI::takeTurn(eng);   // enemy 0
         CombatAI::takeTurn(eng);   // enemy 1
-        const auto& es = eng.enemyArmy().stacks;
-        if (nearestFoe(eng, es[0]) != nearestFoe(eng, es[1])) ++split;
+        // One goes for the north corner, the other for the south corner.
+        int c0, r0, c1, r1;
+        CombatMap::fromHex(eng.enemyArmy().stacks[0].pos, c0, r0);
+        CombatMap::fromHex(eng.enemyArmy().stacks[1].pos, c1, r1);
+        if (std::abs(r0 - r1) >= 2) ++split;
     }
     CHECK_EQ(split, runs);
 }
@@ -1885,6 +1878,145 @@ SUITE("CombatEngine — previewAttack brackets the real damage and kills") {
     CHECK(inRange);
     CHECK(sawRetaliation);
     CHECK(retaliationInRange);
+}
+
+
+// ── Move-and-attack (HoMM3) ───────────────────────────────────────────────────
+
+static CombatEngine duelAt(const UnitType* pt, const UnitType* et, int pCount, int eCount,
+                           HexCoord pPos, HexCoord ePos, uint32_t seed = 7) {
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(CombatUnit::make(pt, pCount, true));
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(CombatUnit::make(et, eCount, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.setSeed(seed);
+    eng.teleportUnit(true, 0, pPos);
+    eng.teleportUnit(false, 0, ePos);
+    return eng;
+}
+
+SUITE("Move-and-attack — melee walks next to a target and strikes in one turn") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2), foe = CombatMap::toHex(4, 2);
+    CombatEngine eng = duelAt(pt, et, 10, 10, start, foe);
+    CHECK_EQ(start.distanceTo(foe), 3);
+    CHECK(eng.canAttack(0));
+    CHECK(!eng.attackableTiles().empty());
+    eng.doAttack(0);
+    const auto& me = eng.playerArmy().stacks[0];
+    CHECK(me.pos != start);
+    CHECK_EQ(me.pos.distanceTo(foe), 1);
+    CHECK(eng.enemyArmy().stacks[0].totalHp() < 100);
+    CHECK(!eng.currentTurn().isPlayer);          // one move + one strike ends the turn
+    auto evs = eng.drainEvents();
+    int moved = -1, attacked = -1;
+    for (int k = 0; k < (int)evs.size(); ++k) {
+        if (evs[k].type == CombatEvent::Type::UnitMoved && moved < 0) moved = k;
+        if (evs[k].type == CombatEvent::Type::UnitAttacked && attacked < 0) attacked = k;
+    }
+    CHECK(moved >= 0 && attacked > moved);       // the walk animates before the blow
+}
+
+SUITE("Move-and-attack — no strike beyond move range + 1") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2), foe = CombatMap::toHex(6, 2);
+    CombatEngine eng = duelAt(pt, et, 10, 10, start, foe);
+    CHECK_EQ(start.distanceTo(foe), 5);
+    CHECK(!eng.canAttack(0));
+    CHECK(eng.attackableTiles().empty());
+    CHECK(eng.attackHexesFor(0).empty());
+    CHECK(!eng.doAttackFrom(foe.neighbor(3), 0));
+    CHECK(eng.currentTurn().isPlayer);           // rejected: still our turn
+    CHECK(!eng.previewAttack(0).valid);
+}
+
+SUITE("Move-and-attack — the standing hex must be empty, reachable and adjacent") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(CombatUnit::make(pt, 10, true));
+    p.stacks.push_back(CombatUnit::make(et, 1, true));   // a slow ally used as a blocker
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(CombatUnit::make(et, 10, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord foe = CombatMap::toHex(4, 2);
+    eng.teleportUnit(true, 0, CombatMap::toHex(1, 2));
+    eng.teleportUnit(true, 1, foe.neighbor(3));
+    eng.teleportUnit(false, 0, foe);
+    const auto spots = eng.attackHexesFor(0);
+    CHECK(!spots.empty());
+    bool allLegal = true;
+    for (const HexCoord& h : spots)
+        allLegal &= h.distanceTo(foe) == 1 && h != foe.neighbor(3) && eng.canMoveTo(h);
+    CHECK(allLegal);
+    CHECK(!eng.canAttackFrom(foe.neighbor(3), 0));      // ally stands there
+    CHECK(!eng.canAttackFrom(foe.neighbor(3).neighbor(3), 0)); // not adjacent to the foe
+    CHECK(!eng.doAttackFrom(foe.neighbor(3), 0));
+    CHECK(eng.currentTurn().isPlayer);
+}
+
+SUITE("Move-and-attack — pinning depends on the chosen standing hex") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* holder = aiType("Holder", 1, 1, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(CombatUnit::make(pt, 10, true));
+    p.stacks.push_back(CombatUnit::make(holder, 5, true));
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(CombatUnit::make(et, 30, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.setSeed(3);
+    const HexCoord foe = CombatMap::toHex(5, 2);
+    eng.teleportUnit(false, 0, foe);
+    eng.teleportUnit(true, 1, foe.neighbor(0));          // ally on one side
+    eng.teleportUnit(true, 0, foe.neighbor(3).neighbor(3).neighbor(4));
+    CHECK(eng.currentTurn().isPlayer && eng.currentTurn().stackIndex == 0);
+    const HexCoord pinHex = foe.neighbor(3), sideHex = foe.neighbor(4);
+    CHECK(eng.canAttackFrom(pinHex, 0));
+    CHECK(eng.canAttackFrom(sideHex, 0));
+    const AttackPreview pin = eng.previewAttack(0, pinHex);
+    const AttackPreview side = eng.previewAttack(0, sideHex);
+    CHECK(pin.valid && pin.pinned && !pin.retaliation);
+    CHECK(side.valid && !side.pinned && side.retaliation);
+    CHECK(pin.damage.min > side.damage.min);
+    CHECK(eng.bestAttackHex(0) == pinHex);
+    CHECK(eng.previewAttack(0).pinned);
+    eng.doAttack(0);
+    bool flanked = false;
+    for (const auto& ev : eng.drainEvents())
+        if (ev.type == CombatEvent::Type::UnitAttacked && ev.wasFlanked) flanked = true;
+    CHECK(flanked);
+    CHECK(eng.playerArmy().stacks[0].pos == pinHex);
+}
+
+SUITE("Move-and-attack — shooters with ammo shoot or move, never walk-and-strike") {
+    const UnitType* archer = aiType("Archer", 6, 4, 10, 5, 5, 3, 12);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2), foe = CombatMap::toHex(3, 2);
+    CombatEngine eng = duelAt(archer, et, 10, 10, start, foe);
+    CHECK(eng.attackHexesFor(0).empty());
+    CHECK(eng.canAttackFrom(start, 0));
+    eng.doAttack(0);
+    CHECK(eng.playerArmy().stacks[0].pos == start);
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, 11);
+}
+
+SUITE("CombatAI — uses move-and-attack when a target is in reach") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    int struck = 0;
+    const int runs = 20;
+    for (uint32_t seed = 1; seed <= runs; ++seed) {
+        const HexCoord start = CombatMap::toHex(1, 2), foe = CombatMap::toHex(4, 1);
+        CombatEngine eng = duelAt(pt, et, 10, 10, start, foe, seed);
+        CombatAI::takeTurn(eng);
+        if (eng.playerArmy().stacks[0].pos.distanceTo(foe) == 1
+            && eng.enemyArmy().stacks[0].totalHp() < 100) ++struck;
+    }
+    CHECK_EQ(struck, runs);
 }
 
 #endif // COMBAT_ENGINE_IMPL

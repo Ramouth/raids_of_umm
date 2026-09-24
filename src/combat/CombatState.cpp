@@ -704,9 +704,18 @@ bool CombatState::handleEvent(void* sdlEvent) {
 
         if (!CombatMap::inBounds(clicked)) return true;
 
-        // Try attack first (click on an attackable enemy hex).
-        // Engine produces events; tickAnimation() will consume them next update().
-        if (m_engine.doAttackAt(clicked)) return true;
+        // Try attack first (click on an attackable enemy hex).  A melee stack
+        // that is not adjacent walks to the engine's best standing hex and
+        // strikes in the same turn (HoMM3 move-and-attack); UnitMoved is queued
+        // before the attack events, so tickAnimation() plays them in order.
+        {
+            const auto& foes = m_engine.enemyArmy().stacks;
+            for (int i = 0; i < static_cast<int>(foes.size()); ++i) {
+                if (foes[i].isDead() || foes[i].pos != clicked) continue;
+                if (m_engine.canAttack(i)) m_engine.doAttack(i);
+                return true;   // an enemy hex is never a move destination
+            }
+        }
 
         // Try move (click on a reachable empty hex).
         // Engine produces UnitMoved event; tickAnimation() animates it.

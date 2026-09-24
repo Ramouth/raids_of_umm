@@ -204,7 +204,7 @@ Balance tool: `godot/native/build/battle_sim data '<army>' '<guards>' [runs]`.
 | 13 | PixelLab art: Old Mine, Kharim + Ushari portraits, Compact + Shariw units/heroes, new mine objects | 🟡 objects + units done (PixelLab + OpenAI) |
 | 14 | **Stage 1 north:** northern map at HoMM3 density, sites, dwellings, zone of control, obelisks + lore codex, families/betrayal story, northern art | ✅ first pass (demo_bot 6/12 won, average day 40, so the race needs tuning) |
 | 15 | **Combat AI + clarity:** scored AI (spreads out, flanks, seeded randomness), turn-order bar, hover damage/kill forecast, combat log, stack inspector | ✅ |
-| 16 | Decide: move **and** attack in one turn (HoMM3) vs today's move **or** attack | ⬜ design decision |
+| 16 | **Move-and-attack in one turn** (HoMM3): melee walks up and strikes; cursor side picks the standing hex; decided 2026-09-24 | ✅ (demo_bot 6/12 won, 4 sealed, 2 timeout) |
 
 ---
 

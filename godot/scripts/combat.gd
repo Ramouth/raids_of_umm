@@ -33,6 +33,9 @@ var _pinned_key := ""
 var _hover_key := ""
 var _hover_cell: Array = []
 var _last_round := 1
+var _pointer := Vector2.ZERO
+## Move-and-attack option picked for the hovered target (standing hex, path, forecast).
+var _stand: Dictionary = {}
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -66,6 +69,7 @@ func _ready() -> void:
     board.cell_clicked.connect(_cell_clicked)
     board.cell_right_clicked.connect(_cell_right_clicked)
     board.cell_hovered.connect(_cell_hovered)
+    board.pointer_moved.connect(_pointer_moved)
     status = _rich(Vector2(36, 630), Vector2(730, 28), 15)
     status.scroll_active = false
     inspection = _rich(Vector2(826, 170), Vector2(415, 262), 16)
@@ -165,13 +169,14 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
-    _log("Battle begins. Each turn a stack either MOVES or ATTACKS — moving ends its turn, so melee stacks strike from where they stand. Archers shoot anyone, with no retaliation.", DIM)
+    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation.", DIM)
     _consume(reply)
     return true
 
-func issue(action: String, cell := Vector2i.ZERO) -> bool:
+func issue(action: String, cell := Vector2i.ZERO, from := Vector2i.ZERO) -> bool:
     if busy or state.is_empty() or state.result != "ongoing": return false
-    var reply := _decode_reply(bridge.act(action, cell.x, cell.y))
+    var raw: String = bridge.strike(cell.x, cell.y, from.x, from.y) if action == "strike" else bridge.act(action, cell.x, cell.y)
+    var reply := _decode_reply(raw)
     if not reply.get("ok", false):
         _log(str(reply.get("error", "Action rejected.")), FOE)
         return false
@@ -185,7 +190,12 @@ func _decode_reply(raw: String) -> Dictionary:
         # type-sensitive, so normalize hex coordinates at this boundary.
         var cells: Array = reply.state.reachable + reply.state.attackable
         for unit in reply.state.units: cells.append(unit.cell)
-        for preview in reply.state.get("previews", []): cells.append(preview.cell)
+        for preview in reply.state.get("previews", []):
+            cells.append(preview.cell)
+            if preview.has("best"): cells.append(preview.best)
+            for option in preview.get("options", []):
+                cells.append(option.from)
+                cells.append_array(option.path)
         for cell in cells:
             cell[0] = int(cell[0])
             cell[1] = int(cell[1])
@@ -376,8 +386,48 @@ func _cell_hovered(cell: Vector2i, inside: bool) -> void:
     board.hover_cell = _hover_cell
     var unit := _unit_at(_hover_cell)
     _hover_key = unit.key if not unit.is_empty() else ""
+    _stand = _pick_stand()
     _update_inspection()
     _update_status()
+
+func _pointer_moved(point: Vector2) -> void:
+    _pointer = point
+    if board.hover_kind == "attack" and _hover_options().size() > 1:
+        var before := _stand
+        _stand = _pick_stand()
+        if _stand != before: _update_status()
+
+## Options (standing hexes) for attacking the hovered enemy; empty if none.
+func _hover_options() -> Array:
+    var unit := _unit_at(_hover_cell)
+    if unit.is_empty(): return []
+    for preview in state.get("previews", []):
+        if preview.key == unit.key: return preview.get("options", [])
+    return []
+
+## HoMM3 sword cursor: the standing hex is the target's neighbour on the side
+## the pointer sits on; if that side is not legal, the closest legal side.
+func _pick_stand() -> Dictionary:
+    var options := _hover_options()
+    if options.is_empty(): return {}
+    if options.size() == 1: return options[0]
+    var centre := Board.cell_point(_hover_cell)
+    var toward := _pointer - centre
+    var best: Dictionary = options[0]
+    var best_score := -INF
+    for option in options:
+        var side := Board.cell_point(option.from) - centre
+        var score := toward.normalized().dot(side.normalized()) if toward.length() > 3.0 else -side.length()
+        if score > best_score:
+            best_score = score
+            best = option
+    if toward.length() <= 3.0:
+        # Pointer dead centre: use the engine's own pick (pin first, then shortest walk).
+        for preview in state.get("previews", []):
+            if preview.cell == _hover_cell:
+                for option in options:
+                    if option.from == preview.best: best = option
+    return best
 
 func _unit_at(cell: Array) -> Dictionary:
     if cell.is_empty(): return {}
@@ -404,20 +454,22 @@ func _update_status() -> void:
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
     elif _hover_cell.is_empty():
-        var how := "shoot or strike" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "attack an adjacent enemy"
-        text = "%s: click a red enemy to %s · a green hex to move (ends the turn) · D to defend · right-click a stack for details." % [_unit_label(state.active), how]
+        var how := "shoot it" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "walk up and strike (cursor picks the side)"
+        text = "%s: click a red enemy to %s · a green hex only moves · D to defend · right-click a stack for details." % [_unit_label(state.active), how]
     elif not unit.is_empty() and not unit.player:
         var preview := {}
         for candidate in state.get("previews", []):
             if candidate.key == unit.key: preview = candidate
+        if not _stand.is_empty() and _stand_matches(preview): preview = _stand
         if preview.is_empty():
             kind = "blocked"
-            text = "[color=#%s]%s is out of reach.[/color] Melee stacks strike only from an adjacent hex: move next to it first (moving ends your turn; it may strike first)." % [FOE.to_html(false), _unit_label(unit.key)]
+            text = "[color=#%s]%s is out of reach this turn[/color] — %s can walk %d hexes and then strike an adjacent enemy." % [FOE.to_html(false), _unit_label(unit.key), _unit_name(state.active), active.get("move", 0)]
         else:
             kind = "attack"
             var damage := _range_text(int(preview.damage_min), int(preview.damage_max))
             var kills := _range_text(int(preview.kills_min), int(preview.kills_max))
-            text = "[b]%s %s[/b]: %s damage, kills %s of %d" % ["Shoot" if preview.ranged else "Attack", _unit_label(unit.key), damage, kills, unit.count]
+            var verb := "Shoot" if preview.ranged else ("Walk up and attack" if not preview.get("path", []).is_empty() else "Attack")
+            text = "[b]%s %s[/b]: %s damage, kills %s of %d" % [verb, _unit_label(unit.key), damage, kills, unit.count]
             label = "%s dmg · %s slain" % [damage, kills]
             if preview.pinned: text += " · [color=#%s]PINNED: +50%%, no retaliation[/color]" % GOLD.to_html(false)
             if preview.ranged: text += " · ranged: no retaliation, no range penalty"
@@ -430,17 +482,32 @@ func _update_status() -> void:
         text = "%s — %s." % [_unit_label(unit.key), "acting now" if unit.key == state.active else "your stack; right-click for details"]
     elif _hover_cell in state.get("reachable", []):
         kind = "move"
-        text = "Move here — this ends %s's turn." % _unit_name(state.active)
+        text = "Move here without attacking — this ends %s's turn." % _unit_name(state.active)
         var near: Array[String] = []
         for other in state.get("units", []):
-            if not other.player and int(other.count) > 0 and _hex_distance(other.cell, _hover_cell) == 1: near.append(_unit_label(other.key))
+            if not other.player and int(other.count) > 0 and not (other.ranged and int(other.shots) > 0) \
+                    and _hex_distance(other.cell, _hover_cell) - 1 <= int(other.move):
+                near.append(_unit_label(other.key))
         if not near.is_empty():
-            text += " [color=#%s]Next to %s: it can strike you before your next turn.[/color]" % [FOE.to_html(false), ", ".join(near)]
+            text += " [color=#%s]In reach of %s: they can walk up and strike first.[/color]" % [FOE.to_html(false), ", ".join(near)]
     else:
         kind = "blocked"
         text = "Out of reach — %s moves up to %d hexes, and cannot pass through stacks." % [_unit_name(state.active), active.get("move", 0)]
     status.text = text
+    var walking: bool = my_turn and kind == "attack" and not _stand.is_empty() and _stand_matches_cell()
+    board.stand_cell = _stand.from if walking and not _stand.path.is_empty() else []
+    board.walk_path = _stand.path if walking else []
     board.set_hover(kind if my_turn else "", label if my_turn else "")
+
+func _stand_matches(preview: Dictionary) -> bool:
+    for option in preview.get("options", []):
+        if option == _stand: return true
+    return false
+
+func _stand_matches_cell() -> bool:
+    for preview in state.get("previews", []):
+        if preview.cell == _hover_cell: return _stand_matches(preview)
+    return false
 
 static func _hex_distance(a: Array, b: Array) -> int:
     var dq: int = int(a[0]) - int(b[0])
@@ -452,7 +519,11 @@ static func _hex_distance(a: Array, b: Array) -> int:
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
     if busy or auto_battle or not state.get("player_turn", false): return
-    if coordinates in state.attackable: issue("attack", cell)
+    if coordinates in state.attackable:
+        if coordinates == _hover_cell and not _stand.is_empty() and _stand_matches_cell():
+            issue("strike", cell, Vector2i(_stand.from[0], _stand.from[1]))
+        else:
+            issue("attack", cell)   # engine picks: pin first, then the shortest walk
     elif coordinates in state.reachable: issue("move", cell)
 
 func _cell_right_clicked(cell: Vector2i) -> void:

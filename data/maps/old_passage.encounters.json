@@ -208,19 +208,19 @@
       "guards": [
         {
           "id": "forest_troll",
-          "count": 8
+          "count": 13
         },
         {
           "id": "highland_bear",
-          "count": 10
+          "count": 12
         },
         {
           "id": "brigand",
-          "count": 20
+          "count": 24
         },
         {
           "id": "grey_wolf",
-          "count": 30
+          "count": 32
         }
       ],
       "reward": {
@@ -232,11 +232,11 @@
       "guards": [
         {
           "id": "forest_troll",
-          "count": 18
+          "count": 28
         },
         {
           "id": "highland_bear",
-          "count": 10
+          "count": 14
         }
       ],
       "reward": {
@@ -248,11 +248,11 @@
       "guards": [
         {
           "id": "ancient_treant",
-          "count": 3
+          "count": 6
         },
         {
           "id": "forest_troll",
-          "count": 8
+          "count": 14
         },
         {
           "id": "grey_wolf",
@@ -325,15 +325,15 @@
       "guards": [
         {
           "id": "barrow_wight",
-          "count": 30
+          "count": 40
         },
         {
           "id": "forest_troll",
-          "count": 6
+          "count": 12
         },
         {
           "id": "skeleton_warrior",
-          "count": 60
+          "count": 70
         }
       ],
       "reward": {
@@ -344,15 +344,15 @@
       "guards": [
         {
           "id": "barrow_wight",
-          "count": 28
+          "count": 38
         },
         {
           "id": "highland_bear",
-          "count": 12
+          "count": 20
         },
         {
           "id": "skeleton_warrior",
-          "count": 60
+          "count": 70
         }
       ],
       "reward": {

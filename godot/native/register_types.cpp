@@ -13,6 +13,7 @@ protected:
     static void _bind_methods() {
         ClassDB::bind_method(D_METHOD("begin_battle", "data_dir", "army_json", "encounter_json"), &UmmCombat::begin_battle);
         ClassDB::bind_method(D_METHOD("act", "action", "q", "r"), &UmmCombat::act);
+        ClassDB::bind_method(D_METHOD("strike", "q", "r", "from_q", "from_r"), &UmmCombat::strike);
         ClassDB::bind_method(D_METHOD("acknowledge", "ticket"), &UmmCombat::acknowledge);
     }
 public:
@@ -26,6 +27,11 @@ public:
     }
     String act(const String& action, int q, int r) {
         try { return encode(session_.command(action.utf8().get_data(), q, r)); }
+        catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
+    }
+    // Move-and-attack: walk to (from_q, from_r), then strike the enemy on (q, r).
+    String strike(int q, int r, int from_q, int from_r) {
+        try { return encode(session_.command("strike", q, r, from_q, from_r)); }
         catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
     }
     bool acknowledge(int64_t ticket) { return session_.acknowledge(ticket); }

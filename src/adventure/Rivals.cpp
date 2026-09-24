@@ -19,7 +19,7 @@ namespace {
 
 constexpr int    MAX_STACKS      = 5;     // CombatMap::GRID_H
 constexpr double AMBUSH_MARGIN   = 1.5;   // attack the hero only when this much stronger
-constexpr double SEARCH_MARGIN   = 1.4;   // search an old mine only when this much stronger
+constexpr double SEARCH_MARGIN   = 1.15;   // search an old mine only when this much stronger
 constexpr double CLEAR_MARGIN    = 1.5;   // attack a guard camp only when this much stronger
 constexpr int    AMBUSH_RANGE    = 10;    // hexes
 constexpr int    RACE_DAY        = 24;    // from here, searching old mines beats capturing
