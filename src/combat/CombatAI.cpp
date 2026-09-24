@@ -21,6 +21,8 @@ constexpr double kDangerWeight     = 0.40;  // exposure to strikes, fades out by
 constexpr double kDefendShield     = 0.10;  // defending takes roughly 10% less damage
 constexpr double kPoolFraction     = 0.08;  // candidates within 8% of the best are eligible
 constexpr double kTemperature      = 0.025; // softmax temperature (fraction of score scale)
+constexpr double kVolleyTieBreak   = 0.2;   // × threat lost to an avoidable volley: prefer, never refuse
+constexpr double kLethalVolley     = 0.5;   // a volley leaving less than this much of the stack is avoided
 constexpr double kCompanionValue   = 1.25;  // companions: their aura and their loss count beyond their damage
 
 constexpr int kCells = CombatMap::GRID_W * CombatMap::GRID_H;
@@ -47,7 +49,8 @@ struct Ctx {
     std::vector<std::array<int, kCells>> reach;  // per foe: walking distance to an attack hex
     std::array<bool, kCells> blocked{};          // living stacks except the actor
     double              dangerWeight = 0;
-    double              volleyFloor = 0;             // cheapest volley of any hex that closes in
+    double              volleyFloor = 0;             // cheapest volley (threat lost) of any hex that closes in
+    double              volleyFloorDamage = 0;       // …and its damage
     double              patience = 1;            // weight of plans vs acting now
     bool                shooter = false;         // actor can shoot this turn
 
@@ -162,15 +165,21 @@ double reactionLoss(const Ctx& c, HexCoord h) {
     if (h == c.actor.pos) return 0;
     double loss = 0;
     for (const auto& r : c.eng.reactionsTo(h)) loss += lossValue(c, r.damage.avg);
-    return std::max(0.0, loss - c.volleyFloor);
+    // Avoiding a volley only postpones it (the next approach draws it too), so
+    // it is a tie-breaker between otherwise equal moves, not a reason to wait.
+    return kVolleyTieBreak * std::max(0.0, loss - c.volleyFloor);
 }
 
-// Fraction of the actor left standing after the volley a walk to h draws.
+// Fraction of the actor left standing after the volley a walk to h draws,
+// beyond the cheapest way of closing in (that much is lost to the archers
+// whatever we do — waiting or sidestepping only lets them shoot on their turn).
 double survivesVolley(const Ctx& c, HexCoord h) {
     if (h == c.actor.pos) return 1;
     double dmg = 0;
     for (const auto& r : c.eng.reactionsTo(h)) dmg += r.damage.avg;
-    return std::clamp(1.0 - dmg / std::max(1, c.actor.totalHp()), 0.0, 1.0);
+    dmg = std::max(0.0, dmg - c.volleyFloorDamage);
+    const double left = std::clamp(1.0 - dmg / std::max(1, c.actor.totalHp()), 0.0, 1.0);
+    return left < kLethalVolley ? left : 1.0;   // only a crippling volley changes the plan
 }
 
 // Value of attacking foe i next turn from hex h (melee), or of shooting it.
@@ -320,9 +329,9 @@ void prepare(Ctx& c) {
         for (const auto& e : c.foes)
             closes |= !e.isDead() && e.pos.distanceTo(h) < e.pos.distanceTo(c.actor.pos);
         if (!closes) continue;
-        double loss = 0;
-        for (const auto& r : c.eng.reactionsTo(h)) loss += lossValue(c, r.damage.avg);
-        if (floor < 0 || loss < floor) floor = loss;
+        double loss = 0, dmg = 0;
+        for (const auto& r : c.eng.reactionsTo(h)) { loss += lossValue(c, r.damage.avg); dmg += r.damage.avg; }
+        if (floor < 0 || loss < floor) { floor = loss; c.volleyFloorDamage = dmg; }
     }
     c.volleyFloor = std::max(0.0, floor);
 }
