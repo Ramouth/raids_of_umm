@@ -243,6 +243,61 @@ func _run() -> void:
     await process_frame
     print("Combat integration: flanking visuals PASS")
 
+    # Line of sight: a shot through a stack is shown, forecast and dealt at half.
+    scene.cleared_dungeons.clear()
+    # Our melee holds; their skeletons advance in front of their brigands.
+    scene.army = [{"id": "desert_archer", "count": 4}, {"id": "armoured_warrior", "count": 30}, {"id": "levy_spearman", "count": 60}]
+    scene.encounter.guards = [{"id": "skeleton_warrior", "count": 60}, {"id": "brigand", "count": 30}, {"id": "grey_wolf", "count": 20}]
+    scene.encounter.seed = int(OS.get_environment("LOS_SEED")) if OS.has_environment("LOS_SEED") else 3
+    scene.state.battle_companions = []
+    check(scene.enter_dungeon(), "Line-of-sight fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var blocked_preview := {}
+    var clear_preview := {}
+    for turn in range(24):
+        if battle.state.result != "ongoing": break
+        var shooter_now: Dictionary = battle.units.get(battle.state.active, {})
+        if shooter_now.get("ranged", false) and int(shooter_now.get("shots", 0)) > 0:
+            for preview in battle.state.previews:
+                if preview.ranged and preview.get("blocked", false): blocked_preview = preview
+                elif preview.ranged: clear_preview = preview
+            if not blocked_preview.is_empty(): break
+        battle.issue("ai" if shooter_now.get("ranged", false) else "defend")
+        await _idle(battle)
+    check(not blocked_preview.is_empty(), "A shot through a stack comes up during the fight")
+    if not blocked_preview.is_empty():
+        var target_key: String = blocked_preview.key
+        battle._cell_hovered(Vector2i(blocked_preview.cell[0], blocked_preview.cell[1]), true)
+        check(battle.board.shot_line.size() == 2 and battle.board.shot_blocked, "The line of fire is drawn as blocked")
+        check("BLOCKED SHOT" in battle.status.get_parsed_text(), "The status line explains the blocked shot")
+        check("blocked" in battle.board.hover_label, "The forecast box marks the shot as blocked")
+        if capture: await _capture("combat_blocked_shot")
+        if not clear_preview.is_empty():
+            battle._cell_hovered(Vector2i(clear_preview.cell[0], clear_preview.cell[1]), true)
+            check(not battle.board.shot_blocked and "clear line of sight" in battle.status.get_parsed_text(), "A clear shot says so")
+        var hp_before := 0
+        for unit in battle.state.units:
+            if unit.key == target_key: hp_before = int(unit.hp)
+        battle._cell_hovered(Vector2i(blocked_preview.cell[0], blocked_preview.cell[1]), true)
+        battle._cell_clicked(Vector2i(blocked_preview.cell[0], blocked_preview.cell[1]))
+        await _idle(battle)
+        var hp_after := hp_before
+        for unit in battle.state.units:
+            if unit.key == target_key: hp_after = int(unit.hp)
+        var dealt := hp_before - hp_after
+        check(dealt >= int(blocked_preview.damage_min) and dealt <= int(blocked_preview.damage_max), "The blocked shot deals what the forecast said (%d in %d–%d)" % [dealt, int(blocked_preview.damage_min), int(blocked_preview.damage_max)])
+        check(battle.history.any(func(line: String): return "blocked shot" in line), "The log records the blocked shot")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    battle.return_button.pressed.emit()
+    await process_frame
+    scene.encounter.erase("seed")
+    print("Combat integration: line of sight PASS")
+
     # Waypoints: Shift+click sets a route; the stack walks it exactly.
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "rider_knight", "count": 6}]

@@ -236,8 +236,9 @@ func _draw_pincer() -> void:
 
 ## Line of fire from the active shooter: gold if clear, red and dashed if a stack is in the way.
 func _draw_shot() -> void:
-    var a := cell_point(shot_line[0]) + Vector2(0, -24)
-    var b := cell_point(shot_line[1]) + Vector2(0, -24)
+    # Centre to centre: exactly the line the engine judges.
+    var a := cell_point(shot_line[0])
+    var b := cell_point(shot_line[1])
     if shot_blocked:
         draw_dashed_line(a, b, DANGER_COLOR, 3.0, 10.0, true)
     else:
@@ -290,6 +291,8 @@ func _place_forecast() -> void:
     var avoid: Array = []
     for cell in [stand_cell, pin_stand, pin_ally]:
         if not cell.is_empty(): avoid.append(cell_point(cell))
+    if shot_line.size() == 2:   # keep the line of fire (and whatever blocks it) in view
+        for k in range(1, 8): avoid.append(cell_point(shot_line[0]).lerp(cell_point(shot_line[1]), k / 8.0))
     var spots := [t + Vector2(-box.x / 2, -84), t + Vector2(-box.x / 2, 46),
                   t + Vector2(44, -box.y / 2 - 20), t + Vector2(-44 - box.x, -box.y / 2 - 20)]
     var at: Vector2 = spots[0]

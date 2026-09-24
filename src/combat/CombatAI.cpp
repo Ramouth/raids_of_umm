@@ -163,7 +163,7 @@ double futureAttackValue(const Ctx& c, int i, HexCoord h, bool shot) {
     me.pos = h;
     const bool pinned = !shot && pinnedFrom(c, i, h);
     DamageRange dmg = CombatEngine::damageRange(me, e, pinned);
-    if (shot && !c.eng.hasLineOfSight(h, e.pos)) {   // a blocked shot loses half
+    if (shot && !c.eng.hasLineOfSight(h, e.pos, &c.actor)) {   // a blocked shot loses half
         dmg.min /= 2; dmg.max /= 2; dmg.avg /= 2;
     }
     double v = killValue(c, i, dmg);

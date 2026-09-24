@@ -651,7 +651,7 @@ func _update_status() -> void:
                 text += " · [color=#%s]a bodyguard takes %s of the blow[/color]" % [GOLD.to_html(false), _range_text(int(preview.guard_min), int(preview.guard_max))]
                 label += " · shielded"
             if preview.ranged and preview.get("blocked", false):
-                text += " · [color=#%s]BLOCKED SHOT: a stack is in the line of fire, half damage[/color]" % FOE.to_html(false)
+                text += " · [color=#%s]BLOCKED SHOT: half damage[/color] (a stack is in the line of fire)" % FOE.to_html(false)
                 label += " · blocked ½"
             elif preview.ranged: text += " · clear line of sight: full damage, no retaliation"
             elif preview.retaliation:

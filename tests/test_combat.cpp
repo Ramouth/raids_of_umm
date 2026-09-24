@@ -2281,4 +2281,61 @@ SUITE("Routes — walk a chosen route, then strike from its end") {
     CHECK(eng.enemyArmy().stacks[0].totalHp() < before);
 }
 
+
+// ── Line of sight: QA ───────────────────────────────────────────────────────────
+
+SUITE("Line of sight — dead stacks do not block; enemies block like friends") {
+    const UnitType* archer = aiType("Archer", 9, 10, 10, 5, 5, 3, 12);
+    const UnitType* body = aiType("Body", 1, 1, 10, 5, 5);
+    const HexCoord from = CombatMap::toHex(1, 2), to = CombatMap::toHex(5, 2), mid = CombatMap::toHex(3, 2);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(archer, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(body, 10, false));
+    e.stacks.push_back(CombatUnit::make(body, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.teleportUnit(true, 0, from);
+    eng.teleportUnit(false, 0, to);
+    eng.teleportUnit(false, 1, mid);
+    CHECK(!eng.hasLineOfSight(from, to));                         // an enemy in the way blocks too
+    CHECK(eng.previewAttack(0).blocked);
+    eng.doAttack(1);                                              // 10 damage kills the lone body
+    CHECK(eng.enemyArmy().stacks[1].isDead());
+    CHECK(eng.hasLineOfSight(from, to));                          // its corpse does not block
+}
+
+SUITE("Line of sight — the same answer in both directions") {
+    const UnitType* body = aiType("Body", 1, 1, 10, 5, 5);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(body, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(body, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.teleportUnit(true, 0, CombatMap::toHex(5, 2));
+    eng.teleportUnit(false, 0, CombatMap::toHex(5, 4));
+    int checked = 0;
+    for (auto a : CombatMap::allHexes())
+        for (auto b : CombatMap::allHexes()) {
+            if (a.distanceTo(b) < 2) continue;
+            CHECK(eng.hasLineOfSight(a, b) == eng.hasLineOfSight(b, a));
+            ++checked;
+        }
+    CHECK(checked > 2000);
+}
+
+SUITE("Line of sight — judging a shot from a new hex ignores the shooter's old hex") {
+    const UnitType* archer = aiType("Archer", 9, 10, 10, 5, 5, 3, 12);
+    const UnitType* body = aiType("Body", 1, 1, 10, 5, 5);
+    const HexCoord old = CombatMap::toHex(3, 2), to = CombatMap::toHex(5, 2), back = CombatMap::toHex(1, 2);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(archer, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(body, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.teleportUnit(true, 0, old);
+    eng.teleportUnit(false, 0, to);
+    CHECK(!eng.hasLineOfSight(back, to));                                          // the archer itself is in the way…
+    CHECK(eng.hasLineOfSight(back, to, &eng.playerArmy().stacks[0]));              // …unless it is the one moving
+}
+
 #endif // COMBAT_ENGINE_IMPL

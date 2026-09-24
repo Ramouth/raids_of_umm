@@ -752,10 +752,11 @@ bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bo
     return target.isDead();
 }
 
-bool CombatEngine::hasLineOfSight(HexCoord from, HexCoord to) const {
+bool CombatEngine::hasLineOfSight(HexCoord from, HexCoord to, const CombatUnit* mover) const {
     std::unordered_set<HexCoord> occupied;
     for (const auto* army : {&m_player, &m_enemy})
-        for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
+        for (const auto& s : army->stacks)
+            if (!s.isDead() && &s != mover) occupied.insert(s.pos);
     for (int nudge : {1, -1}) {
         const auto line = from.lineTo(to, nudge);
         bool clear = true;

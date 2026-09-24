@@ -62,6 +62,8 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
         auto player = make_army(army, true);
         auto enemy = make_army(encounter.at("guards"), false);
         engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy));
+        // Tests and replays may fix the dice and the AI's choices.
+        if (encounter.contains("seed")) engine_->setSeed(encounter.at("seed").get<uint32_t>());
         return response();
     } catch (const std::exception& error) {
         engine_.reset();

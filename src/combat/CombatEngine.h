@@ -139,7 +139,9 @@ public:
     // A shot needs a clear line: any living stack (friend or foe) on a hex
     // between shooter and target blocks it, and a blocked shot does half damage.
     // The line is clear if either side-nudged line is (edge-grazing is fair).
-    bool hasLineOfSight(HexCoord from, HexCoord to) const;
+    // `mover` (if given) is treated as standing on `from` instead of its own
+    // hex — for judging a shot from a hex the unit has not walked to yet.
+    bool hasLineOfSight(HexCoord from, HexCoord to, const CombatUnit* mover = nullptr) const;
 
     // ── Companions ───────────────────────────────────────────────────────────
 
