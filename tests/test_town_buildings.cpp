@@ -135,3 +135,25 @@ SUITE("Town buildings — buildings and today's build survive a save") {
     CHECK(b.town(HOME)->buildings.count("armoury"));
     CHECK(b.buildBlocker(HOME, "marketplace").find("today") != std::string::npos);
 }
+
+SUITE("Town buildings — each town is itself: own starting set, own daily build") {
+    WorldMap map;
+    map.clear(8);
+    map.placeObject({{-6, 0}, ObjType::Town, "Varenhold", 1});
+    map.placeObject({{ 6, 0}, ObjType::Town, "Hallowmere", 1});
+    AdventureSession s;
+    CHECK(!s.start(std::move(map), "data"));
+    rich(s);
+    const HexCoord varen{-6, 0}, hale{6, 0};
+    CHECK(!s.town(varen)->buildings.count("town_hall"));
+    CHECK(s.town(hale)->buildings.count("town_hall") && s.town(hale)->buildings.count("armoury"));   // the Hale seat
+    CHECK(s.canRecruitHere(hale, "armoured_warrior"));
+    CHECK(!s.canRecruitHere(varen, "armoured_warrior"));
+    CHECK(!s.build(varen, "armoury"));
+    CHECK(s.buildBlocker(varen, "marketplace").find("Tomorrow") == 0);
+    CHECK(s.buildBlocker(hale, "citadel").empty());            // Hallowmere's build is still free today
+    CHECK(!s.build(hale, "citadel"));
+    CHECK(!s.town(varen)->buildings.count("citadel"));
+    CHECK_NEAR(s.growthBonus(varen), 0.0, 1e-9);
+    CHECK_NEAR(s.growthBonus(hale), 0.5, 1e-9);
+}

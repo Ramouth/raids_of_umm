@@ -26,3 +26,13 @@ struct BuildingDef {
     int                      attackBonus = 0;
     bool                     starting    = false;   // every town of the faction begins with it
 };
+
+/*
+ * TownDef — what makes one named town itself (buildings.json "towns"):
+ * a title line, its own art, and the buildings it starts with (replacing
+ * the faction's default starting set).
+ */
+struct TownDef {
+    std::string              title, art;
+    std::vector<std::string> starting;
+};

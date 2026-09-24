@@ -42,7 +42,7 @@ Json AdventureSession::saveState() const {
         for (const auto& [id, n] : t.recruitPool) pool[id] = n;
         Json built = Json::array();
         for (const auto& id : t.buildings) built.push_back(id);
-        towns.push_back({{"cell", cellJson(c)}, {"pool", pool}, {"buildings", built}, {"built_on", t.builtOnDay}});
+        towns.push_back({{"cell", cellJson(c)}, {"pool", pool}, {"buildings", built}, {"built_on", t.builtOnDay}, {"last_built", t.lastBuilt}});
     }
     Json explored = Json::array();
     for (const auto& c : m_explored) explored.push_back(cellJson(c));
@@ -117,6 +117,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
                 for (const auto& id : t.at("buildings")) town.buildings.insert(id.get<std::string>());
             }
             town.builtOnDay = t.value("built_on", 0);
+            town.lastBuilt = t.value("last_built", std::string{});
         }
         m_explored.clear();
         for (const auto& c : save.at("explored")) m_explored.insert(cellFrom(c));

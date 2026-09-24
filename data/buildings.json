@@ -206,5 +206,30 @@
       ],
       "attackBonus": 1
     }
-  ]
+  ],
+  "towns": {
+    "Varenhold": {
+      "title": "Seat of House Varen",
+      "art": "screens/town_varenhold.png",
+      "starting": [
+        "village_hall",
+        "fort",
+        "muster_field",
+        "archery_butts"
+      ]
+    },
+    "Hallowmere": {
+      "title": "Seat of House Hale  ·  lent to you by Corvin",
+      "art": "objects/town_north.png",
+      "starting": [
+        "village_hall",
+        "town_hall",
+        "fort",
+        "muster_field",
+        "archery_butts",
+        "armoury",
+        "marketplace"
+      ]
+    }
+  }
 }

@@ -40,6 +40,8 @@ public:
     std::vector<const BuildingDef*> buildingsFor(const std::string& faction) const;
     // The dwelling that unlocks recruiting `unitId`, or nullptr if none is needed.
     const BuildingDef* dwellingFor(const std::string& unitId) const;
+    // A named town's own identity, or nullptr (then faction defaults apply).
+    const TownDef* townDef(const std::string& name) const;
 
     // Returns daily income for a capturable mine type (empty pool if unknown).
     ResourcePool mineIncome(ObjType type) const;
@@ -57,6 +59,7 @@ private:
     std::unordered_map<std::string, SpellDef>     m_spells;
     std::unordered_map<std::string, WondrousItem> m_items;
     std::vector<BuildingDef>                      m_buildings;
+    std::unordered_map<std::string, TownDef>      m_townDefs;
 
     // Stable pointer views (point into m_units / m_spells / m_items after load).
     std::vector<const UnitType*>     m_unitsByTier;

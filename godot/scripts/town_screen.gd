@@ -32,6 +32,8 @@ func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     theme = host.get_node("HUD/Layout").theme  # same fonts and buttons as the adventure HUD
     var town := _town()
+    if can_build and not str(town.get("title", "")).is_empty(): eyebrow_text = "IVORY COMPACT  ·  " + str(town.title).to_upper()
+    if can_build and not str(town.get("art", "")).is_empty(): view_art = "res://content/textures/" + str(town.art)
     _panel(Rect2(24, 18, 1232, 96))
     var title := _label(str(town.get("name", "Town")).to_upper(), 30, Color("f3dfb0"))
     title.position = Vector2(46, 26)
@@ -166,7 +168,8 @@ func _building_card(def: Dictionary, town: Dictionary) -> Control:
     var card := Panel.new()
     card.name = str(def.id)
     card.custom_minimum_size = Vector2(290, 142)
-    var border := Color("7fae7a") if built else (Color("c9a24e") if blocker.is_empty() else Color("5e4a30"))
+    var waiting := blocker.begins_with("Tomorrow")
+    var border := Color("7fae7a") if built else (Color("c9a24e") if blocker.is_empty() else (Color("8a7440") if waiting else Color("5e4a30")))
     card.add_theme_stylebox_override("panel", _style(Color("2b241a") if not built else Color("24301f"), border))
     var box := VBoxContainer.new()
     box.position = Vector2(10, 6)
@@ -188,7 +191,7 @@ func _building_card(def: Dictionary, town: Dictionary) -> Control:
         go.pressed.connect(func(): build(str(def.id)))
         box.add_child(go)
     else:
-        box.add_child(_wrapped_to(blocker, 12, Color("d79a7a"), 270))
+        box.add_child(_wrapped_to(blocker, 12, Color("d8c27a") if waiting else Color("d79a7a"), 270))
     return card
 
 ## Builds through the native session; returns true on success.
@@ -391,8 +394,10 @@ func refresh() -> void:
             return ra < rb if ra != rb else order[a.id] < order[b.id])
         for def in defs: _buildings.add_child(_building_card(def, town))
         var growth := int(round(float(town.get("growth_bonus", 0.0)) * 100.0))
-        _build_note.text = "One building a day%s   ·   Town income %d gold a day   ·   Recruit growth +%d%%" % [
-            " (built today)" if town.get("built_today", false) else "", int(town.get("gold", 0)), growth]
+        var today: String = town.get("built_today_name", "")
+        _build_note.text = "%s   ·   Town income %d gold a day   ·   Recruit growth +%d%%" % [
+            ("Built today: %s — next building tomorrow" % today) if not today.is_empty() else "One building a day: ready",
+            int(town.get("gold", 0)), growth]
     _update_quote()
     for child in _army.get_children(): child.queue_free()
     for stack in state.get("army", []):

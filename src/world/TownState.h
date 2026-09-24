@@ -21,6 +21,7 @@ struct TownState {
     std::unordered_map<std::string, int> recruitPool;  // unitId → count
     std::set<std::string>                buildings;    // buildingIds
     int                                  builtOnDay = 0;
+    std::string                          lastBuilt;    // what went up on builtOnDay
 };
 
 using TownStateMap = std::unordered_map<HexCoord, TownState>;

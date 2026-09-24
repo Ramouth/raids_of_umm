@@ -78,6 +78,12 @@ Json AdventureBridge::snapshot() const {
                          {"owner", session_.owner(obj.pos)}, {"pool", pool},
                          {"buildings", built}, {"blockers", blockers}, {"locked", locked},
                          {"built_today", t->builtOnDay == session_.day()},
+                         {"built_today_name", [&] {
+                             const BuildingDef* b = session_.resources().building(t->lastBuilt);
+                             return t->builtOnDay == session_.day() && b ? b->name : std::string{};
+                         }()},
+                         {"title", [&] { const TownDef* d = session_.resources().townDef(obj.name); return d ? d->title : std::string{}; }()},
+                         {"art", [&] { const TownDef* d = session_.resources().townDef(obj.name); return d ? d->art : std::string{}; }()},
                          {"gold", obj.type == ObjType::Town ? session_.townGold(obj.pos) : 0},
                          {"growth_bonus", session_.growthBonus(obj.pos)}});
     }

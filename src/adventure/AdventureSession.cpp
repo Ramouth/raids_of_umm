@@ -681,6 +681,12 @@ void AdventureSession::ensureBuildings(const HexCoord& c) {
     auto& built = m_towns[c].buildings;
     for (const BuildingDef* b : m_resources->buildingsFor(roster))
         if (built.count(b->id)) return;           // already has this faction's buildings
+    const TownDef* own = m_resources->townDef(obj->name);
+    bool any = false;                            // the town's own starting set, if it has one for this faction
+    if (own)
+        for (const auto& id : own->starting)
+            if (const BuildingDef* b = m_resources->building(id); b && b->faction == roster) { built.insert(id); any = true; }
+    if (any) return;
     for (const BuildingDef* b : m_resources->buildingsFor(roster))
         if (b->starting) built.insert(b->id);
 }
@@ -740,7 +746,10 @@ std::string AdventureSession::buildBlocker(const HexCoord& c, const std::string&
             const BuildingDef* n = m_resources->building(need);
             return "Needs " + (n ? n->name : need) + ".";
         }
-    if (t->builtOnDay == day()) return "Already built here today.";
+    if (t->builtOnDay == day()) {
+        const BuildingDef* today = m_resources->building(t->lastBuilt);
+        return "Tomorrow: " + (today ? today->name : std::string("a building")) + " went up here today.";
+    }
     if (!m_turns.playerFaction().treasury.canAfford(b->cost)) return "You cannot afford it.";
     return "";
 }
@@ -752,6 +761,7 @@ std::optional<std::string> AdventureSession::build(const HexCoord& c, const std:
     m_turns.playerFaction().treasury -= b->cost;
     t.buildings.insert(id);
     t.builtOnDay = day();
+    t.lastBuilt = id;
     if (!b->unlocks.empty())                     // a new dwelling: its first week's recruits
         if (const UnitType* u = m_resources->unit(b->unlocks))
             t.recruitPool[u->id] += static_cast<int>(u->weeklyGrowth * (1.0 + growthBonus(c)) + 0.5);

@@ -133,7 +133,7 @@ func _town_recruiting() -> void:
     town.show_tab("recruit")
     check(not town._cards.get_node("armoured_warrior").find_child("Recruit", true, false).disabled, "Armoured Warriors can now be recruited")
     town.show_tab("market")
-    check("Marketplace" in town._quote.text, "The market asks for a Marketplace first")
+    check("→" in town._quote.text, "Hallowmere's Marketplace lets Varenhold trade too (quote shown)")
     town.find_child("Leave", true, false).pressed.emit()
     await process_frame
     check(scene.open_garrison(), "The hero can garrison Varenhold")

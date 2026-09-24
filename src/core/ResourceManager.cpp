@@ -20,6 +20,7 @@ std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_items.clear();
     m_mineIncome.clear();
     m_buildings.clear();
+    m_townDefs.clear();
     m_unitsByTier.clear();
     m_allSpells.clear();
     m_allItems.clear();
@@ -59,6 +60,11 @@ std::vector<const BuildingDef*> ResourceManager::buildingsFor(const std::string&
 const BuildingDef* ResourceManager::dwellingFor(const std::string& unitId) const {
     for (const auto& b : m_buildings) if (b.unlocks == unitId) return &b;
     return nullptr;
+}
+
+const TownDef* ResourceManager::townDef(const std::string& name) const {
+    auto it = m_townDefs.find(name);
+    return it != m_townDefs.end() ? &it->second : nullptr;
 }
 
 const WondrousItem* ResourceManager::item(const std::string& id) const {
@@ -269,6 +275,16 @@ std::optional<std::string> ResourceManager::loadBuildings(const std::string& pat
     for (const auto& b : m_buildings)
         for (const auto& need : b.requires)
             if (!building(need)) return "ResourceManager: building " + b.id + " requires unknown " + need;
+    const json towns = root.value("towns", json::object());   // keep alive: items() refers into it
+    for (const auto& [name, j] : towns.items()) {
+        TownDef t;
+        t.title    = j.value("title", "");
+        t.art      = j.value("art", "");
+        t.starting = j.value("starting", std::vector<std::string>{});
+        for (const auto& id : t.starting)
+            if (!building(id)) return "ResourceManager: town " + name + " starts with unknown " + id;
+        m_townDefs[name] = std::move(t);
+    }
     return std::nullopt;
 }
 
