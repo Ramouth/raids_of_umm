@@ -38,6 +38,8 @@ var _last_round := 1
 var _pointer := Vector2.ZERO
 ## Move-and-attack option picked for the hovered target (standing hex, path, forecast).
 var _stand: Dictionary = {}
+## Shift+click waypoints: the active stack walks through them in order.
+var waypoints: Array = []
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -184,6 +186,18 @@ func issue(action: String, cell := Vector2i.ZERO, from := Vector2i.ZERO) -> bool
     if not reply.get("ok", false):
         _log(str(reply.get("error", "Action rejected.")), FOE)
         return false
+    _clear_route()
+    _consume(reply)
+    return true
+
+## Walk a chosen route; "strike" then attacks the enemy on `cell` from its end.
+func issue_route(action: String, route: Array, cell := Vector2i.ZERO) -> bool:
+    if busy or state.is_empty() or state.result != "ongoing": return false
+    var reply := _decode_reply(bridge.route(action, JSON.stringify(route), cell.x, cell.y))
+    if not reply.get("ok", false):
+        _log(str(reply.get("error", "Route rejected.")), FOE)
+        return false
+    _clear_route()
     _consume(reply)
     return true
 
@@ -432,12 +446,128 @@ func _pointer_moved(point: Vector2) -> void:
         _stand = _pick_stand()
         if _stand != before: _update_status()
 
+# ── Routes (waypoints) ────────────────────────────────────────────────────────
+
+func _occupied() -> Dictionary:
+    var taken := {}
+    for unit in state.get("units", []):
+        if int(unit.count) > 0 and unit.key != state.get("active", ""): taken[Vector2i(unit.cell[0], unit.cell[1])] = true
+    return taken
+
+static func _neighbours(cell: Vector2i) -> Array:
+    var out := []
+    for d in [Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1)]:
+        var n: Vector2i = cell + d
+        var col := n.x
+        var row := n.y + (col - (col & 1)) / 2
+        if col >= 0 and col < 11 and row >= 0 and row < 5: out.append(n)
+    return out
+
+## Shortest free path from `from` to `to` (cells after `from`), avoiding
+## stacks and the hexes in `used`; [] when there is none.
+func _segment(from: Vector2i, to: Vector2i, used: Dictionary) -> Array:
+    if from == to: return []
+    var blocked := _occupied()
+    var previous := {from: from}
+    var queue: Array[Vector2i] = [from]
+    while not queue.is_empty():
+        var current: Vector2i = queue.pop_front()
+        if current == to: break
+        for next in _neighbours(current):
+            if previous.has(next) or blocked.has(next) or used.has(next): continue
+            previous[next] = current
+            queue.append(next)
+    if not previous.has(to): return []
+    var path := []
+    var cell := to
+    while cell != from:
+        path.push_front([cell.x, cell.y])
+        cell = previous[cell]
+    return path
+
+## The route through the waypoints to `dest` (cells after the active hex),
+## or [] if it cannot be walked; its length may exceed the move range.
+func _route_to(dest: Array) -> Array:
+    var active: Dictionary = units.get(state.get("active", ""), {})
+    if active.is_empty(): return []
+    var at := Vector2i(active.cell[0], active.cell[1])
+    var used := {at: true}
+    var route := []
+    for stop in waypoints + [dest]:
+        var target := Vector2i(stop[0], stop[1])
+        if target == at: continue
+        var leg := _segment(at, target, used)
+        if leg.is_empty(): return []
+        for cell in leg: used[Vector2i(cell[0], cell[1])] = true
+        route.append_array(leg)
+        at = target
+    return route
+
+func _move_range() -> int:
+    return int(units.get(state.get("active", ""), {}).get("move", 0))
+
+## Hexes still reachable after walking through the waypoints.
+func _route_reach() -> Array:
+    if waypoints.is_empty(): return []
+    var so_far := _route_to(waypoints[-1])
+    var left := _move_range() - so_far.size()
+    var used := {}
+    var active: Dictionary = units.get(state.get("active", ""), {})
+    used[Vector2i(active.cell[0], active.cell[1])] = true
+    for cell in so_far: used[Vector2i(cell[0], cell[1])] = true
+    var blocked := _occupied()
+    var out := []
+    var frontier: Array = [Vector2i(waypoints[-1][0], waypoints[-1][1])]
+    for step in left:
+        var next_frontier := []
+        for cell in frontier:
+            for n in _neighbours(cell):
+                if used.has(n) or blocked.has(n): continue
+                used[n] = true
+                out.append([n.x, n.y])
+                next_frontier.append(n)
+        frontier = next_frontier
+    return out
+
+func _clear_route() -> void:
+    waypoints.clear()
+    board.waypoints = waypoints
+    board.route_reach = []
+
+## Shift+click: add a waypoint (or drop it and those after it if clicked again).
+func _toggle_waypoint(cell: Array) -> void:
+    var index := waypoints.find(cell)
+    if index >= 0:
+        waypoints = waypoints.slice(0, index)
+    else:
+        if not _unit_at(cell).is_empty(): return
+        var route := _route_to(cell)
+        if route.is_empty() or route.size() > _move_range():
+            _log("That waypoint is out of reach.", FOE)
+            return
+        waypoints.append(cell)
+    board.waypoints = waypoints
+    board.route_reach = _route_reach()
+    _stand = _pick_stand()
+    _update_status()
+
 ## Options (standing hexes) for attacking the hovered enemy; empty if none.
+## With waypoints, only standing hexes the route can reach, carrying that route.
 func _hover_options() -> Array:
     var unit := _unit_at(_hover_cell)
     if unit.is_empty(): return []
     for preview in state.get("previews", []):
-        if preview.key == unit.key: return preview.get("options", [])
+        if preview.key != unit.key: continue
+        if waypoints.is_empty(): return preview.get("options", [])
+        var routed := []
+        for option in preview.get("options", []):
+            if option.get("ranged", false): continue
+            var route := _route_to(option.from)
+            if route.is_empty() or route.size() > _move_range(): continue
+            var copy: Dictionary = option.duplicate()
+            copy.path = route
+            routed.append(copy)
+        return routed
     return []
 
 ## HoMM3 sword cursor: the standing hex is the target's neighbour on the side
@@ -490,14 +620,19 @@ func _update_status() -> void:
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
     elif _hover_cell.is_empty():
         var how := "shoot it" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "walk up and strike (cursor picks the side)"
-        text = "%s: click a red enemy to %s · a green hex only moves · D to defend · right-click a stack for details." % [_unit_label(state.active), how]
+        text = "%s: click a red enemy to %s · a green hex only moves · Shift+click green hexes to set a route · D to defend." % [_unit_label(state.active), how]
+        if not waypoints.is_empty():
+            text = "Route set through %d waypoint%s: click a green hex to walk it, or an enemy to walk it and strike · Esc or right-click empty ground clears it." % [waypoints.size(), "" if waypoints.size() == 1 else "s"]
 
     elif not unit.is_empty() and not unit.player:
         var preview := {}
         for candidate in state.get("previews", []):
             if candidate.key == unit.key: preview = candidate
         if not _stand.is_empty() and _stand_matches(preview): preview = _stand
-        if preview.is_empty():
+        if not waypoints.is_empty() and not preview.is_empty() and _hover_options().is_empty() and not preview.ranged:
+            kind = "blocked"
+            text = "[color=#%s]Your route cannot reach a side of %s this turn[/color] — move a waypoint, or clear the route (Esc)." % [FOE.to_html(false), _unit_label(unit.key)]
+        elif preview.is_empty():
             kind = "blocked"
             text = "[color=#%s]%s is out of reach this turn[/color] — %s can walk %d hexes and then strike an adjacent enemy." % [FOE.to_html(false), _unit_label(unit.key), _unit_name(state.active), active.get("move", 0)]
         else:
@@ -522,9 +657,11 @@ func _update_status() -> void:
             else: text += " · no retaliation"
     elif not unit.is_empty():
         text = "%s — %s." % [_unit_label(unit.key), "acting now" if unit.key == state.active else "your stack; right-click for details"]
-    elif _hover_cell in state.get("reachable", []):
+    elif (_hover_cell in state.get("reachable", [])) if waypoints.is_empty() else (_hover_cell in board.route_reach or _hover_cell == waypoints[-1]):
         kind = "move"
         text = "Move here without attacking — this ends %s's turn." % _unit_name(state.active)
+        if not waypoints.is_empty():
+            text = "Move along your route (%d of %d hexes, %d waypoint%s) — this ends %s's turn." % [_route_to(_hover_cell).size(), _move_range(), waypoints.size(), "" if waypoints.size() == 1 else "s", _unit_name(state.active)]
         var near: Array[String] = []
         for other in state.get("units", []):
             if not other.player and int(other.count) > 0 and not (other.ranged and int(other.shots) > 0) \
@@ -540,6 +677,7 @@ func _update_status() -> void:
     var walking: bool = my_turn and kind == "attack" and not _stand.is_empty() and _stand_matches_cell()
     board.stand_cell = _stand.from if walking and not _stand.path.is_empty() else []
     board.walk_path = _stand.path if walking else []
+    board.move_path = _route_to(_hover_cell) if my_turn and kind == "move" else []
     board.shot_line = []
     if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("ranged", false):
         board.shot_line = [active.cell, _hover_cell]
@@ -548,7 +686,7 @@ func _update_status() -> void:
 
 func _stand_matches(preview: Dictionary) -> bool:
     for option in preview.get("options", []):
-        if option == _stand: return true
+        if option.from == _stand.get("from", []): return true
     return false
 
 func _stand_matches_cell() -> bool:
@@ -566,6 +704,17 @@ static func _hex_distance(a: Array, b: Array) -> int:
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
     if busy or auto_battle or not state.get("player_turn", false): return
+    if Input.is_key_pressed(KEY_SHIFT):
+        _toggle_waypoint(coordinates)
+        return
+    if not waypoints.is_empty():
+        if coordinates in state.attackable and not _stand.is_empty() and coordinates == _hover_cell and _stand_matches_cell():
+            issue_route("strike", _stand.path, cell)
+        elif _unit_at(coordinates).is_empty():
+            var route := _route_to(coordinates)
+            if not route.is_empty() and route.size() <= _move_range(): issue_route("move", route)
+            else: _log("Your route cannot reach that hex this turn.", FOE)
+        return
     if coordinates in state.attackable:
         if coordinates == _hover_cell and not _stand.is_empty() and _stand_matches_cell():
             issue("strike", cell, Vector2i(_stand.from[0], _stand.from[1]))
@@ -576,6 +725,10 @@ func _cell_clicked(cell: Vector2i) -> void:
 func _cell_right_clicked(cell: Vector2i) -> void:
     var unit := _unit_at([cell.x, cell.y])
     _pinned_key = unit.key if not unit.is_empty() else ""
+    if unit.is_empty() and not waypoints.is_empty():
+        _clear_route()
+        _stand = _pick_stand()
+        _update_status()
     _update_inspection()
 
 func _defend() -> void:
@@ -584,6 +737,11 @@ func _defend() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_D:
         _defend()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not waypoints.is_empty():
+        _clear_route()
+        _stand = _pick_stand()
+        _update_status()
         get_viewport().set_input_as_handled()
 
 func _schedule_ai() -> void:

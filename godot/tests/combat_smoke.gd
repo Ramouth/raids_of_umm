@@ -200,6 +200,48 @@ func _run() -> void:
     await process_frame
     print("Combat integration: move-and-attack side choice PASS")
 
+    # Waypoints: Shift+click sets a route; the stack walks it exactly.
+    scene.cleared_dungeons.clear()
+    scene.army = [{"id": "rider_knight", "count": 6}]
+    scene.encounter.guards = [{"id": "skeleton_warrior", "count": 20}]
+    scene.state.battle_companions = []
+    check(scene.enter_dungeon(), "Route fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var knight: Dictionary = battle.units[battle.state.active]
+    var start := Vector2i(knight.cell[0], knight.cell[1])
+    # A waypoint straight "up" from the knight, then a destination to its right.
+    var waypoint: Array = []
+    for cell in battle.state.reachable:
+        if int(cell[0]) == start.x and int(cell[1]) == start.y - 2: waypoint = cell
+    check(not waypoint.is_empty(), "A hex two steps up is reachable")
+    battle._toggle_waypoint(waypoint)
+    check(battle.waypoints == [waypoint] and battle.board.waypoints == [waypoint], "Shift+click sets a waypoint")
+    check(not battle.board.route_reach.is_empty(), "The reachable area shrinks to what is left after the waypoint")
+    var dest: Array = battle.board.route_reach[0]
+    for cell in battle.board.route_reach:
+        if int(cell[0]) > int(dest[0]): dest = cell
+    var route: Array = battle._route_to(dest)
+    check(route.has(waypoint) and route.size() <= int(knight.move), "The route runs through the waypoint within the move range")
+    battle._cell_hovered(Vector2i(dest[0], dest[1]), true)
+    check(battle.board.move_path == route and "route" in battle.status.get_parsed_text(), "Hovering shows the routed walk")
+    if capture: await _capture("combat_route")
+    battle._cell_clicked(Vector2i(dest[0], dest[1]))
+    await _idle(battle)
+    var moved: Array = []
+    for unit in battle.state.units:
+        if unit.key == knight.key: moved = unit.cell
+    check(moved == dest, "The knight walks the chosen route to its end")
+    check(battle.waypoints.is_empty(), "Acting clears the route")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    battle.return_button.pressed.emit()
+    await process_frame
+    print("Combat integration: waypoint routes PASS")
+
     # Companions: gold-ringed single figures with an aura and a bodyguard.
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "desert_archer", "count": 12}, {"id": "armoured_warrior", "count": 6}]

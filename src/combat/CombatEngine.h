@@ -183,6 +183,15 @@ public:
     // Returns true if an enemy was found and attacked.
     bool doAttackAt(HexCoord targetHex);
 
+    // Walk an exact route (hexes after the current one, ending on the
+    // destination): each step adjacent to the last, in bounds, free of living
+    // stacks, no repeats, at most moveRange steps.  Returns false (no action)
+    // if the route is illegal.  doAttackAlong then strikes enemy targetIndex
+    // from the route's end (or from where it stands if the route is empty).
+    bool isLegalRoute(const std::vector<HexCoord>& route) const;
+    bool doMoveAlong(const std::vector<HexCoord>& route);
+    bool doAttackAlong(const std::vector<HexCoord>& route, int targetIndex);
+
     // Take a defensive stance (sets isDefending; damage bonus applied during resolve).
     void doDefend();
 

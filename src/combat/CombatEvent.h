@@ -102,6 +102,7 @@ struct CombatEvent {
     // Movement endpoints (UnitMoved only)
     HexCoord     from;
     HexCoord     to;
+    std::vector<HexCoord> path;   // UnitMoved: the exact route (after `from`), when one was chosen
 
     // Battle outcome (BattleEnded only)
     CombatResult result         = CombatResult::Ongoing;

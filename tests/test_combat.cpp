@@ -2226,4 +2226,59 @@ SUITE("Line of sight — adjacent hexes and a line grazing an edge stay clear") 
     CHECK(eng.hasLineOfSight({0, 0}, {2, -1}));               // one side of the edge is open
 }
 
+
+// ── Player-chosen routes (waypoints) ────────────────────────────────────────────
+
+SUITE("Routes — a legal detour is walked hex by hex and reported as the path") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 4);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2);
+    CombatEngine eng = duelAt(pt, et, 10, 10, start, CombatMap::toHex(9, 2));
+    // Up and over: N, NE, then SE — three steps where the straight line takes one or two.
+    const std::vector<HexCoord> detour = {start.neighbor(2), start.neighbor(2).neighbor(1),
+                                          start.neighbor(2).neighbor(1).neighbor(0)};
+    CHECK(eng.isLegalRoute(detour));
+    CHECK(eng.doMoveAlong(detour));
+    CHECK(eng.playerArmy().stacks[0].pos == detour.back());
+    bool reported = false;
+    for (const auto& ev : eng.drainEvents())
+        if (ev.type == CombatEvent::Type::UnitMoved) reported = ev.path == detour;
+    CHECK(reported);
+}
+
+SUITE("Routes — gaps, repeats, blocked hexes and overlong routes are refused") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 3);
+    const UnitType* et = aiType("Dummy", 2, 1, 10, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2);
+    const HexCoord foe = start.neighbor(0).neighbor(0);
+    CombatEngine eng = duelAt(pt, et, 10, 10, start, foe);
+    CHECK(!eng.isLegalRoute({start.neighbor(0).neighbor(0).neighbor(0)}));             // not adjacent
+    CHECK(!eng.isLegalRoute({start.neighbor(0), start}));                              // back onto the start
+    CHECK(!eng.isLegalRoute({start.neighbor(0), foe}));                                // through a stack
+    HexCoord h = start;
+    std::vector<HexCoord> tooLong;
+    for (int i = 0; i < 4; ++i) { h = h.neighbor(5); if (CombatMap::inBounds(h)) tooLong.push_back(h); }
+    tooLong.push_back(tooLong.back().neighbor(0));
+    CHECK(!eng.isLegalRoute(tooLong));                                                 // move range 3
+    CHECK(!eng.doMoveAlong({start.neighbor(0), foe}));
+    CHECK(eng.playerArmy().stacks[0].pos == start);                                    // nothing happened
+}
+
+SUITE("Routes — walk a chosen route, then strike from its end") {
+    const UnitType* pt = aiType("Lancer", 6, 4, 10, 5, 5, 4);
+    const UnitType* et = aiType("Dummy", 2, 1, 100, 5, 5, 3);
+    const HexCoord start = CombatMap::toHex(1, 2);
+    const HexCoord foe = CombatMap::toHex(4, 2);
+    CombatEngine eng = duelAt(pt, et, 10, 10, start, foe);
+    // Come in from above the target rather than straight on.
+    std::vector<HexCoord> route = {start.neighbor(1), start.neighbor(1).neighbor(0)};
+    route.push_back(route.back().neighbor(0));
+    CHECK(route.back().distanceTo(foe) == 1);
+    const int before = eng.enemyArmy().stacks[0].totalHp();
+    CHECK(!eng.doAttackAlong({start.neighbor(1)}, 0));                                 // too far to strike
+    CHECK(eng.doAttackAlong(route, 0));
+    CHECK(eng.playerArmy().stacks[0].pos == route.back());
+    CHECK(eng.enemyArmy().stacks[0].totalHp() < before);
+}
+
 #endif // COMBAT_ENGINE_IMPL

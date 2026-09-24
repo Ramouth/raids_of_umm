@@ -115,6 +115,28 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
     return response();
 }
 
+Json CombatSession::command_route(const std::string& action, const Json& route, int q, int r) {
+    if (!engine_) return failure("No battle has started.");
+    if (awaiting_animation_) return failure("Wait for the current action to finish.");
+    if (engine_->isOver()) return failure("The battle has already ended.");
+    if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
+    std::vector<HexCoord> path;
+    try {
+        for (const auto& cell : route) path.push_back({cell.at(0).get<int>(), cell.at(1).get<int>()});
+    } catch (const std::exception&) { return failure("A route is a list of [q, r] hexes."); }
+    if (action == "move") {
+        if (!engine_->doMoveAlong(path)) return failure("That route is blocked or too long.");
+    } else if (action == "strike") {
+        const auto& foes = engine_->enemyArmy();
+        int target = -1;
+        for (int i = 0; i < static_cast<int>(foes.stacks.size()); ++i)
+            if (!foes.stacks[i].isDead() && foes.stacks[i].pos == HexCoord{q, r}) target = i;
+        if (target < 0) return failure("There is no enemy there.");
+        if (!engine_->doAttackAlong(path, target)) return failure("You cannot strike that enemy along that route.");
+    } else return failure("Unknown route action.");
+    return response();
+}
+
 bool CombatSession::acknowledge(int64_t ticket) {
     if (!awaiting_animation_ || ticket != ticket_) return false;
     awaiting_animation_ = false;
@@ -293,8 +315,12 @@ Json CombatSession::response() {
             const auto& target = (event.targetIsPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.targetIndex];
             item["ranged"] = !event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1;
         }
-        if (event.type == CombatEvent::Type::UnitMoved)
-            item["path"] = movement_path(event.from, event.to, event.isPlayer, event.stackIndex);
+        if (event.type == CombatEvent::Type::UnitMoved) {
+            if (!event.path.empty()) {
+                item["path"] = Json::array();
+                for (const auto& cell : event.path) item["path"].push_back(hex(cell));
+            } else item["path"] = movement_path(event.from, event.to, event.isPlayer, event.stackIndex);
+        }
         events.push_back(std::move(item));
     }
     awaiting_animation_ = true;

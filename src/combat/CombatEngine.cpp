@@ -197,6 +197,67 @@ void CombatEngine::doMove(HexCoord dest) {
     advance();
 }
 
+bool CombatEngine::isLegalRoute(const std::vector<HexCoord>& route) const {
+    if (isOver() || route.empty()) return false;
+    const CombatUnit& actor = activeUnit();
+    if (static_cast<int>(route.size()) > actor.type->moveRange) return false;
+    std::unordered_set<HexCoord> occupied;
+    for (const auto* army : {&m_player, &m_enemy})
+        for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
+    std::unordered_set<HexCoord> seen{actor.pos};
+    HexCoord last = actor.pos;
+    for (const HexCoord& h : route) {
+        if (last.distanceTo(h) != 1 || !CombatMap::inBounds(h) || occupied.count(h) || seen.count(h))
+            return false;
+        seen.insert(h);
+        last = h;
+    }
+    return true;
+}
+
+bool CombatEngine::doMoveAlong(const std::vector<HexCoord>& route) {
+    if (!isLegalRoute(route)) return false;
+    TurnSlot& slot = m_queue[m_turn];
+    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
+                                      : m_enemy.stacks[slot.stackIndex];
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::UnitMoved;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    ev.from       = actor.pos;
+    ev.to         = route.back();
+    ev.path       = route;
+    m_events.push_back(ev);
+    actor.pos = route.back();
+    refreshAuras();
+    advance();
+    return true;
+}
+
+bool CombatEngine::doAttackAlong(const std::vector<HexCoord>& route, int targetIndex) {
+    if (route.empty()) {
+        if (!canAttackFrom(activeUnit().pos, targetIndex)) return false;
+        resolveAttack(targetIndex);
+        return true;
+    }
+    if (!isLegalRoute(route) || !canAttackFrom(route.back(), targetIndex)) return false;
+    TurnSlot& slot = m_queue[m_turn];
+    CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
+                                      : m_enemy.stacks[slot.stackIndex];
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::UnitMoved;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    ev.from       = actor.pos;
+    ev.to         = route.back();
+    ev.path       = route;
+    m_events.push_back(ev);
+    actor.pos = route.back();
+    refreshAuras();
+    resolveAttack(targetIndex);
+    return true;
+}
+
 bool CombatEngine::doAttackAt(HexCoord targetHex) {
     if (isOver()) return false;
 

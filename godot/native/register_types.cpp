@@ -14,6 +14,7 @@ protected:
         ClassDB::bind_method(D_METHOD("begin_battle", "data_dir", "army_json", "encounter_json"), &UmmCombat::begin_battle);
         ClassDB::bind_method(D_METHOD("act", "action", "q", "r"), &UmmCombat::act);
         ClassDB::bind_method(D_METHOD("strike", "q", "r", "from_q", "from_r"), &UmmCombat::strike);
+        ClassDB::bind_method(D_METHOD("route", "action", "route_json", "q", "r"), &UmmCombat::route);
         ClassDB::bind_method(D_METHOD("acknowledge", "ticket"), &UmmCombat::acknowledge);
     }
 public:
@@ -33,6 +34,13 @@ public:
     String strike(int q, int r, int from_q, int from_r) {
         try { return encode(session_.command("strike", q, r, from_q, from_r)); }
         catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
+    }
+    // Player-chosen route (waypoints): "move" along it, or "strike" the enemy on (q, r) from its end.
+    String route(const String& action, const String& route_json, int q, int r) {
+        try {
+            return encode(session_.command_route(action.utf8().get_data(),
+                CombatSession::Json::parse(route_json.utf8().get_data()), q, r));
+        } catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
     }
     bool acknowledge(int64_t ticket) { return session_.acknowledge(ticket); }
 };

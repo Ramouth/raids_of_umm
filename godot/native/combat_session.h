@@ -13,6 +13,9 @@ public:
     // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
     // the enemy on (q, r) after walking to the standing hex (fq, fr).
     Json command(const std::string& action, int q = 0, int r = 0, int fq = 0, int fr = 0);
+    // Player-chosen route: walk `route` ([[q, r], ...], ending on the
+    // destination), then for "strike" attack the enemy on (q, r).
+    Json command_route(const std::string& action, const Json& route, int q = 0, int r = 0);
     Json snapshot() const;
     bool acknowledge(int64_t ticket);
 

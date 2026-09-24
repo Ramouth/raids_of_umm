@@ -32,6 +32,12 @@ var walk_path: Array = []
 ## stack blocks it (half damage).
 var shot_line: Array = []
 var shot_blocked := false
+## Player-chosen route: waypoint cells (in order), and when set, the hexes
+## still reachable after them (replaces the plain reachable area).
+var waypoints: Array = []
+var route_reach: Array = []
+## Route drawn for a plain move hover (cells after the start).
+var move_path: Array = []
 var _forecast: Label
 
 static func unit_texture(id: String) -> Texture2D:
@@ -96,7 +102,8 @@ func _draw() -> void:
             var points := hex_points(cell_point(cell))
             var fill := Color("55402a") if (col + row) % 2 else Color("5e472f")
             if not locked and state.get("player_turn", false):
-                if cell in state.get("reachable", []): fill = Color("405347")
+                var reach: Array = route_reach if not waypoints.is_empty() else state.get("reachable", [])
+                if cell in reach: fill = Color("405347")
                 if cell in state.get("attackable", []): fill = Color("854637")
             draw_colored_polygon(points, fill)
             points.append(points[0])
@@ -111,6 +118,9 @@ func _draw() -> void:
         draw_polyline(points, outline, 3.0 if hover_kind == "attack" else 2.0, true)
     if hover_kind == "attack" and not stand_cell.is_empty():
         _draw_walk()
+    if hover_kind == "move" and not move_path.is_empty():
+        _draw_route(move_path)
+    _draw_waypoints()
     if hover_kind == "attack" and shot_line.size() == 2:
         _draw_shot()
     for unit in state.get("units", []):
@@ -158,6 +168,29 @@ func _draw_danger() -> void:
         for p in hex_points(centre): points.append(centre + (p - centre) * 0.84)
         points.append(points[0])
         draw_polyline(points, DANGER_COLOR, 3.0, true)
+
+func _active_cell() -> Array:
+    for unit in state.get("units", []):
+        if unit.key == state.get("active", ""): return unit.cell
+    return []
+
+## Dotted route from the active stack along `path`.
+func _draw_route(path: Array) -> void:
+    var start := _active_cell()
+    if start.is_empty(): return
+    var line := PackedVector2Array([cell_point(start)])
+    for cell in path: line.append(cell_point(cell))
+    draw_polyline(line, Color(0.75, 1.0, 0.8, 0.85), 3.0, true)
+    for k in range(1, line.size()): draw_circle(line[k], 4.0, Color("c9f0d2"))
+
+## Numbered gold markers on the chosen waypoints.
+func _draw_waypoints() -> void:
+    var font := get_theme_default_font()
+    for i in waypoints.size():
+        var at := cell_point(waypoints[i])
+        draw_circle(at, 13.0, Color("16100a"))
+        draw_circle(at, 11.0, COMPANION_COLOR)
+        draw_string(font, at + Vector2(-5, 6), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("16100a"))
 
 ## Line of fire from the active shooter: gold if clear, red and dashed if a stack is in the way.
 func _draw_shot() -> void:
