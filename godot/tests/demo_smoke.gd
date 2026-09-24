@@ -19,6 +19,13 @@ func check(condition: bool, message: String) -> void:
         failures += 1
         push_error("FAIL: " + message)
 
+## Waits out a walk, pressing OK on any site pop-up as a player would
+## (the chest's choice stays open: the test answers it).
+func _walk(scene: Node) -> void:
+    while scene.hero.moving or (is_instance_valid(scene.popup) and scene.popup != scene._chest_panel):
+        if is_instance_valid(scene.popup) and scene.popup != scene._chest_panel: scene.popup.choose(0)
+        await process_frame
+
 func _capture(label: String) -> void:
     if DisplayServer.get_name() == "headless": return
     await process_frame
@@ -98,7 +105,7 @@ func _story() -> void:
     var path := _tiny_map("demo_offer", [{"id": "skeleton_warrior", "count": 3}], true)
     scene = await _scene(path, WEEK2_ARMY)
     check(scene.travel_to(Vector2i(0, 1)), "Walk to the scholar's camp")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(scene._offer_box.get_child_count() == 1, "The camp's offer appears in the sidebar")
     var gold := int(scene.state.treasury.Gold)
     check(scene.accept_offer("clue"), "Paying for a clue succeeds")
@@ -154,9 +161,9 @@ func _ridge_pass() -> void:
     check(scene._xp_at(RIDGE_GUARD) > 0, "The bridge guards show what victory is worth")
     scene.dialogue.skip_all()
     check(scene.travel_to(Vector2i(-7, 2)), "March down the road toward the Coldwater")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(scene.travel_to(RIDGE_GUARD), "Player can order an attack on the bridge guards")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(is_instance_valid(scene.battle), "Reaching the guards starts a battle")
     check(scene.screens.depth() == 1, "Battle is pushed on the screen stack")
     check(scene.battle.heading.text == "BRIDGE WARDENS", "Battle is titled after the guards")
@@ -197,7 +204,7 @@ func _tiny_map(name: String, mine_guards: Array, with_camp := false) -> String:
 func _passage_wins() -> void:
     var scene := await _scene(_tiny_map("demo_win", [{"id": "skeleton_warrior", "count": 3}]), WEEK2_ARMY)
     check(scene.travel_to(Vector2i(1, 0)), "Player attacks the last old mine")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(is_instance_valid(scene.battle), "The old mine is guarded")
     check(await _auto_battle(scene) == "victory", "The mine guards fall")
     check(scene.state.won, "Clearing the passage mine wins the scenario")
@@ -214,7 +221,7 @@ func _defeat_ends() -> void:
     var scene := await _scene(_tiny_map("demo_loss", [{"id": "ancient_guardian", "count": 3}]),
         [{"id": "levy_spearman", "count": 2}])
     scene.travel_to(Vector2i(1, 0))
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(await _auto_battle(scene) == "defeat", "A token army loses")
     var top: Control = scene.screens.top()
     check(top != null and not top.victory, "Defeat screen is shown when the army falls")
@@ -265,7 +272,7 @@ func _save_load() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
     scene.dialogue.skip_all()
     scene.travel_to(Vector2i(-8, 4))
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     scene.end_day()
     await _turn_done(scene)
     var day: int = scene.state.day
@@ -275,7 +282,7 @@ func _save_load() -> void:
     scene.end_day()
     await _turn_done(scene)
     scene.travel_to(Vector2i(-10, 5))
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(scene.load_game(), "Quickload succeeds")
     check(scene.state.day == day and scene.hero.cell == cell and int(scene.state.treasury.Gold) == gold, "Load restores day, hero and treasury")
     check(scene.army.size() == WEEK2_ARMY.size(), "Load restores the army")
@@ -300,7 +307,7 @@ func _sites() -> void:
     FileAccess.open("user://demo_sites.json", FileAccess.WRITE).store_string(JSON.stringify(map))
     var scene := await _scene("user://demo_sites.json", WEEK2_ARMY)
     check(scene.travel_to(Vector2i(-2, 0)), "Walk to the chest")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     check(is_instance_valid(scene._chest_panel), "The chest offers a choice")
     var xp: int = scene.state.specials[0].xp
     check(scene._xp_bar.visible and scene._xp_title.text.contains("Level 1"), "The XP bar shows the commander's level")
@@ -314,13 +321,20 @@ func _sites() -> void:
     check(not is_instance_valid(scene._chest_panel), "The choice closes")
     check(not scene.map_view.anchors[Vector2i(-2, 0)].visible, "The opened chest leaves the map")
     check(scene.travel_to(Vector2i(0, -2)), "Walk to the obelisk")
-    while scene.hero.moving: await process_frame
+    while scene.hero.moving and not is_instance_valid(scene.popup): await process_frame
+    # HoMM3 pop-up: the walk waits on it; the map ignores clicks until OK.
+    check(is_instance_valid(scene.popup) and scene.popup.title == "Stone", "Visiting the obelisk opens its pop-up")
+    check(scene.popup.reward.contains("leads nowhere"), "The pop-up says what the obelisk revealed")
+    check(not scene.travel_to(Vector2i(-3, 0)), "The map waits while the pop-up is open")
+    if capture: await _capture("map_popup")
+    scene.popup.choose(0)
+    await _walk(scene)
     check(scene.state.ruled_out.size() == 1, "The obelisk rules out a false mine")
     check(scene.notice.text.contains("leads nowhere"), "The obelisk's reading is shown")
     scene.end_day()
     await _turn_done(scene)
     check(scene.travel_to(Vector2i(-1, 2)), "Walk to the wolf den")
-    while scene.hero.moving: await process_frame
+    await _walk(scene)
     await process_frame
     var top: Control = scene.screens.top()
     check(top != null and top.has_method("recruit"), "An owned dwelling opens its recruit screen")

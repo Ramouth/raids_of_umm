@@ -39,6 +39,16 @@ func follow(path: Array[Vector2i]) -> void:
         _journey.tween_callback(_arrive.bind(next))
     _journey.tween_callback(_finish)
 
+## HoMM3: the walk waits while a site's pop-up is open.
+func pause_journey() -> void:
+    if _journey and _journey.is_valid(): _journey.pause()
+    sprite.play("idle")
+
+func resume_journey() -> void:
+    if _journey and _journey.is_valid() and moving:
+        sprite.play("walk")
+        _journey.play()
+
 func _arrive(next: Vector2i) -> void:
     cell = next
     entered_cell.emit(cell)

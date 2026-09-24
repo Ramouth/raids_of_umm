@@ -26,8 +26,12 @@ var _xp_bar: ProgressBar
 var _xp_detail: Label
 var _last_xp := -1
 var _last_level := 1
-var _chest_panel: PanelContainer
+var _chest_panel: Control
+## The open HoMM3-style pop-up (site found, mine claimed, chest choice), if any.
+var popup: Control
+var _popup_queue: Array[Dictionary] = []
 const TownScreen = preload("res://scripts/town_screen.gd")
+const MapPopup = preload("res://scripts/map_popup.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
@@ -327,38 +331,74 @@ func claim_chest(gold: bool) -> bool:
     _apply_state(reply)
     _say(reply)
     notice.text = str(reply.get("found", ""))
-    if is_instance_valid(_chest_panel): _chest_panel.queue_free()
+    if is_instance_valid(_chest_panel):
+        if _chest_panel == popup: popup = null
+        _chest_panel.queue_free()
     _update_expedition()
     return true
 
 func _offer_chest(chest: Dictionary) -> void:
-    if is_instance_valid(_chest_panel): _chest_panel.queue_free()
-    _chest_panel = PanelContainer.new()
-    _chest_panel.name = "ChestChoice"
-    var style := StyleBoxFlat.new()
-    style.bg_color = Color(0.11, 0.08, 0.05, 0.96)
-    style.border_color = Color("a07a44")
-    style.set_border_width_all(2)
-    style.set_content_margin_all(14)
-    _chest_panel.add_theme_stylebox_override("panel", style)
-    var box := VBoxContainer.new()
-    box.add_theme_constant_override("separation", 8)
-    _chest_panel.add_child(box)
-    var title := Label.new()
-    title.text = "%s\nThe lid is stiff with frost. Inside: coin, and a soldier's journal that someone kept for a long time." % str(data.objects.get(hero.cell, {}).get("name", "A chest"))
-    title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    title.custom_minimum_size = Vector2(380, 0)
-    box.add_child(title)
-    var take_gold := Button.new()
-    take_gold.text = "Keep the gold  (+%d Gold)" % int(chest.gold)
-    take_gold.pressed.connect(claim_chest.bind(true))
-    box.add_child(take_gold)
-    var read := Button.new()
-    read.text = "Read the journal  (+%d XP%s)" % [int(chest.xp), _level_note(int(chest.xp))]
-    read.pressed.connect(claim_chest.bind(false))
-    box.add_child(read)
-    $HUD.add_child(_chest_panel)
-    _chest_panel.position = get_viewport_rect().size * 0.5 - Vector2(205, 80)
+    if is_instance_valid(_chest_panel): return
+    var landmark: Dictionary = data.objects.get(hero.cell, {})
+    show_popup({"title": str(landmark.get("name", "A chest")),
+        "flavour": "The lid is stiff with frost. Inside: coin, and a soldier's journal that someone kept for a long time.",
+        "picture": map_view.object_texture(landmark),
+        "buttons": ["Keep the gold  (+%d Gold)" % int(chest.gold), "Read the journal  (+%d XP%s)" % [int(chest.xp), _level_note(int(chest.xp))]]},
+        func(choice: int): claim_chest(choice == 0))
+    _chest_panel = popup
+
+## HoMM3 pop-up: {title, flavour, reward, picture (texture path under content/textures), buttons}.
+## Queued if one is already open; `on_close` receives the chosen button's index.
+func show_popup(spec: Dictionary, on_close := Callable()) -> void:
+    if is_instance_valid(popup):
+        _popup_queue.append({"spec": spec, "on_close": on_close})
+        return
+    var box := MapPopup.new()
+    box.name = "MapPopup"
+    box.title = str(spec.get("title", ""))
+    box.flavour = str(spec.get("flavour", ""))
+    box.reward = str(spec.get("reward", ""))
+    var art := str(spec.get("picture", ""))
+    if not art.is_empty() and ResourceLoader.exists("res://content/textures/" + art): box.picture = load("res://content/textures/" + art)
+    var labels: Array[String] = []
+    for text in spec.get("buttons", ["OK"]): labels.append(str(text))
+    box.buttons = labels
+    box.theme = $HUD/Layout.theme
+    box.closed.connect(func(choice: int):
+        popup = null
+        if on_close.is_valid(): on_close.call(choice)
+        if not _popup_queue.is_empty():
+            var next: Dictionary = _popup_queue.pop_front()
+            show_popup(next.spec, next.on_close)
+        elif hero.moving: hero.resume_journey())
+    popup = box
+    if hero.moving: hero.pause_journey()
+    $HUD.add_child(box)
+
+## A site's pop-up from the engine's "Name: what happened" line.
+func _site_popup(cell: Vector2i, found: String) -> Dictionary:
+    var landmark: Dictionary = data.objects.get(cell, {})
+    var name := str(landmark.get("name", ""))
+    var body := found.trim_prefix(name + ": ") if not name.is_empty() else found
+    var kind := str(landmark.get("kind", ""))
+    var flavour := ""
+    match str(landmark.get("type", "")):
+        "pickup":
+            flavour = {"wood": "A stack of cut timber, left to weather under the pines.",
+                "stone": "Dressed stone from a fallen wall, ready to haul.",
+                "gold": "A soldier's purse, dropped in the grass and never missed.",
+                "crystal": "Frost-clear crystals glitter between the roots.",
+                "obsidian": "Black glass, sharp as the day the mountain spat it out.",
+                "campfire": "An abandoned campfire. Whoever sat here left in a hurry, and left their goods."}.get(kind, "Something worth taking lies here.")
+        "artifact": flavour = "Half-buried in the earth, something waits for a hand to lift it."
+        "mill": flavour = "The miller counts out this week's due." if not body.contains("nothing more") else "The miller shakes his head: you have had this week's due."
+        "stables": flavour = "The stable master brings out fresh horses."
+        "watchtower": flavour = "From the top of the tower, the land for leagues around lies open."
+        "learning_stone": flavour = "Runes cut deep into the stone. Your company reads them by torchlight."
+        "obelisk": flavour = "A black obelisk, older than any house in the marches. Veins of light move under its surface."
+    if not body.is_empty(): body = body.left(1).to_upper() + body.substr(1)
+    return {"title": name if not name.is_empty() else "Found", "flavour": flavour, "reward": body,
+        "picture": map_view.object_texture(landmark) if not landmark.is_empty() else ""}
 
 ## What a site does, for the sidebar (HoMM3 right-click text).
 func _site_text(cell: Vector2i, landmark: Dictionary) -> String:
@@ -678,6 +718,7 @@ func _over_map(point: Vector2) -> bool:
     return point.x >= 0 and point.x < size.x - 310 and point.y > 155 and point.y < size.y - 55
 
 func _unhandled_input(event: InputEvent) -> void:
+    if is_instance_valid(popup): return   # the pop-up has the player's attention
     if event is InputEventMouseButton:
         if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
             _dragging = event.pressed and _over_map(event.position)
@@ -774,7 +815,7 @@ func _inspect(cell: Vector2i) -> void:
     overlay.queue_redraw()
 
 func travel_to(cell: Vector2i) -> bool:
-    if hero.moving or is_instance_valid(battle) or turn_busy:
+    if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup):
         return false
     _inspect(cell)
     if _preview.is_empty():
@@ -812,9 +853,14 @@ func _entered_cell(cell: Vector2i) -> void:
         fog.reveal(step.revealed)
         if not str(step.capture).is_empty():
             notice.text = "%s now flies the Compact's banner." % step.capture
+            var taken: Dictionary = data.objects.get(cell, {})
+            if str(taken.get("type", "")) not in ["town", "dwelling"]:   # towns open their own screen
+                show_popup({"title": str(step.capture), "flavour": "Your banner goes up over %s. It will pay into your treasury every dawn while you hold it." % step.capture,
+                    "picture": map_view.object_texture(taken)})
         if not str(step.get("found", "")).is_empty():
             notice.text = str(step.found)
             _found_on_journey = true
+            show_popup(_site_popup(cell, str(step.found)))
     var landmark: Dictionary = data.objects.get(cell, {})
     sidebar.get_node("Location").text = str(landmark.get("name", "%s · [%d, %d]" % [str(data.tiles[cell].terrain).capitalize(), cell.x, cell.y]))
     overlay.origin = cell
