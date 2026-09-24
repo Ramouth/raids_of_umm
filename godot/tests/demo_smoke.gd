@@ -125,6 +125,7 @@ func _town_recruiting() -> void:
 func _ridge_pass() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
     check(scene._guarded(RIDGE_GUARD), "The Coldwater bridge starts guarded")
+    check(scene._xp_at(RIDGE_GUARD) > 0, "The bridge guards show what victory is worth")
     scene.dialogue.skip_all()
     check(scene.travel_to(Vector2i(-7, 2)), "March down the road toward the Coldwater")
     while scene.hero.moving: await process_frame
@@ -276,7 +277,12 @@ func _sites() -> void:
     while scene.hero.moving: await process_frame
     check(is_instance_valid(scene._chest_panel), "The chest offers a choice")
     var xp: int = scene.state.specials[0].xp
+    check(scene._xp_bar.visible and scene._xp_title.text.contains("Level 1"), "The XP bar shows the commander's level")
+    var hero_xp := int(scene.state.hero_progress.xp)
     check(scene.claim_chest(false), "Taking the experience works")
+    check(int(scene.state.hero_progress.xp) == hero_xp + 500, "The commander gains the chest's experience too")
+    check(int(scene.state.hero_progress.level) >= 3, "500 XP is enough for level 3")
+    check(scene._xp_title.text.contains("tree point"), "Unspent tree points are shown")
     check(int(scene.state.specials[0].xp) == xp + 500, "The companions gain the chest's experience")
     await process_frame
     check(not is_instance_valid(scene._chest_panel), "The choice closes")

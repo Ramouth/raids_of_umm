@@ -231,3 +231,36 @@ SUITE("Demo map — day one: the hero can march on the Bridge Wardens") {
     std::cout << "    hero at (" << s.heroPos().q << "," << s.heroPos().r << "), route " << path.size()
               << ", cost " << s.routeCost(path) << ", moves left " << s.moves() << "\n";
 }
+
+SUITE("Hero XP — the preview matches what a victory pays, and levels give tree points") {
+    WorldMap map = sitesMap();
+    map.placeObject(site({-4, -1}, ObjType::Guard, "Wolves"));
+    auto s = started(std::move(map));
+    CHECK_EQ(s.heroProgress().level, 1);
+    CHECK_EQ(s.heroProgress().points, 0);
+    int preview = s.encounterXp({-4, -1});
+    CHECK(preview >= 20);
+    CHECK_EQ(s.encounterXp({-5, 0}), 0);                 // a pile is not a fight
+    s.travel({-5, 0});
+    CHECK(s.pendingEncounter().has_value());
+    int before = s.heroProgress().xp;
+    s.resolveEncounter(true);
+    CHECK_EQ(s.heroProgress().xp, before + preview);
+    s.travel({-4, 0});                                     // the chest: take the experience
+    s.claimChest(false);
+    CHECK(s.heroProgress().xp >= 500);
+    CHECK(s.heroProgress().level >= 3);                  // 250 xp reaches level 3
+    CHECK_EQ(s.heroProgress().points, s.heroProgress().level - 1);
+    AdventureSession b;
+    const std::string path = "/tmp/raids_test_hero_xp_map.json";
+    WorldMap again = sitesMap();
+    CHECK(!again.saveJson(path));
+    CHECK(!b.start(path, "data"));
+    b.travel({-4, 0});
+    b.claimChest(false);
+    AdventureSession c;
+    CHECK(!c.loadState(Scenario::Json::parse(b.saveState().dump())));
+    CHECK_EQ(c.heroProgress().xp, b.heroProgress().xp);
+    CHECK_EQ(c.heroProgress().level, b.heroProgress().level);
+    CHECK_EQ(c.heroProgress().points, b.heroProgress().points);
+}

@@ -70,6 +70,7 @@ Json AdventureSession::saveState() const {
         {"version", 1},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
         {"stables_week", m_stablesWeek},
+        {"hero_progress", {m_heroProgress.level, m_heroProgress.xp, m_heroProgress.points}},
         {"start", {{"map", m_startArgs->map}, {"data", m_startArgs->data}, {"encounters", m_startArgs->encounters},
                    {"triggers", m_startArgs->triggers}, {"seed", m_startArgs->seed}}},
         {"day", day()},
@@ -147,6 +148,10 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             for (const auto& w : save.at("site_weeks")) m_siteWeek[{w.at(0).get<int>(), w.at(1).get<int>()}] = w.at(2).get<int>();
             for (const auto& c : save.at("visited_once")) m_visitedOnce.insert(cellFrom(c));
             m_stablesWeek = save.value("stables_week", 0);
+        }
+        if (save.contains("hero_progress")) {
+            const Json& hp = save.at("hero_progress");
+            m_heroProgress = {hp.at(0).get<int>(), hp.at(1).get<int>(), hp.at(2).get<int>()};
         }
         m_scenario.loadState(save.at("scenario"));
         m_scenario.drainLines();

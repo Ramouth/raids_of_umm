@@ -98,6 +98,7 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_rivalMoves.clear();
     m_garrisons.clear();
     m_specials.clear();
+    m_heroProgress = HeroProgress{};
     m_startArgs.reset();
     m_pendingAmbush = false;
     m_lost = false;
@@ -466,7 +467,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
     if (auto it = std::find_if(m_rivals.begin(), m_rivals.end(),
             [&](const Rival& r) { return r.alive && r.pos == cell; }); it != m_rivals.end()) {
         if (victory) {
-            grantXp(std::max(40, static_cast<int>(power(it->army) / 3)));
+            grantXp(encounterXp(cell));
             it->alive = false;
             m_scenario.fire(*this, "rival_beaten", {{"name", it->name}});
             report("Ushari", "The " + it->name + " is broken. The land is quieter tonight.");
@@ -484,7 +485,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
     ResourcePool reward = m_encounters[cell].reward;
     if (hasAbility("Warlord")) reward[Resource::Gold] += reward[Resource::Gold] / 2;
     m_turns.playerFaction().treasury += reward;
-    grantXp(std::max(20, static_cast<int>(power(guardsOf(cell)) / 3)));
+    grantXp(encounterXp(cell));
     std::string item = m_encounters[cell].item;
     m_encounters.erase(cell);
     if (!item.empty()) addItem(item);

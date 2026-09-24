@@ -80,7 +80,21 @@ int AdventureSession::sightBonus() const {
     return bonus;
 }
 
+int AdventureSession::encounterXp(const HexCoord& c) const {
+    if (const Rival* r = rivalAt(c)) return std::max(40, static_cast<int>(power(r->army) / 3));
+    if (!m_encounters.count(c)) return 0;
+    return std::max(20, static_cast<int>(power(guardsOf(c)) / 3));
+}
+
 void AdventureSession::grantXp(int xp) {
+    if (xp <= 0) return;
+    m_heroProgress.xp += xp;
+    while (m_heroProgress.xp >= xpForLevel(m_heroProgress.level + 1)) {
+        ++m_heroProgress.level;
+        ++m_heroProgress.points;
+        report("Commander", "You reach level " + std::to_string(m_heroProgress.level)
+               + ". One point to spend in the spell tree.");
+    }
     for (auto& sc : m_specials) {
         if (sc.stationed) continue;
         sc.xp += xp;

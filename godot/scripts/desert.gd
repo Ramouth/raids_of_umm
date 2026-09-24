@@ -21,6 +21,11 @@ var passage_seed := -1
 var unit_names: Dictionary = {}
 var unit_defs: Dictionary = {}
 var item_defs: Dictionary = {}
+var _xp_title: Label
+var _xp_bar: ProgressBar
+var _xp_detail: Label
+var _last_xp := -1
+var _last_level := 1
 var _chest_panel: PanelContainer
 const TownScreen = preload("res://scripts/town_screen.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
@@ -234,10 +239,55 @@ func _apply_state(next: Dictionary) -> void:
     for c in state.get("guarded", []): guarded[Vector2i(c[0], c[1])] = true
     map_view.set_cleared_guards(guarded)
     map_view.mark_sites(state.get("sites", []))
+    _show_xp_gain()
     _sync_inventory()
     if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []))
     _sync_rivals()
     _update_turn_hud()
+
+## Every experience gain floats over the hero; a level-up says what it bought.
+func _show_xp_gain() -> void:
+    var hp: Dictionary = state.get("hero_progress", {})
+    if hp.is_empty(): return
+    var xp := int(hp.xp)
+    if _last_xp >= 0 and xp > _last_xp:
+        var text := "+%d XP" % (xp - _last_xp)
+        if int(hp.level) > _last_level:
+            text += "   LEVEL %d!" % int(hp.level)
+            notice.text = "Level %d reached: one point to spend in the spell tree." % int(hp.level)
+        _float_text(text, Color("f0d070") if int(hp.level) == _last_level else Color("ffe9a0"))
+    _last_xp = xp
+    _last_level = int(hp.level)
+
+func _float_text(text: String, color: Color) -> void:
+    if hero == null or map_view == null: return
+    var label := Label.new()
+    label.text = text
+    label.add_theme_font_size_override("font_size", 20)
+    label.add_theme_color_override("font_color", color)
+    label.add_theme_color_override("font_outline_color", Color("2a1a10"))
+    label.add_theme_constant_override("outline_size", 6)
+    label.z_index = 50
+    label.position = UmmMapData.cell_to_world(hero.cell) + Vector2(-60, -110)
+    label.size = Vector2(160, 30)
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    map_view.add_child(label)
+    var tween := label.create_tween()
+    tween.tween_property(label, "position:y", label.position.y - 50, 1.6)
+    tween.parallel().tween_property(label, "modulate:a", 0.0, 1.6).set_delay(0.6)
+    tween.tween_callback(label.queue_free)
+
+## Experience a victory at 'cell' would give (from the native preview), 0 if none.
+func _xp_at(cell: Vector2i) -> int:
+    for e in state.get("encounter_xp", []):
+        if e[0] == cell.x and e[1] == cell.y: return int(e[2])
+    return 0
+
+## "reaches level 3" when a gain would cross the next threshold.
+func _level_note(gain: int) -> String:
+    var hp: Dictionary = state.get("hero_progress", {})
+    if hp.is_empty(): return ""
+    return "  → level %d!" % (int(hp.level) + 1) if int(hp.xp) + gain >= int(hp.next) else ""
 
 ## Items handed over by the story or found at sites join the combat loot list.
 func _sync_inventory() -> void:
@@ -283,7 +333,7 @@ func _offer_chest(chest: Dictionary) -> void:
     take_gold.pressed.connect(claim_chest.bind(true))
     box.add_child(take_gold)
     var read := Button.new()
-    read.text = "Share out the journal  (+%d experience)" % int(chest.xp)
+    read.text = "Read the journal  (+%d XP%s)" % [int(chest.xp), _level_note(int(chest.xp))]
     read.pressed.connect(claim_chest.bind(false))
     box.add_child(read)
     $HUD.add_child(_chest_panel)
@@ -297,7 +347,7 @@ func _site_text(cell: Vector2i, landmark: Dictionary) -> String:
     match str(landmark.get("type", "")):
         "pickup":
             var kind := str(landmark.get("kind", ""))
-            if kind == "chest": return "A chest: gold, or experience for your companions."
+            if kind == "chest": return "A chest: gold, or experience for you and your companions."
             if kind == "campfire": return "An abandoned camp: gold and timber."
             return "Resources lying unclaimed: %s." % kind.capitalize()
         "artifact": return "Something lies half-buried here." + (" (taken)" if used else "")
@@ -306,7 +356,7 @@ func _site_text(cell: Vector2i, landmark: Dictionary) -> String:
             return "Pays %s once a week.%s" % [pay, " Visited this week." if used else ""]
         "stables": return "Fresh horses: +3 movement until the week ends.%s" % [" Used this week." if used else ""]
         "watchtower": return "Climb it to see far across the land.%s" % [" Visited." if used else ""]
-        "learning_stone": return "Runes that teach the companions (+400 experience, once).%s" % [" Read." if used else ""]
+        "learning_stone": return "Runes that teach: +400 XP, once.%s%s" % [_level_note(400) if not used else "", " Read." if used else ""]
         "obelisk": return "A black stone veined with violet. It shows where the passage is not.%s" % [" Read." if used else ""]
         "dwelling":
             var unit := str(unit_names.get(str(landmark.get("kind", "")), str(landmark.get("kind", "")).capitalize()))
@@ -448,6 +498,7 @@ func load_game() -> bool:
     state = reply
     army = reply.army.duplicate(true)
     state = reply
+    _last_xp = -1  # a loaded game is not a gain
     _quest_count = state.get("quests", []).size()
     _apply_state(state)
     hero.place_at(_hero_cell())
@@ -497,6 +548,34 @@ func _build_turn_hud() -> void:
     _moves_label.add_theme_font_size_override("font_size", 13)
     sidebar.add_child(_moves_label)
     sidebar.move_child(_moves_label, sidebar.get_node("Location").get_index() + 1)
+    # Experience: always on screen, with what the next level brings.
+    _xp_title = Label.new()
+    _xp_title.name = "XpTitle"
+    _xp_title.add_theme_font_size_override("font_size", 13)
+    _xp_title.add_theme_color_override("font_color", Color("f0c870"))
+    sidebar.add_child(_xp_title)
+    sidebar.move_child(_xp_title, _moves_label.get_index() + 1)
+    _xp_bar = ProgressBar.new()
+    _xp_bar.name = "XpBar"
+    _xp_bar.show_percentage = false
+    _xp_bar.custom_minimum_size = Vector2(0, 10)
+    var fill := StyleBoxFlat.new()
+    fill.bg_color = Color("c9a24a")
+    var back := StyleBoxFlat.new()
+    back.bg_color = Color(0.2, 0.15, 0.1)
+    back.border_color = Color("6b5230")
+    back.set_border_width_all(1)
+    _xp_bar.add_theme_stylebox_override("fill", fill)
+    _xp_bar.add_theme_stylebox_override("background", back)
+    sidebar.add_child(_xp_bar)
+    sidebar.move_child(_xp_bar, _xp_title.get_index() + 1)
+    _xp_detail = Label.new()
+    _xp_detail.name = "XpDetail"
+    _xp_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    _xp_detail.add_theme_font_size_override("font_size", 12)
+    _xp_detail.add_theme_color_override("font_color", Color("c8b08a"))
+    sidebar.add_child(_xp_detail)
+    sidebar.move_child(_xp_detail, _xp_bar.get_index() + 1)
     _end_day_button = Button.new()
     _end_day_button.name = "EndDay"
     _end_day_button.text = "End day     E"
@@ -517,6 +596,15 @@ func _update_turn_hud() -> void:
         parts.append(line)
     _treasury_label.text = "    ".join(parts)
     _moves_label.text = "Movement  %.1f / %.0f" % [state.moves, state.moves_max]
+    var hp: Dictionary = state.get("hero_progress", {})
+    if is_instance_valid(_xp_bar) and not hp.is_empty():
+        var span := maxi(1, int(hp.next) - int(hp.prev))
+        _xp_title.text = "Commander  ·  Level %d%s" % [int(hp.level),
+            ("   ·   %d tree point%s to spend" % [int(hp.points), "" if int(hp.points) == 1 else "s"]) if int(hp.points) > 0 else ""]
+        _xp_bar.max_value = span
+        _xp_bar.value = int(hp.xp) - int(hp.prev)
+        _xp_detail.text = "%d / %d XP  ·  %d to level %d (+1 tree point)" % [
+            int(hp.xp) - int(hp.prev), span, int(hp.next) - int(hp.xp), int(hp.level) + 1]
     _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy
 
 ## True while the Shariw turn animates; blocks another End Day.
@@ -635,6 +723,11 @@ func _inspect(cell: Vector2i) -> void:
             sidebar.get_node("Inspection").text = "%s\n%s" % [rival.name, _army_text(rival.army)]
         elif _guarded(cell):
             sidebar.get_node("Inspection").text += "\nGuarded by: " + _army_text(_encounters_for(landmark))
+        var xp_here := _xp_at(cell)
+        if xp_here > 0:
+            var gold := int(_encounter_entry(landmark).get("reward", {}).get("Gold", 0))
+            sidebar.get_node("Inspection").text += "\nVictory: %s+%d XP%s" % [
+                ("%d gold  ·  " % gold) if gold > 0 else "", xp_here, _level_note(xp_here)]
         var about := _site_text(cell, landmark)
         if not about.is_empty():
             sidebar.get_node("Inspection").text += "\n" + about
@@ -865,6 +958,7 @@ func _begin_encounter(encounter: Dictionary) -> void:
     _encounter_type = str(encounter.type)
     var guards := {"guards": encounter.guards, "reward": encounter.item}
     notice.text = ("The %s attacks!" if encounter.type == "ambush" else "%s bars the way!") % encounter.name
+    if int(encounter.get("xp", 0)) > 0: notice.text += "  Victory is worth +%d XP." % int(encounter.xp)
     if army.is_empty() or not start_battle(guards, str(encounter.name), _encounter_finished):
         adventure.resolve_encounter(false)
 
@@ -950,6 +1044,7 @@ func _restart() -> void:
     inventory.clear()
     cleared_dungeons.clear()
     if not _start_adventure(): return
+    _last_xp = -1
     _apply_state(state)
     _say(state)
     hero.place_at(_hero_cell())

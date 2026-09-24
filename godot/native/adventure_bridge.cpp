@@ -42,8 +42,19 @@ Json AdventureBridge::snapshot() const {
     for (const auto& [coord, ctrl] : session_.control())
         owners.push_back({coord.q, coord.r, ctrl.ownerFaction});
     Json guarded = Json::array();
+    Json encounter_xp = Json::array();   // [q, r, xp]: what beating each camp is worth
     for (const auto& obj : session_.map().objects())
-        if (session_.isEncounter(obj.pos)) guarded.push_back(cell(obj.pos));
+        if (session_.isEncounter(obj.pos)) {
+            guarded.push_back(cell(obj.pos));
+            encounter_xp.push_back({obj.pos.q, obj.pos.r, session_.encounterXp(obj.pos)});
+        }
+    for (const auto& r : session_.rivals())
+        if (r.alive && session_.isVisible(r.pos))
+            encounter_xp.push_back({r.pos.q, r.pos.r, session_.encounterXp(r.pos)});
+    const auto& hp = session_.heroProgress();
+    Json hero_progress = {{"level", hp.level}, {"xp", hp.xp}, {"points", hp.points},
+                          {"prev", AdventureSession::xpForLevel(hp.level)},
+                          {"next", AdventureSession::xpForLevel(hp.level + 1)}};
     Json army = Json::array();
     for (const auto& s : session_.army()) army.push_back({{"id", s.id}, {"count", s.count}});
     Json towns = Json::array();
@@ -129,7 +140,8 @@ Json AdventureBridge::snapshot() const {
                    {"type", type},
                    {"guards", enc ? Json::parse(enc->guardsJson) : Json::array()},
                    {"reward", enc ? pool(enc->reward) : Json::object()},
-                   {"item", enc ? enc->item : ""}};
+                   {"item", enc ? enc->item : ""},
+                   {"xp", session_.encounterXp(*at)}};
     }
     return {
         {"ok", true},
@@ -143,6 +155,8 @@ Json AdventureBridge::snapshot() const {
         {"visible", cells(session_.visible())},
         {"explored", cells(session_.explored())},
         {"guarded", guarded},
+        {"encounter_xp", encounter_xp},
+        {"hero_progress", hero_progress},
         {"encounter", pending},
         {"sites", sites},
         {"chest", chest},

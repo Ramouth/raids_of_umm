@@ -39,4 +39,10 @@ func _run() -> void:
     scene.dialogue.skip_all()
     scene.toggle_quest_log()
     await _shot("north_questlog")
+    scene.toggle_quest_log()
+    scene.fog.visible = false
+    scene.camera.position = UmmMapData.cell_to_world(Vector2i(-7, 3))
+    scene._inspect(Vector2i(-4, 2))
+    scene._float_text("+85 XP   LEVEL 2!", Color("ffe9a0"))
+    await _shot("north_xp")
     quit()

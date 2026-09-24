@@ -151,6 +151,14 @@ public:
     std::optional<std::string> acceptOffer(const std::string& id);
     int minesHeld(int faction = Faction::Player) const;
 
+    // ── Hero growth (Specials.cpp) ───────────────────────────────────────────
+    // The commander levels from the same experience as the companions; each
+    // level after the first is one point to spend in the spell tree.
+    struct HeroProgress { int level = 1; int xp = 0; int points = 0; };
+    const HeroProgress& heroProgress() const { return m_heroProgress; }
+    // Experience a victory at 'c' would give (guards, old mines, war-bands); 0 = none.
+    int encounterXp(const HexCoord& c) const;
+
     // ── Special characters (see Specials.cpp) ────────────────────────────────
     struct Ability { int level; std::string name, text; };
     struct Special {
@@ -270,6 +278,7 @@ private:
     std::unordered_set<std::string>  m_items;
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::vector<Special>             m_specials;
+    HeroProgress                     m_heroProgress;
     struct StartArgs { std::string map, data, encounters, triggers; uint32_t seed = 0; };
     std::optional<StartArgs>         m_startArgs;   // set when started from files
     std::vector<Rival>               m_rivals;
