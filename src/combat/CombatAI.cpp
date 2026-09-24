@@ -21,7 +21,7 @@ constexpr double kDangerWeight     = 0.40;  // exposure to strikes, fades out by
 constexpr double kDefendShield     = 0.10;  // defending takes roughly 10% less damage
 constexpr double kPoolFraction     = 0.08;  // candidates within 8% of the best are eligible
 constexpr double kTemperature      = 0.025; // softmax temperature (fraction of score scale)
-constexpr double kCompanionValue   = 2.5;   // companions: their aura and their loss count far beyond their damage
+constexpr double kCompanionValue   = 1.25;  // companions: their aura and their loss count beyond their damage
 
 constexpr int kCells = CombatMap::GRID_W * CombatMap::GRID_H;
 constexpr int kFar   = INT_MAX / 4;

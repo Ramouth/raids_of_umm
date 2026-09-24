@@ -213,7 +213,7 @@ func _run() -> void:
     for unit in battle.state.units:
         if unit.get("companion", false): ushari = unit
     check(not ushari.is_empty() and ushari.name == "Ushari", "Ushari rides into battle")
-    check(int(ushari.get("unit_hp", 0)) == 70, "Her health grows with her level (60 + 10)")
+    check(int(ushari.get("unit_hp", 0)) == 85, "Her health grows with her level (75 + 10)")
     check(ushari.get("cell", []) == [0, 2], "She starts at the centre of the back line")
     check(not str(ushari.get("bodyguard", "")).is_empty(), "A troop stack beside her is her bodyguard")
     var shielded := false

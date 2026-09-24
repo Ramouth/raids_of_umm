@@ -743,7 +743,8 @@ std::vector<int> CombatEngine::threatsTo(bool isPlayer, int index) const {
     for (int i = 0; i < static_cast<int>(foes.size()); ++i) {
         const CombatUnit& f = foes[i];
         if (f.isDead()) continue;
-        bool reaches = shootsNow(f) || f.pos.distanceTo(at) == 1;
+        // A shooter counts only with a clear line: a blocked shot is half a threat.
+        bool reaches = (shootsNow(f) && hasLineOfSight(f.pos, at)) || f.pos.distanceTo(at) == 1;
         if (!reaches)
             for (const HexCoord& h : reachableFor(f))
                 if (h.distanceTo(at) == 1) { reaches = true; break; }
@@ -832,14 +833,33 @@ void CombatEngine::placeArmies() {
     auto pSpawns = CombatMap::playerSpawns();
     auto eSpawns = CombatMap::enemySpawns();
 
-    // Companions take the back-line hexes first (centre outwards); the troops
-    // fill the rest of the back line, then the column in front of it.
+    // Companions take the back-line hexes first (centre outwards).  Troops
+    // then wall them in — the free hexes around a companion, front ones first —
+    // and fill the rest of the back line, then the column in front of it.
     auto place = [](CombatArmy& army, std::vector<HexCoord> spawns, int frontCol) {
         for (int row : {2, 1, 3, 0, 4}) spawns.push_back(CombatMap::toHex(frontCol, row));
+        std::vector<HexCoord> taken;
         size_t next = 0;
-        for (bool companions : {true, false})
-            for (auto& s : army.stacks)
-                if (s.isSpecialCharacter == companions && next < spawns.size()) s.pos = spawns[next++];
+        for (auto& s : army.stacks)
+            if (s.isSpecialCharacter && next < spawns.size()) taken.push_back(s.pos = spawns[next++]);
+        std::vector<HexCoord> order;
+        auto add = [&](HexCoord h) {
+            if (std::find(spawns.begin(), spawns.end(), h) == spawns.end()) return;   // not a deployment hex
+            if (std::find(taken.begin(), taken.end(), h) != taken.end()) return;
+            if (std::find(order.begin(), order.end(), h) != order.end()) return;
+            order.push_back(h);
+        };
+        std::vector<HexCoord> around;
+        for (const HexCoord& c : taken)
+            for (int dir = 0; dir < 6; ++dir) around.push_back(c.neighbor(dir));
+        std::stable_sort(around.begin(), around.end(), [frontCol](HexCoord a, HexCoord b) {
+            return std::abs(a.q - frontCol) < std::abs(b.q - frontCol);   // front first
+        });
+        for (const HexCoord& h : around) add(h);
+        for (const HexCoord& h : spawns) add(h);
+        size_t k = 0;
+        for (auto& s : army.stacks)
+            if (!s.isSpecialCharacter && k < order.size()) s.pos = order[k++];
     };
     place(m_player, pSpawns, 1);
     place(m_enemy, eSpawns, CombatMap::GRID_W - 2);

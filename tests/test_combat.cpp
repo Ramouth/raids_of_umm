@@ -2063,7 +2063,7 @@ SUITE("Companions — one figure; level growth goes into hp, attack, defence and
     CHECK_EQ(u.damageBonus, 4);
 }
 
-SUITE("Companions — spawn on the back line first, troops fill in around them") {
+SUITE("Companions — spawn on the back line first, troops wall them in, front first") {
     const UnitType* troop = aiType("Levy", 4, 2, 10, 5, 5);
     const UnitType* c = companionType("Captain", 20, 60, 3);
     CombatArmy p; p.isPlayer = true;
@@ -2073,7 +2073,30 @@ SUITE("Companions — spawn on the back line first, troops fill in around them")
     e.stacks.push_back(CombatUnit::make(troop, 10, false));
     CombatEngine eng(std::move(p), std::move(e));
     CHECK(eng.playerArmy().stacks[1].pos == CombatMap::toHex(0, 2));   // the centre of the back line
-    CHECK(eng.playerArmy().stacks[0].pos == CombatMap::toHex(0, 1));
+    CHECK_EQ(eng.playerArmy().stacks[0].pos.distanceTo(CombatMap::toHex(0, 2)), 1);   // walling her in
+    CHECK_EQ(eng.playerArmy().stacks[0].pos.q, 1);                                    // on her front side
+}
+
+// A full army: four troop stacks close every hex around the companion.
+SUITE("Companions — with four troop stacks the companion starts fully enclosed") {
+    const UnitType* troop = aiType("Levy", 4, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 20, 60, 3);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::companion(c, 1, true));
+    for (int i = 0; i < 4; ++i) p.stacks.push_back(CombatUnit::make(troop, 10, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(troop, 10, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord at = eng.playerArmy().stacks[0].pos;
+    int open = 0;
+    for (int dir = 0; dir < 6; ++dir) {
+        const HexCoord n = at.neighbor(dir);
+        if (!CombatMap::inBounds(n)) continue;
+        bool held = false;
+        for (int i = 1; i <= 4; ++i) held |= eng.playerArmy().stacks[i].pos == n;
+        if (!held) ++open;
+    }
+    CHECK_EQ(open, 0);
 }
 
 SUITE("Companions — the aura gives nearby troops defence, not the companion itself") {

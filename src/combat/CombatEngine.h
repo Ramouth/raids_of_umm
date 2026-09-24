@@ -152,7 +152,8 @@ public:
     static int bodyguardFor(const std::vector<CombatUnit>& friends, int self);
 
     // Enemy stacks that could attack stack `index` of the given side on their
-    // next turn: shooters with ammo, and melee stacks that can walk next to it.
+    // next turn: shooters with ammo and a clear line of sight, and melee stacks
+    // that can walk next to it.
     std::vector<int> threatsTo(bool isPlayer, int index) const;
 
     // ── Movement ─────────────────────────────────────────────────────────────
