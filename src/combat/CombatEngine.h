@@ -132,6 +132,14 @@ public:
     static DamageRange damageRange(const CombatUnit& attacker, const CombatUnit& defender,
                                    bool pinned = false);
 
+    // HoMM3: shooters deal half damage hand to hand (their strikes and their
+    // retaliation), unless their type has "no_melee_penalty".
+    static bool meleePenalty(const CombatUnit& u) {
+        return u.type->isRanged() && !u.type->hasAbility("no_melee_penalty");
+    }
+    // damageRange() for a melee blow: halved for a shooter.
+    static DamageRange meleeRange(const CombatUnit& attacker, const CombatUnit& defender, bool pinned = false);
+
     // Creatures that `damage` would kill in `target` (cascading through the stack).
     static int killsFor(const CombatUnit& target, int damage);
 

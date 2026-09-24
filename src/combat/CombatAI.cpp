@@ -147,14 +147,14 @@ double exposureAt(const Ctx& c, HexCoord h, bool defending, int ignore = -1) {
         for (int j = 0; j < (int)c.own.size(); ++j)
             if (j != c.actorIdx && !c.own[j].isDead() && canReach(e, c.own[j].pos)) ++targets;
         const double share = 1.0 / targets;
-        const double incoming = CombatEngine::damageRange(e, me).avg;
+        const double incoming = CombatEngine::meleeRange(e, me).avg;
         danger += share * lossValue(c, incoming);
         // Retaliation, unless it is already spent for the round the strike lands in.
         const bool spent = c.actor.hasRetaliated && !c.foeActed[i];
         if (!spent && !e.type->hasAbility("no_retaliation")) {
             CombatUnit hurt = afterDamage(me, incoming);
             if (!hurt.isDead())
-                danger -= 0.8 * share * killValue(c, i, CombatEngine::damageRange(hurt, e));
+                danger -= 0.8 * share * killValue(c, i, CombatEngine::meleeRange(hurt, e));
         }
     }
     return danger;
@@ -188,14 +188,14 @@ double futureAttackValue(const Ctx& c, int i, HexCoord h, bool shot) {
     CombatUnit me = c.actor;
     me.pos = h;
     const bool pinned = !shot && pinnedFrom(c, i, h);
-    DamageRange dmg = CombatEngine::damageRange(me, e, pinned);
+    DamageRange dmg = shot ? CombatEngine::damageRange(me, e, pinned) : CombatEngine::meleeRange(me, e, pinned);
     if (shot && !c.eng.hasLineOfSight(h, e.pos, &c.actor)) {   // a blocked shot loses half
         dmg.min /= 2; dmg.max /= 2; dmg.avg /= 2;
     }
     double v = killValue(c, i, dmg);
     if (!shot && !pinned && !me.type->hasAbility("no_retaliation")) {
         CombatUnit hurt = afterDamage(e, dmg.avg);
-        if (!hurt.isDead()) v -= lossValue(c, CombatEngine::damageRange(hurt, me).avg);
+        if (!hurt.isDead()) v -= lossValue(c, CombatEngine::meleeRange(hurt, me).avg);
     }
     // Moving toward something is never worthless, even into a bad trade.
     return std::max(v, 0.15 * killValue(c, i, dmg));

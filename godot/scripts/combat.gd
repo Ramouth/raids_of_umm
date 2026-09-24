@@ -183,7 +183,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
-    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
+    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand, at half damage. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
     _consume(reply)
     return true
 
@@ -415,8 +415,8 @@ func _inspect(unit: Dictionary) -> void:
     lines.append("Attack %d  ·  Defence %d  ·  Damage %d–%d each" % [unit.attack, unit.defense, unit.get("min_damage", 0), unit.get("max_damage", 0)])
     lines.append("Speed %d  ·  Moves %d hexes" % [unit.speed, unit.get("move", 0)])
     if unit.ranged and unit.get("engaged", false):
-        lines.append("[color=#%s]ENGAGED: an enemy is next to it — it cannot shoot, only fight hand to hand[/color]" % FOE.to_html(false))
-    elif unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting" % [unit.shots, unit.get("shots_max", unit.shots)])
+        lines.append("[color=#%s]ENGAGED: an enemy is next to it — it cannot shoot, only fight hand to hand (half damage)[/color]" % FOE.to_html(false))
+    elif unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting  ·  half damage hand to hand" % [unit.shots, unit.get("shots_max", unit.shots)])
     if unit.get("readied_shot", false) and int(unit.get("shots", 0)) > 0:
         lines.append("[color=#%s]Readied shot: fires once a round at an enemy moving closer[/color]" % GOLD.to_html(false))
     else: lines.append("Melee  ·  attacks adjacent stacks only")

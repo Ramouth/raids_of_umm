@@ -315,6 +315,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
 
     int damage = calcDamage(attacker, target, m_rng);
     if (pinned) damage = damage * 3 / 2;
+    if (!isRanged && meleePenalty(attacker)) damage = std::max(1, damage / 2);   // shooter hand to hand
     if (blocked) damage = std::max(1, damage / 2);
 
     // Build attack-type annotation for the log.
@@ -348,6 +349,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
         }
 
         int retDamage = calcDamage(target, attacker, m_rng);
+        if (meleePenalty(target)) retDamage = std::max(1, retDamage / 2);        // a shooter strikes back weakly
         target.hasRetaliated = true;
         hitStack(slot.isPlayer, slot.stackIndex, retDamage, true);
 
@@ -433,6 +435,13 @@ DamageRange CombatEngine::damageRange(const CombatUnit& attacker, const CombatUn
 }
 
 // static
+DamageRange CombatEngine::meleeRange(const CombatUnit& attacker, const CombatUnit& defender, bool pinned) {
+    DamageRange d = damageRange(attacker, defender, pinned);
+    if (!meleePenalty(attacker)) return d;
+    return {std::max(1, d.min / 2), std::max(1, d.max / 2), std::max(1.0, d.avg / 2)};
+}
+
+// static
 int CombatEngine::killsFor(const CombatUnit& target, int damage) {
     CombatUnit copy = target;
     applyDamage(copy, damage);
@@ -486,7 +495,7 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
     p.ranged = actor.type->isRanged() && actor.shotsLeft > 0 && !engaged
                && actor.pos.distanceTo(target.pos) > 1;
     p.pinned = !p.ranged && isFlanked(target, friends);
-    p.damage = damageRange(actor, target, p.pinned);
+    p.damage = p.ranged ? damageRange(actor, target, p.pinned) : meleeRange(actor, target, p.pinned);
     p.blocked = p.ranged && !hasLineOfSight(from, target.pos);
     if (p.blocked)
         p.damage = {std::max(1, p.damage.min / 2), std::max(1, p.damage.max / 2), std::max(1.0, p.damage.avg / 2)};
@@ -506,9 +515,9 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
         applyDamage(weakest, p.damage.max);
         CombatUnit expected = target;
         applyDamage(expected, static_cast<int>(p.damage.avg));
-        DamageRange hi = damageRange(strongest, actor);
-        DamageRange lo = weakest.isDead() ? DamageRange{} : damageRange(weakest, actor);
-        DamageRange mid = expected.isDead() ? DamageRange{} : damageRange(expected, actor);
+        DamageRange hi = meleeRange(strongest, actor);
+        DamageRange lo = weakest.isDead() ? DamageRange{} : meleeRange(weakest, actor);
+        DamageRange mid = expected.isDead() ? DamageRange{} : meleeRange(expected, actor);
         p.retaliationDamage.min = lo.min;
         p.retaliationDamage.max = hi.max;
         p.retaliationDamage.avg = mid.avg;

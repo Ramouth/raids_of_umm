@@ -2521,4 +2521,41 @@ SUITE("Readied shot — fires at the charger that ends up next to it, before the
     CHECK(!eng.canShoot(eng.enemyArmy().stacks[0]));         // and now it is engaged
 }
 
+
+// ── Shooters are weak hand to hand (HoMM3) ──────────────────────────────────────
+
+SUITE("Melee penalty — a shooter's strike and its retaliation do half damage; the forecast agrees") {
+    const UnitType* archer = aiType("Archer", 9, 10, 100, 5, 5, 3, 12);    // 10 damage each, 100 hp
+    const UnitType* grunt  = aiType("Grunt", 1, 10, 100, 5, 5);
+    const HexCoord at = CombatMap::toHex(4, 2);
+    CombatEngine eng = duelAt(archer, grunt, 1, 1, at, at.neighbor(0));
+    CHECK(eng.currentTurn().isPlayer);
+    CHECK(!eng.canShoot(eng.playerArmy().stacks[0]));                     // engaged
+    const AttackPreview p = eng.previewAttack(0);
+    CHECK(!p.ranged);
+    CHECK_EQ(p.damage.min, 5);                                            // half of 10
+    CHECK_EQ(p.retaliationDamage.min, 10);                                // the grunt hits back in full
+    eng.doAttack(0);
+    CHECK_EQ(eng.enemyArmy().stacks[0].totalHp(), 95);
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 90);
+    // Now the grunt strikes: the archer's retaliation is halved too.
+    eng.doAttack(0);
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 80);
+    CHECK_EQ(eng.enemyArmy().stacks[0].totalHp(), 90);
+}
+
+SUITE("Melee penalty — shots are unaffected; no_melee_penalty exempts") {
+    const UnitType* archer = aiType("Archer", 9, 10, 100, 5, 5, 3, 12);
+    const UnitType* grunt  = aiType("Grunt", 1, 10, 100, 5, 5);
+    CombatEngine far = duelAt(archer, grunt, 1, 1, CombatMap::toHex(1, 2), CombatMap::toHex(8, 2));
+    CHECK_EQ(far.previewAttack(0).damage.min, 10);
+    UnitType elite = *archer;
+    elite.name = elite.id = "Elite";
+    elite.abilities.push_back("no_melee_penalty");
+    s_aiTypes.push_back(elite);
+    const HexCoord at = CombatMap::toHex(4, 2);
+    CombatEngine near = duelAt(&s_aiTypes.back(), grunt, 1, 1, at, at.neighbor(0));
+    CHECK_EQ(near.previewAttack(0).damage.min, 10);
+}
+
 #endif // COMBAT_ENGINE_IMPL
