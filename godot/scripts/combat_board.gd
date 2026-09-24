@@ -16,6 +16,8 @@ const DANGER_COLOR := Color("ff5a3c")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
+## True when the last left click held Shift or Ctrl (set route waypoints).
+var modified_click := false
 ## Hover feedback set by the combat screen: the hex under the pointer, what a
 ## click there would do ("attack", "move", "blocked", ""), and a short
 ## forecast drawn above an attack target.
@@ -83,7 +85,10 @@ func _clicked(event: InputEvent) -> void:
     if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
         var cell := cell_at(event.position)
         if cell.is_empty(): return
-        if event.button_index == MOUSE_BUTTON_LEFT: cell_clicked.emit(Vector2i(cell[0], cell[1]))
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            modified_click = event.shift_pressed or event.ctrl_pressed or event.meta_pressed
+            cell_clicked.emit(Vector2i(cell[0], cell[1]))
+            modified_click = false
         else: cell_right_clicked.emit(Vector2i(cell[0], cell[1]))
         accept_event()
 

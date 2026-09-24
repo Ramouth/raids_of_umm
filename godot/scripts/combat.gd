@@ -38,7 +38,7 @@ var _last_round := 1
 var _pointer := Vector2.ZERO
 ## Move-and-attack option picked for the hovered target (standing hex, path, forecast).
 var _stand: Dictionary = {}
-## Shift+click waypoints: the active stack walks through them in order.
+## Ctrl/Shift+click waypoints: the active stack walks through them in order.
 var waypoints: Array = []
 
 func _ready() -> void:
@@ -534,7 +534,7 @@ func _clear_route() -> void:
     board.waypoints = waypoints
     board.route_reach = []
 
-## Shift+click: add a waypoint (or drop it and those after it if clicked again).
+## Ctrl/Shift+click: add a waypoint (or drop it and those after it if clicked again).
 func _toggle_waypoint(cell: Array) -> void:
     var index := waypoints.find(cell)
     if index >= 0:
@@ -619,10 +619,10 @@ func _update_status() -> void:
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
     elif _hover_cell.is_empty():
-        var how := "shoot it" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "walk up and strike (cursor picks the side)"
-        text = "%s: click a red enemy to %s · a green hex only moves · Shift+click green hexes to set a route · D to defend." % [_unit_label(state.active), how]
+        var how := "shoot" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "strike"
+        text = "%s: click enemy = %s · green hex = move · [b]Ctrl+click green = waypoint[/b] · D = defend" % [_unit_name(state.active), how]
         if not waypoints.is_empty():
-            text = "Route set through %d waypoint%s: click a green hex to walk it, or an enemy to walk it and strike · Esc or right-click empty ground clears it." % [waypoints.size(), "" if waypoints.size() == 1 else "s"]
+            text = "Route: %d waypoint%s · click green hex or enemy to go · Esc clears" % [waypoints.size(), "" if waypoints.size() == 1 else "s"]
 
     elif not unit.is_empty() and not unit.player:
         var preview := {}
@@ -704,7 +704,7 @@ static func _hex_distance(a: Array, b: Array) -> int:
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
     if busy or auto_battle or not state.get("player_turn", false): return
-    if Input.is_key_pressed(KEY_SHIFT):
+    if board.modified_click or Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_CTRL):
         _toggle_waypoint(coordinates)
         return
     if not waypoints.is_empty():

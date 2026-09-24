@@ -18,8 +18,9 @@ func _idle(battle: Control) -> void:
     while battle.busy or (battle.state.result == "ongoing" and not battle.state.player_turn):
         await process_frame
 
-func _click(control: Control, local: Vector2) -> void:
+func _click(control: Control, local: Vector2, ctrl := false) -> void:
     var event := InputEventMouseButton.new()
+    event.ctrl_pressed = ctrl
     event.pressed = true
     event.button_index = MOUSE_BUTTON_LEFT
     event.position = control.get_global_transform_with_canvas() * local
@@ -216,8 +217,10 @@ func _run() -> void:
     for cell in battle.state.reachable:
         if int(cell[0]) == start.x and int(cell[1]) == start.y - 2: waypoint = cell
     check(not waypoint.is_empty(), "A hex two steps up is reachable")
-    battle._toggle_waypoint(waypoint)
-    check(battle.waypoints == [waypoint] and battle.board.waypoints == [waypoint], "Shift+click sets a waypoint")
+    _click(battle.board, battle.board.cell_point(waypoint), true)
+    await process_frame
+    check(battle.waypoints == [waypoint] and battle.board.waypoints == [waypoint], "A real Ctrl+click sets a waypoint")
+    check(battle.busy == false, "A waypoint click does not move the stack")
     check(not battle.board.route_reach.is_empty(), "The reachable area shrinks to what is left after the waypoint")
     var dest: Array = battle.board.route_reach[0]
     for cell in battle.board.route_reach:

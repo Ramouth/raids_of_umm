@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     const Json army   = Json::parse(argv[2]);
     const Json guards = {{"guards", Json::parse(argv[3])}};
     const int  runs   = argc > 4 ? std::stoi(argv[4]) : 20;
-    int wins = 0, fell = 0, fellRounds = 0;
+    int wins = 0, fell = 0, fellRounds = 0, rounds = 0;
     Json lastSurvivors;
     for (int i = 0; i < runs; ++i) {
         CombatSession session;
@@ -40,8 +40,10 @@ int main(int argc, char** argv) {
         auto state = session.snapshot();
         if (state["result"] == "victory") { ++wins; lastSurvivors = state["survivors"]; }
         if (!state["fallen"].empty()) { ++fell; fellRounds += state["round"].get<int>(); }
+        rounds += state["round"].get<int>();
     }
     std::cout << "win " << wins << "/" << runs << "  survivors(last win): " << lastSurvivors.dump();
+    std::cout << "  avg rounds " << double(rounds) / runs;
     if (fell) std::cout << "  companion fell " << fell << "/" << runs;
     std::cout << "\n";
 }
