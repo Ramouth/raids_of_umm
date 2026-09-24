@@ -1,4 +1,4 @@
-// demo_bot — plays "The Old Passage" through AdventureSession with a simple
+// demo_bot — plays "The Old Passage" (stage 1, the northern marches) through AdventureSession with a simple
 // greedy strategy, to check the demo is winnable and how long it takes.
 // Usage: demo_bot <repo_root> [seeds] [verbose]
 // Strategy: recruit on growth days, take mines and towns in order, fight any
@@ -43,9 +43,12 @@ int main(int argc, char** argv) {
         s.setArmy({{"levy_spearman", 24}, {"desert_archer", 10}, {"armoured_warrior", 3}});
         recruitAll(s);
         bool visitedCamp = false;
-        std::vector<std::string> plan = {"Khemret Gold Mine", "Palm Grove Sawmill", "Ridge Pass Guard", "Tharakh",
-            "Desert Quarry", "Obsidian Vent", "Scorpion Nest", "Old Mine of Sehet", "Old Mine of Nebu",
-            "Canyon Ford Guard", "Kharim's Camp", "Crystal Cavern", "Old Mine of Djer", "Old Mine of Anhur"};
+        std::vector<std::string> plan = {"Varen Gold Mine", "Log Pile", "Pinewood Sawmill", "Hunters' Camp",
+            "Varen Windmill", "Standing Stone of Varen", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
+            "Tithe Silver", "Weeping Stone", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
+            "Drowned Obelisk", "Blackglass Seam", "Old Mine of Dunmere", "Old Mine of Carrow", "Greyfang Pass",
+            "Greyfang Watch", "Kharim's Camp", "Frostglass Cavern", "Greyfang Obelisk", "Old Mine of Kaldur",
+            "Old Mine of Brannoc"};
         for (int guard = 0; guard < 400 && !s.won() && !s.lost() && !s.army().empty() && s.day() < 60; ++guard) {
             // Weekly: walk home to recruit.
             if (s.dayOfWeek() == 7 || s.dayOfWeek() == 1) {
@@ -67,7 +70,8 @@ int main(int argc, char** argv) {
                 if (!obj) continue;
                 bool done = (s.owner(obj->pos) == 1) || (obj->type == ObjType::Guard && !s.isEncounter(obj->pos))
                          || (obj->type == ObjType::OldMine && !s.isEncounter(obj->pos))
-                         || (obj->type == ObjType::QuestGiver && visitedCamp);
+                         || (obj->type == ObjType::QuestGiver && visitedCamp)
+                         || (obj->type >= ObjType::Pickup && obj->type != ObjType::Dwelling && s.siteUsed(obj->pos));
                 if (obj->type == ObjType::QuestGiver && s.heroPos() == obj->pos) {
                     std::vector<std::string> ids;
                     for (const auto* o : s.scenario().offersAt(name)) ids.push_back(o->id);
@@ -82,7 +86,7 @@ int main(int argc, char** argv) {
                     double threat = 0;                                     // war-bands near the target
                     for (const auto& r : s.rivals())
                         if (r.alive && r.pos.distanceTo(obj->pos) <= 12) threat = std::max(threat, s.power(r.army));
-                    if (s.power(s.army()) < 1.3 * s.power(guards) + 0.6 * threat) {       // not ready: grow
+                    if (s.power(s.army()) < 1.1 * s.power(guards) + 0.6 * threat) {       // not ready: grow
                         if (verbose && s.dayOfWeek() == 3)
                             std::cout << "  d" << s.day() << " waiting for " << name << ": ours " << (int)s.power(s.army())
                                       << " guards " << (int)s.power(guards) << " threat " << (int)threat << "\n";
@@ -95,6 +99,7 @@ int main(int argc, char** argv) {
             if (target) {
                 if (verbose && s.dayOfWeek() == 3) std::cout << "  d" << s.day() << " heading to (" << target->q << "," << target->r << ") from (" << s.heroPos().q << "," << s.heroPos().r << ") route " << s.route(*target).size() << "\n";
                 s.travel(*target);
+                if (s.pendingChest()) s.claimChest(true);
                 if (s.pendingEncounter()) fight(s);
             }
             if (s.won() || s.lost() || s.army().empty()) break;

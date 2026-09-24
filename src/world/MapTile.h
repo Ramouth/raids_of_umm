@@ -33,6 +33,8 @@ enum class Terrain : uint8_t {
     Highland     = 12, // rocky moorland — elevated, medium cost
     GrassSandEdge  = 13, // grass↔sand transition tile (hand-authored blends)
     GrassSandEdge2 = 14, // same as above with sand removed (transparent overlay)
+    Lake         = 15, // still water — impassable, does not block sight
+    Swamp        = 16, // boggy lowland — very slow movement
 
     COUNT  // must remain last — used for iteration and bounds checks
 };
@@ -68,6 +70,8 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
         case Terrain::Highland:      return "Highland";
         case Terrain::GrassSandEdge:  return "Grass-Sand Edge";
         case Terrain::GrassSandEdge2: return "Grass-Sand Edge 2";
+        case Terrain::Lake:           return "Lake";
+        case Terrain::Swamp:          return "Swamp";
         default:                      return "Unknown";
     }
 }
@@ -75,7 +79,7 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
 // Default passability for a freshly generated tile of this terrain type.
 // Editor can override per-tile.
 constexpr bool terrainDefaultPassable(Terrain t) noexcept {
-    return t != Terrain::Obsidian && t != Terrain::Wall;
+    return t != Terrain::Obsidian && t != Terrain::Wall && t != Terrain::Lake;
 }
 
 // Default movement cost for a terrain type.
@@ -92,6 +96,8 @@ constexpr float terrainDefaultMoveCost(Terrain t) noexcept {
         case Terrain::Grass:    return 1.0f;  // open meadow — easy movement
         case Terrain::Forest:   return 1.5f;  // dense woodland — slows movement
         case Terrain::Highland: return 1.25f; // rocky moorland — slightly slower
+        case Terrain::Lake:     return 0.0f;  // impassable
+        case Terrain::Swamp:    return 1.75f; // bog — the slowest walkable ground
         default:                return 1.0f;
     }
 }

@@ -204,7 +204,7 @@
     {
       "id": "sand_wraith",
       "name": "Sand Wraith",
-      "description": "Elemental spirits of sandstorm and wind. Semi-corporeal \u2014 weapons pass through them as through smoke, but their touch scours flesh from bone.",
+      "description": "Elemental spirits of sandstorm and wind. Semi-corporeal — weapons pass through them as through smoke, but their touch scours flesh from bone.",
       "tier": 1,
       "attack": 4,
       "defense": 2,
@@ -449,6 +449,166 @@
       "abilities": [],
       "meshId": "dune_stalker",
       "textureId": "dune_stalker"
+    },
+    {
+      "id": "grey_wolf",
+      "name": "Grey Wolf",
+      "description": "Lean pack hunters of the northern marches. Fast, hungry and never alone.",
+      "tier": 1,
+      "attack": 6,
+      "defense": 3,
+      "minDamage": 2,
+      "maxDamage": 3,
+      "hitPoints": 10,
+      "speed": 9,
+      "moveRange": 6,
+      "shots": 0,
+      "weeklyGrowth": 12,
+      "cost": {
+        "Gold": 70,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "grey_wolf",
+      "textureId": "grey_wolf"
+    },
+    {
+      "id": "brigand",
+      "name": "Brigand",
+      "description": "Deserters and outlaws who hold the forest roads with crossbows and nerve.",
+      "tier": 2,
+      "attack": 6,
+      "defense": 4,
+      "minDamage": 2,
+      "maxDamage": 4,
+      "hitPoints": 12,
+      "speed": 6,
+      "moveRange": 4,
+      "shots": 12,
+      "weeklyGrowth": 8,
+      "cost": {
+        "Gold": 130,
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "piercing",
+      "abilities": [],
+      "meshId": "brigand",
+      "textureId": "brigand"
+    },
+    {
+      "id": "barrow_wight",
+      "name": "Barrow Wight",
+      "description": "Chieftains of a forgotten age, bound to the old mines they were buried in. Their rusted blades still bite.",
+      "tier": 3,
+      "attack": 9,
+      "defense": 8,
+      "minDamage": 3,
+      "maxDamage": 5,
+      "hitPoints": 28,
+      "speed": 5,
+      "moveRange": 3,
+      "shots": 0,
+      "weeklyGrowth": 5,
+      "cost": {
+        "Gold": 260,
+        "Wood": 0,
+        "Stone": 1,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [
+        "undead"
+      ],
+      "meshId": "barrow_wight",
+      "textureId": "barrow_wight"
+    },
+    {
+      "id": "highland_bear",
+      "name": "Highland Bear",
+      "description": "Moorland giants that take a spear and keep coming.",
+      "tier": 3,
+      "attack": 10,
+      "defense": 7,
+      "minDamage": 4,
+      "maxDamage": 6,
+      "hitPoints": 32,
+      "speed": 6,
+      "moveRange": 4,
+      "shots": 0,
+      "weeklyGrowth": 4,
+      "cost": {
+        "Gold": 300,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "highland_bear",
+      "textureId": "highland_bear"
+    },
+    {
+      "id": "forest_troll",
+      "name": "Forest Troll",
+      "description": "Moss-grown brutes of the deep woods. Slow to anger and slower to die.",
+      "tier": 4,
+      "attack": 12,
+      "defense": 9,
+      "minDamage": 6,
+      "maxDamage": 10,
+      "hitPoints": 50,
+      "speed": 5,
+      "moveRange": 3,
+      "shots": 0,
+      "weeklyGrowth": 3,
+      "cost": {
+        "Gold": 500,
+        "Wood": 1,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "forest_troll",
+      "textureId": "forest_troll"
+    },
+    {
+      "id": "ancient_treant",
+      "name": "Ancient Treant",
+      "description": "An oak older than the families' oldest oath. It remembers who cut its kin.",
+      "tier": 6,
+      "attack": 18,
+      "defense": 20,
+      "minDamage": 12,
+      "maxDamage": 20,
+      "hitPoints": 180,
+      "speed": 3,
+      "moveRange": 2,
+      "shots": 0,
+      "weeklyGrowth": 1,
+      "cost": {
+        "Gold": 1800,
+        "Wood": 3,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [
+        "large_creature"
+      ],
+      "meshId": "ancient_treant",
+      "textureId": "ancient_treant"
     }
   ]
 }

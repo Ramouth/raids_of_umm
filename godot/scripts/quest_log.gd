@@ -1,5 +1,5 @@
 extends PanelContainer
-## Quest log (Q): main quest first, then Kharim's optional tasks.
+## Quest log (Q): main quest first, then optional tasks, then the Lore codex.
 ## Completed quests are dimmed and marked done.
 
 var _list: VBoxContainer
@@ -17,7 +17,7 @@ func _ready() -> void:
     _list.add_theme_constant_override("separation", 10)
     add_child(_list)
 
-func show_quests(quests: Array) -> void:
+func show_quests(quests: Array, lore: Array = []) -> void:
     for child in _list.get_children(): child.queue_free()
     _list.add_child(_label("QUEST LOG   ·   Q to close", 12, Color("ad854a")))
     var ordered := quests.duplicate()
@@ -29,6 +29,12 @@ func show_quests(quests: Array) -> void:
         var title := "%s   ·   %s%s" % [quest.title, kind, "   ·   DONE" if quest.done else ""]
         _list.add_child(_label(title, 16, Color("7c7060") if quest.done else Color("f0c870")))
         _list.add_child(_label(str(quest.text), 14, Color("7c7060") if quest.done else Color("e8d8b8")))
+    if not lore.is_empty():
+        # What the expedition has learned: the mythos, one entry per discovery.
+        _list.add_child(_label("LORE   ·   what you have learned", 12, Color("ad854a")))
+        for entry in lore:
+            _list.add_child(_label(str(entry.title), 15, Color("b9a6e0")))
+            _list.add_child(_label(str(entry.text), 13, Color("d8cce8")))
 
 func _label(text: String, size: int, color: Color) -> Label:
     var label := Label.new()

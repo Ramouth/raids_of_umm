@@ -68,6 +68,7 @@ float AdventureSession::movesBonus() const {
     if (hasAbility("Drillmaster")) bonus += 1;
     if (hasAbility("Legend of the Sands")) bonus += 2;
     if (hasAbility("Surveyor")) bonus += 1;
+    if (m_stablesWeek != 0 && m_stablesWeek == week()) bonus += STABLES_BONUS;
     return bonus;
 }
 

@@ -27,3 +27,6 @@ godot/content/
 godot/artifacts/
 godot/bin/
 godot/native/build/
+
+# Local OpenAI API credential
+/openai_key

@@ -27,9 +27,16 @@ class AdventureSession;
  *              "clue": true                     — rule out one wrong old mine
  *              "offer": id                      — a choice the UI shows at a visit
  *              "join": id                       — a special character joins the hero
- * (event "quests_done" (count) fires as optional quests complete)
+ *              "troops": [{"id","count"}]      — soldiers join the hero's army
+ *              "item": id                       — an item is handed to the hero
+ *              "lore": [title, text]            — a codex entry (the journal's Lore page)
+ *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
+ *                                               — that site turns rival; a war-band rides out
+ * (event "quests_done" (count) fires as optional quests complete;
+ *  event "rival_beaten" (name) fires when the hero breaks a war-band)
  *
  * when.after: id — only after that trigger has fired (story order).
+ * when.unless: id — never, once that trigger has fired (a beat overtaken by events).
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
  * made through AdventureSession::acceptOffer().
  */
@@ -39,6 +46,7 @@ public:
 
     struct Line  { std::string speaker, text; };
     struct Quest { std::string id, title, text; bool main = false; bool done = false; };
+    struct Lore  { std::string title, text; };   // codex entry: what the player has learned
     struct Offer {
         std::string id, label;       // label shown on the button
         std::string at;              // object name where it is offered
@@ -58,6 +66,7 @@ public:
     // Dialogue produced since the last drain (UI shows it WC3-transmission style).
     std::vector<Line> drainLines();
     const std::vector<Quest>& quests() const { return m_quests; }
+    const std::vector<Lore>&  lore()   const { return m_lore; }
     // Offers available at an object right now.
     std::vector<const Offer*> offersAt(const std::string& objectName) const;
     Offer* offer(const std::string& id);
@@ -79,4 +88,5 @@ private:
     std::vector<Offer>              m_offers;
     std::vector<Offer>              m_offerDefs;
     std::vector<Line>               m_lines;
+    std::vector<Lore>               m_lore;
 };

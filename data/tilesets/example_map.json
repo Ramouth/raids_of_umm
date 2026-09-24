@@ -1,0 +1,18 @@
+{
+  "cellH": 64,
+  "cellW": 64,
+  "cells": [
+    {
+      "col": 16,
+      "file": "assets/textures/terrain/example_map/c16_r7.png",
+      "row": 7
+    },
+    {
+      "col": 17,
+      "file": "assets/textures/terrain/example_map/c17_r6.png",
+      "row": 6
+    }
+  ],
+  "name": "example_map",
+  "sheet": "assets/assorted /example_map.png"
+}

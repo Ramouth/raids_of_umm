@@ -60,8 +60,16 @@ Json AdventureSession::saveState() const {
     for (const auto& r : m_rivals)
         rivals.push_back({{"id", r.id}, {"name", r.name}, {"pos", cellJson(r.pos)}, {"home", cellJson(r.home)},
                           {"army", stacksJson(r.army)}, {"start_power", r.startPower}, {"alive", r.alive}});
+    Json pickups = Json::array();
+    for (const auto& [c, p] : m_pickups) pickups.push_back(cellJson(c));
+    Json siteWeeks = Json::array();
+    for (const auto& [c, w] : m_siteWeek) siteWeeks.push_back({c.q, c.r, w});
+    Json visited = Json::array();
+    for (const auto& c : m_visitedOnce) visited.push_back(cellJson(c));
     return {
         {"version", 1},
+        {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
+        {"stables_week", m_stablesWeek},
         {"start", {{"map", m_startArgs->map}, {"data", m_startArgs->data}, {"encounters", m_startArgs->encounters},
                    {"triggers", m_startArgs->triggers}, {"seed", m_startArgs->seed}}},
         {"day", day()},
@@ -131,6 +139,15 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             m_rivals.push_back({r.at("id").get<int>(), r.at("name").get<std::string>(), cellFrom(r.at("pos")),
                                 cellFrom(r.at("home")), stacksFrom(r.at("army")), r.at("start_power").get<double>(),
                                 r.at("alive").get<bool>(), ""});
+        if (save.contains("pickups")) {            // older saves predate sites
+            std::unordered_set<HexCoord> left;
+            for (const auto& c : save.at("pickups")) left.insert(cellFrom(c));
+            for (auto it = m_pickups.begin(); it != m_pickups.end();)
+                it = left.count(it->first) ? std::next(it) : m_pickups.erase(it);
+            for (const auto& w : save.at("site_weeks")) m_siteWeek[{w.at(0).get<int>(), w.at(1).get<int>()}] = w.at(2).get<int>();
+            for (const auto& c : save.at("visited_once")) m_visitedOnce.insert(cellFrom(c));
+            m_stablesWeek = save.value("stables_week", 0);
+        }
         m_scenario.loadState(save.at("scenario"));
         m_scenario.drainLines();
         m_movesMax = DEFAULT_MOVES + movesBonus();

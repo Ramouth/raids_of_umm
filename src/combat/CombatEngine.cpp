@@ -8,6 +8,7 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     : m_player(std::move(player))
     , m_enemy(std::move(enemy))
     , m_rng(std::random_device{}())
+    , m_aiRng(std::random_device{}())
 {
     placeArmies();
     buildQueue();
@@ -22,6 +23,11 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
                                                : m_enemy.stacks[first.stackIndex];
         awardScXp(firstUnit, first, firstUnit.perTurnXp);
     }
+}
+
+void CombatEngine::setSeed(uint32_t seed) {
+    m_rng.seed(seed);
+    m_aiRng.seed(seed ^ 0x9E3779B9u);
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -189,6 +195,7 @@ void CombatEngine::doAttack(int targetIndex) {
 
     int damage = calcDamage(attacker, target, m_rng);
     if (pinned) damage = damage * 3 / 2;
+    const int targetCountBefore = target.count;
     applyDamage(target, damage);
 
     // Build attack-type annotation for the log.
@@ -210,6 +217,8 @@ void CombatEngine::doAttack(int targetIndex) {
         ev.isPlayer   = !slot.isPlayer;   // target's army
         ev.stackIndex = targetIndex;
         ev.damage     = damage;
+        ev.kills      = targetCountBefore - target.count;
+        ev.remaining  = target.count;
         m_events.push_back(ev);
     }
     if (target.isDead()) {
@@ -239,6 +248,7 @@ void CombatEngine::doAttack(int targetIndex) {
         }
 
         int retDamage = calcDamage(target, attacker, m_rng);
+        const int attackerCountBefore = attacker.count;
         applyDamage(attacker, retDamage);
         target.hasRetaliated = true;
 
@@ -252,6 +262,8 @@ void CombatEngine::doAttack(int targetIndex) {
             ev.isPlayer   = slot.isPlayer;   // attacker took retaliation
             ev.stackIndex = slot.stackIndex;
             ev.damage     = retDamage;
+            ev.kills      = attackerCountBefore - attacker.count;
+            ev.remaining  = attacker.count;
             m_events.push_back(ev);
         }
         if (attacker.isDead()) {
@@ -288,15 +300,7 @@ bool CombatEngine::isFlanked(const CombatUnit& target,
 }
 
 // static
-int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
-                              std::mt19937& rng) {
-    // Base damage roll: each creature in the stack rolls [minDmg, maxDmg],
-    // then adds a flat per-creature bonus from equipped items.
-    std::uniform_int_distribution<int> dist(attacker.type->minDamage, attacker.type->maxDamage);
-    int baseDmg = 0;
-    for (int i = 0; i < attacker.count; ++i)
-        baseDmg += dist(rng) + attacker.damageBonus;
-
+double CombatEngine::damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender) {
     // Effective attack and defense incorporate item bonuses.
     int effAtk = attacker.effectiveAttack();
     int effDef = defender.effectiveDefense();
@@ -310,13 +314,98 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
         effDefReduced = static_cast<int>(effDef * (1.0f - attacker.type->defBypassRatio));
 
     int diff = effAtk - effDefReduced;
-    double mult;
     if (diff >= 0)
-        mult = 1.0 + 0.05 * std::min(diff, 20);
-    else
-        mult = std::max(0.3, 1.0 + 0.025 * diff);
+        return 1.0 + 0.05 * std::min(diff, 20);
+    return std::max(0.3, 1.0 + 0.025 * diff);
+}
 
-    return std::max(1, static_cast<int>(baseDmg * mult));
+// static
+int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
+                              std::mt19937& rng) {
+    // Base damage roll: each creature in the stack rolls [minDmg, maxDmg],
+    // then adds a flat per-creature bonus from equipped items.
+    std::uniform_int_distribution<int> dist(attacker.type->minDamage, attacker.type->maxDamage);
+    int baseDmg = 0;
+    for (int i = 0; i < attacker.count; ++i)
+        baseDmg += dist(rng) + attacker.damageBonus;
+
+    return std::max(1, static_cast<int>(baseDmg * damageMultiplier(attacker, defender)));
+}
+
+// static
+DamageRange CombatEngine::damageRange(const CombatUnit& attacker, const CombatUnit& defender,
+                                      bool pinned) {
+    DamageRange out;
+    if (attacker.isDead()) return out;
+    const double mult = damageMultiplier(attacker, defender);
+    const int n = attacker.count;
+    auto finish = [&](double base) {
+        int dmg = std::max(1, static_cast<int>(base * mult));
+        return pinned ? dmg * 3 / 2 : dmg;
+    };
+    out.min = finish(double(n) * (attacker.type->minDamage + attacker.damageBonus));
+    out.max = finish(double(n) * (attacker.type->maxDamage + attacker.damageBonus));
+    const double avgBase = double(n) * (0.5 * (attacker.type->minDamage + attacker.type->maxDamage)
+                                        + attacker.damageBonus);
+    out.avg = std::max(1.0, avgBase * mult) * (pinned ? 1.5 : 1.0);
+    return out;
+}
+
+// static
+int CombatEngine::killsFor(const CombatUnit& target, int damage) {
+    CombatUnit copy = target;
+    applyDamage(copy, damage);
+    return target.count - copy.count;
+}
+
+bool CombatEngine::canAttack(int targetIndex) const {
+    if (isOver()) return false;
+    const CombatUnit& actor = activeUnit();
+    const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
+    const CombatUnit& target = enemies[targetIndex];
+    if (target.isDead()) return false;
+    if (actor.pos.distanceTo(target.pos) == 1) return true;
+    return actor.type->isRanged() && actor.shotsLeft > 0;
+}
+
+AttackPreview CombatEngine::previewAttack(int targetIndex) const {
+    AttackPreview p;
+    if (!canAttack(targetIndex)) return p;
+    const CombatUnit& actor = activeUnit();
+    const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    const auto& friends = actor.isPlayer ? m_player.stacks : m_enemy.stacks;
+    const CombatUnit& target = enemies[targetIndex];
+
+    p.valid  = true;
+    p.ranged = actor.type->isRanged() && actor.shotsLeft > 0
+               && actor.pos.distanceTo(target.pos) > 1;
+    p.pinned = !p.ranged && isFlanked(target, friends);
+    p.damage = damageRange(actor, target, p.pinned);
+    p.killsMin = killsFor(target, p.damage.min);
+    p.killsMax = killsFor(target, p.damage.max);
+
+    const bool canRetaliate = !p.ranged && !p.pinned && !target.hasRetaliated
+                              && !actor.type->hasAbility("no_retaliation");
+    // Retaliation only happens if the target survives; the low roll leaves the most alive.
+    if (canRetaliate && p.killsMin < target.count) {
+        p.retaliation = true;
+        CombatUnit strongest = target;   // survivors after the low roll
+        applyDamage(strongest, p.damage.min);
+        CombatUnit weakest = target;     // survivors after the high roll
+        applyDamage(weakest, p.damage.max);
+        CombatUnit expected = target;
+        applyDamage(expected, static_cast<int>(p.damage.avg));
+        DamageRange hi = damageRange(strongest, actor);
+        DamageRange lo = weakest.isDead() ? DamageRange{} : damageRange(weakest, actor);
+        DamageRange mid = expected.isDead() ? DamageRange{} : damageRange(expected, actor);
+        p.retaliationDamage.min = lo.min;
+        p.retaliationDamage.max = hi.max;
+        p.retaliationDamage.avg = mid.avg;
+        p.retKillsMin = killsFor(actor, lo.min);
+        p.retKillsMax = killsFor(actor, hi.max);
+    }
+    return p;
 }
 
 // ── SC XP ─────────────────────────────────────────────────────────────────────

@@ -62,7 +62,7 @@ struct CombatOutcome {
  *   UnitMoved    — isPlayer, stackIndex, from, to
  *   UnitAttacked — isPlayer, stackIndex, targetIsPlayer, targetIndex,
  *                  isRetaliation, wasFlanked
- *   UnitDamaged  — isPlayer, stackIndex, damage
+ *   UnitDamaged  — isPlayer, stackIndex, damage, kills, remaining
  *   UnitDied     — isPlayer, stackIndex
  *   UnitDefended — isPlayer, stackIndex
  *   BattleEnded  — result
@@ -94,6 +94,8 @@ struct CombatEvent {
 
     // Damage amount (UnitDamaged only)
     int          damage         = 0;
+    int          kills          = 0;   // creatures that died from this damage (UnitDamaged)
+    int          remaining      = 0;   // creatures left in the stack afterwards (UnitDamaged)
 
     // Movement endpoints (UnitMoved only)
     HexCoord     from;

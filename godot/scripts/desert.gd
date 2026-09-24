@@ -20,6 +20,8 @@ const EndScreen = preload("res://scripts/end_screen.gd")
 var passage_seed := -1
 var unit_names: Dictionary = {}
 var unit_defs: Dictionary = {}
+var item_defs: Dictionary = {}
+var _chest_panel: PanelContainer
 const TownScreen = preload("res://scripts/town_screen.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
@@ -98,6 +100,9 @@ func _ready() -> void:
         for unit in units.units:
             unit_names[unit.id] = unit.name
             unit_defs[unit.id] = unit
+    var items: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/items.json"))
+    if items is Dictionary:
+        for item in items.items: item_defs[item.id] = item
     _build_expedition_controls()
     _build_turn_hud()
     $HUD/Layout/Header/Text/Title.text = data.title
@@ -162,7 +167,7 @@ func station(id: String, stay: bool) -> Dictionary:
     return reply
 
 func can_govern() -> bool:
-    return _owned_town(hero.cell)
+    return _owned_town(hero.cell) and data.objects.get(hero.cell, {}).get("type", "") == "town"
 
 func open_party() -> bool:
     if hero.moving or is_instance_valid(battle): return false
@@ -194,6 +199,12 @@ func open_town() -> bool:
     var screen := TownScreen.new()
     screen.host = self
     screen.cell = hero.cell
+    var landmark: Dictionary = data.objects.get(hero.cell, {})
+    if landmark.get("type", "") == "dwelling":
+        screen.view_art = "res://content/textures/" + map_view.object_texture(landmark)
+        screen.eyebrow_text = "DWELLING  ·  RECRUITS GATHER WEEKLY"
+    elif data.ground == "grass" and ResourceLoader.exists("res://content/textures/screens/town_varenhold.png"):
+        screen.view_art = "res://content/textures/screens/town_varenhold.png"
     screens.push(screen, func(_result: Dictionary):
         _apply_state(state)
         _update_expedition())
@@ -222,8 +233,85 @@ func _apply_state(next: Dictionary) -> void:
     var guarded: Dictionary = {}
     for c in state.get("guarded", []): guarded[Vector2i(c[0], c[1])] = true
     map_view.set_cleared_guards(guarded)
+    map_view.mark_sites(state.get("sites", []))
+    _sync_inventory()
+    if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []))
     _sync_rivals()
     _update_turn_hud()
+
+## Items handed over by the story or found at sites join the combat loot list.
+func _sync_inventory() -> void:
+    var held: Dictionary = {}
+    for item in inventory: held[str(item.id)] = true
+    for id in state.get("items", []):
+        if held.has(str(id)): continue
+        var def: Dictionary = item_defs.get(str(id), {})
+        inventory.append({"id": str(id), "name": str(def.get("name", str(id).capitalize())),
+            "description": str(def.get("description", ""))})
+
+## HoMM3 treasure chest: gold now, or experience for the companions.
+func claim_chest(gold: bool) -> bool:
+    if state.get("chest") == null: return false
+    var reply: Dictionary = JSON.parse_string(adventure.claim_chest(gold))
+    _apply_state(reply)
+    _say(reply)
+    notice.text = str(reply.get("found", ""))
+    if is_instance_valid(_chest_panel): _chest_panel.queue_free()
+    _update_expedition()
+    return true
+
+func _offer_chest(chest: Dictionary) -> void:
+    if is_instance_valid(_chest_panel): _chest_panel.queue_free()
+    _chest_panel = PanelContainer.new()
+    _chest_panel.name = "ChestChoice"
+    var style := StyleBoxFlat.new()
+    style.bg_color = Color(0.11, 0.08, 0.05, 0.96)
+    style.border_color = Color("a07a44")
+    style.set_border_width_all(2)
+    style.set_content_margin_all(14)
+    _chest_panel.add_theme_stylebox_override("panel", style)
+    var box := VBoxContainer.new()
+    box.add_theme_constant_override("separation", 8)
+    _chest_panel.add_child(box)
+    var title := Label.new()
+    title.text = "%s\nThe lid is stiff with frost. Inside: coin, and a soldier's journal that someone kept for a long time." % str(data.objects.get(hero.cell, {}).get("name", "A chest"))
+    title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    title.custom_minimum_size = Vector2(380, 0)
+    box.add_child(title)
+    var take_gold := Button.new()
+    take_gold.text = "Keep the gold  (+%d Gold)" % int(chest.gold)
+    take_gold.pressed.connect(claim_chest.bind(true))
+    box.add_child(take_gold)
+    var read := Button.new()
+    read.text = "Share out the journal  (+%d experience)" % int(chest.xp)
+    read.pressed.connect(claim_chest.bind(false))
+    box.add_child(read)
+    $HUD.add_child(_chest_panel)
+    _chest_panel.position = get_viewport_rect().size * 0.5 - Vector2(205, 80)
+
+## What a site does, for the sidebar (HoMM3 right-click text).
+func _site_text(cell: Vector2i, landmark: Dictionary) -> String:
+    var used := false
+    for entry in state.get("sites", []):
+        if entry.cell[0] == cell.x and entry.cell[1] == cell.y: used = entry.used
+    match str(landmark.get("type", "")):
+        "pickup":
+            var kind := str(landmark.get("kind", ""))
+            if kind == "chest": return "A chest: gold, or experience for your companions."
+            if kind == "campfire": return "An abandoned camp: gold and timber."
+            return "Resources lying unclaimed: %s." % kind.capitalize()
+        "artifact": return "Something lies half-buried here." + (" (taken)" if used else "")
+        "mill":
+            var pay := "+500 Gold" if landmark.get("kind", "") == "watermill" else "+2 Wood, +2 Stone"
+            return "Pays %s once a week.%s" % [pay, " Visited this week." if used else ""]
+        "stables": return "Fresh horses: +3 movement until the week ends.%s" % [" Used this week." if used else ""]
+        "watchtower": return "Climb it to see far across the land.%s" % [" Visited." if used else ""]
+        "learning_stone": return "Runes that teach the companions (+400 experience, once).%s" % [" Read." if used else ""]
+        "obelisk": return "A black stone veined with violet. It shows where the passage is not.%s" % [" Read." if used else ""]
+        "dwelling":
+            var unit := str(unit_names.get(str(landmark.get("kind", "")), str(landmark.get("kind", "")).capitalize()))
+            return "A dwelling: capture it to recruit %s each week." % unit
+    return ""
 
 ## Shows war-bands the player can currently see; hides the rest.
 func _sync_rivals() -> void:
@@ -370,7 +458,7 @@ func load_game() -> bool:
 
 func toggle_quest_log() -> void:
     quest_log.visible = not quest_log.visible
-    if quest_log.visible: quest_log.show_quests(state.get("quests", []))
+    if quest_log.visible: quest_log.show_quests(state.get("quests", []), state.get("lore", []))
 
 func _build_turn_hud() -> void:
     dialogue = DialoguePanel.new()
@@ -529,7 +617,7 @@ func _inspect(cell: Vector2i) -> void:
     _preview.clear()
     overlay.reachable = -1
     if not data.tiles.has(cell):
-        sidebar.get_node("Inspection").text = "Hover over the desert to inspect terrain and landmarks."
+        sidebar.get_node("Inspection").text = "Hover over the land to inspect terrain and landmarks."
         sidebar.get_node("Route").text = "Click a reachable hex to travel."
     elif fog != null and not fog.is_explored(cell):
         sidebar.get_node("Inspection").text = "Unexplored\n[%d, %d]" % [cell.x, cell.y]
@@ -547,6 +635,9 @@ func _inspect(cell: Vector2i) -> void:
             sidebar.get_node("Inspection").text = "%s\n%s" % [rival.name, _army_text(rival.army)]
         elif _guarded(cell):
             sidebar.get_node("Inspection").text += "\nGuarded by: " + _army_text(_encounters_for(landmark))
+        var about := _site_text(cell, landmark)
+        if not about.is_empty():
+            sidebar.get_node("Inspection").text += "\n" + about
         if not data.is_passable(cell):
             sidebar.get_node("Route").text = "Impassable terrain."
         elif cell == hero.cell:
@@ -594,7 +685,7 @@ func travel_to(cell: Vector2i) -> bool:
         _destination = walked[-1]  # stop beside the guards, then fight
     overlay.path = walked.duplicate()
     overlay.reachable = -1
-    notice.text = "Crossing the sands…"
+    notice.text = "On the march…"
     sidebar.get_node("Route").text = "Travelling · %d hexes" % walked.size()
     state = reply
     hero.follow(walked)
@@ -607,6 +698,9 @@ func _entered_cell(cell: Vector2i) -> void:
         fog.reveal(step.revealed)
         if not str(step.capture).is_empty():
             notice.text = "%s now flies the Compact's banner." % step.capture
+        if not str(step.get("found", "")).is_empty():
+            notice.text = str(step.found)
+            _found_on_journey = true
     var landmark: Dictionary = data.objects.get(cell, {})
     sidebar.get_node("Location").text = str(landmark.get("name", "%s · [%d, %d]" % [str(data.tiles[cell].terrain).capitalize(), cell.x, cell.y]))
     overlay.origin = cell
@@ -615,8 +709,11 @@ func _entered_cell(cell: Vector2i) -> void:
     overlay.queue_redraw()
     _update_expedition()
 
+var _found_on_journey := false
+
 func _journey_finished() -> void:
-    var captured := notice.text.ends_with("banner.")
+    var captured := notice.text.ends_with("banner.") or _found_on_journey
+    _found_on_journey = false
     _apply_state(state)
     if _check_lost(): return
     if not _held_lines.is_empty():
@@ -625,7 +722,12 @@ func _journey_finished() -> void:
     if state.get("encounter") != null:
         _begin_encounter(state.encounter)
         return
+    if state.get("chest") != null:
+        _offer_chest(state.chest)
+        return
     var object: Dictionary = data.objects.get(hero.cell, {})
+    if captured and object.get("type", "") == "dwelling" and hero.cell == _destination:
+        open_town.call_deferred()  # a freshly taken dwelling shows its recruits at once
     if hero.cell != _destination:
         notice.text = "Out of movement — the expedition makes camp. End the day (E) to press on."
     elif not captured:
@@ -633,9 +735,12 @@ func _journey_finished() -> void:
             "town":
                 notice.text = "%s · Banners stir above the gates." % object.name
                 if _owned_town(hero.cell): open_town.call_deferred()
+            "dwelling":
+                notice.text = "%s · Its creatures watch your banners." % object.name
+                if _owned_town(hero.cell): open_town.call_deferred()
             "dungeon": notice.text = "%s · A cold wind rises from the sealed entrance." % object.name
-            "artifact": notice.text = "%s · Something ancient glimmers beneath the sand." % object.name
-            "old_mine": notice.text = "%s · The shaft is choked with sand. Nothing here yet." % object.name
+            "artifact": notice.text = "%s · Only a hollow in the earth remains." % object.name
+            "old_mine": notice.text = "%s · The shaft is empty and cold. Something below is breathing, slowly." % object.name
             "quest_giver": notice.text = "%s · The camp is quiet. Nothing here yet." % object.name
             "guard": notice.text = "%s · Their fires are cold. Nothing here yet." % object.name
             _: notice.text = "The expedition has arrived. Choose the next stretch of your journey."
@@ -672,7 +777,7 @@ func _build_expedition_controls() -> void:
     sidebar.move_child(_garrison_button, sidebar.get_node("Spacer").get_index())
     _restart_button = Button.new()
     _restart_button.text = "New expedition"
-    _restart_button.tooltip_text = "Reset the army, collected loot, and cleared dungeons; return to Khemret."
+    _restart_button.tooltip_text = "Reset the army, collected loot, and cleared dungeons; return to Varenhold."
     _restart_button.pressed.connect(new_expedition)
     sidebar.add_child(_restart_button)
     sidebar.move_child(_restart_button, sidebar.get_node("Spacer").get_index())
@@ -810,13 +915,13 @@ func _show_end(victory: bool, reason := "") -> void:
     screen.illustration = "res://content/textures/screens/%s.png" % ("victory" if victory else ("sealed" if not reason.is_empty() else ""))
     if not reason.is_empty():
         screen.heading = "The Passage Is Sealed"
-        screen.body = reason + " The Shariw have kept their desert's secret. The Compact will have to find another way down."
+        screen.body = reason + " The Shariw have sealed the old passage, and House Hale holds the north. The Compact will have to find another way south."
     elif victory:
         screen.heading = "The Old Passage Is Found"
-        screen.body = "Kharim was right: the official histories lied. Below the abandoned mine, worn steps lead down into a city that was never meant to be seen from the surface. The Compact's banners will be the first to descend."
+        screen.body = "Below the old mine, steps too even for any mason lead down into warm dark. The veins in the walls brighten as you pass, as if something has been expecting you. Far to the south, the air tastes of sand. Umm'Natur is waiting."
     else:
         screen.heading = "The Expedition Is Lost"
-        screen.body = "The desert keeps its secrets. Somewhere beneath the sand, the old passage waits for braver hands."
+        screen.body = "The marches keep their secrets. Somewhere under the Greyfangs, the old passage waits, and something in it is still counting."
     screen.stats = "Day %d · Week %d · Gold %d" % [state.day_of_week, state.week, state.treasury.Gold]
     screens.push(screen, func(result: Dictionary):
         if result.get("action") == "quit": get_tree().quit()
@@ -830,7 +935,7 @@ func _dungeon_finished(result: Dictionary, cell: Vector2i) -> void:
             var reply: Dictionary = JSON.parse_string(adventure.add_item(str(item.id)))
             _apply_state(reply)
             _say(reply)
-    notice.text = {"victory": "Victory! Survivors and loot have returned to the expedition.", "defeat": "The army has fallen.", "retreat": "Your survivors return. The dungeon remains guarded."}.get(result.result, "Returned to the desert.")
+    notice.text = {"victory": "Victory! Survivors and loot have returned to the expedition.", "defeat": "The army has fallen.", "retreat": "Your survivors return. The dungeon remains guarded."}.get(result.result, "Returned to the map.")
     _check_defeat()
 
 func new_expedition() -> void:

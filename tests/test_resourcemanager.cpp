@@ -269,10 +269,10 @@ SUITE("Hero — cursed item added same as normal item") {
 
 // ── WondrousItem loading ──────────────────────────────────────────────────────
 
-SUITE("ResourceManager — loads all 5 items from data/items.json") {
+SUITE("ResourceManager — loads all 14 items (5 desert + 9 northern) from data/items.json") {
     ResourceManager rm;
     rm.load("data");
-    CHECK_EQ((int)rm.allItems().size(), 5);
+    CHECK_EQ((int)rm.allItems().size(), 14);
 }
 
 SUITE("ResourceManager — known item lookup returns correct fields") {

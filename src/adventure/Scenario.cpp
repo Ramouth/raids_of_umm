@@ -1,4 +1,5 @@
 #include "Scenario.h"
+#include <algorithm>
 #include "AdventureSession.h"
 #include <fstream>
 
@@ -57,7 +58,8 @@ bool Scenario::matches(const Json& when, const std::string& event, const Json& d
     if (event == "mines_held" || event == "quests_done")
         return detail.value("count", 0) >= when.value("count", 99);
     if (event == "item")        return detail.value("item", "") == when.value("item", "");
-    if (event == "see" || event == "visit" || event == "capture" || event == "encounter_won")
+    if (event == "see" || event == "visit" || event == "capture" || event == "encounter_won"
+        || event == "rival_beaten")
         return detail.value("name", "") == when.value("name", "");
     return true;  // "start"
 }
@@ -69,6 +71,8 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
         if (m_fired.count(id) || !matches(trigger.value("when", Json::object()), event, detail)) continue;
         std::string after = trigger.value("when", Json::object()).value("after", "");
         if (!after.empty() && !m_fired.count(after)) continue;   // story order
+        std::string unless = trigger.value("when", Json::object()).value("unless", "");
+        if (!unless.empty() && m_fired.count(unless)) { m_fired.insert(id); continue; }  // overtaken by events
         m_fired.insert(id);
         run(s, trigger.value("do", Json::array()));
     }
@@ -103,6 +107,30 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             else
                 m_lines.push_back({"Kharim", "You have already ruled out every false mine. Trust the one that remains."});
         }
+        if (a.contains("item")) s.addItem(a["item"].get<std::string>());
+        if (a.contains("lore")) {
+            Lore entry{a["lore"].at(0).get<std::string>(), a["lore"].at(1).get<std::string>()};
+            if (std::none_of(m_lore.begin(), m_lore.end(), [&](const Lore& l) { return l.title == entry.title; }))
+                m_lore.push_back(entry);
+        }
+        if (a.contains("troops")) {                  // allies send soldiers to the hero
+            auto army = s.army();
+            for (const auto& st : a["troops"]) {
+                std::string id = st.value("id", "");
+                int n = st.value("count", 0);
+                auto it = std::find_if(army.begin(), army.end(), [&](const auto& x) { return x.id == id; });
+                if (it != army.end()) it->count += n;
+                else army.push_back({id, n});
+            }
+            s.setArmy(army);
+        }
+        if (a.contains("betray")) {
+            const auto& b = a["betray"];
+            std::vector<AdventureSession::Stack> army;
+            for (const auto& st : b.value("army", Json::array()))
+                army.push_back({st.value("id", ""), st.value("count", 0)});
+            s.betray(b.value("at", ""), b.value("band", "war-band"), army);
+        }
         if (a.contains("offer"))
             for (const auto& def : m_offerDefs)
                 if (def.id == a["offer"] && !offer(def.id)) m_offers.push_back(def);
@@ -114,8 +142,10 @@ Scenario::Json Scenario::saveState() const {
     for (const auto& q : m_quests) quests.push_back({{"id", q.id}, {"text", q.text}, {"done", q.done}});
     Json offers = Json::array();
     for (const auto& o : m_offers) offers.push_back({{"id", o.id}, {"taken", o.taken}});
+    Json lore = Json::array();
+    for (const auto& l : m_lore) lore.push_back({l.title, l.text});
     return {{"fired", Json(std::vector<std::string>(m_fired.begin(), m_fired.end()))},
-            {"quests", quests}, {"offers", offers}};
+            {"quests", quests}, {"offers", offers}, {"lore", lore}};
 }
 
 void Scenario::loadState(const Json& state) {
@@ -138,6 +168,9 @@ void Scenario::loadState(const Json& state) {
                 copy.taken = o.value("taken", false);
                 m_offers.push_back(copy);
             }
+    m_lore.clear();
+    for (const auto& l : state.value("lore", Json::array()))
+        m_lore.push_back({l.at(0).get<std::string>(), l.at(1).get<std::string>()});
     m_lines.clear();
 }
 

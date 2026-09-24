@@ -5,7 +5,7 @@ extends SceneTree
 
 const WEEK2_ARMY := [{"id": "levy_spearman", "count": 50}, {"id": "desert_archer", "count": 26},
     {"id": "armoured_warrior", "count": 10}, {"id": "rider_archer", "count": 4}]
-const RIDGE_GUARD := Vector2i(-6, 3)
+const RIDGE_GUARD := Vector2i(-4, 2)  # the Bridge Wardens on the Coldwater
 
 var failures := 0
 
@@ -27,6 +27,7 @@ func _run() -> void:
     await _defeat_ends()
     await _rival_raids()
     await _save_load()
+    await _sites()
     print("Demo smoke: ", "PASS" if failures == 0 else "%d failures" % failures)
     quit(failures)
 
@@ -62,7 +63,9 @@ func _story() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
     check(scene.dialogue.is_speaking(), "The intro transmission plays at the start")
     check(scene.dialogue._speaker.text == "USHARI", "Ushari opens the story")
-    check(scene.state.quests.size() == 1 and scene.state.quests[0].main, "The main quest is given")
+    check(scene.state.quests.any(func(q): return q.main), "The main quest is given")
+    check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
+    check(scene.state.lore.size() >= 1, "The first lore entry is in the codex")
     scene.toggle_quest_log()
     check(scene.quest_log.visible, "Q opens the quest log")
     scene.toggle_quest_log()
@@ -72,7 +75,7 @@ func _story() -> void:
     check(scene.open_party(), "The companions screen opens")
     var party: Control = scene.screens.top()
     party._station("ushari", true)
-    check(scene.state.specials[0].stationed != null, "Ushari can govern Khemret")
+    check(scene.state.specials[0].stationed != null, "Ushari can govern Varenhold")
     party._station("ushari", false)
     check(scene.state.specials[0].stationed == null, "Ushari can be recalled")
     party.find_child("Done", true, false).pressed.emit()
@@ -94,20 +97,20 @@ func _story() -> void:
 
 func _town_recruiting() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", [{"id": "levy_spearman", "count": 24}])
-    check(scene._town_button.visible, "Enter-town button shows in Khemret")
-    check(scene.open_town(), "The hero can enter Khemret")
+    check(scene._town_button.visible, "Enter-town button shows in Varenhold")
+    check(scene.open_town(), "The hero can enter Varenhold")
     var town: Control = scene.screens.top()
     check(town != null and town.has_method("recruit"), "Town screen is pushed")
-    check(town._cards.get_child_count() == 5, "Khemret offers the five Ivory Compact tiers")
+    check(town._cards.get_child_count() == 5, "Varenhold offers the five Ivory Compact tiers")
     var gold := int(scene.state.treasury.Gold)
     check(town.recruit("levy_spearman", 6), "Recruiting levies succeeds")
     check(int(scene.state.treasury.Gold) == gold - 300, "Recruiting spends 50 gold per levy")
     check(scene.army.any(func(s): return s.id == "levy_spearman" and s.count == 30), "Recruits merge into the existing stack")
-    check(not town.recruit("rider_knight", 2), "Cannot afford two knights (1800 gold, 1700 left)")
+    check(not town.recruit("rider_knight", 3), "Cannot afford three knights (2700 gold, 2200 left)")
     check(not town.recruit("levy_spearman", 999), "Cannot recruit past the weekly pool")
     town.find_child("Leave", true, false).pressed.emit()
     await process_frame
-    check(scene.open_garrison(), "The hero can garrison Khemret")
+    check(scene.open_garrison(), "The hero can garrison Varenhold")
     var garrison: Control = scene.screens.top()
     check(garrison.move("levy_spearman", 10, true), "Ten levies stay behind as a garrison")
     check(scene.army.any(func(s): return s.id == "levy_spearman" and s.count == 20), "The garrisoned levies leave the army")
@@ -121,25 +124,24 @@ func _town_recruiting() -> void:
 
 func _ridge_pass() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
-    check(scene._guarded(RIDGE_GUARD), "Ridge Pass starts guarded")
-    var beyond: Dictionary = JSON.parse_string(scene.adventure.preview(-4, 2))
-    check(beyond.path.is_empty(), "No route through the guarded pass")
-    check(scene.travel_to(RIDGE_GUARD), "Player can order an attack on the pass guards")
+    check(scene._guarded(RIDGE_GUARD), "The Coldwater bridge starts guarded")
+    scene.dialogue.skip_all()
+    check(scene.travel_to(Vector2i(-7, 2)), "March down the road toward the Coldwater")
+    while scene.hero.moving: await process_frame
+    check(scene.travel_to(RIDGE_GUARD), "Player can order an attack on the bridge guards")
     while scene.hero.moving: await process_frame
     check(is_instance_valid(scene.battle), "Reaching the guards starts a battle")
     check(scene.screens.depth() == 1, "Battle is pushed on the screen stack")
-    check(scene.battle.heading.text == "RIDGE PASS GUARD", "Battle is titled after the guards")
+    check(scene.battle.heading.text == "BRIDGE WARDENS", "Battle is titled after the guards")
     check(not scene.get_node("HUD").visible, "Adventure HUD is hidden under the battle")
     var result := await _auto_battle(scene)
-    check(result == "victory", "A week-two army beats the pass guards")
+    check(result == "victory", "A week-two army beats the bridge guards")
     check(scene.screens.depth() == 0 and scene.get_node("HUD").visible, "Battle pops back to the adventure")
     check(not scene._guarded(RIDGE_GUARD), "Beaten guards no longer hold the pass")
     check(scene.hero.cell == RIDGE_GUARD, "Hero steps into the pass after victory")
     check(not scene.map_view.anchors[RIDGE_GUARD].visible, "Guard camp disappears from the map")
     check(int(scene.state.treasury.Gold) >= 2750, "Guard reward gold is paid")
-    check(scene.inventory.any(func(item): return item.id == "scarab_amulet"), "Guard item drop joins the inventory")
-    beyond = JSON.parse_string(scene.adventure.preview(-4, 2))
-    check(not beyond.path.is_empty(), "The pass is open")
+    check(scene.inventory.any(func(item): return item.id == "wolfpelt_boots"), "Guard item drop joins the inventory")
     scene.queue_free()
     await process_frame
 
@@ -250,5 +252,50 @@ func _save_load() -> void:
     check(scene.load_game(), "Quickload succeeds")
     check(scene.state.day == day and scene.hero.cell == cell and int(scene.state.treasury.Gold) == gold, "Load restores day, hero and treasury")
     check(scene.army.size() == WEEK2_ARMY.size(), "Load restores the army")
+    scene.queue_free()
+    await process_frame
+
+## Northern sites: a chest asks gold-or-experience, an obelisk rules out a
+## false mine, and a dwelling opens a one-creature recruit screen.
+func _sites() -> void:
+    var tiles := []
+    for q in range(-3, 4):
+        for r in range(-3, 4):
+            if absi(q + r) <= 3:
+                tiles.append({"q": q, "r": r, "terrain": "grass", "passable": true, "moveCost": 1.0, "variant": 0})
+    var map := {"version": 1, "name": "Sites", "radius": 3, "ground": "grass", "tiles": tiles, "objects": [
+        {"q": -3, "r": 0, "type": "town", "name": "Camp", "factionId": 1},
+        {"q": -2, "r": 0, "type": "pickup", "name": "Strongbox", "kind": "chest"},
+        {"q": -1, "r": 2, "type": "dwelling", "name": "Wolf Den", "kind": "grey_wolf"},
+        {"q": 0, "r": -2, "type": "obelisk", "name": "Stone"},
+        {"q": 3, "r": -3, "type": "old_mine", "name": "Mine A"},
+        {"q": 3, "r": 0, "type": "old_mine", "name": "Mine B"}]}
+    FileAccess.open("user://demo_sites.json", FileAccess.WRITE).store_string(JSON.stringify(map))
+    var scene := await _scene("user://demo_sites.json", WEEK2_ARMY)
+    check(scene.travel_to(Vector2i(-2, 0)), "Walk to the chest")
+    while scene.hero.moving: await process_frame
+    check(is_instance_valid(scene._chest_panel), "The chest offers a choice")
+    var xp: int = scene.state.specials[0].xp
+    check(scene.claim_chest(false), "Taking the experience works")
+    check(int(scene.state.specials[0].xp) == xp + 500, "The companions gain the chest's experience")
+    await process_frame
+    check(not is_instance_valid(scene._chest_panel), "The choice closes")
+    check(not scene.map_view.anchors[Vector2i(-2, 0)].visible, "The opened chest leaves the map")
+    check(scene.travel_to(Vector2i(0, -2)), "Walk to the obelisk")
+    while scene.hero.moving: await process_frame
+    check(scene.state.ruled_out.size() == 1, "The obelisk rules out a false mine")
+    check(scene.notice.text.contains("leads nowhere"), "The obelisk's reading is shown")
+    scene.end_day()
+    await _turn_done(scene)
+    check(scene.travel_to(Vector2i(-1, 2)), "Walk to the wolf den")
+    while scene.hero.moving: await process_frame
+    await process_frame
+    var top: Control = scene.screens.top()
+    check(top != null and top.has_method("recruit"), "An owned dwelling opens its recruit screen")
+    if top != null and top.has_method("recruit"):
+        check(top._cards.get_child_count() == 1, "The den offers only its wolves")
+        check(top.recruit("grey_wolf", 2), "Wolves can be recruited")
+        top.find_child("Leave", true, false).pressed.emit()
+        await process_frame
     scene.queue_free()
     await process_frame

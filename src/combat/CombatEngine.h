@@ -2,6 +2,7 @@
 #include "CombatArmy.h"
 #include "CombatEvent.h"
 #include "CombatMap.h"
+#include <cstdint>
 #include <random>
 #include <vector>
 
@@ -11,6 +12,37 @@
 struct TurnSlot {
     bool isPlayer;
     int  stackIndex;   // index into CombatArmy::stacks
+};
+
+/*
+ * DamageRange — the exact damage bounds of one strike, plus its expected value.
+ * Mirrors CombatEngine::calcDamage so previews never disagree with real rolls.
+ */
+struct DamageRange {
+    int    min = 0;
+    int    max = 0;
+    double avg = 0.0;
+};
+
+/*
+ * AttackPreview — what the active stack's attack on one enemy stack would do.
+ * Used by the UI hover preview and by CombatAI's scoring.
+ *
+ * Kill ranges are creatures killed (min from the low roll, max from the high).
+ * Retaliation is the target's counter-strike after surviving the hit; its
+ * range spans "target took the high roll" .. "target took the low roll".
+ */
+struct AttackPreview {
+    bool        valid       = false;  // target exists, alive, and legally attackable now
+    bool        ranged      = false;  // shot (no retaliation) vs melee strike
+    bool        pinned      = false;  // flanked: +50% damage, no retaliation
+    DamageRange damage;
+    int         killsMin    = 0;
+    int         killsMax    = 0;
+    bool        retaliation = false;  // the target can strike back (if it survives)
+    DamageRange retaliationDamage;
+    int         retKillsMin = 0;
+    int         retKillsMax = 0;
 };
 
 /*
@@ -28,6 +60,15 @@ struct TurnSlot {
 class CombatEngine {
 public:
     CombatEngine(CombatArmy player, CombatArmy enemy);
+
+    // Reseed damage rolls and the AI's tie-break RNG.  Same seed + same
+    // commands ⇒ identical battle (tests, replays, balance sims).
+    // Without a call both streams are seeded from std::random_device.
+    void setSeed(uint32_t seed);
+
+    // RNG reserved for CombatAI decisions (separate stream so AI jitter never
+    // shifts damage rolls).
+    std::mt19937& aiRng() { return m_aiRng; }
 
     // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -50,6 +91,21 @@ public:
     // Hexes that contain an enemy adjacent to the active unit (melee),
     // or all living enemy hexes (ranged).
     std::vector<HexCoord> attackableTiles() const;
+
+    // True if the active unit could attack the enemy stack at targetIndex now
+    // (adjacent melee, or any range with shots left).
+    bool canAttack(int targetIndex) const;
+
+    // Preview of the active unit attacking enemy stack targetIndex (see AttackPreview).
+    AttackPreview previewAttack(int targetIndex) const;
+
+    // Damage bounds for `attacker` striking `defender` with the current stats
+    // (defending bonus, item bonuses, bypass).  `pinned` applies the ×1.5.
+    static DamageRange damageRange(const CombatUnit& attacker, const CombatUnit& defender,
+                                   bool pinned = false);
+
+    // Creatures that `damage` would kill in `target` (cascading through the stack).
+    static int killsFor(const CombatUnit& target, int damage);
 
     // ── Movement ─────────────────────────────────────────────────────────────
 
@@ -134,6 +190,9 @@ private:
     // Check if either side is fully dead and update m_result accordingly.
     void checkWinCondition();
 
+    // ATK/DEF multiplier shared by calcDamage and damageRange.
+    static double damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender);
+
     // HoMM3-style damage roll: sum rand(min,max) over each creature in attacker.
     static int calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
                           std::mt19937& rng);
@@ -150,6 +209,7 @@ private:
     int                   m_round = 1;
     CombatResult          m_result = CombatResult::Ongoing;
     std::mt19937          m_rng;
+    std::mt19937          m_aiRng;
 
     std::vector<CombatEvent> m_events;   // output queue; drained by CombatState
 

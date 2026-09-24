@@ -45,6 +45,31 @@ See `economy.md` for economy decisions and implementation plan.
 
 ---
 
+## Campaign arc — three stages, north to south
+
+| Stage | Land | Status |
+|-------|------|--------|
+| **1 — The Northern Marches** | meadows, pine and oak forest, lakes, the Coldwater river, the Greyfang mountains | ◀ the demo (`data/maps/old_passage.*`, `scripts/gen_north_map.py`, `scripts/north_story.py`) |
+| 2 — The Desert of Umm'Natur | sand, dunes, oases, ruins; the first desert draft | parked as `data/maps/desert_passage.*` |
+| 3 — The Scorched Black Earth | burnt plains, obsidian, ash | ⬜ |
+
+The old passage under the Greyfangs is the road from stage 1 to stage 2.
+Map density for every stage follows HoMM3; see `docs/map_density.md`.
+
+### Stage 1 — story (draft, see the story doc)
+- **The families:** House Varen (the player) at Varenhold and House Hale (cousin Corvin) at Hallowmere hold the marches for the Ivory Compact.
+- **The brother's fall:** Aldren rode east with Kharim's letter. His horse comes home on day 5, and his body is found on day 7, killed by crossbow bolts.
+- **The ally:** Corvin sends spears and timber, lends Hallowmere, and gives the Hale signet.
+- **The betrayal** (day 12+, after you have visited Hallowmere; day 16 at the latest): Corvin admits he killed Aldren and has sided with the Shariw. Hallowmere turns rival and the Hale household rides out.
+- **The mythos, in layers:** four obelisks (inscription + Lore entry + rules out a false mine), relics (the Warm Stone, the Listening Shard), the Drowned King's barrow and crown. The deepest layer: the Veined, whose roads are the old passages. The journal (Q) has a **Lore** page.
+
+### Stage 1 — HoMM3-style adventure objects (native, tested)
+Resource piles, campfires, chests (gold **or** experience), windmills/watermills (weekly),
+stables (+3 movement for the week), watchtowers (reveal radius 9), learning stones,
+obelisks, creature dwellings (capture, recruit weekly), artifacts on the map, bridges,
+lakes and swamps, and **guard zones of control** (walking next to a camp starts the fight;
+routes go around camps when they can).
+
 ## Demo — "The Old Passage" (Godot) ◀ current focus
 
 A 20–30 min handcrafted scenario that shows off the core loop:
@@ -177,6 +202,9 @@ Balance tool: `godot/native/build/battle_sim data '<army>' '<guards>' [runs]`.
 | 11 | Kharim + `quests.json` + quest log | ✅ (quests live in triggers.json) |
 | 12 | SC stage abilities (Veteran map ability, Champion signature) | 🟡 adventure abilities done; SCs in combat ⬜ |
 | 13 | PixelLab art: Old Mine, Kharim + Ushari portraits, Compact + Shariw units/heroes, new mine objects | 🟡 objects + units done (PixelLab + OpenAI) |
+| 14 | **Stage 1 north:** northern map at HoMM3 density, sites, dwellings, zone of control, obelisks + lore codex, families/betrayal story, northern art | ✅ first pass (demo_bot 6/12 won, average day 40, so the race needs tuning) |
+| 15 | **Combat AI + clarity:** scored AI (spreads out, flanks, seeded randomness), turn-order bar, hover damage/kill forecast, combat log, stack inspector | ✅ |
+| 16 | Decide: move **and** attack in one turn (HoMM3) vs today's move **or** attack | ⬜ design decision |
 
 ---
 

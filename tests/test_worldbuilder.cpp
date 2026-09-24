@@ -349,9 +349,9 @@ SUITE("WorldMap — variant=0 default is preserved on save/load") {
 
 // ── 5. New terrain types (Grass, Forest, Highland) ───────────────────────────
 
-SUITE("Terrain — COUNT is 15 (10 desert + 3 biome + 2 edge)") {
-    CHECK_EQ(static_cast<int>(Terrain::COUNT), 15);
-    CHECK_EQ(TERRAIN_COUNT, 15);
+SUITE("Terrain — COUNT is 17 (10 desert + 3 biome + 2 edge + lake + swamp)") {
+    CHECK_EQ(static_cast<int>(Terrain::COUNT), 17);
+    CHECK_EQ(TERRAIN_COUNT, 17);
 }
 
 SUITE("Terrain — new biome enum values are correct") {

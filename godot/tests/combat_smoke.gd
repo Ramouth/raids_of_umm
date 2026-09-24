@@ -30,6 +30,9 @@ func _click(control: Control, local: Vector2) -> void:
 
 func _run() -> void:
     capture = "--capture" in OS.get_cmdline_user_args()
+    if capture and DisplayServer.get_name() != "headless":
+        # Capture windows must never steal the user's keyboard or mouse.
+        DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
     check(ClassDB.class_exists("UmmCombat"), "Real C++ extension loads in Godot")
     scene = load("res://scenes/desert.tscn").instantiate()
     # Written against the canonical map, not the demo map.
@@ -57,7 +60,26 @@ func _run() -> void:
     check(not scene.travel_to(scene.data.spawn), "Adventure movement is blocked during battle")
     check(battle.state.units.size() == 4, "Original expedition and dungeon guards are present")
     if capture: await _capture("combat")
+    # Clarity UI: turn order, inspector, hover forecast.
+    check(battle.initiative.get_child_count() >= 4, "Turn-order bar shows every stack")
+    check(battle.inspection.get_parsed_text().contains("ACTING NOW"), "Inspector describes the active stack")
     var target: Array = battle.state.attackable[0]
+    battle._cell_hovered(Vector2i(target[0], target[1]), true)
+    check(battle.board.hover_kind == "attack" and "slain" in battle.board.hover_label, "Hovering a target shows the damage forecast on the board")
+    check("damage, kills" in battle.status.get_parsed_text(), "Status bar spells out damage and kills")
+    if capture: await _capture("combat_hover_attack")
+    var enemy_far: Dictionary = {}
+    for unit in battle.state.units:
+        if not unit.player and not (unit.cell in battle.state.attackable): enemy_far = unit
+    if not enemy_far.is_empty() and not battle.state.units[0].ranged:
+        battle._cell_hovered(Vector2i(enemy_far.cell[0], enemy_far.cell[1]), true)
+        check("out of reach" in battle.status.get_parsed_text(), "Unreachable melee target is explained")
+    var walk: Array = battle.state.reachable[0]
+    battle._cell_hovered(Vector2i(walk[0], walk[1]), true)
+    check(battle.board.hover_kind == "move" and "ends" in battle.status.get_parsed_text(), "Movement hover explains that moving ends the turn")
+    battle._cell_right_clicked(Vector2i(battle.state.units[3].cell[0], battle.state.units[3].cell[1]))
+    battle._cell_hovered(Vector2i.ZERO, false)
+    check(battle.inspection.get_parsed_text().contains(battle.state.units[3].name), "Right-click pins a stack in the inspector")
     _click(battle.board, battle.board.cell_point(target))
     check(battle.busy, "Actual battlefield click starts an attack animation")
     check(not battle.issue("defend"), "Rapid follow-up command is blocked during animation")
@@ -80,6 +102,8 @@ func _run() -> void:
     for stack in battle.state.survivors: remaining += int(stack.count)
     check(remaining < 13, "Enemy melee inflicts real expedition casualties")
     check(battle.history.any(func(line: String): return "retaliation" in line), "Retaliation events are presented")
+    check(battle.history.any(func(line: String): return "Round 2" in line), "Round changes are logged")
+    if capture: await _capture("combat_log")
     # Retreat through the real confirmation dialog; preserve casualties exactly.
     var survivors: Array = battle.state.survivors.duplicate(true)
     battle.retreat.pressed.emit()

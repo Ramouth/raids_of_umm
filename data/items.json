@@ -7,7 +7,10 @@
       "cursed": false,
       "description": "A carved lapis scarab humming with old battle-magic. Your troops strike harder.",
       "passiveEffects": [
-        { "stat": "attack", "amount": 1 }
+        {
+          "stat": "attack",
+          "amount": 1
+        }
       ]
     },
     {
@@ -17,7 +20,10 @@
       "cursed": false,
       "description": "Woven from enchanted sandstorm dust. Blows deflect blows.",
       "passiveEffects": [
-        { "stat": "defense", "amount": 2 }
+        {
+          "stat": "defense",
+          "amount": 2
+        }
       ]
     },
     {
@@ -27,7 +33,10 @@
       "cursed": false,
       "description": "A shard of volcanic glass bound to your hero's will. Each strike cuts deeper.",
       "passiveEffects": [
-        { "stat": "damage", "amount": 3 }
+        {
+          "stat": "damage",
+          "amount": 3
+        }
       ]
     },
     {
@@ -37,8 +46,14 @@
       "cursed": true,
       "description": "The god's gaze grants savage fury — but rots the bearer's guard. Cannot be discarded.",
       "passiveEffects": [
-        { "stat": "attack",  "amount":  4 },
-        { "stat": "defense", "amount": -2 }
+        {
+          "stat": "attack",
+          "amount": 4
+        },
+        {
+          "stat": "defense",
+          "amount": -2
+        }
       ]
     },
     {
@@ -48,7 +63,131 @@
       "cursed": false,
       "description": "A coiling bronze band. The serpent spirit inside quickens your warriors' legs.",
       "passiveEffects": [
-        { "stat": "speed", "amount": 1 }
+        {
+          "stat": "speed",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "oathstone_amulet",
+      "name": "Oathstone Amulet",
+      "slot": "amulet",
+      "cursed": false,
+      "description": "A river pebble carved with a family oath. Men fight harder under it.",
+      "passiveEffects": [
+        {
+          "stat": "attack",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "bearhide_cloak",
+      "name": "Bearhide Cloak",
+      "slot": "armor",
+      "cursed": false,
+      "description": "Heavy, warm, and stitched with bronze rings.",
+      "passiveEffects": [
+        {
+          "stat": "defense",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "barrow_blade",
+      "name": "Barrow Blade",
+      "slot": "weapon",
+      "cursed": false,
+      "description": "A bronze sword from a barrow king's grave. Still sharp. Still hungry.",
+      "passiveEffects": [
+        {
+          "stat": "damage",
+          "amount": 3
+        }
+      ]
+    },
+    {
+      "id": "drowned_crown",
+      "name": "Drowned Crown",
+      "slot": "trinket",
+      "cursed": true,
+      "description": "The crown of a king who went into the mere rather than kneel. It remembers the old tunnels.",
+      "passiveEffects": [
+        {
+          "stat": "attack",
+          "amount": 4
+        },
+        {
+          "stat": "defense",
+          "amount": -2
+        }
+      ]
+    },
+    {
+      "id": "hale_signet",
+      "name": "Hale Signet",
+      "slot": "trinket",
+      "cursed": false,
+      "description": "Your cousin's seal ring, given in friendship. The wolf of House Hale quickens your march.",
+      "passiveEffects": [
+        {
+          "stat": "speed",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "wolfpelt_boots",
+      "name": "Wolfpelt Boots",
+      "slot": "boots",
+      "cursed": false,
+      "description": "Soft-soled and silent. The column keeps pace with the scouts.",
+      "passiveEffects": [
+        {
+          "stat": "speed",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "greyfang_helm",
+      "name": "Greyfang Helm",
+      "slot": "helm",
+      "cursed": false,
+      "description": "A troll-chief's iron cap, hammered to fit a human skull.",
+      "passiveEffects": [
+        {
+          "stat": "defense",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "listening_shard",
+      "name": "Listening Shard",
+      "slot": "trinket",
+      "cursed": false,
+      "description": "A splinter of violet crystal. Held to the ear, it is silent. Held to the ground, it is not.",
+      "passiveEffects": [
+        {
+          "stat": "defense",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "warm_stone",
+      "name": "The Warm Stone",
+      "slot": "trinket",
+      "cursed": true,
+      "description": "Always the temperature of a sleeping body. It has a pulse, if you wait long enough. The soldiers will not say why they refuse to carry it.",
+      "passiveEffects": [
+        {
+          "stat": "attack",
+          "amount": 2
+        }
       ]
     }
   ]

@@ -4,6 +4,7 @@
 #include "combat/CombatAI.h"
 #include "combat/CombatEngine.h"
 #include "hero/Hero.h"
+#include <deque>
 
 // ── Test-local type registry ───────────────────────────────────────────────────
 // CombatUnit stores const UnitType* — pointers must outlive the engine.
@@ -538,41 +539,37 @@ SUITE("CombatAI — defends when moveRange is zero and enemy is not adjacent") {
     CHECK(defended);
 }
 
-SUITE("CombatAI — targets weakest when attacking among multiple adjacent stacks") {
-    // Two enemy stacks adjacent to player: one healthy (100 hp), one wounded (5 hp).
-    // AI should attack the wounded one.
+SUITE("CombatAI — finishes a nearly-dead dangerous stack") {
+    // Two adjacent enemies: a full stack of 10 brutes (100 HP) and a single
+    // champion that hits for 20 but has only 8 HP left.  Wiping the champion
+    // removes more enemy damage than halving the brutes (and draws no
+    // retaliation), so the scorer must finish it.  Checked across seeds so
+    // the softmax jitter can never pick the worse strike.
     const UnitType* pt = makeFixed("P", 5, 5, 10, 5, 5);
-    const UnitType* et = makeFixed("E", 3, 5, 10, 5, 5);
+    const UnitType* bt = makeFixed("Brute", 3, 5, 10, 5, 5);
+    const UnitType* ct = makeFixed("Champion", 3, 20, 50, 5, 5);
+    bool alwaysFinished = true;
+    for (uint32_t seed = 1; seed <= 20; ++seed) {
+        CombatArmy pArmy;
+        pArmy.isPlayer = true; pArmy.ownerName = "Player";
+        pArmy.stacks.push_back(CombatUnit::make(pt, 10, true));
+        CombatArmy eArmy;
+        eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
+        eArmy.stacks.push_back(CombatUnit::make(bt, 10, false));
+        CombatUnit champ = CombatUnit::make(ct, 1, false);
+        champ.hpLeft = 8;
+        eArmy.stacks.push_back(champ);
 
-    CombatArmy pArmy;
-    pArmy.isPlayer = true; pArmy.ownerName = "Player";
-    pArmy.stacks.push_back(CombatUnit::make(pt, 10, true));  // 10 × 10hp = 100hp total
+        CombatEngine eng(std::move(pArmy), std::move(eArmy));
+        eng.setSeed(seed);
+        HexCoord playerPos = eng.playerArmy().stacks[0].pos;
+        eng.teleportUnit(false, 0, playerPos.neighbor(0));
+        eng.teleportUnit(false, 1, playerPos.neighbor(1));
 
-    CombatArmy eArmy;
-    eArmy.isPlayer = false; eArmy.ownerName = "Enemy";
-    CombatUnit healthy = CombatUnit::make(et, 10, false);  // 100 hp
-    CombatUnit wounded = CombatUnit::make(et, 1,  false);  // 10 hp (wounded)
-    eArmy.stacks.push_back(healthy);
-    eArmy.stacks.push_back(wounded);
-
-    CombatEngine eng(std::move(pArmy), std::move(eArmy));
-
-    // Place both enemies adjacent to player spawn.
-    HexCoord playerPos = eng.playerArmy().stacks[0].pos;
-    eng.teleportUnit(false, 0, playerPos.neighbor(0));  // healthy — adj
-    eng.teleportUnit(false, 1, playerPos.neighbor(1));  // wounded — adj
-
-    CHECK(eng.currentTurn().isPlayer);
-    CombatAI::takeTurn(eng);
-    auto events = eng.drainEvents();
-
-    // The UnitDamaged event should target stack 1 (wounded, index 1).
-    bool hitWounded = false;
-    for (const auto& ev : events)
-        if (ev.type == CombatEvent::Type::UnitDamaged && !ev.isPlayer
-                && ev.stackIndex == 1)
-            hitWounded = true;
-    CHECK(hitWounded);
+        CombatAI::takeTurn(eng);
+        if (!eng.enemyArmy().stacks[1].isDead()) alwaysFinished = false;
+    }
+    CHECK(alwaysFinished);
 }
 
 SUITE("CombatAI — full auto-battle resolves to a winner") {
@@ -1686,6 +1683,208 @@ SUITE("SC XP — level-up emits ScLevelUp event") {
     eng.drainEvents();
     CHECK(!eng.hasPendingChoice());
     CHECK(eng.playerArmy().stacks[0].attackBonus == 1);  // duelist: +1 attack
+}
+
+
+// ── Scored CombatAI ───────────────────────────────────────────────────────────
+// Own registry (deque: pointers stay valid as it grows).
+static std::deque<UnitType> s_aiTypes;
+static const UnitType* aiType(const std::string& name, int speed, int dmg, int hp,
+                              int atk, int def, int moveRange = 3, int shots = 0) {
+    UnitType t;
+    t.id = t.name = name;
+    t.speed = speed; t.minDamage = t.maxDamage = dmg; t.hitPoints = hp;
+    t.attack = atk; t.defense = def; t.moveRange = moveRange; t.shots = shots;
+    s_aiTypes.push_back(std::move(t));
+    return &s_aiTypes.back();
+}
+
+static int nearestFoe(const CombatEngine& eng, const CombatUnit& u) {
+    const auto& foes = u.isPlayer ? eng.enemyArmy().stacks : eng.playerArmy().stacks;
+    int best = -1, bestD = 1 << 20;
+    for (int i = 0; i < (int)foes.size(); ++i) {
+        if (foes[i].isDead()) continue;
+        int d = u.pos.distanceTo(foes[i].pos);
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+SUITE("CombatAI — two melee stacks split up instead of converging on one target") {
+    // Two fast enemy stacks start side by side in mid-field; two identical,
+    // slow player stacks wait in opposite corners.  The first enemy picks a
+    // corner; the second must see that target as claimed and go for the other.
+    const UnitType* pt = aiType("Militia", 3, 3, 10, 4, 4);
+    const UnitType* et = aiType("Raider", 6, 3, 10, 4, 4);
+    int split = 0;
+    const int runs = 30;
+    for (uint32_t seed = 1; seed <= runs; ++seed) {
+        CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+        p.stacks.push_back(CombatUnit::make(pt, 8, true));
+        p.stacks.push_back(CombatUnit::make(pt, 8, true));
+        CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+        e.stacks.push_back(CombatUnit::make(et, 8, false));
+        e.stacks.push_back(CombatUnit::make(et, 8, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        eng.teleportUnit(true, 0, CombatMap::toHex(1, 0));
+        eng.teleportUnit(true, 1, CombatMap::toHex(1, 4));
+        eng.teleportUnit(false, 0, CombatMap::toHex(6, 2));
+        eng.teleportUnit(false, 1, CombatMap::toHex(7, 2));
+        CHECK(!eng.currentTurn().isPlayer);
+        CombatAI::takeTurn(eng);   // enemy 0
+        CombatAI::takeTurn(eng);   // enemy 1
+        const auto& es = eng.enemyArmy().stacks;
+        if (nearestFoe(eng, es[0]) != nearestFoe(eng, es[1])) ++split;
+    }
+    CHECK_EQ(split, runs);
+}
+
+SUITE("CombatAI — second attacker takes the flanking hex") {
+    // One enemy stack already engages a tough player stack from one side.  The
+    // second enemy can reach either the opposite side (pin: ×1.5 damage, no
+    // retaliation) or an ordinary side hex — it must choose the pin.
+    const UnitType* wall  = aiType("Wall", 2, 1, 400, 5, 5);
+    const UnitType* raider = aiType("Raider", 6, 4, 10, 5, 5);
+    int flanked = 0;
+    const int runs = 20;
+    for (uint32_t seed = 1; seed <= runs; ++seed) {
+        CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+        p.stacks.push_back(CombatUnit::make(wall, 1, true));
+        CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+        e.stacks.push_back(CombatUnit::make(raider, 6, false));
+        e.stacks.push_back(CombatUnit::make(raider, 6, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        const HexCoord centre = CombatMap::toHex(5, 2);
+        eng.teleportUnit(true, 0, centre);
+        eng.teleportUnit(false, 0, centre.neighbor(0));
+        eng.teleportUnit(false, 1, centre.neighbor(3).neighbor(3));
+        // Enemy 0 acts first; make it hold so enemy 1 decides next.
+        eng.doDefend();
+        CombatAI::takeTurn(eng);
+        if (eng.enemyArmy().stacks[1].pos == centre.neighbor(3)) ++flanked;
+    }
+    CHECK_EQ(flanked, runs);
+}
+
+SUITE("CombatAI — shooter fires instead of walking, even with a foe adjacent") {
+    // An archer with a melee stack glued to it still has a clean shot at a
+    // distant stack (no retaliation).  It must never walk or defend.
+    const UnitType* archer = aiType("Archer", 6, 4, 10, 5, 5, 3, 12);
+    const UnitType* grunt  = aiType("Grunt", 3, 2, 10, 5, 5);
+    int shots = 0;
+    const int runs = 20;
+    for (uint32_t seed = 1; seed <= runs; ++seed) {
+        CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+        p.stacks.push_back(CombatUnit::make(archer, 10, true));
+        CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+        e.stacks.push_back(CombatUnit::make(grunt, 6, false));
+        e.stacks.push_back(CombatUnit::make(grunt, 6, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        const HexCoord at = eng.playerArmy().stacks[0].pos;
+        eng.teleportUnit(false, 0, at.neighbor(0));
+        HexCoord before = at;
+        CombatAI::takeTurn(eng);
+        const auto& a = eng.playerArmy().stacks[0];
+        if (a.pos == before && a.shotsLeft == 11) ++shots;
+    }
+    CHECK_EQ(shots, runs);
+}
+
+static std::vector<int> replayBattle(uint32_t seed) {
+    const UnitType* spear = aiType("Spear", 5, 3, 12, 5, 4);
+    const UnitType* bow   = aiType("Bow", 6, 2, 8, 4, 3, 3, 12);
+    const UnitType* bone  = aiType("Bone", 4, 2, 9, 4, 4);
+    const UnitType* sting = aiType("Sting", 7, 4, 14, 6, 3, 4);
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(CombatUnit::make(spear, 20, true));
+    p.stacks.push_back(CombatUnit::make(bow, 10, true));
+    p.stacks.push_back(CombatUnit::make(spear, 8, true));
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(CombatUnit::make(bone, 20, false));
+    e.stacks.push_back(CombatUnit::make(sting, 8, false));
+    e.stacks.push_back(CombatUnit::make(bone, 12, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.setSeed(seed);
+    std::vector<int> trace;
+    for (int n = 0; n < 500 && !eng.isOver(); ++n) {
+        CombatAI::takeTurn(eng);
+        for (const auto& ev : eng.drainEvents()) {
+            trace.push_back(static_cast<int>(ev.type));
+            trace.push_back(ev.stackIndex);
+            trace.push_back(ev.damage);
+            trace.push_back(ev.to.q * 100 + ev.to.r);
+        }
+    }
+    trace.push_back(static_cast<int>(eng.result()));
+    return trace;
+}
+
+SUITE("CombatAI — same seed replays the same battle; seeds differ") {
+    const auto a = replayBattle(42);
+    const auto b = replayBattle(42);
+    CHECK(a == b);
+    CHECK(a.back() != static_cast<int>(CombatResult::Ongoing));
+    int distinct = 0;
+    for (uint32_t seed = 1; seed <= 6; ++seed)
+        if (replayBattle(seed) != a) ++distinct;
+    CHECK(distinct > 0);
+}
+
+SUITE("CombatAI — all-melee mirror battles never stall") {
+    // Cautious first-strike logic must still end every battle.
+    const UnitType* m = aiType("Mirror", 4, 3, 10, 5, 5);
+    bool allEnded = true;
+    for (uint32_t seed = 1; seed <= 20; ++seed) {
+        CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+        CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+        for (int i = 0; i < 3; ++i) {
+            p.stacks.push_back(CombatUnit::make(m, 10, true));
+            e.stacks.push_back(CombatUnit::make(m, 10, false));
+        }
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        for (int n = 0; n < 400 && !eng.isOver(); ++n) CombatAI::takeTurn(eng);
+        if (!eng.isOver()) allEnded = false;
+    }
+    CHECK(allEnded);
+}
+
+SUITE("CombatEngine — previewAttack brackets the real damage and kills") {
+    const UnitType* hitter = aiType("Hitter", 6, 0, 10, 7, 3);
+    UnitType ranged = *hitter; ranged.name = "Ranged"; ranged.minDamage = 2; ranged.maxDamage = 5;
+    s_aiTypes.push_back(ranged);
+    const UnitType* rt = &s_aiTypes.back();
+    const UnitType* target = aiType("Target", 2, 3, 7, 4, 4);
+    bool inRange = true, retaliationInRange = true, sawRetaliation = false;
+    for (uint32_t seed = 1; seed <= 40; ++seed) {
+        CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+        p.stacks.push_back(CombatUnit::make(rt, 9, true));
+        CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+        e.stacks.push_back(CombatUnit::make(target, 30, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.setSeed(seed);
+        eng.teleportUnit(false, 0, eng.playerArmy().stacks[0].pos.neighbor(0));
+        const AttackPreview pv = eng.previewAttack(0);
+        CHECK(pv.valid && !pv.ranged && pv.retaliation);
+        eng.doAttack(0);
+        for (const auto& ev : eng.drainEvents()) {
+            if (ev.type != CombatEvent::Type::UnitDamaged) continue;
+            if (!ev.isPlayer) {
+                inRange &= ev.damage >= pv.damage.min && ev.damage <= pv.damage.max;
+                inRange &= ev.kills >= pv.killsMin && ev.kills <= pv.killsMax;
+            } else {
+                sawRetaliation = true;
+                retaliationInRange &= ev.damage >= pv.retaliationDamage.min
+                                   && ev.damage <= pv.retaliationDamage.max;
+            }
+        }
+    }
+    CHECK(inRange);
+    CHECK(sawRetaliation);
+    CHECK(retaliationInRange);
 }
 
 #endif // COMBAT_ENGINE_IMPL

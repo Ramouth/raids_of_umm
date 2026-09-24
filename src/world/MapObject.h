@@ -27,6 +27,14 @@ enum class ObjType : uint8_t {
     OldMine      = 8,   // abandoned mine — may hide the old passage
     QuestGiver   = 9,   // SC camp that offers quests
     Guard        = 10,  // neutral guard stack (placeholder until guard data lands)
+    // ── HoMM3-style adventure objects (kind refines each, see MapObjectDef) ──
+    Pickup        = 11, // one-time: resource pile (kind = resource), "chest", "campfire"
+    Mill          = 12, // weekly: kind "windmill" (wood + stone) / "watermill" (gold)
+    Watchtower    = 13, // one-time: lifts the fog in a wide radius
+    Stables       = 14, // weekly: extra movement until the week ends
+    LearningStone = 15, // one-time: experience for the travelling companions
+    Dwelling      = 16, // capturable: weekly recruits of one unit (kind = unit id)
+    Obelisk       = 17, // one-time: an inscription (story) + one piece of the passage map
 
     COUNT  // must remain last
 };
@@ -46,6 +54,13 @@ constexpr std::string_view objTypeName(ObjType t) noexcept {
         case ObjType::OldMine:      return "Old Mine";
         case ObjType::QuestGiver:   return "Quest Giver";
         case ObjType::Guard:        return "Guard";
+        case ObjType::Pickup:       return "Pickup";
+        case ObjType::Mill:         return "Mill";
+        case ObjType::Watchtower:   return "Watchtower";
+        case ObjType::Stables:      return "Stables";
+        case ObjType::LearningStone:return "Learning Stone";
+        case ObjType::Dwelling:     return "Dwelling";
+        case ObjType::Obelisk:      return "Obelisk";
         default:                    return "Unknown";
     }
 }
@@ -55,6 +70,7 @@ struct MapObjectDef {
     ObjType     type      = ObjType::Town;
     std::string name;
     int         factionId = 0;  // starting owner (0=neutral, 1=player, 2+=AI)
+    std::string kind;           // subtype: pile resource, mill kind, dwelling unit id
 
     // Convenience
     std::string_view typeName() const noexcept { return objTypeName(type); }

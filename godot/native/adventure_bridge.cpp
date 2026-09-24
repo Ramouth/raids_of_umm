@@ -65,6 +65,8 @@ Json AdventureBridge::snapshot() const {
             offers.push_back({{"id", o->id}, {"label", o->label}});
     Json items = Json::array();
     for (const auto& id : session_.items()) items.push_back(id);
+    Json lore = Json::array();
+    for (const auto& l : session_.scenario().lore()) lore.push_back({{"title", l.title}, {"text", l.text}});
     Json garrisons = Json::array();
     for (const auto& [coord, ctrl] : session_.control()) {
         const auto* held = session_.garrison(coord);
@@ -100,6 +102,22 @@ Json AdventureBridge::snapshot() const {
             if (session_.isVisible(c)) path.push_back(cell(c));   // only what the player saw
         if (!path.empty()) moves.push_back({{"id", m.id}, {"path", path}});
     }
+    // Adventure sites: used = weekly site spent this week / one-time site done.
+    Json sites = Json::array();
+    for (const auto& obj : session_.map().objects()) {
+        switch (obj.type) {
+            case ObjType::Pickup: case ObjType::Artifact: case ObjType::Mill:
+            case ObjType::Stables: case ObjType::Watchtower: case ObjType::LearningStone:
+            case ObjType::Obelisk:
+                sites.push_back({{"cell", cell(obj.pos)}, {"used", session_.siteUsed(obj.pos)}});
+                break;
+            default: break;
+        }
+    }
+    Json chest = nullptr;
+    if (auto at = session_.pendingChest())
+        if (const auto* p = session_.pickupAt(*at))
+            chest = {{"cell", cell(*at)}, {"gold", p->reward[Resource::Gold]}, {"xp", p->xp}};
     Json pending = nullptr;
     if (auto at = session_.pendingEncounter()) {
         const auto* enc = session_.encounterAt(*at);
@@ -126,12 +144,15 @@ Json AdventureBridge::snapshot() const {
         {"explored", cells(session_.explored())},
         {"guarded", guarded},
         {"encounter", pending},
+        {"sites", sites},
+        {"chest", chest},
         {"won", session_.won()},
         {"army", army},
         {"towns", towns},
         {"quests", quests},
         {"offers", offers},
         {"items", items},
+        {"lore", lore},
         {"ruled_out", cells(session_.ruledOut())},
         {"rivals", rivals},
         {"garrisons", garrisons},
@@ -153,7 +174,7 @@ Json AdventureBridge::travel(int q, int r) {
     Json steps = Json::array();
     for (const auto& step : session_.travel({q, r}))
         steps.push_back({{"cell", cell(step.cell)}, {"capture", step.capture},
-                         {"revealed", cells(step.revealed)}});
+                         {"revealed", cells(step.revealed)}, {"found", step.found}});
     Json out = snapshot();
     out["steps"] = steps;
     return with_lines(out);
@@ -232,5 +253,12 @@ Json AdventureBridge::end_day() {
     std::string event = session_.endDay();
     Json out = snapshot();
     out["event"] = event;
+    return with_lines(out);
+}
+
+Json AdventureBridge::claim_chest(bool gold) {
+    std::string found = session_.claimChest(gold);
+    Json out = snapshot();
+    out["found"] = found;
     return with_lines(out);
 }

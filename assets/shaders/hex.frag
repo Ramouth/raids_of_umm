@@ -10,6 +10,7 @@ uniform sampler2D u_Texture;
 uniform int       u_Textured;     // 1 = pixel-art texture, 0 = solid colour tile
 uniform int       u_TintMode;     // 0 = normal alpha-blend, 1 = multiplicative tint (use with neutral greyscale tiles)
 uniform int       u_SoftEdge;     // 1 = soft-edge blend pass: output feathered alpha so variants fade into each other
+uniform float     u_TexScale;     // > 0 = world-space UV tiling (no hex grid lines); 0 = model-space
 uniform vec3      u_SunDir;
 uniform vec3      u_SunColor;
 uniform vec3      u_AmbientColor;
@@ -44,15 +45,18 @@ void main() {
             // Transparent pixels (outside hex in tile image) fall back to base colour.
             color = mix(v_Color, color, texSample.a);
         } else {
-            // Alpha-blend texture over the solid base terrain colour.
-            // Transparent areas show base terrain colour; opaque areas show texture as-is.
+            // Alpha-blend texture details over base terrain colour.
+            // World-space: transparent areas show base colour → seamless across tiles.
+            // Model-space: same — hex-shaped PNGs fall back to base colour at corners.
             color = mix(v_Color, texColor, texSample.a);
         }
 
-        // Very faint hex-edge darkening — just enough to read tile boundaries
-        // without overwriting the pixel art edge detail.
-        float edgeFactor = smoothstep(0.44, 0.50, v_EdgeDist);
-        color = mix(color, color * 0.70, edgeFactor * 0.30);
+        // Hex-edge darkening — only for model-space tiles (sprites, roads).
+        // World-space tiled terrain (u_TexScale > 0) has no grid lines, like HoMM3.
+        if (u_TexScale == 0.0) {
+            float edgeFactor = smoothstep(0.44, 0.50, v_EdgeDist);
+            color = mix(color, color * 0.70, edgeFactor * 0.30);
+        }
 
     } else {
         // ── Ordered-dither terrain (LucasArts VGA style) ──────────────────────
@@ -71,18 +75,15 @@ void main() {
         // Hex-local radial gradient: lighter centre, darker rim.
         float hexLight = clamp(1.0 - v_EdgeDist * 2.2 + 0.15, 0.0, 1.0);
 
-        // World-space sine variation: slow organic brightness shift between hexes
-        // (~3-hex period) so adjacent tiles feel hand-painted, not stamped.
-        float worldVar = sin(v_WorldPos.x * 1.8 + 0.7) * cos(v_WorldPos.z * 2.1 + 1.3)
-                         * 0.5 + 0.5;
-
-        // Blend: structural (hex gradient) + fine grain (bayer) + slow variation.
-        float blend = hexLight * 0.55 + bayer * 0.30 + worldVar * 0.15;
+        // Blend: structural (hex gradient) + fine grain (bayer).
+        float blend = hexLight * 0.65 + bayer * 0.35;
         color = (blend >= 0.5) ? colLight : colDark;
 
-        // Crisp tile-boundary darkening reads as grid lines.
-        float edgeFactor = smoothstep(0.40, 0.50, v_EdgeDist);
-        color = mix(color, color * 0.58, edgeFactor * 0.45);
+        // Crisp tile-boundary darkening (solid colour / dither tiles only).
+        if (u_TexScale == 0.0) {
+            float edgeFactor = smoothstep(0.40, 0.50, v_EdgeDist);
+            color = mix(color, color * 0.58, edgeFactor * 0.45);
+        }
     }
 
     // Distance fog

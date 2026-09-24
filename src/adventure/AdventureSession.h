@@ -51,7 +51,20 @@ public:
         HexCoord    cell;
         std::string capture;  // non-empty when this step took an object ("Desert Quarry")
         std::vector<HexCoord> revealed;  // cells explored for the first time on this step
+        std::string found;    // what a visited site gave ("Wood Pile: +5 Wood"), "" if nothing
     };
+
+    // One-time pickups: resource piles, campfires, artifacts and chests.
+    // A chest offers a HoMM3 choice — gold, or experience for the companions.
+    struct Pickup {
+        ResourcePool reward;
+        std::string  item;       // artifact item id ("" = none)
+        int          xp = 0;     // chest: the experience alternative
+        bool         chest = false;
+    };
+    static constexpr int   WATCHTOWER_RADIUS = 9;
+    static constexpr float STABLES_BONUS     = 3.0f;  // extra moves per day until week's end
+    static constexpr int   LEARNING_XP       = 400;
 
     // Loads the map + data registry and seeds ownership from map factionIds.
     // Hero starts at the first player-owned town (else first town, else first passable tile).
@@ -78,6 +91,9 @@ public:
 
     // ── Encounters ───────────────────────────────────────────────────────────
     bool isEncounter(const HexCoord& c) const;       // uncleared guard / old mine
+    // HoMM3 zone of control: the neutral guard camp next to 'c' that attacks a
+    // hero stepping there (old mines and war-bands do not). nullopt = none.
+    std::optional<HexCoord> guardZoneAt(const HexCoord& c) const;
     const Encounter* encounterAt(const HexCoord& c) const;
     std::optional<HexCoord> pendingEncounter() const { return m_pending; }
     // Called after the battle. Victory clears the hex, pays the reward and moves the
@@ -85,6 +101,15 @@ public:
     MineFind resolveEncounter(bool victory);
     bool won() const { return m_won; }
     std::optional<HexCoord> passageMine() const { return m_passage; }
+
+    // ── Adventure sites (mills, stables, watchtowers, pickups, dwellings) ────
+    const Pickup* pickupAt(const HexCoord& c) const;
+    // Travel stops on a chest; the choice is made here (gold=false takes the xp).
+    std::optional<HexCoord> pendingChest() const { return m_pendingChest; }
+    std::string claimChest(bool gold);
+    // True when a weekly site (mill, stables) was already used this week, or a
+    // one-time site (watchtower, learning stone) was already visited.
+    bool siteUsed(const HexCoord& c) const;
 
     // ── Army ─────────────────────────────────────────────────────────────────
     struct Stack { std::string id; int count = 0; };
@@ -113,6 +138,9 @@ public:
     const Scenario& scenario() const { return m_scenario; }
     void revealArea(const HexCoord& center, int radius);
     void give(const ResourcePool& resources);
+    // A house turns on the player: the named town/site flies the rival banner
+    // and a war-band with 'army' rides out of it. Returns false if no such object.
+    bool betray(const std::string& objectName, const std::string& bandName, const std::vector<Stack>& army);
     // Rules out one wrong old mine not yet searched or ruled out; returns its name.
     std::optional<std::string> giveClue();
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }
@@ -206,6 +234,8 @@ private:
     void growTown(const HexCoord& c);
     void fireSightings(const std::vector<HexCoord>& revealed);
     void spawnRival(const HexCoord& town, int band);
+    std::string visitSite(const HexCoord& cell);
+    std::string collect(const HexCoord& cell, bool gold);
     void rivalTurn(Rival& r);
     void rivalRecruit(Rival& r);
     std::vector<HexCoord> rivalRoute(const Rival& r, const HexCoord& to) const;
@@ -245,7 +275,13 @@ private:
     std::vector<Rival>               m_rivals;
     std::vector<RivalMove>           m_rivalMoves;
     bool                             m_pendingAmbush = false;
+    bool                             m_pendingZone = false;  // guard attacked from its zone of control
     bool                             m_lost = false;
     std::string                      m_lostReason;
     mutable Encounter                m_rivalEncounter;  // synthesized for encounterAt()
+    std::unordered_map<HexCoord, Pickup> m_pickups;        // uncollected only
+    std::unordered_map<HexCoord, int>    m_siteWeek;       // weekly sites: week last used
+    std::unordered_set<HexCoord>         m_visitedOnce;    // one-time sites already used
+    std::optional<HexCoord>              m_pendingChest;
+    int                                  m_stablesWeek = 0;
 };

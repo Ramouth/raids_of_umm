@@ -1,30 +1,26 @@
 {
-  "_comment": "Guard armies + rewards for old_passage.json, keyed by object name. Balanced with godot/native/build/battle_sim (see ROADMAP demo notes).",
+  "_comment": "Guard armies + rewards for old_passage.json (stage 1, the northern marches), keyed by object name. Balance with godot/native/build/battle_sim.",
   "defaults": {
     "guard": {
       "guards": [
         {
-          "id": "skeleton_warrior",
-          "count": 20
-        },
-        {
-          "id": "sand_scorpion",
-          "count": 6
+          "id": "grey_wolf",
+          "count": 14
         }
       ],
       "reward": {
-        "Gold": 500
+        "Gold": 300
       }
     },
     "old_mine": {
       "guards": [
         {
-          "id": "mummy",
-          "count": 10
+          "id": "barrow_wight",
+          "count": 14
         },
         {
-          "id": "sand_scorpion",
-          "count": 16
+          "id": "skeleton_warrior",
+          "count": 30
         }
       ],
       "reward": {
@@ -33,171 +29,377 @@
     }
   },
   "objects": {
-    "Ridge Pass Guard": {
+    "Hill Wolves": {
       "guards": [
         {
-          "id": "skeleton_warrior",
-          "count": 30
+          "id": "grey_wolf",
+          "count": 12
+        }
+      ],
+      "reward": {
+        "Gold": 250
+      }
+    },
+    "Den Wolves": {
+      "guards": [
+        {
+          "id": "grey_wolf",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Gold": 300
+      }
+    },
+    "Brigand Lookouts": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 8
         },
         {
-          "id": "sand_scorpion",
+          "id": "grey_wolf",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "Gold": 300
+      }
+    },
+    "Tarn Brigands": {
+      "guards": [
+        {
+          "id": "brigand",
           "count": 10
+        }
+      ],
+      "reward": {
+        "Gold": 300,
+        "Wood": 2
+      }
+    },
+    "Hermit's Wolves": {
+      "guards": [
+        {
+          "id": "grey_wolf",
+          "count": 14
+        }
+      ],
+      "reward": {
+        "Gold": 250
+      }
+    },
+    "Bridge Wardens": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 8
         },
         {
-          "id": "mummy",
+          "id": "grey_wolf",
+          "count": 12
+        },
+        {
+          "id": "highland_bear",
           "count": 2
         }
       ],
       "reward": {
         "Gold": 750
       },
-      "item": "scarab_amulet"
+      "item": "wolfpelt_boots"
     },
-    "Scorpion Nest": {
+    "Ford Wights": {
       "guards": [
         {
-          "id": "sand_scorpion",
-          "count": 22
+          "id": "barrow_wight",
+          "count": 8
         },
         {
-          "id": "mummy",
-          "count": 3
+          "id": "skeleton_warrior",
+          "count": 26
         }
       ],
       "reward": {
-        "Gold": 500,
-        "Wood": 4
-      },
-      "item": "serpent_band"
+        "Gold": 600,
+        "Stone": 2
+      }
     },
-    "Old Mine of Sehet": {
+    "Lowland Wolves": {
+      "guards": [
+        {
+          "id": "grey_wolf",
+          "count": 30
+        }
+      ],
+      "reward": {
+        "Gold": 400
+      }
+    },
+    "Highland Bears": {
+      "guards": [
+        {
+          "id": "highland_bear",
+          "count": 10
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Brigand Band": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 24
+        },
+        {
+          "id": "grey_wolf",
+          "count": 10
+        }
+      ],
+      "reward": {
+        "Gold": 600,
+        "Wood": 3
+      }
+    },
+    "Mere Dead": {
       "guards": [
         {
           "id": "skeleton_warrior",
-          "count": 36
+          "count": 30
         },
         {
-          "id": "mummy",
+          "id": "barrow_wight",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Cairn Wights": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 12
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Marsh Wights": {
+      "guards": [
+        {
+          "id": "barrow_wight",
           "count": 8
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 20
+        }
+      ],
+      "reward": {
+        "Gold": 400
+      }
+    },
+    "Greyfang Pass": {
+      "guards": [
+        {
+          "id": "forest_troll",
+          "count": 8
+        },
+        {
+          "id": "highland_bear",
+          "count": 10
+        },
+        {
+          "id": "brigand",
+          "count": 20
+        },
+        {
+          "id": "grey_wolf",
+          "count": 30
+        }
+      ],
+      "reward": {
+        "Gold": 2000
+      },
+      "item": "greyfang_helm"
+    },
+    "Troll Gate": {
+      "guards": [
+        {
+          "id": "forest_troll",
+          "count": 18
+        },
+        {
+          "id": "highland_bear",
+          "count": 10
+        }
+      ],
+      "reward": {
+        "Gold": 1500,
+        "Crystal": 2
+      }
+    },
+    "Treant Grove": {
+      "guards": [
+        {
+          "id": "ancient_treant",
+          "count": 3
+        },
+        {
+          "id": "forest_troll",
+          "count": 8
+        },
+        {
+          "id": "grey_wolf",
+          "count": 40
+        }
+      ],
+      "reward": {
+        "Gold": 1000,
+        "Wood": 6
+      },
+      "item": "obsidian_edge"
+    },
+    "Troll Warband": {
+      "guards": [
+        {
+          "id": "forest_troll",
+          "count": 16
+        },
+        {
+          "id": "brigand",
+          "count": 30
+        }
+      ],
+      "reward": {
+        "Gold": 1200
+      }
+    },
+    "Cairn Bears": {
+      "guards": [
+        {
+          "id": "highland_bear",
+          "count": 24
+        }
+      ],
+      "reward": {
+        "Gold": 800
+      }
+    },
+    "Old Mine of Dunmere": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 16
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 36
         }
       ],
       "reward": {
         "Stone": 3
       }
     },
-    "Old Mine of Nebu": {
+    "Old Mine of Carrow": {
       "guards": [
         {
-          "id": "sand_scorpion",
-          "count": 16
+          "id": "barrow_wight",
+          "count": 14
         },
         {
-          "id": "mummy",
-          "count": 10
+          "id": "skeleton_warrior",
+          "count": 40
         }
       ],
       "reward": {
         "Wood": 3
       }
     },
-    "Canyon Ford Guard": {
+    "Old Mine of Kaldur": {
       "guards": [
         {
-          "id": "mummy",
-          "count": 16
+          "id": "barrow_wight",
+          "count": 30
+        },
+        {
+          "id": "forest_troll",
+          "count": 6
         },
         {
           "id": "skeleton_warrior",
           "count": 60
-        },
-        {
-          "id": "sand_wraith",
-          "count": 30
-        },
-        {
-          "id": "storm_caller",
-          "count": 4
-        }
-      ],
-      "reward": {
-        "Gold": 2000
-      },
-      "item": "veil_of_sands"
-    },
-    "Wraith Host": {
-      "guards": [
-        {
-          "id": "sand_wraith",
-          "count": 60
-        },
-        {
-          "id": "storm_caller",
-          "count": 9
-        },
-        {
-          "id": "mummy",
-          "count": 16
-        }
-      ],
-      "reward": {
-        "Crystal": 3,
-        "Gold": 1000
-      },
-      "item": "obsidian_edge"
-    },
-    "Old Mine of Djer": {
-      "guards": [
-        {
-          "id": "mummy",
-          "count": 26
-        },
-        {
-          "id": "sand_wraith",
-          "count": 45
-        },
-        {
-          "id": "storm_caller",
-          "count": 6
         }
       ],
       "reward": {
         "Obsidian": 3
       }
     },
-    "Old Mine of Anhur": {
+    "Old Mine of Brannoc": {
       "guards": [
         {
-          "id": "ancient_guardian",
-          "count": 3
+          "id": "barrow_wight",
+          "count": 28
+        },
+        {
+          "id": "highland_bear",
+          "count": 12
         },
         {
           "id": "skeleton_warrior",
           "count": 60
-        },
-        {
-          "id": "mummy",
-          "count": 16
         }
       ],
       "reward": {
         "Crystal": 3
       }
     },
-    "Collapsed Shrine": {
+    "Barrow of the Drowned King": {
       "guards": [
         {
-          "id": "mummy",
-          "count": 8
+          "id": "barrow_wight",
+          "count": 12
         },
         {
           "id": "skeleton_warrior",
-          "count": 24
+          "count": 30
         }
       ],
       "reward": {
         "Gold": 800
       },
-      "item": "cursed_eye_of_set"
+      "item": "drowned_crown"
+    }
+  },
+  "pickups": {
+    "Brigand Strongbox": {
+      "reward": {
+        "Gold": 1000
+      },
+      "xp": 500
+    },
+    "Drowned Chest": {
+      "reward": {
+        "Gold": 1500
+      },
+      "xp": 1000
+    },
+    "Frozen Chest": {
+      "reward": {
+        "Gold": 2000
+      },
+      "xp": 1500
+    },
+    "Hermit's Chest": {
+      "reward": {
+        "Gold": 1000
+      },
+      "xp": 500
     }
   }
 }

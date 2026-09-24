@@ -10,6 +10,8 @@ const CARD := Vector2(170, 360)
 
 var host: Node        # desert.gd: provides state, unit_defs, recruit()
 var cell := Vector2i.ZERO
+var view_art := "res://content/textures/screens/town_khemret.png"   # dwellings pass their map sprite
+var eyebrow_text := "IVORY COMPACT  ·  TOWN"
 var _treasury: Label
 var _army: HBoxContainer
 var _cards: HBoxContainer
@@ -24,7 +26,7 @@ func _ready() -> void:
     var title := _label(str(town.get("name", "Town")).to_upper(), 30, Color("f3dfb0"))
     title.position = Vector2(46, 26)
     add_child(title)
-    var eyebrow := _label("IVORY COMPACT  ·  TOWN", 12, Color("ad854a"))
+    var eyebrow := _label(eyebrow_text, 12, Color("ad854a"))
     eyebrow.position = Vector2(48, 74)
     add_child(eyebrow)
     _treasury = _label("", 15, Color("e8d8b8"))
@@ -41,7 +43,7 @@ func _ready() -> void:
     sky.size = Vector2(276, 496)
     add_child(sky)
     var art := TextureRect.new()
-    var view := "res://content/textures/screens/town_khemret.png"
+    var view := view_art
     art.texture = load(view if ResourceLoader.exists(view) else "res://content/textures/objects/castle.png")
     art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

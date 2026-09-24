@@ -24,6 +24,7 @@ public:
     Json save(const std::string& path, const Json& extra);
     Json load(const std::string& path);   // snapshot + "extra"
     Json add_item(const std::string& id);
+    Json claim_chest(bool gold);          // snapshot + "found"
 
 private:
     Json with_lines(Json out);  // attaches dialogue produced by the last action

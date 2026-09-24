@@ -156,8 +156,13 @@ void HexRenderer::loadTerrainTextures(const std::string& assetRoot) {
             for (const auto& p : pngs) {
                 if (m_variantCount[i] >= MAX_TERRAIN_VARIANTS) break;
                 GLuint id = loadTexturePNG(p.string());
-                if (id)
+                if (id) {
+                    glBindTexture(GL_TEXTURE_2D, id);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                    glBindTexture(GL_TEXTURE_2D, 0);
                     m_terrainTex[i][m_variantCount[i]++] = id;
+                }
             }
         }
     }
@@ -249,7 +254,8 @@ void HexRenderer::drawTile(const HexCoord& coord,
                             const glm::vec2& xzOffset,
                             int tintMode,
                             bool softEdge,
-                            int rotation) {
+                            int rotation,
+                            float texScale) {
     // Always use the world hex size for positioning so tokens land on the correct tile
     float wx, wz;
     coord.toWorld(m_worldHexSize, wx, wz);
@@ -265,15 +271,16 @@ void HexRenderer::drawTile(const HexCoord& coord,
     if (texId != 0)
         glBindTexture(GL_TEXTURE_2D, texId);
 
-    m_shader.setMat4("u_MVP",          mvp);
-    m_shader.setMat4("u_Model",        model);
-    m_shader.setMat3("u_NormalMatrix", norm);
-    m_shader.setVec3("u_TileColor",    color);
-    m_shader.setFloat("u_Height",      0.0f);
-    m_shader.setInt  ("u_Textured",    texId != 0 ? 1 : 0);
-    m_shader.setInt  ("u_TintMode",    tintMode);
-    m_shader.setInt  ("u_SoftEdge",    softEdge ? 1 : 0);
-    m_shader.setInt  ("u_Rotation",    rotation % 6);
+    m_shader.setMat4 ("u_MVP",          mvp);
+    m_shader.setMat4 ("u_Model",        model);
+    m_shader.setMat3 ("u_NormalMatrix", norm);
+    m_shader.setVec3 ("u_TileColor",    color);
+    m_shader.setFloat("u_Height",       0.0f);
+    m_shader.setInt  ("u_Textured",     texId != 0 ? 1 : 0);
+    m_shader.setInt  ("u_TintMode",     tintMode);
+    m_shader.setInt  ("u_SoftEdge",     softEdge ? 1 : 0);
+    m_shader.setInt  ("u_Rotation",     rotation % 6);
+    m_shader.setFloat("u_TexScale",     texScale);
 
     glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_SHORT, nullptr);
 

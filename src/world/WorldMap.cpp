@@ -35,6 +35,8 @@ static const char* terrainToStr(Terrain t) noexcept {
         case Terrain::Highland:      return "highland";
         case Terrain::GrassSandEdge:  return "grass_sand_edge";
         case Terrain::GrassSandEdge2: return "grass_sand_edge_2";
+        case Terrain::Lake:           return "lake";
+        case Terrain::Swamp:          return "swamp";
         default:                      return "sand";
     }
 }
@@ -52,6 +54,8 @@ static Terrain terrainFromStr(const std::string& s) noexcept {
     if (s == "grass")           return Terrain::Grass;
     if (s == "forest")          return Terrain::Forest;
     if (s == "highland")        return Terrain::Highland;
+    if (s == "lake")            return Terrain::Lake;
+    if (s == "swamp")           return Terrain::Swamp;
     if (s == "grass_sand_edge")   return Terrain::GrassSandEdge;
     if (s == "grass_sand_edge_2") return Terrain::GrassSandEdge2;
     return Terrain::Sand;
@@ -70,6 +74,13 @@ static const char* objTypeToStr(ObjType t) noexcept {
         case ObjType::OldMine:      return "old_mine";
         case ObjType::QuestGiver:   return "quest_giver";
         case ObjType::Guard:        return "guard";
+        case ObjType::Pickup:       return "pickup";
+        case ObjType::Mill:         return "mill";
+        case ObjType::Watchtower:   return "watchtower";
+        case ObjType::Stables:      return "stables";
+        case ObjType::LearningStone:return "learning_stone";
+        case ObjType::Dwelling:     return "dwelling";
+        case ObjType::Obelisk:      return "obelisk";
         default:                    return "town";
     }
 }
@@ -85,6 +96,13 @@ static ObjType objTypeFromStr(const std::string& s) noexcept {
     if (s == "old_mine")      return ObjType::OldMine;
     if (s == "quest_giver")   return ObjType::QuestGiver;
     if (s == "guard")         return ObjType::Guard;
+    if (s == "pickup")        return ObjType::Pickup;
+    if (s == "mill")          return ObjType::Mill;
+    if (s == "watchtower")    return ObjType::Watchtower;
+    if (s == "stables")       return ObjType::Stables;
+    if (s == "learning_stone")return ObjType::LearningStone;
+    if (s == "dwelling")      return ObjType::Dwelling;
+    if (s == "obelisk")       return ObjType::Obelisk;
     return ObjType::Town;
 }
 
@@ -212,6 +230,7 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
                 {"name", obj.name}
             });
             if (obj.factionId) objs.back()["factionId"] = obj.factionId;
+            if (!obj.kind.empty()) objs.back()["kind"] = obj.kind;
         }
         j["objects"] = std::move(objs);
 
@@ -264,6 +283,7 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
             obj.type     = objTypeFromStr(o.value("type", "town"));
             obj.name     = o.value("name", "");
             obj.factionId = o.value("factionId", 0);
+            obj.kind      = o.value("kind", "");
             m_objects.push_back(std::move(obj));
         }
 

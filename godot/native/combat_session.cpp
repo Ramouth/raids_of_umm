@@ -119,8 +119,13 @@ Json CombatSession::snapshot() const {
             state["units"].push_back({{"key", key(player, index)}, {"id", unit.type->id},
                 {"name", unit.type->name}, {"player", player}, {"cell", hex(unit.pos)},
                 {"count", unit.count}, {"hp", unit.totalHp()}, {"unit_hp", unit.type->hitPoints},
-                {"shots", unit.shotsLeft}, {"ranged", unit.type->isRanged()},
+                {"hp_left", unit.hpLeft}, {"shots", unit.shotsLeft}, {"shots_max", unit.type->shots},
+                {"ranged", unit.type->isRanged()},
                 {"attack", unit.effectiveAttack()}, {"defense", unit.effectiveDefense()},
+                {"min_damage", unit.type->minDamage + unit.damageBonus},
+                {"max_damage", unit.type->maxDamage + unit.damageBonus},
+                {"move", unit.type->moveRange}, {"abilities", unit.type->abilities},
+                {"retaliated", unit.hasRetaliated},
                 {"speed", unit.effectiveSpeed()}, {"defending", unit.isDefending}});
             if (player && !unit.isDead()) state["survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
         }
@@ -138,12 +143,51 @@ Json CombatSession::snapshot() const {
                 {"acted", index < engine_->turnIndex()}});
             ++index;
         }
+        state["next_round"] = next_round();
+        state["previews"] = previews();
     }
     if (engine_->result() == CombatResult::PlayerWon && !reward_.empty()) {
         const auto* item = resources_->item(reward_);
         state["rewards"].push_back({{"id", item->id}, {"name", item->name}, {"description", item->description}});
     }
     return state;
+}
+
+Json CombatSession::next_round() const {
+    // Same rule as CombatEngine::buildQueue: faster first, the expedition wins ties.
+    struct Slot { bool player; int index; int speed; };
+    std::vector<Slot> order;
+    for (bool player : {true, false}) {
+        const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
+        for (int i = 0; i < static_cast<int>(army.stacks.size()); ++i)
+            if (!army.stacks[i].isDead()) order.push_back({player, i, army.stacks[i].effectiveSpeed()});
+    }
+    std::stable_sort(order.begin(), order.end(), [](const Slot& a, const Slot& b) {
+        if (a.speed != b.speed) return a.speed > b.speed;
+        return a.player && !b.player;
+    });
+    Json out = Json::array();
+    for (const auto& slot : order) out.push_back(key(slot.player, slot.index));
+    return out;
+}
+
+Json CombatSession::previews() const {
+    // Hover forecast for every stack the active unit may attack right now.
+    Json out = Json::array();
+    const auto& actor = engine_->activeUnit();
+    const auto& enemies = actor.isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
+    for (int i = 0; i < static_cast<int>(enemies.stacks.size()); ++i) {
+        const AttackPreview p = engine_->previewAttack(i);
+        if (!p.valid) continue;
+        out.push_back({{"key", key(!actor.isPlayer, i)}, {"cell", hex(enemies.stacks[i].pos)},
+            {"ranged", p.ranged}, {"pinned", p.pinned},
+            {"damage_min", p.damage.min}, {"damage_max", p.damage.max},
+            {"kills_min", p.killsMin}, {"kills_max", p.killsMax},
+            {"retaliation", p.retaliation},
+            {"retaliation_min", p.retaliationDamage.min}, {"retaliation_max", p.retaliationDamage.max},
+            {"retaliation_kills_min", p.retKillsMin}, {"retaliation_kills_max", p.retKillsMax}});
+    }
+    return out;
 }
 
 Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int index) const {
@@ -182,7 +226,14 @@ Json CombatSession::response() {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
             {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
-            {"from", hex(event.from)}, {"to", hex(event.to)}};
+            {"from", hex(event.from)}, {"to", hex(event.to)},
+            {"kills", event.kills}, {"remaining", event.remaining}};
+        if (event.type == CombatEvent::Type::UnitAttacked) {
+            // Attacks never move anyone, so the current positions tell shots from strikes.
+            const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];
+            const auto& target = (event.targetIsPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.targetIndex];
+            item["ranged"] = !event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1;
+        }
         if (event.type == CombatEvent::Type::UnitMoved)
             item["path"] = movement_path(event.from, event.to, event.isPlayer, event.stackIndex);
         events.push_back(std::move(item));

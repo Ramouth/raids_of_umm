@@ -1,0 +1,28 @@
+{
+  "cellH": 64,
+  "cellW": 64,
+  "cells": [
+    {
+      "col": 13,
+      "file": "assets/textures/custom/Tiles/c13_r5.png",
+      "row": 5
+    },
+    {
+      "col": 14,
+      "file": "assets/textures/custom/Tiles/c14_r5.png",
+      "row": 5
+    },
+    {
+      "col": 15,
+      "file": "assets/textures/custom/Tiles/c15_r4.png",
+      "row": 4
+    },
+    {
+      "col": 16,
+      "file": "assets/textures/custom/Tiles/c16_r4.png",
+      "row": 4
+    }
+  ],
+  "name": "Tiles",
+  "sheet": "assets/assorted /map_pergament.png"
+}

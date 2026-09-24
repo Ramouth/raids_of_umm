@@ -15,6 +15,7 @@ bool isCapturable(ObjType t) {
         case ObjType::Sawmill:
         case ObjType::Quarry:
         case ObjType::ObsidianVent:
+        case ObjType::Dwelling:
             return true;
         default:
             return false;
@@ -27,6 +28,31 @@ bool isEncounterType(ObjType t) {
 
 bool blocksSight(Terrain t) {
     return t == Terrain::Mountain || t == Terrain::Wall;
+}
+
+// HoMM3-sized defaults; <map>.encounters.json "pickups" overrides them by name.
+AdventureSession::Pickup defaultPickup(const MapObjectDef& obj) {
+    AdventureSession::Pickup p;
+    const std::string& k = obj.kind;
+    if (obj.type == ObjType::Artifact) { p.item = k; return p; }
+    if (k == "chest")         { p.chest = true; p.reward[Resource::Gold] = 1000; p.xp = 500; }
+    else if (k == "campfire") { p.reward[Resource::Gold] = 400; p.reward[Resource::Wood] = 3; }
+    else if (k == "wood")     p.reward[Resource::Wood] = 6;
+    else if (k == "stone")    p.reward[Resource::Stone] = 6;
+    else if (k == "obsidian") p.reward[Resource::Obsidian] = 3;
+    else if (k == "crystal")  p.reward[Resource::Crystal] = 3;
+    else                      p.reward[Resource::Gold] = 750;
+    return p;
+}
+
+std::string describe(const ResourcePool& pool) {
+    std::string out;
+    for (int i = 0; i < RESOURCE_COUNT; ++i) {
+        if (pool.amounts[i] <= 0) continue;
+        if (!out.empty()) out += ", ";
+        out += "+" + std::to_string(pool.amounts[i]) + " " + std::string(resourceName(static_cast<Resource>(i)));
+    }
+    return out;
 }
 
 } // namespace
@@ -76,6 +102,11 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_pendingAmbush = false;
     m_lost = false;
     m_lostReason.clear();
+    m_pickups.clear();
+    m_siteWeek.clear();
+    m_visitedOnce.clear();
+    m_pendingChest.reset();
+    m_stablesWeek = 0;
 
     const MapObjectDef* spawn = nullptr;
     std::vector<HexCoord> oldMines;
@@ -88,6 +119,9 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
             ctrl.ownerFaction = obj.factionId;
             m_control[obj.pos] = ctrl;
         }
+        if (obj.type == ObjType::Pickup || (obj.type == ObjType::Artifact && !obj.kind.empty()))
+            m_pickups[obj.pos] = defaultPickup(obj);
+        if (obj.type == ObjType::Dwelling) m_towns[obj.pos];
         if (obj.type == ObjType::Town) {
             m_towns[obj.pos];
             bool better = !spawn || (obj.factionId == Faction::Player && spawn->factionId != Faction::Player);
@@ -159,6 +193,17 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
             if (objects.contains(obj->name))  enc = parse(objects.at(obj->name));
             else if (defaults.contains(typeKey)) enc = parse(defaults.at(typeKey));
         }
+        // "pickups": { "<name>": { "reward": {...}, "item": "id", "xp": 500 } }
+        const json pickups = root.value("pickups", json::object());
+        for (auto& [cell, pickup] : m_pickups) {
+            const MapObjectDef* obj = m_map.objectAt(cell);
+            if (!obj || !pickups.contains(obj->name)) continue;
+            const json& e = pickups.at(obj->name);
+            Encounter parsed = parse(e);
+            if (e.contains("reward")) pickup.reward = parsed.reward;
+            if (e.contains("item"))   pickup.item = parsed.item;
+            pickup.xp = e.value("xp", pickup.xp);
+        }
         return std::nullopt;
     } catch (const std::exception& e) {
         return std::string("Encounters parse error: ") + e.what();
@@ -169,8 +214,12 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
 
 std::vector<HexCoord> AdventureSession::route(const HexCoord& to) const {
     if (to == m_hero.pos) return {};
+    // Prefer a route that skirts guard zones; if none exists, walk into one.
     auto path = m_map.findPathWeighted(m_hero.pos, to,
-        [&](const HexCoord& c) { return c != to && isEncounter(c); });
+        [&](const HexCoord& c) { return c != to && (isEncounter(c) || guardZoneAt(c)); });
+    if (path.size() < 2)
+        path = m_map.findPathWeighted(m_hero.pos, to,
+            [&](const HexCoord& c) { return c != to && isEncounter(c); });
     if (path.size() < 2) return {};
     path.erase(path.begin());
     return path;
@@ -202,6 +251,8 @@ int AdventureSession::affordableSteps(const std::vector<HexCoord>& path) const {
 std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to) {
     std::vector<Step> steps;
     m_pending.reset();
+    m_pendingZone = false;
+    if (m_pendingChest) claimChest(true);  // walked away from the choice: take the gold
     auto path = route(to);
     int  n    = affordableSteps(path);
     for (int i = 0; i < n; ++i) {
@@ -211,7 +262,8 @@ std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to)
         }
         m_moves    = std::max(0.0f, m_moves - stepCost(path[i]));
         m_hero.pos = path[i];
-        Step step{path[i], enter(path[i]), {}};
+        Step step{path[i], enter(path[i]), {}, {}};
+        step.found = visitSite(path[i]);
         auto before = m_explored;
         recomputeVisibility();
         for (const auto& c : m_explored)
@@ -227,8 +279,142 @@ std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to)
             m_scenario.fire(*this, "mines_held", {{"count", minesHeld()}});  // gated triggers may now apply
         }
         steps.push_back(std::move(step));
+        if (m_pendingChest) break;   // the chest's choice waits for the player
+        if (auto guard = guardZoneAt(path[i])) {
+            // Walking at the camp is an attack; passing by, the camp attacks you.
+            m_pending     = *guard;
+            m_pendingZone = *guard != to;
+            break;
+        }
     }
     return steps;
+}
+
+// ── Adventure sites ───────────────────────────────────────────────────────────
+
+const AdventureSession::Pickup* AdventureSession::pickupAt(const HexCoord& c) const {
+    auto it = m_pickups.find(c);
+    return it == m_pickups.end() ? nullptr : &it->second;
+}
+
+bool AdventureSession::siteUsed(const HexCoord& c) const {
+    const MapObjectDef* obj = m_map.objectAt(c);
+    if (!obj) return false;
+    switch (obj->type) {
+        case ObjType::Mill:     { auto it = m_siteWeek.find(c); return it != m_siteWeek.end() && it->second == week(); }
+        case ObjType::Stables:  return m_stablesWeek == week();
+        case ObjType::Watchtower:
+        case ObjType::Obelisk:
+        case ObjType::LearningStone: return m_visitedOnce.count(c) > 0;
+        case ObjType::Pickup:
+        case ObjType::Artifact: return !m_pickups.count(c);
+        default:                return false;
+    }
+}
+
+std::string AdventureSession::visitSite(const HexCoord& cell) {
+    const MapObjectDef* obj = m_map.objectAt(cell);
+    if (!obj) return "";
+    switch (obj->type) {
+        case ObjType::Pickup:
+        case ObjType::Artifact: {
+            auto it = m_pickups.find(cell);
+            if (it == m_pickups.end()) return "";
+            if (it->second.chest) { m_pendingChest = cell; return ""; }
+            return collect(cell, true);
+        }
+        case ObjType::Mill: {
+            if (siteUsed(cell)) return obj->name + ": nothing more until next week.";
+            m_siteWeek[cell] = week();
+            ResourcePool pay;
+            if (obj->kind == "watermill") pay[Resource::Gold] = 500;
+            else { pay[Resource::Wood] = 2; pay[Resource::Stone] = 2; }
+            give(pay);
+            return obj->name + ": " + describe(pay);
+        }
+        case ObjType::Stables:
+            if (siteUsed(cell)) return obj->name + ": your horses are already fresh this week.";
+            m_stablesWeek = week();
+            m_movesMax += STABLES_BONUS;
+            m_moves    += STABLES_BONUS;
+            return obj->name + ": fresh horses, +" + std::to_string((int)STABLES_BONUS) + " movement until the week ends.";
+        case ObjType::Watchtower:
+            if (!m_visitedOnce.insert(cell).second) return "";
+            revealArea(cell, WATCHTOWER_RADIUS);
+            return obj->name + ": the land for leagues around is revealed.";
+        case ObjType::Obelisk: {
+            // HoMM3's puzzle map: each obelisk read shows where the passage is not.
+            if (!m_visitedOnce.insert(cell).second) return obj->name + ": the markings are the same as before. You are almost sure of it.";
+            auto ruled = giveClue();
+            return obj->name + (ruled ? ": the veins in the stone trace the tunnels below. The " + *ruled + " leads nowhere."
+                                      : ": the veins in the stone point where you already know to look.");
+        }
+        case ObjType::LearningStone:
+            if (!m_visitedOnce.insert(cell).second) return obj->name + ": you have already read these runes.";
+            grantXp(LEARNING_XP);
+            return obj->name + ": the companions gain " + std::to_string(LEARNING_XP) + " experience.";
+        default:
+            return "";
+    }
+}
+
+std::string AdventureSession::claimChest(bool gold) {
+    if (!m_pendingChest) return "";
+    HexCoord cell = *m_pendingChest;
+    m_pendingChest.reset();
+    return collect(cell, gold);
+}
+
+std::string AdventureSession::collect(const HexCoord& cell, bool gold) {
+    auto it = m_pickups.find(cell);
+    if (it == m_pickups.end()) return "";
+    Pickup p = it->second;
+    m_pickups.erase(it);
+    const MapObjectDef* obj = m_map.objectAt(cell);
+    std::string text = obj ? obj->name + ": " : std::string();
+    if (p.chest && !gold) {
+        grantXp(p.xp);
+        text += "+" + std::to_string(p.xp) + " experience";
+    } else {
+        give(p.reward);
+        text += describe(p.reward);
+    }
+    if (!p.item.empty()) {
+        addItem(p.item);
+        text += (text.back() == ' ' ? "" : ", ") + std::string("found ") + p.item;
+    }
+    return text;
+}
+
+bool AdventureSession::betray(const std::string& objectName, const std::string& bandName,
+                              const std::vector<Stack>& army) {
+    const MapObjectDef* obj = nullptr;
+    for (const auto& o : m_map.objects()) if (o.name == objectName) { obj = &o; break; }
+    if (!obj) return false;
+    if (auto it = m_control.find(obj->pos); it != m_control.end()) {
+        it->second.ownerFaction = Faction::AI;
+        m_garrisons.erase(obj->pos);
+        for (auto& sc : m_specials)
+            if (sc.stationed == obj->pos) sc.stationed.reset();   // the governor flees to the hero
+        if (obj->type == ObjType::Town) { m_towns[obj->pos].recruitPool.clear(); growTown(obj->pos); }
+    }
+    HexCoord at = obj->pos;
+    if (at == m_hero.pos)                     // the band forms up beside the hero
+        for (int d = 0; d < 6; ++d) {
+            HexCoord nb = obj->pos.neighbor(d);
+            const MapTile* t = m_map.tileAt(nb);
+            if (t && t->passable && !isEncounter(nb) && !m_map.objectAt(nb)) { at = nb; break; }
+        }
+    Rival r;
+    r.id   = static_cast<int>(m_rivals.size()) + 1;
+    r.name = bandName;
+    r.pos  = at;
+    r.home = obj->pos;
+    r.army = army;
+    r.startPower = power(r.army);
+    m_rivals.push_back(r);
+    recomputeVisibility();
+    return true;
 }
 
 std::string AdventureSession::enter(const HexCoord& cell) {
@@ -244,6 +430,15 @@ std::string AdventureSession::enter(const HexCoord& cell) {
 }
 
 // ── Encounters ────────────────────────────────────────────────────────────────
+
+std::optional<HexCoord> AdventureSession::guardZoneAt(const HexCoord& c) const {
+    for (int d = 0; d < 6; ++d) {
+        HexCoord nb = c.neighbor(d);
+        if (!m_encounters.count(nb)) continue;
+        if (const MapObjectDef* obj = m_map.objectAt(nb); obj && obj->type == ObjType::Guard) return nb;
+    }
+    return std::nullopt;
+}
 
 bool AdventureSession::isEncounter(const HexCoord& c) const {
     return m_encounters.count(c) > 0 || rivalAt(c) != nullptr;
@@ -264,14 +459,17 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
     if (!m_pending) return MineFind::None;
     HexCoord cell = *m_pending;
     bool ambush = m_pendingAmbush;
+    bool zone   = m_pendingZone;
     m_pending.reset();
     m_pendingAmbush = false;
+    m_pendingZone   = false;
     if (auto it = std::find_if(m_rivals.begin(), m_rivals.end(),
             [&](const Rival& r) { return r.alive && r.pos == cell; }); it != m_rivals.end()) {
         if (victory) {
             grantXp(std::max(40, static_cast<int>(power(it->army) / 3)));
             it->alive = false;
-            report("Ushari", "The " + it->name + " is broken. The desert is quieter tonight.");
+            m_scenario.fire(*this, "rival_beaten", {{"name", it->name}});
+            report("Ushari", "The " + it->name + " is broken. The land is quieter tonight.");
             if (!ambush) {
                 m_moves    = std::max(0.0f, m_moves - stepCost(cell));
                 m_hero.pos = cell;
@@ -292,9 +490,11 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
     if (!item.empty()) addItem(item);
     if (const MapObjectDef* obj = m_map.objectAt(cell))
         m_scenario.fire(*this, "encounter_won", {{"name", obj->name}});
-    m_moves    = std::max(0.0f, m_moves - stepCost(cell));
-    m_hero.pos = cell;
-    enter(cell);
+    if (!zone) {   // attacked in the camp's zone: the hero holds its ground
+        m_moves    = std::max(0.0f, m_moves - stepCost(cell));
+        m_hero.pos = cell;
+        enter(cell);
+    }
     recomputeVisibility();
 
     auto find = m_mineFinds.find(cell);
@@ -321,7 +521,8 @@ void AdventureSession::fireSightings(const std::vector<HexCoord>& revealed) {
         m_scenario.fire(*this, "see", {{"name", obj->name}});
         std::string type = obj->type == ObjType::OldMine ? "old_mine"
                          : obj->type == ObjType::QuestGiver ? "quest_giver"
-                         : obj->type == ObjType::Town ? "town" : "other";
+                         : obj->type == ObjType::Town ? "town"
+                         : obj->type == ObjType::Obelisk ? "obelisk" : "other";
         m_scenario.fire(*this, "see_type", {{"type", type}});
     }
 }
@@ -371,7 +572,7 @@ std::optional<std::string> AdventureSession::acceptOffer(const std::string& id) 
 int AdventureSession::minesHeld(int faction) const {
     int n = 0;
     for (const auto& [coord, ctrl] : m_control)
-        if (ctrl.ownerFaction == faction && ctrl.objType != ObjType::Town) ++n;
+        if (ctrl.ownerFaction == faction && ctrl.objType != ObjType::Town && ctrl.objType != ObjType::Dwelling) ++n;
     return n;
 }
 
@@ -456,6 +657,10 @@ std::string AdventureSession::rosterFor(int owner) {
 }
 
 void AdventureSession::growTown(const HexCoord& c) {
+    if (const MapObjectDef* obj = m_map.objectAt(c); obj && obj->type == ObjType::Dwelling) {
+        if (const UnitType* u = m_resources->unit(obj->kind)) m_towns[c].recruitPool[u->id] += u->weeklyGrowth;
+        return;
+    }
     std::string roster = rosterFor(owner(c));
     if (roster.empty()) return;
     auto& pool = m_towns[c].recruitPool;

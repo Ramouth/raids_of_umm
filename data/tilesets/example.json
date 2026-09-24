@@ -1,0 +1,33 @@
+{
+  "cellH": 64,
+  "cellW": 64,
+  "cells": [
+    {
+      "col": 15,
+      "file": "assets/textures/custom/example/c15_r6.png",
+      "row": 6
+    },
+    {
+      "col": 16,
+      "file": "assets/textures/custom/example/c16_r6.png",
+      "row": 6
+    },
+    {
+      "col": 16,
+      "file": "assets/textures/custom/example/c16_r7.png",
+      "row": 7
+    },
+    {
+      "col": 17,
+      "file": "assets/textures/custom/example/c17_r6.png",
+      "row": 6
+    },
+    {
+      "col": 17,
+      "file": "assets/textures/custom/example/c17_r7.png",
+      "row": 7
+    }
+  ],
+  "name": "example",
+  "sheet": "assets/assorted /example_map.png"
+}

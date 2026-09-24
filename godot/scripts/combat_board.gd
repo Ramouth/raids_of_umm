@@ -1,12 +1,32 @@
 extends Control
 
 signal cell_clicked(cell: Vector2i)
+signal cell_right_clicked(cell: Vector2i)
+## Emitted when the pointer enters a new hex; inside is false when it leaves the grid.
+signal cell_hovered(cell: Vector2i, inside: bool)
 const HEX := Vector2(80, 76)
 const ORIGIN := Vector2(70, 70)
 const ART := {"dune_stalker": "enemy_scout"}  # units sharing another unit's sprite
+const PLAYER_COLOR := Color("789b88")
+const ENEMY_COLOR := Color("bc7660")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
+## Hover feedback set by the combat screen: the hex under the pointer, what a
+## click there would do ("attack", "move", "blocked", ""), and a short
+## forecast drawn above an attack target.
+var hover_cell: Array = []
+var hover_kind := ""
+var hover_label := ""
+## A stack highlighted from outside the board (initiative bar hover).
+var highlight_key := ""
+var _forecast: Label
+
+static func unit_texture(id: String) -> Texture2D:
+    var filename: String = ART.get(id, id)
+    var path := "res://content/textures/units/%s.png" % filename
+    if not ResourceLoader.exists(path): path = "res://content/textures/units/armoured_warrior.png"
+    return load(path)
 
 static func cell_point(cell: Array) -> Vector2:
     return ORIGIN + Vector2(float(cell[0]) * 60.0, (float(cell[1]) + float(cell[0]) * 0.5) * 76.0)
@@ -19,18 +39,42 @@ static func hex_points(center: Vector2) -> PackedVector2Array:
     return points
 
 func _ready() -> void:
-    mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    mouse_default_cursor_shape = Control.CURSOR_ARROW
     gui_input.connect(_clicked)
+    mouse_exited.connect(func():
+        if not hover_cell.is_empty():
+            hover_cell = []
+            cell_hovered.emit(Vector2i.ZERO, false))
+
+static func cell_at(point: Vector2) -> Array:
+    for col in range(11):
+        for row in range(5):
+            var cell := [col, row - (col - (col & 1)) / 2]
+            if Geometry2D.is_point_in_polygon(point, hex_points(cell_point(cell))):
+                return cell
+    return []
 
 func _clicked(event: InputEvent) -> void:
-    if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        for col in range(11):
-            for row in range(5):
-                var cell := [col, row - (col - (col & 1)) / 2]
-                if Geometry2D.is_point_in_polygon(event.position, hex_points(cell_point(cell))):
-                    cell_clicked.emit(Vector2i(cell[0], cell[1]))
-                    accept_event()
-                    return
+    if event is InputEventMouseMotion:
+        var cell := cell_at(event.position)
+        if cell != hover_cell:
+            hover_cell = cell
+            cell_hovered.emit(Vector2i(cell[0], cell[1]) if not cell.is_empty() else Vector2i.ZERO, not cell.is_empty())
+        return
+    if event is InputEventMouseButton and event.pressed and event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+        var cell := cell_at(event.position)
+        if cell.is_empty(): return
+        if event.button_index == MOUSE_BUTTON_LEFT: cell_clicked.emit(Vector2i(cell[0], cell[1]))
+        else: cell_right_clicked.emit(Vector2i(cell[0], cell[1]))
+        accept_event()
+
+## Updates hover feedback and the pointer shape (sword-like cross for attacks).
+func set_hover(kind: String, label: String) -> void:
+    hover_kind = kind
+    hover_label = label
+    mouse_default_cursor_shape = {"attack": Control.CURSOR_CROSS, "move": Control.CURSOR_POINTING_HAND,
+        "blocked": Control.CURSOR_FORBIDDEN}.get(kind, Control.CURSOR_ARROW)
+    queue_redraw()
 
 func _draw() -> void:
     for col in range(11):
@@ -44,11 +88,46 @@ func _draw() -> void:
             draw_colored_polygon(points, fill)
             points.append(points[0])
             draw_polyline(points, Color("947044"), 1.0, true)
+    var playing: bool = not locked and state.get("player_turn", false)
+    if not hover_cell.is_empty():
+        var points := hex_points(cell_point(hover_cell))
+        if playing and hover_kind == "move": draw_colored_polygon(points, Color(0.55, 0.85, 0.6, 0.28))
+        points.append(points[0])
+        var outline: Color = {"attack": Color("ff9d7a"), "move": Color("c9f0d2"), "blocked": Color("8a7a66")}.get(hover_kind, Color("e8d8b3"))
+        draw_polyline(points, outline, 3.0 if hover_kind == "attack" else 2.0, true)
     for unit in state.get("units", []):
-        if unit.count > 0 and unit.key == state.get("active", ""):
-            var points := hex_points(cell_point(unit.cell))
-            points.append(points[0])
-            draw_polyline(points, Color("f7d580"), 3.0, true)
+        if unit.count <= 0: continue
+        var ring := ""
+        if unit.key == state.get("active", ""): ring = "active"
+        elif unit.key == highlight_key: ring = "highlight"
+        if ring.is_empty(): continue
+        var points := hex_points(cell_point(unit.cell))
+        points.append(points[0])
+        draw_polyline(points, Color("f7d580") if ring == "active" else Color("ffffff"), 3.0, true)
+    _place_forecast()
+
+## Attack forecast box, kept above every sprite.
+func _place_forecast() -> void:
+    if _forecast == null:
+        _forecast = Label.new()
+        _forecast.z_index = 20
+        _forecast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        _forecast.add_theme_font_size_override("font_size", 15)
+        _forecast.add_theme_color_override("font_color", Color("ffe3c4"))
+        var style := StyleBoxFlat.new()
+        style.bg_color = Color(0.08, 0.05, 0.03, 0.94)
+        style.border_color = Color("ff9d7a")
+        style.set_border_width_all(1)
+        style.set_content_margin_all(5)
+        _forecast.add_theme_stylebox_override("normal", style)
+        add_child(_forecast)
+    _forecast.visible = hover_kind == "attack" and not hover_label.is_empty() and not hover_cell.is_empty()
+    if not _forecast.visible: return
+    _forecast.text = hover_label
+    _forecast.size = Vector2.ZERO
+    var box := _forecast.get_combined_minimum_size()
+    var at := cell_point(hover_cell) + Vector2(-box.x / 2, -84)
+    _forecast.position = Vector2(clampf(at.x, 2, size.x - box.x - 2), maxf(at.y, 2))
 
 func _add_shadow(actor: Node2D, team_color: Color) -> void:
     var points := PackedVector2Array()
@@ -73,13 +152,10 @@ func sync(snapshot: Dictionary) -> void:
             var actor := Node2D.new()
             add_child(actor)
             actors[unit.key] = actor
-            _add_shadow(actor, Color("789b88") if unit.player else Color("bc7660"))
+            _add_shadow(actor, PLAYER_COLOR if unit.player else ENEMY_COLOR)
             var sprite := Sprite2D.new()
             sprite.name = "Sprite"
-            var filename: String = ART.get(unit.id, unit.id)
-            var path := "res://content/textures/units/%s.png" % filename
-            if not ResourceLoader.exists(path): path = "res://content/textures/units/armoured_warrior.png"
-            sprite.texture = load(path)
+            sprite.texture = unit_texture(unit.id)
             sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
             var art_size := sprite.texture.get_size()
             sprite.scale = Vector2.ONE * minf(66.0 / art_size.x, 72.0 / art_size.y)
@@ -109,9 +185,13 @@ func float_text(actor: Node2D, message: String, color: Color, duration: float) -
     var label := Label.new()
     label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     label.text = message
-    label.position = actor.position + Vector2(-24, -60)
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.size = Vector2(140, 44)
+    label.position = actor.position + Vector2(-70, -86)
+    label.add_theme_font_size_override("font_size", 19)
     label.add_theme_color_override("font_color", color)
-    label.add_theme_constant_override("outline_size", 5)
+    label.add_theme_color_override("font_outline_color", Color("16100a"))
+    label.add_theme_constant_override("outline_size", 6)
     add_child(label)
     var tween := create_tween().set_parallel()
     tween.tween_property(label, "position:y", label.position.y - 32, duration)
@@ -156,7 +236,8 @@ func animate(event: Dictionary, speed: float) -> void:
                 var hp := maxi(0, int(actor.get_meta("hp")) - int(event.damage))
                 actor.set_meta("hp", hp)
                 actor.get_node("Count").text = "× %d" % ceili(float(hp) / float(actor.get_meta("unit_hp")))
-                float_text(actor, "−%d%s" % [event.damage, " FLANK" if event.flanked else ""], Color("ffbc91"), duration * 2)
+                var kills := int(event.get("kills", 0))
+                float_text(actor, "−%d%s" % [event.damage, ("\n%d slain" % kills) if kills > 0 else ""], Color("ffbc91"), duration * 3)
                 actor.modulate = Color(2.0, 0.45, 0.3)
                 var tween := create_tween()
                 tween.tween_property(actor, "modulate", Color.WHITE, duration)

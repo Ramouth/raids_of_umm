@@ -22,7 +22,7 @@ constexpr double AMBUSH_MARGIN   = 1.5;   // attack the hero only when this much
 constexpr double SEARCH_MARGIN   = 1.4;   // search an old mine only when this much stronger
 constexpr double CLEAR_MARGIN    = 1.5;   // attack a guard camp only when this much stronger
 constexpr int    AMBUSH_RANGE    = 10;    // hexes
-constexpr int    RACE_DAY        = 18;    // from here, searching old mines beats capturing
+constexpr int    RACE_DAY        = 24;    // from here, searching old mines beats capturing
 // The Shariw tribes pay their war-chief daily (their economy beyond the map).
 constexpr int    TITHE_GOLD      = 1000;
 constexpr int    TITHE_WOOD      = 2;

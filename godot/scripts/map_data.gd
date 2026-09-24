@@ -8,6 +8,7 @@ const DIRECTIONS := [Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1),
 const HEX_SIZE := Vector2(112.0, 80.0)
 
 var title := ""
+var ground := "sand"   # base terrain drawn under everything ("sand" desert, "grass" north)
 var tiles: Dictionary = {}
 var objects: Dictionary = {}
 var spawn := Vector2i.ZERO
@@ -32,6 +33,7 @@ func read(path: String) -> bool:
         error = "Map tiles and objects must be arrays."
         return false
     title = str(document.get("name", "The Sands of Umm'Natur"))
+    ground = str(document.get("ground", "sand"))
     for entry: Variant in document.tiles:
         if not entry is Dictionary or not entry.has_all(["q", "r", "terrain"]):
             error = "A map tile is missing its coordinates or terrain."

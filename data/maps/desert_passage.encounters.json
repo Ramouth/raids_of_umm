@@ -1,0 +1,203 @@
+{
+  "_comment": "Guard armies + rewards for old_passage.json, keyed by object name. Balanced with godot/native/build/battle_sim (see ROADMAP demo notes).",
+  "defaults": {
+    "guard": {
+      "guards": [
+        {
+          "id": "skeleton_warrior",
+          "count": 20
+        },
+        {
+          "id": "sand_scorpion",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "old_mine": {
+      "guards": [
+        {
+          "id": "mummy",
+          "count": 10
+        },
+        {
+          "id": "sand_scorpion",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    }
+  },
+  "objects": {
+    "Ridge Pass Guard": {
+      "guards": [
+        {
+          "id": "skeleton_warrior",
+          "count": 30
+        },
+        {
+          "id": "sand_scorpion",
+          "count": 10
+        },
+        {
+          "id": "mummy",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "Gold": 750
+      },
+      "item": "scarab_amulet"
+    },
+    "Scorpion Nest": {
+      "guards": [
+        {
+          "id": "sand_scorpion",
+          "count": 22
+        },
+        {
+          "id": "mummy",
+          "count": 3
+        }
+      ],
+      "reward": {
+        "Gold": 500,
+        "Wood": 4
+      },
+      "item": "serpent_band"
+    },
+    "Old Mine of Sehet": {
+      "guards": [
+        {
+          "id": "skeleton_warrior",
+          "count": 36
+        },
+        {
+          "id": "mummy",
+          "count": 8
+        }
+      ],
+      "reward": {
+        "Stone": 3
+      }
+    },
+    "Old Mine of Nebu": {
+      "guards": [
+        {
+          "id": "sand_scorpion",
+          "count": 16
+        },
+        {
+          "id": "mummy",
+          "count": 10
+        }
+      ],
+      "reward": {
+        "Wood": 3
+      }
+    },
+    "Canyon Ford Guard": {
+      "guards": [
+        {
+          "id": "mummy",
+          "count": 16
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 60
+        },
+        {
+          "id": "sand_wraith",
+          "count": 30
+        },
+        {
+          "id": "storm_caller",
+          "count": 4
+        }
+      ],
+      "reward": {
+        "Gold": 2000
+      },
+      "item": "veil_of_sands"
+    },
+    "Wraith Host": {
+      "guards": [
+        {
+          "id": "sand_wraith",
+          "count": 60
+        },
+        {
+          "id": "storm_caller",
+          "count": 9
+        },
+        {
+          "id": "mummy",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Crystal": 3,
+        "Gold": 1000
+      },
+      "item": "obsidian_edge"
+    },
+    "Old Mine of Djer": {
+      "guards": [
+        {
+          "id": "mummy",
+          "count": 26
+        },
+        {
+          "id": "sand_wraith",
+          "count": 45
+        },
+        {
+          "id": "storm_caller",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "Obsidian": 3
+      }
+    },
+    "Old Mine of Anhur": {
+      "guards": [
+        {
+          "id": "ancient_guardian",
+          "count": 3
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 60
+        },
+        {
+          "id": "mummy",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Crystal": 3
+      }
+    },
+    "Collapsed Shrine": {
+      "guards": [
+        {
+          "id": "mummy",
+          "count": 8
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 24
+        }
+      ],
+      "reward": {
+        "Gold": 800
+      },
+      "item": "cursed_eye_of_set"
+    }
+  }
+}

@@ -667,7 +667,7 @@ void WorldBuilderState::renderTerrain() {
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
         m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex,
-                                {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation);
+                                {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation, /*texScale=*/0.0f);
     }
 
     // Pass 3 (grass↔sand edge tiles) is intentionally omitted in the editor.

@@ -6,8 +6,10 @@ extends PanelContainer
 signal drained
 
 const PORTRAITS := {
-    "Ushari": "units/ushari.png", "Kharim": "portraits/kharim.png",
+    "Ushari": "portraits/ushari.png", "Kharim": "portraits/kharim.png",
     "Scout": "units/rider_archer.png", "Messenger": "units/levy_spearman.png",
+    "Aldren": "portraits/aldren.png", "Corvin": "portraits/corvin.png",
+    "Inscription": "objects/obelisk.png",
 }
 
 var _queue: Array[Dictionary] = []

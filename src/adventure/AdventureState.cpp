@@ -654,7 +654,14 @@ void AdventureState::onHeroVisit(const HexCoord& coord) {
         case ObjType::OldMine:
         case ObjType::QuestGiver:
         case ObjType::Guard:
-            // Demo placeholders — behaviour lands in later demo steps.
+        case ObjType::Pickup:
+        case ObjType::Mill:
+        case ObjType::Watchtower:
+        case ObjType::Stables:
+        case ObjType::LearningStone:
+        case ObjType::Dwelling:
+        case ObjType::Obelisk:
+            // Demo placeholders (the Godot demo runs these through AdventureSession) — behaviour lands in later demo steps.
             m_notification = obj->name + " (not yet implemented)";
             m_notifyTimer  = NOTIFY_DURATION;
             break;
@@ -1258,7 +1265,7 @@ void AdventureState::renderTerrain() {
         if (!tex) continue;
         RenderOffset off = m_offsets.forTerrain(coord, tile.terrain);
         float h = terrainHeight(tile.terrain) + off.dy;
-        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation);
+        m_hexRenderer.drawTile(coord, terrainColor(tile.terrain), HEX_SIZE, h, tex, {off.dx, off.dz}, 0, /*softEdge=*/true, tile.rotation, /*texScale=*/0.0f);
     }
 
     // Pass 3: HoMM3-style directional grass↔sand edge tiles.

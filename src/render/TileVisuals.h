@@ -35,6 +35,8 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
         case Terrain::Highland:      return { 0.35f, 0.46f, 0.28f };  // grey-green moorland
         case Terrain::GrassSandEdge:  return { 0.48f, 0.57f, 0.28f };  // blended grass↔sand border
         case Terrain::GrassSandEdge2: return { 0.78f, 0.63f, 0.35f };  // sand base — transparent pixels show sand, grass pixels show grass texture
+        case Terrain::Lake:           return { 0.20f, 0.42f, 0.62f };  // cold northern lake
+        case Terrain::Swamp:          return { 0.28f, 0.34f, 0.20f };  // murky bog
         default:                      return { 1.00f, 0.00f, 1.00f };  // magenta = unknown
     }
 }
@@ -72,6 +74,13 @@ inline const char* objTypeSpritePath(ObjType t) noexcept {
         case ObjType::OldMine:      return "assets/textures/objects/old_mine.png";
         case ObjType::QuestGiver:   return "assets/textures/objects/quest_giver.png";
         case ObjType::Guard:        return "assets/textures/objects/guard.png";
+        case ObjType::Pickup:       return "assets/textures/objects/treasure_chest.png";
+        case ObjType::Mill:         return "assets/textures/objects/windmill.png";
+        case ObjType::Watchtower:   return "assets/textures/objects/watchtower.png";
+        case ObjType::Stables:      return "assets/textures/objects/stables.png";
+        case ObjType::LearningStone:return "assets/textures/objects/learning_stone.png";
+        case ObjType::Dwelling:     return "assets/textures/objects/dwelling_grey_wolf.png";
+        case ObjType::Obelisk:      return "assets/textures/objects/obelisk.png";
         default:                    return "";
     }
 }
@@ -98,6 +107,13 @@ inline glm::vec3 objTypeColor(ObjType t) noexcept {
         case ObjType::OldMine:      return { 0.45f, 0.30f, 0.20f };
         case ObjType::QuestGiver:   return { 0.30f, 0.90f, 0.40f };
         case ObjType::Guard:        return { 0.90f, 0.40f, 0.10f };
+        case ObjType::Pickup:       return { 0.95f, 0.85f, 0.40f };
+        case ObjType::Mill:         return { 0.70f, 0.55f, 0.35f };
+        case ObjType::Watchtower:   return { 0.60f, 0.45f, 0.30f };
+        case ObjType::Stables:      return { 0.65f, 0.40f, 0.20f };
+        case ObjType::LearningStone:return { 0.55f, 0.65f, 0.90f };
+        case ObjType::Dwelling:     return { 0.50f, 0.35f, 0.25f };
+        case ObjType::Obelisk:      return { 0.35f, 0.20f, 0.45f };
         default:                    return { 1.00f, 0.00f, 1.00f };
     }
 }

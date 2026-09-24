@@ -1,79 +1,30 @@
 {
   "name": "Untitled Map",
-  "objects": [
-    {
-      "name": "Umm'Natur",
-      "q": 0,
-      "r": 4,
-      "type": "town"
-    },
-    {
-      "name": "Tomb of Kha'Set",
-      "q": 5,
-      "r": -3,
-      "type": "dungeon"
-    },
-    {
-      "name": "Buried Sanctum",
-      "q": -4,
-      "r": 6,
-      "type": "dungeon"
-    },
-    {
-      "name": "Gold Vein",
-      "q": 3,
-      "r": 3,
-      "type": "gold_mine"
-    },
-    {
-      "name": "Crystal Seam",
-      "q": -6,
-      "r": -2,
-      "type": "crystal_mine"
-    },
-    {
-      "name": "Scarab of Eternity",
-      "q": 7,
-      "r": -6,
-      "type": "artifact"
-    },
-    {
-      "name": "Pharaoh's Eye",
-      "q": -8,
-      "r": 4,
-      "type": "artifact"
-    },
-    {
-      "name": "Sunken Treasury",
-      "q": 1,
-      "r": -7,
-      "type": "gold_mine"
-    }
-  ],
+  "objects": [],
   "radius": 12,
   "tiles": [
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": 0,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": -9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": -10,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -81,31 +32,31 @@
       "passable": true,
       "q": 12,
       "r": -11,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": -12,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": -8,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -141,19 +92,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": 2,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -173,11 +124,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 10,
       "r": -10,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -189,11 +140,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": -12,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -205,27 +156,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": 2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -8,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -237,11 +188,11 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -10,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -269,11 +220,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": 2,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -301,11 +252,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": 0,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -325,11 +276,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": -4,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -349,11 +300,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": -10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -365,11 +316,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": -12,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -389,19 +340,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -1,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -421,11 +372,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -437,11 +388,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -461,43 +412,43 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": 0,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -5,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -7,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 5,
       "r": -8,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -517,11 +468,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -12,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -549,27 +500,27 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": 5,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": 4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": 3,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -609,15 +560,15 @@
       "passable": true,
       "q": 4,
       "r": -3,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": -4,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -653,27 +604,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": -9,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": -11,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": -12,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -685,11 +636,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": 8,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -721,7 +672,7 @@
       "passable": true,
       "q": 3,
       "r": 4,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -733,11 +684,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": 2,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -753,7 +704,7 @@
       "passable": true,
       "q": 3,
       "r": 0,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -765,11 +716,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -3,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -781,27 +732,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 3,
       "r": -6,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -813,19 +764,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -12,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -833,7 +784,7 @@
       "passable": true,
       "q": 2,
       "r": 10,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -853,11 +804,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": 7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -885,11 +836,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": 3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -925,11 +876,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": -2,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -949,27 +900,27 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 2,
       "r": -7,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": -8,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": -10,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -981,11 +932,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1013,35 +964,35 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": 7,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": 6,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 1,
       "r": 5,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": 4,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1057,7 +1008,7 @@
       "passable": true,
       "q": 1,
       "r": 2,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1077,11 +1028,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": -1,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1109,19 +1060,19 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": -10,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": 7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1149,11 +1100,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": -9,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1173,11 +1124,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 2,
       "r": -6,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1189,11 +1140,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -7,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1213,11 +1164,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": 7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1229,11 +1180,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1309,59 +1260,59 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -2,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": -5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": -9,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": 8,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": 2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -6,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1381,43 +1332,43 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 3,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": 0,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": 10,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1425,15 +1376,15 @@
       "passable": true,
       "q": 6,
       "r": 2,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 2,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1445,43 +1396,43 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 0,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1517,19 +1468,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": -1,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 10,
       "r": -1,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1549,19 +1500,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": 2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": -9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1573,12 +1524,12 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -1,
       "r": -2,
-      "terrain": "obsidian",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -1589,11 +1540,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -7,
       "r": 1,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1605,11 +1556,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": -3,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1629,11 +1580,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": 2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1642,7 +1593,7 @@
       "q": -3,
       "r": 0,
       "terrain": "sand",
-      "variant": 0
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -1653,59 +1604,59 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": 1,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": 4,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": -3,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": -1,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": 5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1717,35 +1668,35 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -8,
       "r": 12,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 10,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": -3,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 6,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1797,11 +1748,11 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": 3,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1813,11 +1764,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.25,
       "passable": true,
       "q": -1,
       "r": -1,
-      "terrain": "river",
+      "terrain": "rock",
       "variant": 0
     },
     {
@@ -1829,19 +1780,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": 2,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -11,
       "r": 6,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1869,11 +1820,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": 4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1893,11 +1844,11 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": 0,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1917,11 +1868,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": 4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1941,19 +1892,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1969,7 +1920,7 @@
       "passable": true,
       "q": -4,
       "r": 5,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1981,11 +1932,11 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": -7,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -1997,27 +1948,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": -3,
-      "terrain": "rock",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": 8,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2033,7 +1984,7 @@
       "passable": true,
       "q": 7,
       "r": -7,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2065,15 +2016,15 @@
       "passable": true,
       "q": -5,
       "r": 4,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.25,
       "passable": true,
       "q": -1,
       "r": 0,
-      "terrain": "river",
+      "terrain": "rock",
       "variant": 0
     },
     {
@@ -2093,11 +2044,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": -1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2109,19 +2060,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2133,43 +2084,43 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 3,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": -5,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": -12,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 12,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2181,35 +2132,35 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 0,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 3,
       "r": -10,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": 3,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": -1,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2225,55 +2176,55 @@
       "passable": true,
       "q": -10,
       "r": 8,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 0,
-      "terrain": "river",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": -1,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": 0,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 1,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2290,7 +2241,7 @@
       "q": -3,
       "r": 1,
       "terrain": "sand",
-      "variant": 0
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -2301,11 +2252,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": 0,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2325,11 +2276,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2349,19 +2300,19 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -1,
-      "terrain": "river",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 2,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2373,11 +2324,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 8,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2397,11 +2348,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2429,11 +2380,11 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -9,
       "r": 11,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2445,19 +2396,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": -1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": 5,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2477,19 +2428,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -11,
       "r": 10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2501,11 +2452,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": 4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2517,11 +2468,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 4,
       "r": -10,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2529,39 +2480,39 @@
       "passable": true,
       "q": -8,
       "r": 4,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": -2,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": -9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -12,
       "r": 7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2573,28 +2524,28 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": 6,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -6,
       "r": 4,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -2,
-      "terrain": "river",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -2613,11 +2564,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -4,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2637,19 +2588,19 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.25,
       "passable": true,
       "q": -2,
       "r": 1,
-      "terrain": "river",
+      "terrain": "rock",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 8,
       "r": -10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2661,19 +2612,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 0,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -4,
       "r": 2,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2685,11 +2636,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 12,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2701,11 +2652,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2717,11 +2668,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 10,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2746,7 +2697,7 @@
       "q": 1,
       "r": -5,
       "terrain": "sand",
-      "variant": 0
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -2781,19 +2732,19 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -3,
       "r": 7,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -9,
       "r": 12,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2801,23 +2752,23 @@
       "passable": true,
       "q": 9,
       "r": 0,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": 0,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": 2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2869,27 +2820,27 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -11,
       "r": 1,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 11,
       "r": -7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": 9,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2901,11 +2852,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -9,
       "r": -2,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2917,11 +2868,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -5,
       "r": 10,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2933,27 +2884,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.0,
+      "moveCost": 1.25,
       "passable": true,
       "q": 0,
       "r": -1,
+      "terrain": "rock",
+      "variant": 0
+    },
+    {
+      "moveCost": 1.0,
+      "passable": true,
+      "q": 12,
+      "r": -2,
       "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
-      "passable": true,
-      "q": 12,
-      "r": -2,
-      "terrain": "dune",
-      "variant": 0
-    },
-    {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -8,
       "r": 9,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2965,11 +2916,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -2997,11 +2948,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -10,
       "r": 3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3013,11 +2964,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -6,
       "r": 5,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3029,11 +2980,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3045,12 +2996,12 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 1,
       "r": -4,
-      "terrain": "obsidian",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -3061,11 +3012,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 6,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3093,11 +3044,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -11,
       "r": -1,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3133,11 +3084,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3149,11 +3100,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 5,
       "r": 6,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3165,12 +3116,12 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 0,
       "r": -3,
-      "terrain": "obsidian",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -3189,11 +3140,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3213,43 +3164,43 @@
       "variant": 0
     },
     {
-      "moveCost": 1.0,
+      "moveCost": 1.25,
       "passable": true,
       "q": 0,
       "r": -2,
-      "terrain": "sand",
-      "variant": 0
-    },
-    {
-      "moveCost": 1.5,
-      "passable": true,
-      "q": -11,
-      "r": 4,
-      "terrain": "dune",
-      "variant": 0
-    },
-    {
-      "moveCost": 1.25,
-      "passable": true,
-      "q": 11,
-      "r": -4,
       "terrain": "rock",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
-      "q": -7,
-      "r": 8,
-      "terrain": "dune",
+      "q": -11,
+      "r": 4,
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
+      "passable": true,
+      "q": 11,
+      "r": -4,
+      "terrain": "sand",
+      "variant": 0
+    },
+    {
+      "moveCost": 1.0,
+      "passable": true,
+      "q": -7,
+      "r": 8,
+      "terrain": "sand",
+      "variant": 0
+    },
+    {
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": -6,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3301,12 +3252,12 @@
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": -4,
-      "terrain": "mountain",
-      "variant": 0
+      "terrain": "sand",
+      "variant": 3
     },
     {
       "moveCost": 1.0,
@@ -3325,11 +3276,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": 10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3341,11 +3292,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -7,
       "r": 5,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3353,7 +3304,7 @@
       "passable": true,
       "q": 7,
       "r": -5,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3373,11 +3324,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -6,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3385,7 +3336,7 @@
       "passable": true,
       "q": -5,
       "r": 6,
-      "terrain": "oasis",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3397,19 +3348,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": 10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": -5,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3453,11 +3404,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 0,
       "r": -7,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3469,27 +3420,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": -8,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 9,
       "r": -3,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": -5,
       "r": 9,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3501,11 +3452,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": 5,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3517,11 +3468,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": -1,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3557,11 +3508,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": -6,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3581,27 +3532,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 7,
       "r": -2,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -3,
       "r": 12,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 2.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -9,
-      "terrain": "mountain",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3621,11 +3572,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -2,
       "r": -5,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3637,19 +3588,19 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": -7,
-      "terrain": "ruins",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 0.0,
-      "passable": false,
+      "moveCost": 1.0,
+      "passable": true,
       "q": 0,
       "r": 12,
-      "terrain": "obsidian",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3661,11 +3612,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": 11,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3677,27 +3628,27 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": 10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -1,
       "r": -4,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": 9,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3717,11 +3668,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": -4,
       "r": -7,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3741,11 +3692,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": -10,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3757,11 +3708,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.5,
+      "moveCost": 1.0,
       "passable": true,
       "q": 0,
       "r": -9,
-      "terrain": "dune",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3773,11 +3724,11 @@
       "variant": 0
     },
     {
-      "moveCost": 1.25,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": -12,
-      "terrain": "rock",
+      "terrain": "sand",
       "variant": 0
     },
     {
@@ -3797,11 +3748,11 @@
       "variant": 0
     },
     {
-      "moveCost": 0.0,
+      "moveCost": 1.0,
       "passable": true,
       "q": 1,
       "r": -8,
-      "terrain": "river",
+      "terrain": "sand",
       "variant": 0
     }
   ],

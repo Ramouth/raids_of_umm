@@ -87,6 +87,13 @@ static const char* objKey(ObjType t) {
         case ObjType::OldMine:     return "OldMine";
         case ObjType::QuestGiver:  return "QuestGiver";
         case ObjType::Guard:       return "Guard";
+        case ObjType::Pickup:      return "Pickup";
+        case ObjType::Mill:        return "Mill";
+        case ObjType::Watchtower:  return "Watchtower";
+        case ObjType::Stables:     return "Stables";
+        case ObjType::LearningStone: return "LearningStone";
+        case ObjType::Dwelling:    return "Dwelling";
+        case ObjType::Obelisk:     return "Obelisk";
         default:                   return "Unknown";
     }
 }
