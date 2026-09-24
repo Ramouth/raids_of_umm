@@ -205,7 +205,12 @@ Balance tool: `godot/native/build/battle_sim data '<army>' '<guards>' [runs]`.
 | 14 | **Stage 1 north:** northern map at HoMM3 density, sites, dwellings, zone of control, obelisks + lore codex, families/betrayal story, northern art | ✅ first pass (demo_bot 6/12 won, average day 40, so the race needs tuning) |
 | 15 | **Combat AI + clarity:** scored AI (spreads out, flanks, seeded randomness), turn-order bar, hover damage/kill forecast, combat log, stack inspector | ✅ |
 | 16 | **Move-and-attack in one turn** (HoMM3): melee walks up and strikes; cursor side picks the standing hex; decided 2026-09-24 | ✅ (demo_bot 6/12 won, 4 sealed, 2 timeout) |
-| 17 | **Hero growth** (HoMM3's long hook): the hero levels up with primary stats, picks skills and learns spells; artifacts that change play | ⬜ next, design first |
+| 17 | **Hero growth**: XP visible (✅ 7d69c03); spell tree, 1 point per level, no mana: **Command** (Banner aura, Wider Banner, Rally, Oathbound) · **Sand** (Displace, Quicksand, Stone Wall, Ward) · **Veined**, after 2 obelisks (Vein Sight, Grave Harvest, Listen Below, The Door). Designed 2026-09-24 | 🟡 designed |
+| 17b | **Companions in battle: powerful but vulnerable**: single figure, high damage, low HP, the source of an aura (Ushari +3 defence, radius 1); a stack beside them takes half of every melee blow; the enemy AI hunts them; red warning when they can be reached. Falls = wounded 3 days, lost if the battle is lost too | ✅ (demo_bot 6/12 won, same as before; ~2 wounds a game) |
+| 17e | **Line of sight**: any stack between a shooter and its target halves the shot; the forecast and a drawn line of fire show it. Moving units (Displace, walls) will open or close lines | ✅ |
+| 17f | **Sand spells**: Displace, Quicksand, Stone Wall, Ward in the combat engine (hero tree + Sekhara/Khet) | ⬜ next |
+| 17c | **Grave Harvest (necromancy, HoMM3 caveats)**: raise skeletons from living enemies only; cap 3 × hero level per battle; dead stack ≤ largest living stack; decay 10%/week unless paid Crystal; Ushari and northern towns object | ⬜ |
+| 17d | **Baldur's Gate companions**: approval per companion (wages fold in), interjections at choice points, "X disapproves", warning scene, leaving on crossed lines, personal quests at high approval, camp banter | ⬜ |
 | 18 | **Atmosphere beyond text**: obelisk sound sting + violet tint, ambient audio per region, slower "strange" transmissions, a visual for the Veined | ⬜ next |
 
 ---

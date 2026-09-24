@@ -20,6 +20,8 @@ var heading: Label
 var turn_label: Label
 var initiative: HBoxContainer
 var status: RichTextLabel
+## Red line at the top of the board: which companions the enemy can reach.
+var warning: RichTextLabel
 var inspection: RichTextLabel
 var log_view: RichTextLabel
 var defend: Button
@@ -72,6 +74,8 @@ func _ready() -> void:
     board.pointer_moved.connect(_pointer_moved)
     status = _rich(Vector2(36, 630), Vector2(730, 28), 15)
     status.scroll_active = false
+    warning = _rich(Vector2(36, 164), Vector2(730, 24), 14)
+    warning.scroll_active = false
     inspection = _rich(Vector2(826, 170), Vector2(415, 262), 16)
     inspection.scroll_active = false
     defend = _button("Defend · D", Vector2(830, 440), _defend)
@@ -169,7 +173,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
-    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation.", DIM)
+    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
     _consume(reply)
     return true
 
@@ -242,13 +246,16 @@ func _log_damage(event: Dictionary, strike: Dictionary) -> void:
     var outcome := "%d damage" % event.damage
     if kills > 0: outcome += ", %d slain" % kills
     outcome += " — stack destroyed" if left == 0 else " (%d left)" % left
-    if strike.is_empty() or strike.target != victim:
+    if event.get("bodyguard", false) and not strike.is_empty():
+        _log("   » %s steps in front of %s and takes %s." % [_unit_label(victim), _unit_name(strike.target), outcome], TEXT, victim)
+    elif strike.is_empty() or strike.target != victim:
         _log("%s takes %s." % [_unit_label(victim), outcome], TEXT, victim)
     elif strike.retaliation:
         _log("   » retaliation: %s strikes back at %s: %s." % [_unit_label(strike.unit), _unit_label(victim), outcome], TEXT, strike.unit)
     else:
         var verb := "shoots" if strike.get("ranged", false) else "attacks"
         var pinned := " PINNED (+50%, no retaliation)" if strike.flanked else ""
+        if strike.get("blocked", false): pinned += " through the ranks (blocked shot: half damage)"
         _log("%s %s %s%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), pinned, outcome], TEXT, strike.unit)
 
 func _unit_name(key: String) -> String:
@@ -256,7 +263,22 @@ func _unit_name(key: String) -> String:
 
 func _unit_label(key: String) -> String:
     if not units.has(key): return key
+    if units[key].get("companion", false): return "%s (level %d)" % [units[key].name, int(units[key].level)]
     return "%s ×%d" % [units[key].name, units[key].count]
+
+## "Ushari can be reached by Brigands ×12, Grey Wolves ×8" for every exposed companion.
+func _companion_warnings() -> String:
+    var lines: Array[String] = []
+    for unit in state.get("units", []):
+        if not unit.player or not unit.get("companion", false) or int(unit.count) <= 0: continue
+        var threats: Array = unit.get("threats", [])
+        if threats.is_empty(): continue
+        var names: Array[String] = []
+        for key in threats: names.append(_unit_label(key))
+        var guard := "" if str(unit.get("bodyguard", "")).is_empty() else " (a bodyguard takes half of melee blows)"
+        lines.append("%s is exposed to %s%s" % [unit.name, ", ".join(names), guard])
+    if lines.is_empty(): return ""
+    return "[color=#%s]⚠ %s.[/color]" % [Board.DANGER_COLOR.to_html(false), "; ".join(lines)]
 
 func _refresh() -> void:
     board.locked = busy or auto_battle
@@ -324,7 +346,7 @@ func _portrait(key: String, active: bool, upcoming := false) -> Control:
     picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
     frame.add_child(picture)
     var count := Label.new()
-    count.text = "×%d" % unit.count
+    count.text = ("♥%d" % int(unit.hp)) if unit.get("companion", false) else "×%d" % unit.count
     count.position = Vector2(0, 48)
     count.size = Vector2(62, 20)
     count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -357,13 +379,26 @@ func _inspect(unit: Dictionary) -> void:
     var colour := FRIEND if unit.player else FOE
     var lines: Array[String] = []
     var tag := "ACTING NOW" if unit.key == state.get("active", "") else ("kept on screen · right-click empty ground to release" if unit.key == _pinned_key else "")
-    lines.append("[font_size=21][b][color=#%s]%s ×%d[/color][/b][/font_size]" % [colour.to_html(false), unit.name, unit.count])
-    lines.append("[color=#%s]%s%s[/color]" % [DIM.to_html(false), "Your expedition" if unit.player else "Enemy", ("  ·  " + tag) if not tag.is_empty() else ""])
-    lines.append("Health  %d / %d on the top creature  ·  %d total" % [unit.get("hp_left", unit.unit_hp), unit.unit_hp, unit.hp])
+    var companion: bool = unit.get("companion", false)
+    if companion:
+        lines.append("[font_size=21][b][color=#%s]%s[/color][/b][/font_size]" % [GOLD.to_html(false), unit.name])
+        lines.append("[color=#%s]Companion · level %d%s[/color]" % [DIM.to_html(false), int(unit.level), ("  ·  " + tag) if not tag.is_empty() else ""])
+        lines.append("Health  %d / %d  ·  one figure: when it falls, it is out of the fight" % [unit.hp, unit.unit_hp])
+    else:
+        lines.append("[font_size=21][b][color=#%s]%s ×%d[/color][/b][/font_size]" % [colour.to_html(false), unit.name, unit.count])
+        lines.append("[color=#%s]%s%s[/color]" % [DIM.to_html(false), "Your expedition" if unit.player else "Enemy", ("  ·  " + tag) if not tag.is_empty() else ""])
+        lines.append("Health  %d / %d on the top creature  ·  %d total" % [unit.get("hp_left", unit.unit_hp), unit.unit_hp, unit.hp])
     lines.append("Attack %d  ·  Defence %d  ·  Damage %d–%d each" % [unit.attack, unit.defense, unit.get("min_damage", 0), unit.get("max_damage", 0)])
     lines.append("Speed %d  ·  Moves %d hexes" % [unit.speed, unit.get("move", 0)])
     if unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting" % [unit.shots, unit.get("shots_max", unit.shots)])
     else: lines.append("Melee  ·  attacks adjacent stacks only")
+    if int(unit.get("aura_radius", 0)) > 0:
+        lines.append("[color=#%s]Aura: stacks within %d hex get +%d defence while %s stands[/color]" % [GOLD.to_html(false), int(unit.aura_radius), int(unit.aura_defense), unit.name])
+    if int(unit.get("aura_bonus", 0)) > 0:
+        lines.append("[color=#%s]+%d defence from a companion's aura[/color]" % [GOLD.to_html(false), int(unit.aura_bonus)])
+    if companion:
+        var guard: String = unit.get("bodyguard", "")
+        lines.append("Bodyguard: %s" % (_unit_label(guard) + " takes half of each melee blow" if not guard.is_empty() else "none — keep a stack beside %s" % unit.name))
     var notes: Array[String] = []
     if unit.defending: notes.append("defending (+25% defence)")
     notes.append("retaliation used this round" if unit.get("retaliated", false) else "will retaliate once this round")
@@ -456,6 +491,7 @@ func _update_status() -> void:
     elif _hover_cell.is_empty():
         var how := "shoot it" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 else "walk up and strike (cursor picks the side)"
         text = "%s: click a red enemy to %s · a green hex only moves · D to defend · right-click a stack for details." % [_unit_label(state.active), how]
+
     elif not unit.is_empty() and not unit.player:
         var preview := {}
         for candidate in state.get("previews", []):
@@ -472,7 +508,13 @@ func _update_status() -> void:
             text = "[b]%s %s[/b]: %s damage, kills %s of %d" % [verb, _unit_label(unit.key), damage, kills, unit.count]
             label = "%s dmg · %s slain" % [damage, kills]
             if preview.pinned: text += " · [color=#%s]PINNED: +50%%, no retaliation[/color]" % GOLD.to_html(false)
-            if preview.ranged: text += " · ranged: no retaliation, no range penalty"
+            if preview.get("guarded", false):
+                text += " · [color=#%s]a bodyguard takes %s of the blow[/color]" % [GOLD.to_html(false), _range_text(int(preview.guard_min), int(preview.guard_max))]
+                label += " · shielded"
+            if preview.ranged and preview.get("blocked", false):
+                text += " · [color=#%s]BLOCKED SHOT: a stack is in the line of fire, half damage[/color]" % FOE.to_html(false)
+                label += " · blocked ½"
+            elif preview.ranged: text += " · clear line of sight: full damage, no retaliation"
             elif preview.retaliation:
                 text += " · [color=#%s]they strike back for %s (kills %s)[/color]" % [FOE.to_html(false), _range_text(int(preview.retaliation_min), int(preview.retaliation_max)), _range_text(int(preview.retaliation_kills_min), int(preview.retaliation_kills_max))]
             elif int(preview.kills_min) >= int(unit.count): text += " · wipes out the stack"
@@ -494,9 +536,14 @@ func _update_status() -> void:
         kind = "blocked"
         text = "Out of reach — %s moves up to %d hexes, and cannot pass through stacks." % [_unit_name(state.active), active.get("move", 0)]
     status.text = text
+    warning.text = _companion_warnings() if ongoing else ""
     var walking: bool = my_turn and kind == "attack" and not _stand.is_empty() and _stand_matches_cell()
     board.stand_cell = _stand.from if walking and not _stand.path.is_empty() else []
     board.walk_path = _stand.path if walking else []
+    board.shot_line = []
+    if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("ranged", false):
+        board.shot_line = [active.cell, _hover_cell]
+        board.shot_blocked = _stand.get("blocked", false)
     board.set_hover(kind if my_turn else "", label if my_turn else "")
 
 func _stand_matches(preview: Dictionary) -> bool:
@@ -554,7 +601,14 @@ func _show_result() -> void:
     _log(turn_label.text, GOLD)
     var survivors: Array[String] = []
     for unit in state.survivors: survivors.append("%d %s" % [unit.count, str(unit.id).replace("_", " ")])
-    var text := "[b]SURVIVORS[/b]\n" + (", ".join(survivors) if not survivors.is_empty() else "None") + "\n\n[b]LOOT[/b]\n"
+    var text := "[b]SURVIVORS[/b]\n" + (", ".join(survivors) if not survivors.is_empty() else "None") + "\n\n"
+    var fallen: Array = state.get("fallen", [])
+    if not fallen.is_empty():
+        var names: Array[String] = []
+        for id in fallen: names.append(str(id).capitalize())
+        var fate := "lost with the battle" if state.result == "defeat" else "carried from the field, wounded: out of battle for 3 days"
+        text += "[b][color=#%s]FALLEN[/color][/b]\n%s — %s\n\n" % [FOE.to_html(false), ", ".join(names), fate]
+    text += "[b]LOOT[/b]\n"
     if state.rewards.is_empty(): text += "None"
     for item in state.rewards: text += item.name + "\n"
     inspection.text = text

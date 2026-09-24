@@ -97,8 +97,12 @@ Json AdventureBridge::snapshot() const {
                             {"next", AdventureSession::xpForLevel(sc.level + 1)},
                             {"stationed", sc.stationed ? cell(*sc.stationed) : Json(nullptr)},
                             {"unpaid", sc.unpaidDays}, {"upkeep", AdventureSession::upkeepFor(sc.level)},
+                            {"wounded_until", sc.woundedUntil}, {"wounded", session_.isWounded(sc)},
                             {"abilities", abilities}});
     }
+    Json battle_companions = Json::array();
+    for (const auto& c : session_.battleCompanions())
+        battle_companions.push_back({{"id", c.id}, {"count", 1}, {"level", c.level}, {"companion", true}});
     Json rivals = Json::array();
     for (const auto& r : session_.rivals()) {
         if (!r.alive || !session_.isVisible(r.pos)) continue;   // hidden in fog
@@ -171,6 +175,7 @@ Json AdventureBridge::snapshot() const {
         {"rivals", rivals},
         {"garrisons", garrisons},
         {"specials", specials},
+        {"battle_companions", battle_companions},
         {"upkeep", session_.upkeepPerDay()},
         {"rival_moves", moves},
         {"lost", session_.lost()},
@@ -200,6 +205,13 @@ Json AdventureBridge::resolve_encounter(bool victory) {
     Json out = snapshot();
     out["find"] = kFinds[static_cast<int>(find)];
     return with_lines(out);
+}
+
+Json AdventureBridge::companions_fell(const Json& fallen, bool lost) {
+    std::vector<std::string> ids;
+    for (const auto& id : fallen) ids.push_back(id.get<std::string>());
+    session_.companionsFell(ids, lost);
+    return with_lines(snapshot());
 }
 
 Json AdventureBridge::set_army(const Json& stacks) {

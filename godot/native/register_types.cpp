@@ -59,6 +59,7 @@ protected:
         ClassDB::bind_method(D_METHOD("claim_chest", "gold"), &UmmAdventure::claim_chest);
         ClassDB::bind_method(D_METHOD("resolve_encounter", "victory"), &UmmAdventure::resolve_encounter);
         ClassDB::bind_method(D_METHOD("set_army", "stacks_json"), &UmmAdventure::set_army);
+        ClassDB::bind_method(D_METHOD("companions_fell", "fallen_json", "lost"), &UmmAdventure::companions_fell);
         ClassDB::bind_method(D_METHOD("recruit", "q", "r", "unit_id", "count"), &UmmAdventure::recruit);
         ClassDB::bind_method(D_METHOD("snapshot"), &UmmAdventure::snapshot);
         ClassDB::bind_method(D_METHOD("preview", "q", "r"), &UmmAdventure::preview);
@@ -83,6 +84,9 @@ public:
     String add_item(const String& id) { return guarded([&] { return bridge_.add_item(id.utf8().get_data()); }); }
     String claim_chest(bool gold) { return guarded([&] { return bridge_.claim_chest(gold); }); }
     String resolve_encounter(bool victory) { return guarded([&] { return bridge_.resolve_encounter(victory); }); }
+    String companions_fell(const String& fallen, bool lost) {
+        return guarded([&] { return bridge_.companions_fell(AdventureBridge::Json::parse(fallen.utf8().get_data()), lost); });
+    }
     String set_army(const String& stacks) {
         return guarded([&] { return bridge_.set_army(AdventureBridge::Json::parse(stacks.utf8().get_data())); });
     }

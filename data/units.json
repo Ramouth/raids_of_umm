@@ -609,6 +609,80 @@
       ],
       "meshId": "ancient_treant",
       "textureId": "ancient_treant"
+    },
+    {
+      "id": "ushari",
+      "name": "Ushari",
+      "description": "Veteran commander of the Compact. One sword, one voice, and the line holds wherever she stands. She cannot take many blows.",
+      "attack": 10,
+      "defense": 9,
+      "minDamage": 18,
+      "maxDamage": 26,
+      "hitPoints": 60,
+      "speed": 7,
+      "moveRange": 5,
+      "shots": 0,
+      "attackType": "physical",
+      "aura": {
+        "radius": 1,
+        "defense": 3
+      },
+      "levelGrowth": {
+        "hitPoints": 10,
+        "attack": 1,
+        "defense": 1,
+        "damage": 2
+      },
+      "meshId": "ushari",
+      "textureId": "ushari",
+      "tier": 0,
+      "faction": "companion",
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 0,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "abilities": [
+        "companion"
+      ]
+    },
+    {
+      "id": "kharim",
+      "name": "Kharim",
+      "description": "Scholar of Pha'raxh. He throws words the old kings used, and armour does not stop them. Keep something between him and the enemy.",
+      "attack": 7,
+      "defense": 4,
+      "minDamage": 10,
+      "maxDamage": 16,
+      "hitPoints": 35,
+      "speed": 6,
+      "moveRange": 3,
+      "shots": 8,
+      "attackType": "magical",
+      "levelGrowth": {
+        "hitPoints": 6,
+        "attack": 1,
+        "defense": 0,
+        "damage": 2
+      },
+      "meshId": "kharim",
+      "textureId": "kharim",
+      "tier": 0,
+      "faction": "companion",
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 0,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "abilities": [
+        "companion"
+      ]
     }
   ]
 }

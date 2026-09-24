@@ -30,8 +30,10 @@ void CastleState::onEnter() {
     m_hud.init();
 
     auto& rm = Application::get().resources();
+    m_rows.clear();
     if (rm.loaded())
-        m_rows = rm.unitsByTier();
+        for (const UnitType* u : rm.unitsByTier())
+            if (!u->isCompanion()) m_rows.push_back(u);   // companions join, they are not recruited
 
     m_pending.clear();
     m_initialized = true;

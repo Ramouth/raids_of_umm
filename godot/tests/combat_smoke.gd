@@ -50,6 +50,7 @@ func _run() -> void:
     check(scene.travel_to(dungeon), "A real map route reaches a dungeon")
     while scene.hero.moving: await process_frame
     check(scene._enter_button.visible and not scene._enter_button.disabled, "Arrival enables dungeon entry")
+    scene.state.battle_companions = []   # the tuned fixtures below fight without companions
     _click(scene._enter_button, scene._enter_button.size / 2)
     await process_frame
     check(is_instance_valid(scene.battle), "Actual dungeon button starts native combat")
@@ -121,6 +122,7 @@ func _run() -> void:
 
     # Lopsided fixtures make outcomes deterministic without changing production RNG.
     scene.army = [{"id": "desert_archer", "count": 1000}]
+    scene.state.battle_companions = []
     check(scene.enter_dungeon(), "Uncleared dungeon can be challenged again")
     battle = scene.battle
     battle.animation_speed = 0.01
@@ -142,6 +144,7 @@ func _run() -> void:
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "rider_knight", "count": 6}, {"id": "armoured_warrior", "count": 4}]
     scene.encounter.guards = [{"id": "skeleton_warrior", "count": 20}, {"id": "sand_scorpion", "count": 5}]
+    scene.state.battle_companions = []
     check(scene.enter_dungeon(), "Move-and-attack fixture starts")
     battle = scene.battle
     battle.animation_speed = 0.02
@@ -197,9 +200,71 @@ func _run() -> void:
     await process_frame
     print("Combat integration: move-and-attack side choice PASS")
 
+    # Companions: gold-ringed single figures with an aura and a bodyguard.
+    scene.cleared_dungeons.clear()
+    scene.army = [{"id": "desert_archer", "count": 12}, {"id": "armoured_warrior", "count": 6}]
+    scene.encounter.guards = [{"id": "grey_wolf", "count": 14}, {"id": "brigand", "count": 8}]
+    scene.state.battle_companions = [{"id": "ushari", "count": 1, "level": 2, "companion": true}]
+    check(scene.enter_dungeon(), "Companion fixture starts")
+    battle = scene.battle
+    battle.animation_speed = 0.02
+    await _idle(battle)
+    var ushari := {}
+    for unit in battle.state.units:
+        if unit.get("companion", false): ushari = unit
+    check(not ushari.is_empty() and ushari.name == "Ushari", "Ushari rides into battle")
+    check(int(ushari.get("unit_hp", 0)) == 70, "Her health grows with her level (60 + 10)")
+    check(ushari.get("cell", []) == [0, 2], "She starts at the centre of the back line")
+    check(not str(ushari.get("bodyguard", "")).is_empty(), "A troop stack beside her is her bodyguard")
+    var shielded := false
+    for unit in battle.state.units:
+        if unit.player and int(unit.get("aura_bonus", 0)) == 3: shielded = true
+    check(shielded, "Her aura gives a neighbouring stack +3 defence")
+    check(battle.board.actors[ushari.key].get_node("Count").text.begins_with("♥"), "Her badge shows health, not a head count")
+    battle._cell_right_clicked(Vector2i(0, 2))
+    check(battle.inspection.get_parsed_text().contains("Bodyguard") and battle.inspection.get_parsed_text().contains("Aura"), "Inspector explains her aura and bodyguard")
+    if capture: await _capture("combat_companion")
+    # Hold until the enemy can reach her: the warning must say so.
+    var warned := false
+    for turn in range(10):
+        battle._cell_hovered(Vector2i.ZERO, false)
+        if "exposed" in battle.warning.get_parsed_text():
+            warned = true
+            break
+        if battle.state.result != "ongoing": break
+        check(battle.issue("defend"), "Hold while the guards close in")
+        await _idle(battle)
+    check(warned, "A warning names the enemies that can reach a companion")
+    if capture: await _capture("combat_companion_exposed")
+    # An archer's shot shows its line of fire and whether it is clear.
+    for turn in range(6):
+        var active: Dictionary = battle.units.get(battle.state.active, {})
+        if battle.state.result != "ongoing" or (active.get("ranged", false) and not battle.state.attackable.is_empty()): break
+        battle.issue("defend")
+        await _idle(battle)
+    var shooter: Dictionary = battle.units.get(battle.state.active, {})
+    if battle.state.result == "ongoing" and shooter.get("ranged", false) and not battle.state.attackable.is_empty():
+        var aim: Array = battle.state.attackable[0]
+        battle._cell_hovered(Vector2i(aim[0], aim[1]), true)
+        check(battle.board.shot_line.size() == 2, "Hovering a shot draws the line of fire")
+        var said: String = battle.status.get_parsed_text()
+        check("line of sight" in said or "BLOCKED SHOT" in said, "The forecast says whether the shot is clear")
+        if capture: await _capture("combat_line_of_sight")
+    else:
+        check(false, "An archer gets a shot during the companion fixture")
+    battle.retreat.pressed.emit()
+    battle.confirm_retreat.confirmed.emit()
+    battle.confirm_retreat.hide()
+    await _idle(battle)
+    check(not battle.state.survivors.any(func(s): return s.id == "ushari"), "Companions never come back as troops")
+    battle.return_button.pressed.emit()
+    await process_frame
+    print("Combat integration: companions, aura, bodyguard, line of sight PASS")
+
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "skeleton_warrior", "count": 1}]
     scene.encounter.guards = [{"id": "djinn", "count": 1000}]
+    scene.state.battle_companions = [{"id": "ushari", "count": 1, "level": 1, "companion": true}]
     check(scene.enter_dungeon(), "Defeat fixture starts")
     battle = scene.battle
     battle.animation_speed = 0.01
@@ -207,8 +272,11 @@ func _run() -> void:
     while battle.busy or battle.state.result == "ongoing": await process_frame
     check(battle.state.result == "defeat", "Native AI reaches defeat")
     check(battle.state.survivors.is_empty() and battle.state.rewards.is_empty(), "Defeat returns neither units nor new rewards")
+    check(battle.state.fallen == ["ushari"], "A companion who falls in a lost battle is reported")
+    check("FALLEN" in battle.inspection.get_parsed_text(), "The result screen names the fallen")
     battle.return_button.pressed.emit()
     await process_frame
+    check(not scene.state.specials.any(func(sc): return sc.id == "ushari"), "Lost with the battle: Ushari is gone")
     check(scene.army.is_empty() and not scene.enter_dungeon(), "Defeated army is not silently replenished")
     scene.new_expedition()
     check(scene.army == scene.STARTING_ARMY and scene.inventory.is_empty() and scene.hero.cell == scene.data.spawn, "Explicit new expedition resets session state")

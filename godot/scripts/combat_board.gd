@@ -11,6 +11,8 @@ const ORIGIN := Vector2(70, 70)
 const ART := {"dune_stalker": "enemy_scout"}  # units sharing another unit's sprite
 const PLAYER_COLOR := Color("789b88")
 const ENEMY_COLOR := Color("bc7660")
+const COMPANION_COLOR := Color("f7d580")
+const DANGER_COLOR := Color("ff5a3c")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
@@ -26,6 +28,10 @@ var highlight_key := ""
 ## the walk there (cells after the start, ending on stand_cell).
 var stand_cell: Array = []
 var walk_path: Array = []
+## Shot preview: [from, to] cells of the active shooter's line, and whether a
+## stack blocks it (half damage).
+var shot_line: Array = []
+var shot_blocked := false
 var _forecast: Label
 
 static func unit_texture(id: String) -> Texture2D:
@@ -95,6 +101,7 @@ func _draw() -> void:
             draw_colored_polygon(points, fill)
             points.append(points[0])
             draw_polyline(points, Color("947044"), 1.0, true)
+    _draw_companions()
     var playing: bool = not locked and state.get("player_turn", false)
     if not hover_cell.is_empty():
         var points := hex_points(cell_point(hover_cell))
@@ -104,6 +111,8 @@ func _draw() -> void:
         draw_polyline(points, outline, 3.0 if hover_kind == "attack" else 2.0, true)
     if hover_kind == "attack" and not stand_cell.is_empty():
         _draw_walk()
+    if hover_kind == "attack" and shot_line.size() == 2:
+        _draw_shot()
     for unit in state.get("units", []):
         if unit.count <= 0: continue
         var ring := ""
@@ -113,7 +122,51 @@ func _draw() -> void:
         var points := hex_points(cell_point(unit.cell))
         points.append(points[0])
         draw_polyline(points, Color("f7d580") if ring == "active" else Color("ffffff"), 3.0, true)
+    _draw_danger()
     _place_forecast()
+
+static func _hex_distance(a: Array, b: Array) -> int:
+    var dq: int = int(a[0]) - int(b[0])
+    var dr: int = int(a[1]) - int(b[1])
+    return (absi(dq) + absi(dr) + absi(dq + dr)) / 2
+
+## Companion auras (tinted hexes), bodyguard links, and a red ring on a
+## companion the enemy can reach next turn.
+func _draw_companions() -> void:
+    var by_key := {}
+    for unit in state.get("units", []): by_key[unit.key] = unit
+    for unit in state.get("units", []):
+        if int(unit.count) <= 0 or int(unit.get("aura_radius", 0)) <= 0: continue
+        var tint := Color(0.97, 0.84, 0.5, 0.2) if unit.player else Color(1.0, 0.5, 0.4, 0.18)
+        for col in range(11):
+            for row in range(5):
+                var cell := [col, row - (col - (col & 1)) / 2]
+                var d := _hex_distance(cell, unit.cell)
+                if d == 0 or d > int(unit.aura_radius): continue
+                var points := hex_points(cell_point(cell))
+                draw_colored_polygon(points, tint)
+                points.append(points[0])
+                draw_polyline(points, Color(COMPANION_COLOR, 0.35), 1.5, true)
+
+## Red inner ring on every companion the enemy can reach next turn (drawn
+## after the active/highlight rings so it is never hidden).
+func _draw_danger() -> void:
+    for unit in state.get("units", []):
+        if int(unit.count) <= 0 or not unit.get("companion", false) or unit.get("threats", []).is_empty(): continue
+        var centre := cell_point(unit.cell)
+        var points := PackedVector2Array()
+        for p in hex_points(centre): points.append(centre + (p - centre) * 0.84)
+        points.append(points[0])
+        draw_polyline(points, DANGER_COLOR, 3.0, true)
+
+## Line of fire from the active shooter: gold if clear, red and dashed if a stack is in the way.
+func _draw_shot() -> void:
+    var a := cell_point(shot_line[0]) + Vector2(0, -24)
+    var b := cell_point(shot_line[1]) + Vector2(0, -24)
+    if shot_blocked:
+        draw_dashed_line(a, b, DANGER_COLOR, 3.0, 10.0, true)
+    else:
+        draw_line(a, b, Color(COMPANION_COLOR, 0.85), 3.0, true)
 
 ## Standing hex (sword side) and the dotted walk leading to it.
 func _draw_walk() -> void:
@@ -185,7 +238,7 @@ func sync(snapshot: Dictionary) -> void:
             var actor := Node2D.new()
             add_child(actor)
             actors[unit.key] = actor
-            _add_shadow(actor, PLAYER_COLOR if unit.player else ENEMY_COLOR)
+            _add_shadow(actor, COMPANION_COLOR if unit.get("companion", false) else (PLAYER_COLOR if unit.player else ENEMY_COLOR))
             var sprite := Sprite2D.new()
             sprite.name = "Sprite"
             sprite.texture = unit_texture(unit.id)
@@ -205,14 +258,38 @@ func sync(snapshot: Dictionary) -> void:
             badge.add_theme_color_override("font_outline_color", Color("16100a"))
             badge.add_theme_constant_override("outline_size", 6)
             actor.add_child(badge)
+            var shield := Polygon2D.new()
+            shield.name = "Shield"
+            shield.polygon = PackedVector2Array([Vector2(-8, -9), Vector2(8, -9), Vector2(8, 1), Vector2(0, 10), Vector2(-8, 1)])
+            shield.color = COMPANION_COLOR
+            shield.position = Vector2(30, -6)
+            shield.z_index = 5   # above neighbouring sprites and badges
+            var rim := Line2D.new()
+            rim.points = PackedVector2Array([Vector2(-8, -9), Vector2(8, -9), Vector2(8, 1), Vector2(0, 10), Vector2(-8, 1), Vector2(-8, -9)])
+            rim.width = 2.0
+            rim.default_color = Color("5a4424")
+            shield.add_child(rim)
+            shield.visible = false
+            actor.add_child(shield)
         var node: Node2D = actors[unit.key]
         node.position = cell_point(unit.cell)
         node.visible = unit.count > 0
         node.modulate = Color.WHITE
         node.set_meta("hp", int(unit.hp))
         node.set_meta("unit_hp", int(unit.unit_hp))
-        node.get_node("Count").text = "× %d" % unit.count
+        node.set_meta("companion", unit.get("companion", false))
+        node.get_node("Count").text = _badge(unit.get("companion", false), int(unit.hp), int(unit.unit_hp), int(unit.count))
+        if unit.get("companion", false): node.get_node("Count").add_theme_color_override("font_color", COMPANION_COLOR)
+        node.get_node("Shield").visible = false
+    # A gold shield marks each stack guarding a companion.
+    for unit in state.units:
+        var guard: String = unit.get("bodyguard", "")
+        if int(unit.count) > 0 and actors.has(guard): actors[guard].get_node("Shield").visible = true
     queue_redraw()
+
+## Troops show their head count; a companion (one figure) shows its health.
+static func _badge(companion: bool, hp: int, unit_hp: int, count: int) -> String:
+    return "♥ %d/%d" % [hp, unit_hp] if companion else "× %d" % count
 
 func float_text(actor: Node2D, message: String, color: Color, duration: float) -> void:
     var label := Label.new()
@@ -246,6 +323,7 @@ func animate(event: Dictionary, speed: float) -> void:
         "attack":
             if actor and target:
                 if event.flanked: float_text(target, "PINNED", Color("f7d580"), duration * 2)
+                if event.get("blocked", false): float_text(target, "BLOCKED SHOT ½", Color("ffb08a"), duration * 3)
                 var start := actor.position
                 if start.distance_to(target.position) > 100:
                     var projectile := Polygon2D.new()
@@ -268,9 +346,11 @@ func animate(event: Dictionary, speed: float) -> void:
             if actor:
                 var hp := maxi(0, int(actor.get_meta("hp")) - int(event.damage))
                 actor.set_meta("hp", hp)
-                actor.get_node("Count").text = "× %d" % ceili(float(hp) / float(actor.get_meta("unit_hp")))
+                var unit_hp := int(actor.get_meta("unit_hp"))
+                actor.get_node("Count").text = _badge(actor.get_meta("companion", false), hp, unit_hp, ceili(float(hp) / float(unit_hp)))
                 var kills := int(event.get("kills", 0))
-                float_text(actor, "−%d%s" % [event.damage, ("\n%d slain" % kills) if kills > 0 else ""], Color("ffbc91"), duration * 3)
+                var guarding := "\nshields" if event.get("bodyguard", false) else ""
+                float_text(actor, "−%d%s%s" % [event.damage, ("\n%d slain" % kills) if kills > 0 else "", guarding], Color("ffbc91"), duration * 3)
                 actor.modulate = Color(2.0, 0.45, 0.3)
                 var tween := create_tween()
                 tween.tween_property(actor, "modulate", Color.WHITE, duration)

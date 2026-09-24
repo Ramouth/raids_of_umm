@@ -13,6 +13,7 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
     , m_aiRng(std::random_device{}())
 {
     placeArmies();
+    refreshAuras();
     buildQueue();
     std::cout << "[CombatEngine] Round 1 start — "
               << m_queue.size() << " stacks in initiative order\n";
@@ -42,8 +43,10 @@ const CombatUnit& CombatEngine::activeUnit() const {
 
 std::vector<HexCoord> CombatEngine::reachableTiles() const {
     if (isOver()) return {};
+    return reachableFor(activeUnit());
+}
 
-    const CombatUnit& unit = activeUnit();
+std::vector<HexCoord> CombatEngine::reachableFor(const CombatUnit& unit) const {
 
     // Build a set of all occupied hexes (any living stack, friend or foe).
     // A unit cannot move through or onto an occupied hex.
@@ -52,6 +55,7 @@ std::vector<HexCoord> CombatEngine::reachableTiles() const {
         if (!s.isDead()) occupied.insert(s.pos);
     for (const auto& s : m_enemy.stacks)
         if (!s.isDead()) occupied.insert(s.pos);
+    occupied.erase(unit.pos);
 
     // BFS flood-fill up to moveRange steps from the unit's current position.
     // State: (hex, steps_used).  We never step onto an occupied hex.
@@ -189,6 +193,7 @@ void CombatEngine::doMove(HexCoord dest) {
     m_events.push_back(ev);
 
     actor.pos = dest;
+    refreshAuras();
     advance();
 }
 
@@ -232,6 +237,7 @@ bool CombatEngine::doAttackFrom(HexCoord from, int targetIndex) {
         ev.to         = from;
         m_events.push_back(ev);
         actor.pos = from;
+        refreshAuras();
     }
     resolveAttack(targetIndex);
     return true;
@@ -258,6 +264,9 @@ void CombatEngine::resolveAttack(int targetIndex) {
         --attacker.shotsLeft;
     }
 
+    // Line of sight: a shot through another stack loses half its force.
+    const bool blocked = isRanged && !hasLineOfSight(attacker.pos, target.pos);
+
     // Flanking / Pinned: target has attackers on two opposite hex sides.
     // Pinned units take 150% damage and lose their retaliation.
     const auto& friendlyStacks = slot.isPlayer ? m_player.stacks : m_enemy.stacks;
@@ -276,13 +285,13 @@ void CombatEngine::resolveAttack(int targetIndex) {
         ev.targetIsPlayer = !slot.isPlayer;
         ev.targetIndex    = targetIndex;
         ev.wasFlanked     = pinned;
+        ev.blockedShot    = blocked;
         m_events.push_back(ev);
     }
 
     int damage = calcDamage(attacker, target, m_rng);
     if (pinned) damage = damage * 3 / 2;
-    const int targetCountBefore = target.count;
-    applyDamage(target, damage);
+    if (blocked) damage = std::max(1, damage / 2);
 
     // Build attack-type annotation for the log.
     static const char* kAttackTypeNames[] = { "physical", "piercing", "magical" };
@@ -296,27 +305,8 @@ void CombatEngine::resolveAttack(int targetIndex) {
               << " [" << atName << " | effDef " << rawDef << "→" << reducedDef << "]"
               << " (" << target.count << " survivors)\n";
 
-    // ── Damage event ─────────────────────────────────────────────────────────
-    {
-        CombatEvent ev;
-        ev.type       = CombatEvent::Type::UnitDamaged;
-        ev.isPlayer   = !slot.isPlayer;   // target's army
-        ev.stackIndex = targetIndex;
-        ev.damage     = damage;
-        ev.kills      = targetCountBefore - target.count;
-        ev.remaining  = target.count;
-        m_events.push_back(ev);
-    }
-    if (target.isDead()) {
-        CombatEvent ev;
-        ev.type       = CombatEvent::Type::UnitDied;
-        ev.isPlayer   = !slot.isPlayer;
-        ev.stackIndex = targetIndex;
-        m_events.push_back(ev);
-
-        // Award kill XP to the attacker if it is an SC.
-        awardScXp(attacker, slot, attacker.killXp);
-    }
+    if (hitStack(!slot.isPlayer, targetIndex, damage, !isRanged))
+        awardScXp(attacker, slot, attacker.killXp);   // kill XP if the attacker is an SC
 
     // ── Melee retaliation ────────────────────────────────────────────────────
     if (!isRanged && !target.isDead() && !target.hasRetaliated
@@ -334,31 +324,12 @@ void CombatEngine::resolveAttack(int targetIndex) {
         }
 
         int retDamage = calcDamage(target, attacker, m_rng);
-        const int attackerCountBefore = attacker.count;
-        applyDamage(attacker, retDamage);
         target.hasRetaliated = true;
+        hitStack(slot.isPlayer, slot.stackIndex, retDamage, true);
 
         std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
                   << " (" << attacker.type->name << ": " << attacker.count << " left)\n";
-
-        {
-            CombatEvent ev;
-            ev.type       = CombatEvent::Type::UnitDamaged;
-            ev.isPlayer   = slot.isPlayer;   // attacker took retaliation
-            ev.stackIndex = slot.stackIndex;
-            ev.damage     = retDamage;
-            ev.kills      = attackerCountBefore - attacker.count;
-            ev.remaining  = attacker.count;
-            m_events.push_back(ev);
-        }
-        if (attacker.isDead()) {
-            CombatEvent ev;
-            ev.type       = CombatEvent::Type::UnitDied;
-            ev.isPlayer   = slot.isPlayer;
-            ev.stackIndex = slot.stackIndex;
-            m_events.push_back(ev);
-        }
     }
 
     advance();
@@ -473,14 +444,27 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())
         || enemies[targetIndex].isDead()) return p;
     std::vector<CombatUnit> friends = actor.isPlayer ? m_player.stacks : m_enemy.stacks;
-    friends[currentTurn().stackIndex].pos = from;
+    const int self = currentTurn().stackIndex;
+    friends[self].pos = from;
+    actor.auraBonus = auraAt(friends, self, from);
     const CombatUnit& target = enemies[targetIndex];
+
+    // A companion's bodyguard takes half of a melee blow (rounded down).
+    auto split = [](DamageRange& d, DamageRange& guard) {
+        guard = {d.min / 2, d.max / 2, d.avg / 2};
+        d = {d.min - guard.min, d.max - guard.max, d.avg - guard.avg};
+    };
 
     p.valid  = true;
     p.ranged = actor.type->isRanged() && actor.shotsLeft > 0
                && actor.pos.distanceTo(target.pos) > 1;
     p.pinned = !p.ranged && isFlanked(target, friends);
     p.damage = damageRange(actor, target, p.pinned);
+    p.blocked = p.ranged && !hasLineOfSight(from, target.pos);
+    if (p.blocked)
+        p.damage = {std::max(1, p.damage.min / 2), std::max(1, p.damage.max / 2), std::max(1.0, p.damage.avg / 2)};
+    p.guarded = !p.ranged && bodyguardFor(enemies, targetIndex) >= 0;
+    if (p.guarded) split(p.damage, p.guardDamage);
     p.killsMin = killsFor(target, p.damage.min);
     p.killsMax = killsFor(target, p.damage.max);
 
@@ -501,6 +485,11 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
         p.retaliationDamage.min = lo.min;
         p.retaliationDamage.max = hi.max;
         p.retaliationDamage.avg = mid.avg;
+        p.retaliationGuarded = bodyguardFor(friends, self) >= 0;
+        if (p.retaliationGuarded) {
+            DamageRange ignored;
+            split(p.retaliationDamage, ignored);
+        }
         p.retKillsMin = killsFor(actor, lo.min);
         p.retKillsMax = killsFor(actor, hi.max);
     }
@@ -647,6 +636,7 @@ void CombatEngine::teleportUnit(bool isPlayer, int stackIdx, HexCoord pos) {
     auto& stacks = isPlayer ? m_player.stacks : m_enemy.stacks;
     if (stackIdx >= 0 && stackIdx < static_cast<int>(stacks.size()))
         stacks[stackIdx].pos = pos;
+    refreshAuras();
 }
 
 // static
@@ -655,12 +645,111 @@ void CombatEngine::applyDamage(CombatUnit& target, int damage) {
         if (damage >= target.hpLeft) {
             damage -= target.hpLeft;
             target.count--;
-            target.hpLeft = (target.count > 0) ? target.type->hitPoints : 0;
+            target.hpLeft = (target.count > 0) ? target.maxHp() : 0;
         } else {
             target.hpLeft -= damage;
             break;
         }
     }
+}
+
+bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee) {
+    auto& stacks = targetIsPlayer ? m_player.stacks : m_enemy.stacks;
+    CombatUnit& target = stacks[targetIndex];
+    auto emitDamage = [&](int index, int amount, int before, bool guard) {
+        CombatEvent ev;
+        ev.type       = CombatEvent::Type::UnitDamaged;
+        ev.isPlayer   = targetIsPlayer;
+        ev.stackIndex = index;
+        ev.damage     = amount;
+        ev.kills      = before - stacks[index].count;
+        ev.remaining  = stacks[index].count;
+        ev.bodyguard  = guard;
+        m_events.push_back(ev);
+        if (stacks[index].isDead()) {
+            CombatEvent died;
+            died.type       = CombatEvent::Type::UnitDied;
+            died.isPlayer   = targetIsPlayer;
+            died.stackIndex = index;
+            m_events.push_back(died);
+        }
+    };
+    // A companion's bodyguard steps into half of any melee blow.
+    const int guard = melee ? bodyguardFor(stacks, targetIndex) : -1;
+    if (guard >= 0) {
+        const int share = damage / 2;
+        damage -= share;
+        const int before = stacks[guard].count;
+        applyDamage(stacks[guard], share);
+        emitDamage(guard, share, before, true);
+    }
+    const int before = target.count;
+    applyDamage(target, damage);
+    emitDamage(targetIndex, damage, before, false);
+    if (guard >= 0 && stacks[guard].isDead()) refreshAuras();
+    if (target.isDead()) refreshAuras();
+    return target.isDead();
+}
+
+bool CombatEngine::hasLineOfSight(HexCoord from, HexCoord to) const {
+    std::unordered_set<HexCoord> occupied;
+    for (const auto* army : {&m_player, &m_enemy})
+        for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
+    for (int nudge : {1, -1}) {
+        const auto line = from.lineTo(to, nudge);
+        bool clear = true;
+        for (size_t i = 1; i + 1 < line.size() && clear; ++i)
+            clear = !occupied.count(line[i]);
+        if (clear) return true;
+    }
+    return false;
+}
+
+int CombatEngine::auraAt(const std::vector<CombatUnit>& friends, int self, HexCoord pos) {
+    int best = 0;
+    for (int j = 0; j < static_cast<int>(friends.size()); ++j) {
+        const CombatUnit& s = friends[j];
+        if (j == self || s.isDead() || s.type->auraRadius <= 0) continue;
+        if (s.pos.distanceTo(pos) <= s.type->auraRadius) best = std::max(best, s.type->auraDefense);
+    }
+    return best;
+}
+
+int CombatEngine::bodyguardFor(const std::vector<CombatUnit>& friends, int self) {
+    if (self < 0 || self >= static_cast<int>(friends.size())) return -1;
+    const CombatUnit& ward = friends[self];
+    if (!ward.isSpecialCharacter || ward.isDead()) return -1;
+    int best = -1, bestHp = 0;
+    for (int j = 0; j < static_cast<int>(friends.size()); ++j) {
+        const CombatUnit& s = friends[j];
+        if (j == self || s.isDead() || s.isSpecialCharacter || s.pos.distanceTo(ward.pos) != 1) continue;
+        if (s.totalHp() > bestHp) { bestHp = s.totalHp(); best = j; }
+    }
+    return best;
+}
+
+void CombatEngine::refreshAuras() {
+    for (auto* army : {&m_player, &m_enemy})
+        for (int i = 0; i < static_cast<int>(army->stacks.size()); ++i)
+            army->stacks[i].auraBonus = auraAt(army->stacks, i, army->stacks[i].pos);
+}
+
+std::vector<int> CombatEngine::threatsTo(bool isPlayer, int index) const {
+    std::vector<int> out;
+    const auto& own = isPlayer ? m_player.stacks : m_enemy.stacks;
+    const auto& foes = isPlayer ? m_enemy.stacks : m_player.stacks;
+    if (index < 0 || index >= static_cast<int>(own.size()) || own[index].isDead()) return out;
+    const HexCoord at = own[index].pos;
+    for (int i = 0; i < static_cast<int>(foes.size()); ++i) {
+        const CombatUnit& f = foes[i];
+        if (f.isDead()) continue;
+        bool reaches = shootsNow(f) || f.pos.distanceTo(at) == 1;
+        if (!reaches)
+            for (const HexCoord& h : reachableFor(f))
+                if (h.distanceTo(at) == 1) { reaches = true; break; }
+        if (reaches) out.push_back(i);
+    }
+    return out;
 }
 
 void CombatEngine::doDefend() {
@@ -743,11 +832,17 @@ void CombatEngine::placeArmies() {
     auto pSpawns = CombatMap::playerSpawns();
     auto eSpawns = CombatMap::enemySpawns();
 
-    for (size_t i = 0; i < m_player.stacks.size() && i < pSpawns.size(); ++i)
-        m_player.stacks[i].pos = pSpawns[i];
-
-    for (size_t i = 0; i < m_enemy.stacks.size() && i < eSpawns.size(); ++i)
-        m_enemy.stacks[i].pos = eSpawns[i];
+    // Companions take the back-line hexes first (centre outwards); the troops
+    // fill the rest of the back line, then the column in front of it.
+    auto place = [](CombatArmy& army, std::vector<HexCoord> spawns, int frontCol) {
+        for (int row : {2, 1, 3, 0, 4}) spawns.push_back(CombatMap::toHex(frontCol, row));
+        size_t next = 0;
+        for (bool companions : {true, false})
+            for (auto& s : army.stacks)
+                if (s.isSpecialCharacter == companions && next < spawns.size()) s.pos = spawns[next++];
+    };
+    place(m_player, pSpawns, 1);
+    place(m_enemy, eSpawns, CombatMap::GRID_W - 2);
 }
 
 void CombatEngine::buildQueue() {

@@ -54,9 +54,33 @@ void AdventureSession::joinSpecial(const std::string& id) {
     }
 }
 
+std::vector<AdventureSession::Companion> AdventureSession::battleCompanions() const {
+    std::vector<Companion> out;
+    for (const auto& sc : m_specials)
+        if (!sc.stationed && !isWounded(sc) && sc.unpaidDays < SULK_DAYS && m_resources->unit(sc.id))
+            out.push_back({sc.id, sc.level});
+    return out;
+}
+
+void AdventureSession::companionsFell(const std::vector<std::string>& fallen, bool battleLost) {
+    for (const auto& id : fallen) {
+        auto sc = std::find_if(m_specials.begin(), m_specials.end(), [&](const Special& s) { return s.id == id; });
+        if (sc == m_specials.end()) continue;
+        if (battleLost) {
+            report("Commander", sc->name + " fell, and no one was left to carry " + sc->name
+                   + " from the field. " + sc->name + " is gone.");
+            m_specials.erase(sc);
+        } else {
+            sc->woundedUntil = day() + WOUND_DAYS;
+            report(sc->name, "I will live. Give me three days before you ask me to hold a line again.");
+        }
+    }
+    recomputeVisibility();
+}
+
 bool AdventureSession::hasAbility(const std::string& abilityName) const {
     for (const auto& sc : m_specials) {
-        if (sc.stationed || sc.unpaidDays >= SULK_DAYS) continue;
+        if (sc.stationed || sc.unpaidDays >= SULK_DAYS || isWounded(sc)) continue;
         for (const auto& a : abilitiesOf(sc.id))
             if (a.name == abilityName && sc.level >= a.level) return true;
     }

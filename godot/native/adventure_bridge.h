@@ -16,6 +16,8 @@ public:
     Json end_day();
     Json resolve_encounter(bool victory);
     Json set_army(const Json& stacks);
+    // Companions who fell in the last battle: wounded, or gone if it was lost.
+    Json companions_fell(const Json& fallen, bool lost);
     Json recruit(int q, int r, const std::string& unit_id, int count);
     Json accept_offer(const std::string& id);
     Json transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison);

@@ -21,19 +21,31 @@ const char* result_name(CombatResult result) {
 }
 
 CombatArmy CombatSession::make_army(const Json& input, bool player) const {
-    if (!input.is_array() || input.empty() || input.size() > CombatMap::GRID_H)
+    // Up to five troop stacks, plus companions ({"id", "level", "companion": true}).
+    if (!input.is_array() || input.empty())
         throw std::runtime_error("An army must contain between one and five stacks.");
     CombatArmy army;
     army.isPlayer = player;
     army.ownerName = player ? "Expedition" : "Dungeon guards";
+    int troops = 0, companions = 0;
     for (const auto& entry : input) {
         const auto id = entry.at("id").get<std::string>();
-        const int count = entry.at("count").get<int>();
         const UnitType* type = resources_->unit(id);
+        if (entry.value("companion", false)) {
+            const int level = entry.value("level", 1);
+            if (!type || !type->isCompanion() || level < 1 || level > 30 || ++companions > 3)
+                throw std::runtime_error("Unknown companion or too many companions: " + id);
+            army.stacks.push_back(CombatUnit::companion(type, level, player));
+            continue;
+        }
+        const int count = entry.at("count").get<int>();
         if (!type || count <= 0 || count > 10000)
             throw std::runtime_error("Unknown unit or invalid stack size: " + id);
+        if (++troops > CombatMap::GRID_H)
+            throw std::runtime_error("An army must contain between one and five stacks.");
         army.stacks.push_back(CombatUnit::make(type, count, player));
     }
+    if (troops == 0) throw std::runtime_error("An army must contain between one and five stacks.");
     return army;
 }
 
@@ -114,6 +126,7 @@ Json CombatSession::snapshot() const {
     Json state = {{"result", result_name(engine_->result())}, {"round", engine_->roundNumber()},
         {"units", Json::array()}, {"initiative", Json::array()}, {"reachable", Json::array()},
         {"attackable", Json::array()}, {"survivors", Json::array()}, {"rewards", Json::array()},
+        {"fallen", Json::array()},
         {"active", ""}, {"player_turn", false}};
     for (bool player : {true, false}) {
         const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
@@ -121,7 +134,14 @@ Json CombatSession::snapshot() const {
             const auto& unit = army.stacks[index];
             state["units"].push_back({{"key", key(player, index)}, {"id", unit.type->id},
                 {"name", unit.type->name}, {"player", player}, {"cell", hex(unit.pos)},
-                {"count", unit.count}, {"hp", unit.totalHp()}, {"unit_hp", unit.type->hitPoints},
+                {"count", unit.count}, {"hp", unit.totalHp()}, {"unit_hp", unit.maxHp()},
+                {"companion", unit.isSpecialCharacter}, {"level", unit.scLevel},
+                {"aura_radius", unit.type->auraRadius}, {"aura_defense", unit.type->auraDefense},
+                {"aura_bonus", unit.auraBonus},
+                {"bodyguard", [&] {
+                    const int guard = CombatEngine::bodyguardFor(army.stacks, index);
+                    return guard >= 0 ? key(player, guard) : std::string{};
+                }()},
                 {"hp_left", unit.hpLeft}, {"shots", unit.shotsLeft}, {"shots_max", unit.type->shots},
                 {"ranged", unit.type->isRanged()},
                 {"attack", unit.effectiveAttack()}, {"defense", unit.effectiveDefense()},
@@ -130,7 +150,18 @@ Json CombatSession::snapshot() const {
                 {"move", unit.type->moveRange}, {"abilities", unit.type->abilities},
                 {"retaliated", unit.hasRetaliated},
                 {"speed", unit.effectiveSpeed()}, {"defending", unit.isDefending}});
-            if (player && !unit.isDead()) state["survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
+            if (player && unit.isSpecialCharacter) {
+                if (unit.isDead()) state["fallen"].push_back(unit.scId);
+                else {
+                    // Enemies that can reach this companion on their next turn.
+                    Json threats = Json::array();
+                    if (!engine_->isOver())
+                        for (int foe : engine_->threatsTo(true, index)) threats.push_back(key(false, foe));
+                    state["units"].back()["threats"] = threats;
+                }
+            } else if (player && !unit.isDead()) {
+                state["survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
+            }
         }
     }
     if (!engine_->isOver()) {
@@ -184,7 +215,9 @@ Json CombatSession::previews() const {
     const auto& actor = engine_->activeUnit();
     const auto& enemies = actor.isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
     auto forecast = [](const AttackPreview& p) {
-        return Json{{"ranged", p.ranged}, {"pinned", p.pinned},
+        return Json{{"ranged", p.ranged}, {"pinned", p.pinned}, {"blocked", p.blocked},
+            {"guarded", p.guarded}, {"guard_min", p.guardDamage.min}, {"guard_max", p.guardDamage.max},
+            {"retaliation_guarded", p.retaliationGuarded},
             {"damage_min", p.damage.min}, {"damage_max", p.damage.max},
             {"kills_min", p.killsMin}, {"kills_max", p.killsMax},
             {"retaliation", p.retaliation},
@@ -251,6 +284,7 @@ Json CombatSession::response() {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
             {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
+            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard},
             {"from", hex(event.from)}, {"to", hex(event.to)},
             {"kills", event.kills}, {"remaining", event.remaining}};
         if (event.type == CombatEvent::Type::UnitAttacked) {

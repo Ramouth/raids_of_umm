@@ -21,6 +21,7 @@ constexpr double kDangerWeight     = 0.40;  // exposure to strikes, fades out by
 constexpr double kDefendShield     = 0.10;  // defending takes roughly 10% less damage
 constexpr double kPoolFraction     = 0.08;  // candidates within 8% of the best are eligible
 constexpr double kTemperature      = 0.025; // softmax temperature (fraction of score scale)
+constexpr double kCompanionValue   = 2.5;   // companions: their aura and their loss count far beyond their damage
 
 constexpr int kCells = CombatMap::GRID_W * CombatMap::GRID_H;
 constexpr int kFar   = INT_MAX / 4;
@@ -161,7 +162,10 @@ double futureAttackValue(const Ctx& c, int i, HexCoord h, bool shot) {
     CombatUnit me = c.actor;
     me.pos = h;
     const bool pinned = !shot && pinnedFrom(c, i, h);
-    const DamageRange dmg = CombatEngine::damageRange(me, e, pinned);
+    DamageRange dmg = CombatEngine::damageRange(me, e, pinned);
+    if (shot && !c.eng.hasLineOfSight(h, e.pos)) {   // a blocked shot loses half
+        dmg.min /= 2; dmg.max /= 2; dmg.avg /= 2;
+    }
     double v = killValue(c, i, dmg);
     if (!shot && !pinned && !me.type->hasAbility("no_retaliation")) {
         CombatUnit hurt = afterDamage(e, dmg.avg);
@@ -247,6 +251,10 @@ void prepare(Ctx& c) {
     for (int i = 0; i < (int)c.foes.size(); ++i)
         c.foeThreat[i] = c.foes[i].isDead() ? 0 : threatOf(c.foes[i], c.own);
     c.ownThreat = threatOf(c.actor, c.foes);
+    // Hunt the other side's companions; keep our own out of harm's way.
+    for (int i = 0; i < (int)c.foes.size(); ++i)
+        if (c.foes[i].isSpecialCharacter) c.foeThreat[i] *= kCompanionValue;
+    if (c.actor.isSpecialCharacter) c.ownThreat *= kCompanionValue;
     c.shooter = c.actor.type->isRanged() && c.actor.shotsLeft > 0;
 
     // Claims: which foe is each ally (melee) currently going for?

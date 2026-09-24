@@ -52,6 +52,14 @@ struct UnitType {
     // Examples: "undead", "flying", "poison_strike", "no_retaliation"
     std::vector<std::string> abilities;
 
+    // ── Companions (faction "companion") ────────────────────────────────────
+    // Aura: living friendly stacks within auraRadius hexes (not the source)
+    // gain auraDefense.  levelGrowth: gained per companion level above 1.
+    int auraRadius  = 0;
+    int auraDefense = 0;
+    struct LevelGrowth { int hitPoints = 0, attack = 0, defense = 0, damage = 0; };
+    LevelGrowth levelGrowth;
+
     // ── Visual ───────────────────────────────────────────────────────────────
     std::string meshId;     // ResourceManager key for the 3D mesh
     std::string textureId;  // ResourceManager key for albedo texture
@@ -65,6 +73,7 @@ struct UnitType {
     bool isRanged()   const { return shots > 0; }
     bool isUndead()   const { return hasAbility("undead"); }
     bool isFlying()   const { return hasAbility("flying"); }
+    bool isCompanion() const { return faction == "companion"; }
 
     int avgDamage() const { return (minDamage + maxDamage) / 2; }
 };

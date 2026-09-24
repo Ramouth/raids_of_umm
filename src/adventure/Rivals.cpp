@@ -60,7 +60,8 @@ double AdventureSession::power(const std::vector<Stack>& army) const {
 }
 
 AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stack>& attacker,
-                                                          const std::vector<Stack>& defender) const {
+                                                          const std::vector<Stack>& defender,
+                                                          const std::vector<Companion>& companions) const {
     auto build = [&](const std::vector<Stack>& stacks, bool player) {
         CombatArmy army;
         army.isPlayer = player;
@@ -74,13 +75,20 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
     };
     AutoResult out;
     CombatArmy a = build(attacker, true);
+    if (!a.stacks.empty())
+        for (const auto& c : companions)
+            if (const UnitType* u = m_resources->unit(c.id))
+                a.stacks.push_back(CombatUnit::companion(u, c.level, true));
     CombatArmy d = build(defender, false);
     if (a.stacks.empty()) { out.defender = defender; return out; }
     if (d.stacks.empty()) { out.attackerWon = true; out.attacker = attacker; return out; }
     CombatEngine engine(std::move(a), std::move(d));
     for (int n = 0; n < 4000 && !engine.isOver(); ++n) CombatAI::takeTurn(engine);
     out.attackerWon = engine.result() == CombatResult::PlayerWon;
-    for (const auto& u : engine.playerArmy().stacks) if (!u.isDead()) out.attacker.push_back({u.type->id, u.count});
+    for (const auto& u : engine.playerArmy().stacks) {
+        if (u.isSpecialCharacter) { if (u.isDead()) out.fallen.push_back(u.scId); }
+        else if (!u.isDead()) out.attacker.push_back({u.type->id, u.count});
+    }
     for (const auto& u : engine.enemyArmy().stacks)  if (!u.isDead()) out.defender.push_back({u.type->id, u.count});
     return out;
 }

@@ -122,6 +122,15 @@ std::optional<std::string> ResourceManager::loadUnits(const std::string& path) {
             if (j.contains("defBypassRatio"))
                 u.defBypassRatio = j.value("defBypassRatio", u.defBypassRatio);
         }
+        if (j.contains("aura") && j["aura"].is_object()) {
+            u.auraRadius  = j["aura"].value("radius",  0);
+            u.auraDefense = j["aura"].value("defense", 0);
+        }
+        if (j.contains("levelGrowth") && j["levelGrowth"].is_object()) {
+            const auto& g = j["levelGrowth"];
+            u.levelGrowth = {g.value("hitPoints", 0), g.value("attack", 0),
+                             g.value("defense", 0), g.value("damage", 0)};
+        }
         u.meshId      = j.value("meshId",      "");
         u.textureId   = j.value("textureId",   "");
 

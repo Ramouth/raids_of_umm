@@ -882,7 +882,8 @@ func _update_expedition() -> void:
     _army_label.text = ", ".join(summary) if not army.is_empty() else "Your army has fallen. Start a new expedition to fight again."
     var companions: Array[String] = []
     for sc in state.get("specials", []):
-        companions.append("%s L%d%s" % [sc.name, sc.level, " (governing)" if sc.stationed != null else ""])
+        var note := " (governing)" if sc.stationed != null else (" (wounded until day %d)" % int(sc.wounded_until) if sc.get("wounded", false) else "")
+        companions.append("%s L%d%s" % [sc.name, sc.level, note])
     if not companions.is_empty():
         _army_label.text += "\nCompanions: " + ", ".join(companions)
     if not inventory.is_empty():
@@ -916,15 +917,28 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
     screens.push(view, func(result: Dictionary):
         battle = null
         army = result.survivors.duplicate(true)
+        _companions_after(result)
         on_result.call(result)
         _update_expedition())
-    if not view.begin(army, guards, title):
+    # Companions ride in beside the troops (wounded or unpaid ones stay behind).
+    var fighters: Array = army.duplicate(true)
+    if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
+    if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})
         notice.text = "Could not start combat. Check the native build and data files."
         return false
     battle = view
     _dragging = false
     return true
+
+## Fallen companions: wounded for a few days, or gone if the battle was lost.
+func _companions_after(result: Dictionary) -> void:
+    var fallen: Array = result.get("fallen", [])
+    if fallen.is_empty() or adventure == null: return
+    var reply: Dictionary = JSON.parse_string(adventure.companions_fell(JSON.stringify(fallen), result.result == "defeat"))
+    if reply.get("ok", false):
+        _apply_state(reply)
+        _say(reply)
 
 func screen_covered() -> void:
     set_process(false)

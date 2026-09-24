@@ -34,6 +34,10 @@ class CombatEngine;
  * fades out by round 4 (and is off when only the other side has shooters), so
  * the weaker side may hold for a round or two but never stalls a battle.
  *
+ * Companions (single figures with an aura) are valued kCompanionValue× their
+ * damage: the AI hunts the other side's and shields its own.  Shots are
+ * valued through line of sight (a blocked shot does half damage).
+ *
  * Randomness: the best action is picked by a softmax over candidates within a
  * few percent of the top score, using engine.aiRng() — deterministic for a
  * given CombatEngine::setSeed(), different between battles otherwise.

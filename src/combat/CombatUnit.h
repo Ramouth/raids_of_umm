@@ -55,10 +55,16 @@ struct CombatUnit {
     int defenseBonus = 0;
     int damageBonus  = 0;  // flat bonus added per-creature before the atk/def multiplier
     int speedBonus   = 0;  // added to type->speed for initiative order
+    int hpBonus      = 0;  // added to type->hitPoints (companion level growth)
+
+    // Defence granted by a friendly aura where the stack stands right now.
+    // Recomputed by CombatEngine::refreshAuras() whenever anyone moves or dies.
+    int auraBonus    = 0;
 
     // Effective stats (base + item bonuses) — convenience used by CombatEngine.
     int effectiveAttack()  const { return type->attack  + attackBonus;  }
-    int effectiveDefense() const { return type->defense + defenseBonus; }
+    int effectiveDefense() const { return type->defense + defenseBonus + auraBonus; }
+    int maxHp()            const { return type->hitPoints + hpBonus; }
     int effectiveSpeed()   const { return type->speed   + speedBonus;   }
 
     bool isDead()  const { return count <= 0; }
@@ -66,7 +72,7 @@ struct CombatUnit {
     // Total HP across the entire stack
     int totalHp() const {
         if (count <= 0) return 0;
-        return (count - 1) * type->hitPoints + hpLeft;
+        return (count - 1) * maxHp() + hpLeft;
     }
 
     // Factory: fill hpLeft to full.  pos defaults to origin — CombatEngine
@@ -83,6 +89,21 @@ struct CombatUnit {
         u.pos           = startPos;
         u.shotsLeft     = t->shots;
         u.hasRetaliated = false;
+        return u;
+    }
+
+    // A companion fights as one figure: level growth goes into the bonuses.
+    static CombatUnit companion(const UnitType* t, int level, bool player) {
+        CombatUnit u = make(t, 1, player);
+        const int n = level > 1 ? level - 1 : 0;
+        u.hpBonus      = t->levelGrowth.hitPoints * n;
+        u.attackBonus  = t->levelGrowth.attack * n;
+        u.defenseBonus = t->levelGrowth.defense * n;
+        u.damageBonus  = t->levelGrowth.damage * n;
+        u.hpLeft       = u.maxHp();
+        u.isSpecialCharacter = true;
+        u.scId         = t->id;
+        u.scLevel      = level;
         return u;
     }
 };

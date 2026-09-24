@@ -2,6 +2,7 @@
 #include <cmath>
 #include <functional>
 #include <array>
+#include <vector>
 
 /*
  * HexCoord — strongly-typed axial coordinate (q, r).
@@ -57,6 +58,23 @@ struct HexCoord {
         float fq = (2.0f / 3.0f * x) / hexSize;
         float fr = (-1.0f / 3.0f * x + sqrtf(3.0f) / 3.0f * z) / hexSize;
         return axialRound(fq, fr);
+    }
+
+    // Hexes on the straight line from this hex to `to`, both ends included
+    // (redblobgames line drawing).  `nudge` (+1/-1) shifts the line a hair to
+    // one side so lines running exactly along a hex edge resolve consistently.
+    std::vector<HexCoord> lineTo(const HexCoord& to, int nudge = 1) const {
+        const int n = distanceTo(to);
+        std::vector<HexCoord> out;
+        out.reserve(n + 1);
+        const float eq = 1e-4f * nudge, er = 2e-4f * nudge;
+        for (int i = 0; i <= n; ++i) {
+            const float t = n == 0 ? 0.0f : static_cast<float>(i) / n;
+            const float fq = q + eq + (to.q - q) * t;
+            const float fr = r + er + (to.r - r) * t;
+            out.push_back(axialRound(fq, fr));
+        }
+        return out;
     }
 
 private:

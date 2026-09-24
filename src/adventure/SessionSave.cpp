@@ -55,6 +55,7 @@ Json AdventureSession::saveState() const {
     Json specials = Json::array();
     for (const auto& sc : m_specials)
         specials.push_back({{"id", sc.id}, {"level", sc.level}, {"xp", sc.xp}, {"unpaid", sc.unpaidDays},
+                            {"wounded_until", sc.woundedUntil},
                             {"stationed", sc.stationed ? cellJson(*sc.stationed) : Json(nullptr)}});
     Json rivals = Json::array();
     for (const auto& r : m_rivals)
@@ -133,6 +134,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             sc.level = s.at("level").get<int>();
             sc.xp = s.at("xp").get<int>();
             sc.unpaidDays = s.at("unpaid").get<int>();
+            sc.woundedUntil = s.value("wounded_until", 0);
             if (!s.at("stationed").is_null()) sc.stationed = cellFrom(s.at("stationed"));
         }
         m_rivals.clear();

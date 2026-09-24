@@ -36,6 +36,7 @@ struct AttackPreview {
     bool        valid       = false;  // target exists, alive, and legally attackable now
     bool        ranged      = false;  // shot (no retaliation) vs melee strike
     bool        pinned      = false;  // flanked: +50% damage, no retaliation
+    bool        blocked     = false;  // shot with no clear line of sight: half damage
     DamageRange damage;
     int         killsMin    = 0;
     int         killsMax    = 0;
@@ -43,6 +44,11 @@ struct AttackPreview {
     DamageRange retaliationDamage;
     int         retKillsMin = 0;
     int         retKillsMax = 0;
+    // A melee blow on a companion is split with an adjacent friendly stack:
+    // damage/kills above are the companion's share; the bodyguard takes guardDamage.
+    bool        guarded     = false;
+    DamageRange guardDamage;
+    bool        retaliationGuarded = false;  // same, for the counter-strike on our companion
 };
 
 /*
@@ -128,6 +134,26 @@ public:
 
     // Creatures that `damage` would kill in `target` (cascading through the stack).
     static int killsFor(const CombatUnit& target, int damage);
+
+    // ── Line of sight ────────────────────────────────────────────────────────
+    // A shot needs a clear line: any living stack (friend or foe) on a hex
+    // between shooter and target blocks it, and a blocked shot does half damage.
+    // The line is clear if either side-nudged line is (edge-grazing is fair).
+    bool hasLineOfSight(HexCoord from, HexCoord to) const;
+
+    // ── Companions ───────────────────────────────────────────────────────────
+
+    // Defence a friendly aura gives stack `self` of `friends` standing on pos
+    // (the strongest aura in range; auras do not stack, nor apply to their source).
+    static int auraAt(const std::vector<CombatUnit>& friends, int self, HexCoord pos);
+
+    // The stack that shields companion `self` from a melee blow: the adjacent
+    // living non-companion friend with the most HP, or -1.
+    static int bodyguardFor(const std::vector<CombatUnit>& friends, int self);
+
+    // Enemy stacks that could attack stack `index` of the given side on their
+    // next turn: shooters with ammo, and melee stacks that can walk next to it.
+    std::vector<int> threatsTo(bool isPlayer, int index) const;
 
     // ── Movement ─────────────────────────────────────────────────────────────
 
@@ -233,6 +259,16 @@ private:
 
     // Cascade damage through the stack, decrementing count as creatures die.
     static void applyDamage(CombatUnit& target, int damage);
+
+    // Deal `damage` to a stack (splitting a melee blow on a companion with its
+    // bodyguard) and emit the Damaged/Died events.  Returns true if it died.
+    bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee);
+
+    // Recompute every stack's auraBonus from current positions.
+    void refreshAuras();
+
+    // Hexes `unit` can walk to (same rules as reachableTiles), ignoring `self`.
+    std::vector<HexCoord> reachableFor(const CombatUnit& unit) const;
 
 
     CombatArmy            m_player;

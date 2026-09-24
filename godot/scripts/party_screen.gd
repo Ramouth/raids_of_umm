@@ -76,6 +76,7 @@ func _card(sc: Dictionary) -> Control:
     row.add_child(column)
     var status := "travelling with the hero"
     if sc.stationed != null: status = "governing a town (+%d gold a day)" % (100 * int(sc.level))
+    if sc.get("wounded", false): status = "WOUNDED until day %d — sits out battles, abilities rest" % int(sc.wounded_until)
     if int(sc.unpaid) >= 3: status = "UNPAID %d days — abilities withheld, leaves at 7" % int(sc.unpaid)
     elif int(sc.unpaid) > 0: status += "  ·  unpaid %d day(s)" % int(sc.unpaid)
     column.add_child(_label("%s  ·  %s" % [sc.name, sc.title], 18, Color("f0c870")))

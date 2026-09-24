@@ -167,7 +167,9 @@ public:
         int                     xp = 0;
         std::optional<HexCoord> stationed;   // governing an owned town
         int                     unpaidDays = 0;
+        int                     woundedUntil = 0;   // wounded (no battles, no abilities) while day() < this
     };
+    static constexpr int WOUND_DAYS = 3;   // a companion who falls in battle is out this long
     static constexpr int SULK_DAYS  = 3;   // unpaid this long: abilities stop
     static constexpr int LEAVE_DAYS = 7;   // unpaid this long: the SC leaves
     const std::vector<Special>& specials() const { return m_specials; }
@@ -176,6 +178,13 @@ public:
     static int upkeepFor(int level);       // gold per day
     bool hasAbility(const std::string& abilityName) const;  // active on an SC travelling with the hero
     void joinSpecial(const std::string& id);
+    bool isWounded(const Special& sc) const { return day() < sc.woundedUntil; }
+    // Companions who ride into the hero's next battle: travelling, unwounded, paid.
+    struct Companion { std::string id; int level = 1; };
+    std::vector<Companion> battleCompanions() const;
+    // After a battle: each fallen companion is wounded for WOUND_DAYS, or lost
+    // for good if the battle was lost as well.
+    void companionsFell(const std::vector<std::string>& fallen, bool battleLost);
     std::optional<std::string> station(const std::string& id, bool stay);  // stay=false recalls
     int upkeepPerDay() const;
 
@@ -202,9 +211,15 @@ public:
     const std::string& lostReason() const { return m_lostReason; }
     // Battle strength estimate used by the AI to pick fights.
     double power(const std::vector<Stack>& army) const;
-    struct AutoResult { bool attackerWon = false; std::vector<Stack> attacker, defender; };
-    // Resolves a battle with no player involvement (AI vs guards) using the real engine.
-    AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender) const;
+    struct AutoResult {
+        bool attackerWon = false;
+        std::vector<Stack> attacker, defender;
+        std::vector<std::string> fallen;   // attacker companions who fell
+    };
+    // Resolves a battle with no player involvement (AI vs guards) using the real
+    // engine; `companions` fight on the attacking side.
+    AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender,
+                          const std::vector<Companion>& companions = {}) const;
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 

@@ -91,11 +91,13 @@ struct CombatEvent {
     int          targetIndex     = -1;
     bool         isRetaliation   = false;  // true when this attack is a counter-attack
     bool         wasFlanked      = false;  // true when target was pinned (flanking bonus applied)
+    bool         blockedShot     = false;  // a shot through another stack (half damage)
 
     // Damage amount (UnitDamaged only)
     int          damage         = 0;
     int          kills          = 0;   // creatures that died from this damage (UnitDamaged)
     int          remaining      = 0;   // creatures left in the stack afterwards (UnitDamaged)
+    bool         bodyguard      = false; // UnitDamaged: this stack took the blow meant for a companion
 
     // Movement endpoints (UnitMoved only)
     HexCoord     from;

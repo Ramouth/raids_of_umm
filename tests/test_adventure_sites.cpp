@@ -264,3 +264,40 @@ SUITE("Hero XP — the preview matches what a victory pays, and levels give tree
     CHECK_EQ(c.heroProgress().level, b.heroProgress().level);
     CHECK_EQ(c.heroProgress().points, b.heroProgress().points);
 }
+
+SUITE("Companions — a fallen companion is wounded for three days, lost if the battle was") {
+    auto s = started();
+    CHECK_EQ((int)s.battleCompanions().size(), 1);
+    CHECK(s.battleCompanions()[0].id == "ushari");
+    CHECK(s.hasAbility("Drillmaster"));
+    s.companionsFell({"ushari"}, false);
+    CHECK_EQ((int)s.specials().size(), 1);
+    CHECK(s.isWounded(s.specials()[0]));
+    CHECK(s.battleCompanions().empty());                 // sits out the next fights
+    CHECK(!s.hasAbility("Drillmaster"));                 // and her map ability rests
+    AdventureSession b;
+    const std::string path = "/tmp/raids_test_wounds_map.json";
+    WorldMap again = sitesMap();
+    CHECK(!again.saveJson(path));
+    CHECK(!b.start(path, "data"));
+    b.companionsFell({"ushari"}, false);
+    AdventureSession c;
+    CHECK(!c.loadState(Scenario::Json::parse(b.saveState().dump())));
+    CHECK(c.isWounded(c.specials()[0]));                 // wounds survive a save
+    for (int d = 0; d < AdventureSession::WOUND_DAYS; ++d) s.endDay();
+    CHECK(!s.isWounded(s.specials()[0]));
+    CHECK_EQ((int)s.battleCompanions().size(), 1);
+    s.companionsFell({"ushari"}, true);
+    CHECK(s.specials().empty());
+}
+
+SUITE("Companions — auto-resolved battles field them and report who fell") {
+    auto s = started();
+    auto lost = s.autoBattle({{"levy_spearman", 1}}, {{"forest_troll", 40}}, s.battleCompanions());
+    CHECK(!lost.attackerWon);
+    CHECK_EQ((int)lost.fallen.size(), 1);
+    CHECK(lost.attacker.empty());                        // companions never appear as troops
+    auto won = s.autoBattle({{"armoured_warrior", 60}}, {{"grey_wolf", 2}}, s.battleCompanions());
+    CHECK(won.attackerWon);
+    for (const auto& st : won.attacker) CHECK(st.id != "ushari");
+}

@@ -2019,4 +2019,188 @@ SUITE("CombatAI — uses move-and-attack when a target is in reach") {
     CHECK_EQ(struck, runs);
 }
 
+
+// ── Companions: powerful, vulnerable, the source of an aura ─────────────────────
+
+static const UnitType* companionType(const std::string& name, int dmg, int hp, int aura) {
+    UnitType t;
+    t.id = t.name = name;
+    t.faction = "companion";
+    t.speed = 5; t.minDamage = t.maxDamage = dmg; t.hitPoints = hp;
+    t.attack = 5; t.defense = 5; t.moveRange = 4;
+    t.auraRadius = aura > 0 ? 1 : 0; t.auraDefense = aura;
+    t.levelGrowth = {10, 1, 1, 2};
+    s_aiTypes.push_back(std::move(t));
+    return &s_aiTypes.back();
+}
+
+// Player: troops (index 0) + companion (index 1); enemy: one stack.
+static CombatEngine companionBattle(const UnitType* troop, int troops, const UnitType* comp,
+                                    const UnitType* foe, int foes, HexCoord troopAt, HexCoord compAt,
+                                    HexCoord foeAt, uint32_t seed = 7) {
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(CombatUnit::make(troop, troops, true));
+    p.stacks.push_back(CombatUnit::companion(comp, 1, true));
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(CombatUnit::make(foe, foes, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    eng.setSeed(seed);
+    eng.teleportUnit(true, 0, troopAt);
+    eng.teleportUnit(true, 1, compAt);
+    eng.teleportUnit(false, 0, foeAt);
+    return eng;
+}
+
+SUITE("Companions — one figure; level growth goes into hp, attack, defence and damage") {
+    const UnitType* c = companionType("Captain", 20, 60, 3);
+    CombatUnit u = CombatUnit::companion(c, 3, true);
+    CHECK_EQ(u.count, 1);
+    CHECK(u.isSpecialCharacter);
+    CHECK_EQ(u.maxHp(), 80);
+    CHECK_EQ(u.totalHp(), 80);
+    CHECK_EQ(u.attackBonus, 2);
+    CHECK_EQ(u.defenseBonus, 2);
+    CHECK_EQ(u.damageBonus, 4);
+}
+
+SUITE("Companions — spawn on the back line first, troops fill in around them") {
+    const UnitType* troop = aiType("Levy", 4, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 20, 60, 3);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(troop, 10, true));
+    p.stacks.push_back(CombatUnit::companion(c, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(troop, 10, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    CHECK(eng.playerArmy().stacks[1].pos == CombatMap::toHex(0, 2));   // the centre of the back line
+    CHECK(eng.playerArmy().stacks[0].pos == CombatMap::toHex(0, 1));
+}
+
+SUITE("Companions — the aura gives nearby troops defence, not the companion itself") {
+    const UnitType* troop = aiType("Levy", 4, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 20, 60, 3);
+    const UnitType* foe = aiType("Raider", 2, 1, 10, 5, 5);
+    const HexCoord at = CombatMap::toHex(2, 2);
+    CombatEngine eng = companionBattle(troop, 10, c, foe, 5, at.neighbor(0), at, CombatMap::toHex(9, 2));
+    CHECK_EQ(eng.playerArmy().stacks[0].auraBonus, 3);
+    CHECK_EQ(eng.playerArmy().stacks[0].effectiveDefense(), 5 + 3);
+    CHECK_EQ(eng.playerArmy().stacks[1].auraBonus, 0);
+    eng.teleportUnit(true, 0, at.neighbor(0).neighbor(0));           // two hexes away: outside
+    CHECK_EQ(eng.playerArmy().stacks[0].auraBonus, 0);
+}
+
+SUITE("Companions — a bodyguard takes half of a melee blow; the forecast agrees") {
+    const UnitType* troop = aiType("Levy", 1, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 1, 60, 0);          // no aura: exact numbers
+    const UnitType* foe = aiType("Raider", 9, 20, 100, 5, 5);        // one blow of exactly 20
+    const HexCoord at = CombatMap::toHex(4, 2);
+    CombatEngine eng = companionBattle(troop, 10, c, foe, 1, at.neighbor(3), at, at.neighbor(0));
+    CHECK(!eng.currentTurn().isPlayer);
+    CHECK_EQ(CombatEngine::bodyguardFor(eng.playerArmy().stacks, 1), 0);
+    const AttackPreview p = eng.previewAttackUnchecked(1, at.neighbor(0));
+    CHECK(p.guarded);
+    CHECK_EQ(p.damage.min, 10);
+    CHECK_EQ(p.guardDamage.min, 10);
+    eng.doAttackFrom(at.neighbor(0), 1);
+    CHECK_EQ(eng.playerArmy().stacks[1].totalHp(), 50);
+    CHECK_EQ(eng.playerArmy().stacks[0].totalHp(), 90);
+    bool flagged = false;
+    for (const auto& ev : eng.drainEvents())
+        if (ev.type == CombatEvent::Type::UnitDamaged && ev.bodyguard) flagged = ev.stackIndex == 0;
+    CHECK(flagged);
+}
+
+SUITE("Companions — alone, a companion takes the whole blow") {
+    const UnitType* troop = aiType("Levy", 1, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 1, 60, 0);
+    const UnitType* foe = aiType("Raider", 9, 20, 100, 5, 5);
+    const HexCoord at = CombatMap::toHex(4, 2);
+    CombatEngine eng = companionBattle(troop, 10, c, foe, 1, CombatMap::toHex(0, 0), at, at.neighbor(0));
+    CHECK_EQ(CombatEngine::bodyguardFor(eng.playerArmy().stacks, 1), -1);
+    eng.doAttackFrom(at.neighbor(0), 1);
+    CHECK_EQ(eng.playerArmy().stacks[1].totalHp(), 40);
+}
+
+SUITE("Companions — enemies that can reach a companion are listed as threats") {
+    const UnitType* troop = aiType("Levy", 1, 2, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 1, 60, 0);
+    const UnitType* foe = aiType("Raider", 9, 20, 100, 5, 5, 3);
+    const HexCoord at = CombatMap::toHex(2, 2);
+    CombatEngine near = companionBattle(troop, 10, c, foe, 1, CombatMap::toHex(0, 0), at, CombatMap::toHex(5, 2));
+    CHECK_EQ((int)near.threatsTo(true, 1).size(), 1);
+    CombatEngine far = companionBattle(troop, 10, c, foe, 1, CombatMap::toHex(0, 0), at, CombatMap::toHex(10, 2));
+    CHECK(far.threatsTo(true, 1).empty());
+}
+
+SUITE("CombatAI — hunts a companion over a bigger troop stack") {
+    const UnitType* troop = aiType("Levy", 1, 3, 10, 5, 5);
+    const UnitType* c = companionType("Captain", 20, 60, 0);
+    const UnitType* foe = aiType("Raider", 9, 15, 100, 5, 5, 4);
+    int hunted = 0;
+    const int runs = 20;
+    for (uint32_t seed = 1; seed <= runs; ++seed) {
+        // Troops and companion far apart (no bodyguard), both within the raider's reach.
+        CombatEngine eng = companionBattle(troop, 10, c, foe, 1, CombatMap::toHex(4, 0),
+                                           CombatMap::toHex(4, 4), CombatMap::toHex(6, 2), seed);
+        CombatAI::takeTurn(eng);
+        if (eng.playerArmy().stacks[1].totalHp() < 60) ++hunted;
+    }
+    CHECK(hunted >= runs - 2);
+}
+
+// ── Line of sight ───────────────────────────────────────────────────────────────
+
+SUITE("Line of sight — any stack between shooter and target halves the shot") {
+    const UnitType* archer = aiType("Archer", 9, 10, 10, 5, 5, 3, 12);
+    const UnitType* wall = aiType("Wall", 1, 1, 10, 5, 5);
+    const UnitType* dummy = aiType("Dummy", 1, 1, 10, 5, 5);
+    const HexCoord from = CombatMap::toHex(1, 2), to = CombatMap::toHex(5, 2), mid = CombatMap::toHex(3, 2);
+    CHECK(from.lineTo(to)[2] == mid);
+    auto battle = [&](bool blocked) {
+        CombatArmy p; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(archer, 1, true));
+        p.stacks.push_back(CombatUnit::make(wall, 1, true));
+        CombatArmy e; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dummy, 10, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        eng.teleportUnit(true, 0, from);
+        eng.teleportUnit(true, 1, blocked ? mid : CombatMap::toHex(0, 0));
+        eng.teleportUnit(false, 0, to);
+        return eng;
+    };
+    CombatEngine clear = battle(false);
+    CHECK(clear.hasLineOfSight(from, to));
+    CHECK(!clear.previewAttack(0).blocked);
+    CHECK_EQ(clear.previewAttack(0).damage.min, 10);
+    clear.doAttack(0);
+    CHECK_EQ(clear.enemyArmy().stacks[0].totalHp(), 90);
+
+    CombatEngine blocked = battle(true);                        // even a friend blocks
+    CHECK(!blocked.hasLineOfSight(from, to));
+    CHECK(blocked.previewAttack(0).blocked);
+    CHECK_EQ(blocked.previewAttack(0).damage.min, 5);
+    blocked.doAttack(0);
+    CHECK_EQ(blocked.enemyArmy().stacks[0].totalHp(), 95);
+    bool flagged = false;
+    for (const auto& ev : blocked.drainEvents())
+        if (ev.type == CombatEvent::Type::UnitAttacked && ev.blockedShot) flagged = true;
+    CHECK(flagged);
+}
+
+SUITE("Line of sight — adjacent hexes and a line grazing an edge stay clear") {
+    const UnitType* archer = aiType("Archer", 9, 10, 10, 5, 5, 3, 12);
+    const UnitType* dummy = aiType("Dummy", 1, 1, 10, 5, 5);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(archer, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(dummy, 10, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord a = CombatMap::toHex(2, 2);
+    CHECK(eng.hasLineOfSight(a, a.neighbor(0)));
+    // (0,0) → (2,-1): the line runs along the edge between (1,0) and (1,-1).
+    eng.teleportUnit(true, 0, {0, 0});
+    eng.teleportUnit(false, 0, {1, 0});
+    CHECK(eng.hasLineOfSight({0, 0}, {2, -1}));               // one side of the edge is open
+}
+
 #endif // COMBAT_ENGINE_IMPL
