@@ -93,6 +93,8 @@ int main(int argc, char** argv) {
                     for (const auto& id : ids) s.acceptOffer(id);   // pays what it can
                     visitedCamp = done = true;
                 }
+                if (s.heroPos() == obj->pos && !s.scenario().offersAt(name).empty() && obj->type == ObjType::Town)
+                    s.acceptOffer("hire_hale");                    // a trusting cousin buys Corvin's men
                 if (done) continue;
                 if (obj->type == ObjType::OldMine && s.ruledOut().count(obj->pos)) continue;
                 if (s.isEncounter(obj->pos)) {

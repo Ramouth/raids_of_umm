@@ -35,8 +35,9 @@ quests = [
     {"id": "aldren", "title": "Where Is Aldren?",
      "text": "Your brother Aldren left Varenhold three days ago with a letter from the scholar Kharim. "
              "He has not written since."},
-    {"id": "bridge", "title": "Cousin Corvin's Request",
-     "text": "Corvin Hale asks you to clear the brigands and wolves holding the Coldwater bridge."},
+    {"id": "bridge", "title": "The Road to Hallowmere",
+     "text": "Your cousin Corvin Hale holds Hallowmere across the Coldwater. House Hale has promised help. "
+             "Brigands hold the bridge; get past them and ride to meet him."},
     {"id": "tribute", "title": "A Scholar's Price",
      "text": "Kharim will share what his maps show, for 3000 gold."},
     {"id": "crown", "title": "The Drowned Crown",
@@ -46,6 +47,12 @@ quests = [
 ]
 
 offers = [
+    # Corvin's men are cheap and good. They are also his (see "turncoats" in the betrayal).
+    {"id": "hire_hale", "label": "Hire 16 Hale men-at-arms (1000 gold)", "at": "Hallowmere",
+     "cost": {"Gold": 1000},
+     "then": [{"troops": [{"id": "hale_man_at_arms", "count": 16}]},
+              say(("Corvin", "Sixteen of my best, and I charge you only for their boots. Family is family."),
+                  ("Ushari", "Men who wear another house's colours fight for that house, commander. Remember whose heron is on those shields."))]},
     {"id": "pay_tribute", "label": "Pay Kharim 3000 gold", "at": "Kharim's Camp",
      "cost": {"Gold": 3000}, "quest": "tribute",
      "then": [say(("Kharim", "Gold buys ink, and ink buys truth. Listen closely.")), {"clue": True}]},
@@ -109,25 +116,21 @@ trig("druid_gone", {"event": "encounter_won", "name": "Hermit's Wolves"},
           "A druid stood with the wolves above the hermit's hollow and warned you off the old passage. "
           "His forefathers, he said, grew roots across it: not to keep the families out, but to keep something in."))
 
+# Her arrival is about her: she can feel the passage. The politics wait for the morning.
 trig("ushari_arrives", {"event": "cleared", "names": VALE_WOLVES},
      say(("Steward", "Riders on the west road, commander! Compact colours. The vale is quiet enough for them now."),
          ("Ushari", "Ushari, of the Ivory Compact. So you are the Varen who cleared the road for me. Good. I dislike waiting."),
-         ("Ushari", "The Compact did not send me for the view. Aldren rode east with Kharim's letter. The old passage, he said: "
-                    "a road under the Greyfangs that runs all the way south to Umm'Natur."),
-         ("Ushari", "Whoever holds that road reaches the desert crown first. Every house in the marches has heard the rumour."),
+         ("Ushari", "Your brother went looking for the old passage with a scholar's letter. He will not find it with a letter."),
+         ("Ushari", "I can feel it, commander. East, under the mountains. The way you feel a hearth with your eyes closed."),
+         ("Ushari", "Your hooded man felt it too, I think. Nobody grows roots that thick over nothing.")),
+     {"join": "ushari"}, {"quest_done": "wolves"}, {"quest": "main"}, {"quest": "aldren"},
+     lore("Ushari",
+          "The Compact sent Ushari north because she can feel the old passage, faintly, the way you feel heat on your face. "
+          "She says it lies east, under the Greyfangs. Closer than that, she cannot say. Yet."))
+
+trig("ushari_road", {"event": "day", "day": 2, "after": "ushari_arrives", "unless": "hallowmere"},
+     say(("Ushari", "Whoever holds that road reaches the desert crown first, and every house in the marches has heard the rumour."),
          ("Ushari", "Your cousin Corvin holds Hallowmere across the Coldwater. House Hale has promised us help. Let us see what a promise weighs.")),
-     {"join": "ushari"}, {"quest_done": "wolves"}, {"quest": "main"}, {"quest": "aldren"})
-
-trig("ushari_druid", {"event": "cleared", "names": VALE_WOLVES, "after": "druid_speaks"},
-     say(("Ushari", "A hooded man who talks to wolves and warns you away from a door. "
-                    "The north is full of old men with warnings, commander. The trouble is, most of them are right about something.")))
-
-# Corvin's letter comes the morning after, so Ushari's arrival has the stage.
-trig("corvin_gift", {"event": "day", "day": 2, "after": "ushari_arrives"},
-     say(("Corvin", "Cousin! Word reached me that Aldren left you the keys. Good. You were always the steadier of the two."),
-         ("Corvin", "I am sending twelve spears and a wagon of timber. Consider it an apology for the state of the bridge."),
-         ("Corvin", "Brigands and wolves hold the Coldwater crossing. Clear it and Hallowmere is yours to recruit from, as if it flew your banner.")),
-     {"troops": [{"id": "levy_spearman", "count": 12}]}, {"give": {"Wood": 5, "Gold": 500}},
      {"quest": "bridge"})
 
 # ── Act 1 — the families ────────────────────────────────────────────────────
@@ -135,19 +138,19 @@ trig("bridge_seen", {"event": "see", "name": "Bridge Wardens"},
      say(("Scout", "The Coldwater bridge. Crossbows on the far bank and wolves in the reeds. They are not stopping travellers; they are counting them."),
          ("Scout", "Clear the bridge and we have a straight road to Hallowmere.")))
 
-# Waits for Corvin's request, so a bridge cleared early still closes his quest.
-trig("bridge_won", {"event": "encounter_won", "name": "Bridge Wardens", "wait": "corvin_gift"},
+trig("bridge_won", {"event": "encounter_won", "name": "Bridge Wardens"},
      say(("Ushari", "The brigands carried Hale coin. Fresh-struck. Someone paid them to sit on that bridge."),
-         ("Ushari", "Probably nothing. Brigands rob everyone, including cousins.")),
-     {"quest_done": "bridge"})
+         ("Ushari", "Probably nothing. Brigands rob everyone, including cousins.")))
 
-trig("hallowmere", {"event": "visit", "name": "Hallowmere", "unless": "betrayal_late"},
-     say(("Corvin", "Welcome to Hallowmere, cousin. My gate is yours. My levies are yours. My wine is mostly yours."),
+# The cousin's scene: the first time you ride in with Ushari. He sells you his men.
+trig("hallowmere", {"event": "visit", "name": "Hallowmere", "unless": "betrayal_late", "after": "ushari_arrives"},
+     say(("Corvin", "Cousin! Welcome to Hallowmere. My gate is yours. My wine is mostly yours."),
+         ("Corvin", "And this must be the Compact's famous bloodhound. Ushari, is it? They say you can smell gold through a mountain."),
+         ("Ushari", "Not gold, my lord."),
          ("Corvin", "Take this. The Hale signet. Show it anywhere in the lowlands and doors will open."),
          ("Corvin", "Aldren came through here four days ago. He asked about the old mines. Which ones, how deep. He seemed... excited."),
-         ("Corvin", "If you find him, tell him his cousin still waits for that letter.")),
-     {"item": "hale_signet"},
-     {"troops": [{"id": "armoured_warrior", "count": 4}]})
+         ("Corvin", "You will want soldiers where you are going. My household men-at-arms are yours, for what their kit cost me.")),
+     {"item": "hale_signet"}, {"quest_done": "bridge"}, {"offer": "hire_hale"})
 
 trig("shariw_warning", {"event": "day", "day": 3},
      say(("Scout", "Riders in the east, commander. Veiled, on scorpions. Scorpions, commander. In the snow."),
@@ -275,13 +278,18 @@ BETRAYAL = [say(("Corvin", "Cousin. I had hoped the Greyfangs would take you the
          ("Corvin", "The Shariw offer something better. They seal the passage and go home, and House Hale holds the north. All of it."),
          ("Corvin", "Hallowmere's gate is closed to you. My household rides tonight. Do not make me bury two Varens.")),
      {"betray": {"at": "Hallowmere", "band": "Hale household", "army": HALE_HOUSEHOLD}},
+     # The men you bought from him were always his.
+     {"turncoats": {"unit": "hale_man_at_arms", "band": "Hale men-at-arms",
+                    "say": [["Scout", "Commander! The Hale men-at-arms, the ones we paid for. They have drawn steel inside the camp!"],
+                            ["Ushari", "The heron was on their shields the whole time. To arms!"]]}},
      {"quest_text": ["aldren", "Corvin Hale murdered Aldren for the passage and has sided with the Shariw. Hallowmere is closed. Break the Hale household."]},
      lore("The Cousin",
-          "Corvin Hale smiled, sent spears, gave you his signet, and had your brother shot at the foot of the pass. "
+          "Corvin Hale smiled, sold you his own soldiers, gave you his signet, and had your brother shot at the foot of the pass. "
           "He has sold the north to the Shariw for the promise of ruling it.")]
-# Corvin turns once you have eaten at his table (day 12+), or on day 16 regardless.
-trig("betrayal", {"event": "day", "day": 12, "after": "hallowmere"}, *BETRAYAL)
-trig("betrayal_late", {"event": "day", "day": 16, "unless": "betrayal"}, *BETRAYAL)
+# Corvin turns a few days after you have eaten at his table (day 12 at the earliest),
+# long enough for his men to feel like yours. Never visited by day 16: he turns anyway.
+trig("betrayal", {"event": "day", "day": 12, "after": "hallowmere", "delay": 4}, *BETRAYAL)
+trig("betrayal_late", {"event": "day", "day": 16, "unless": "hallowmere"}, *BETRAYAL)
 
 trig("hale_broken", {"event": "rival_beaten", "name": "Hale household"},
      say(("Corvin", "...Tell the Compact the north was never theirs."),

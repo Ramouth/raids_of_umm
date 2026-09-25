@@ -175,6 +175,10 @@ public:
     // A house turns on the player: the named town/site flies the rival banner
     // and a war-band with 'army' rides out of it. Returns false if no such object.
     bool betray(const std::string& objectName, const std::string& bandName, const std::vector<Stack>& army);
+    // Every soldier of `unitId` in the hero's army and garrisons turns on the
+    // player: they leave, form a war-band beside the hero and attack at once.
+    // Returns how many turned (0 = none were hired, nothing happens).
+    int turncoats(const std::string& unitId, const std::string& bandName);
     // Rules out one wrong old mine not yet searched or ruled out; returns its name.
     std::optional<std::string> giveClue();
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }

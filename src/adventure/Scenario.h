@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -37,11 +38,14 @@ class AdventureSession;
  *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
  *                                               — that site turns rival; a war-band rides out
  *              "vanish": name                   — that map object leaves the map (a figure walks off)
+ *              "turncoats": {"unit": id, "band": name, "say": [[speaker, text], ...]}
+ *                                               — hired men of that unit turn and ambush the hero
  * (event "quests_done" (count) fires as optional quests complete;
  *  event "rival_beaten" (name) fires when the hero breaks a war-band)
  *
  * when.after: id — only after that trigger has fired (story order).
  * when.unless: id — never, once that trigger has fired (a beat overtaken by events).
+ * when.delay: N — with "after": only N or more days after that trigger fired.
  * when.wait: id — if that trigger has not fired yet, hold this one and run it
  *                 right after it does (e.g. a companion's line before she has joined).
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
@@ -105,4 +109,5 @@ private:
     std::unordered_set<std::string> m_won;          // guard camps beaten, by name
     std::unordered_set<std::string> m_vanished;     // map objects gone from the map
     std::vector<std::string>        m_waiting;      // triggers held by when.wait
+    std::unordered_map<std::string, int> m_firedOn; // trigger id → day it fired
 };

@@ -719,7 +719,7 @@ func end_day() -> void:
         turn_busy = false
         _update_turn_hud()
     if state.get("encounter") != null and not is_instance_valid(battle):
-        _begin_encounter(state.encounter)
+        _engage()
 
 func _resize_hud() -> void:
     var width := get_viewport_rect().size.x

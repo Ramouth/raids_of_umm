@@ -503,6 +503,32 @@
       "textureId": "brigand"
     },
     {
+      "id": "hale_man_at_arms",
+      "name": "Hale Man-at-Arms",
+      "description": "House Hale's household soldiers, sold to their cousins at a friendly price. Loyal to the heron first.",
+      "tier": 2,
+      "attack": 6,
+      "defense": 7,
+      "minDamage": 2,
+      "maxDamage": 4,
+      "hitPoints": 14,
+      "speed": 5,
+      "moveRange": 4,
+      "shots": 0,
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 60,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "hale_man_at_arms",
+      "textureId": "hale_man_at_arms"
+    },
+    {
       "id": "barrow_wight",
       "name": "Barrow Wight",
       "description": "Chieftains of a forgotten age, bound to the old mines they were buried in. Their rusted blades still bite.",

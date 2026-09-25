@@ -27,6 +27,16 @@ bool hasQuest(const AdventureSession& s, const std::string& id, bool done) {
     return false;
 }
 
+// Walk to a place day after day, winning every fight on the way.
+void reach(AdventureSession& s, HexCoord at) {
+    for (int day = 0; day < 14 && s.heroPos() != at; ++day) {
+        s.travel(at);
+        while (s.pendingEncounter()) { s.resolveEncounter(true); s.travel(at); }
+        if (s.heroPos() != at) s.endDay();
+        while (s.pendingEncounter()) s.resolveEncounter(true);   // a night ambush
+    }
+}
+
 // March on a guard camp day after day and win every fight on the way.
 // Returns the dialogue heard just before the fight at `name` began.
 std::vector<Scenario::Line> beat(AdventureSession& s, const std::string& name) {
@@ -78,8 +88,9 @@ SUITE("Level 1 — the druid speaks before his pack fights, then walks off; Usha
     if (!s.specials().empty()) CHECK(s.specials()[0].id == "ushari");
     CHECK(hasQuest(s, "wolves", true));
     CHECK(hasQuest(s, "main", false));
+    CHECK(!hasQuest(s, "bridge", false));                // the politics wait for the morning
     s.endDay();
-    CHECK(spoke(s.scenario().drainLines(), "Corvin"));
+    CHECK(spoke(s.scenario().drainLines(), "Ushari"));
     CHECK(hasQuest(s, "bridge", false));
     // A save keeps the arrival, the beaten packs and the druid's absence.
     AdventureSession c;
@@ -148,4 +159,66 @@ SUITE("Scenario — wait holds a beat until its cue; cleared needs every camp; v
     }
     CHECK_EQ((int)s.specials().size(), 1);
     CHECK(s.scenario().vanished().count("Stranger") == 1);
+}
+
+SUITE("Level 1 — Corvin sells his men at Hallowmere; they turn on you when he does") {
+    AdventureSession s;
+    CHECK(!s.start(kMap, "data", kEncounters, 1, kTriggers));
+    s.setArmy({{"rider_knight", 30}, {"levy_spearman", 40}, {"desert_archer", 20}});
+    for (const char* pack : {"Hill Wolves", "Den Wolves", "Hermit's Wolves"}) beat(s, pack);
+    s.scenario().drainLines();
+    reach(s, cellOf(s, "Hallowmere"));
+    CHECK(s.heroPos() == cellOf(s, "Hallowmere"));
+    auto scene = s.scenario().drainLines();
+    CHECK(spoke(scene, "Corvin"));
+    CHECK(s.hasItem("hale_signet"));
+    CHECK(hasQuest(s, "bridge", true));
+    CHECK_EQ((int)s.scenario().offersAt("Hallowmere").size(), 1);
+    CHECK(!s.acceptOffer("hire_hale"));
+    int hired = 0;
+    for (const auto& st : s.army()) if (st.id == "hale_man_at_arms") hired = st.count;
+    CHECK_EQ(hired, 16);
+    int hiredOn = s.day();
+    // Wait out the days until Corvin turns; his men turn with him.
+    bool turned = false;
+    for (int i = 0; i < 20 && !turned; ++i) {
+        s.scenario().drainLines();
+        s.endDay();
+        for (const auto& r : s.rivals()) turned = turned || r.name == "Hale men-at-arms";
+        if (!turned) while (s.pendingEncounter()) s.resolveEncounter(true);
+    }
+    CHECK(turned);
+    CHECK(s.day() >= hiredOn + 4);                      // his men ride with you a while first
+    for (const auto& st : s.army()) CHECK(st.id != "hale_man_at_arms");
+    CHECK(s.pendingIsAmbush());
+    if (auto at = s.pendingEncounter())
+        if (const auto* band = s.rivalAt(*at)) {
+            CHECK(band->name == "Hale men-at-arms");
+            CHECK_EQ(band->army[0].count, 16);
+        }
+    auto lines = s.scenario().drainLines();
+    bool steel = false;
+    for (const auto& l : lines) steel = steel || l.text.find("drawn steel") != std::string::npos;
+    CHECK(steel);
+}
+
+SUITE("Scenario — turncoats: nobody hired, nothing happens; hired men leave army and garrisons") {
+    WorldMap map;
+    map.clear(6);
+    for (const auto& [c, t] : map) map.setTile(c, makeTile(Terrain::Grass));
+    map.placeObject({{-4, 0}, ObjType::Town, "Home", 1});
+    map.placeObject({{ 3, 0}, ObjType::Town, "Keep", 1});
+    AdventureSession s;
+    CHECK(!s.start(std::move(map), "data"));
+    s.setArmy({{"levy_spearman", 10}});
+    CHECK_EQ(s.turncoats("hale_man_at_arms", "Turncoats"), 0);
+    CHECK(s.rivals().empty());
+    CHECK(!s.pendingEncounter().has_value());
+    s.setArmy({{"levy_spearman", 10}, {"hale_man_at_arms", 12}});
+    CHECK(!s.transfer({-4, 0}, "hale_man_at_arms", 5, true));   // leave five in the garrison
+    CHECK_EQ(s.turncoats("hale_man_at_arms", "Turncoats"), 12);
+    CHECK_EQ((int)s.army().size(), 1);
+    if (const auto* g = s.garrison({-4, 0})) for (const auto& st : *g) CHECK(st.id != "hale_man_at_arms");
+    CHECK_EQ((int)s.rivals().size(), 1);
+    CHECK(s.pendingIsAmbush());
 }

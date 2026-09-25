@@ -424,6 +424,39 @@ bool AdventureSession::betray(const std::string& objectName, const std::string& 
     return true;
 }
 
+int AdventureSession::turncoats(const std::string& unitId, const std::string& bandName) {
+    int count = 0;
+    std::vector<Stack> loyal;
+    for (const auto& st : army()) {
+        if (st.id == unitId) count += st.count;
+        else loyal.push_back(st);
+    }
+    setArmy(loyal);
+    for (auto& [cell, held] : m_garrisons)
+        for (auto it = held.begin(); it != held.end();)
+            if (it->id == unitId) { count += it->count; it = held.erase(it); } else ++it;
+    if (count == 0) return 0;
+    HexCoord at = m_hero.pos;
+    for (int d = 0; d < 6; ++d) {
+        HexCoord nb = m_hero.pos.neighbor(d);
+        const MapTile* t = m_map.tileAt(nb);
+        if (t && t->passable && !isEncounter(nb) && !m_map.objectAt(nb) && !rivalAt(nb)) { at = nb; break; }
+    }
+    Rival r;
+    r.id   = static_cast<int>(m_rivals.size()) + 1;
+    r.name = bandName;
+    r.pos  = at;
+    r.home = at;
+    r.army = {{unitId, count}};
+    r.startPower = power(r.army);
+    m_rivals.push_back(r);
+    if (!m_pending) {                        // they fall on the camp at once
+        m_pending       = r.pos;
+        m_pendingAmbush = true;
+    }
+    return count;
+}
+
 std::string AdventureSession::enter(const HexCoord& cell) {
     auto it = m_control.find(cell);
     if (it == m_control.end() || it->second.ownerFaction == Faction::Player) return "";
@@ -477,7 +510,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
             grantXp(encounterXp(cell));
             it->alive = false;
             m_scenario.fire(*this, "rival_beaten", {{"name", it->name}});
-            report(adviser(), "The " + it->name + " is broken. The land is quieter tonight.");
+            report(adviser(), "We have broken the " + it->name + ". The land is quieter tonight.");
             if (!ambush) {
                 m_moves    = std::max(0.0f, m_moves - stepCost(cell));
                 m_hero.pos = cell;

@@ -19,8 +19,8 @@
     },
     {
       "id": "bridge",
-      "title": "Cousin Corvin's Request",
-      "text": "Corvin Hale asks you to clear the brigands and wolves holding the Coldwater bridge."
+      "title": "The Road to Hallowmere",
+      "text": "Your cousin Corvin Hale holds Hallowmere across the Coldwater. House Hale has promised help. Brigands hold the bridge; get past them and ride to meet him."
     },
     {
       "id": "tribute",
@@ -39,6 +39,36 @@
     }
   ],
   "offers": [
+    {
+      "id": "hire_hale",
+      "label": "Hire 16 Hale men-at-arms (1000 gold)",
+      "at": "Hallowmere",
+      "cost": {
+        "Gold": 1000
+      },
+      "then": [
+        {
+          "troops": [
+            {
+              "id": "hale_man_at_arms",
+              "count": 16
+            }
+          ]
+        },
+        {
+          "say": [
+            [
+              "Corvin",
+              "Sixteen of my best, and I charge you only for their boots. Family is family."
+            ],
+            [
+              "Ushari",
+              "Men who wear another house's colours fight for that house, commander. Remember whose heron is on those shields."
+            ]
+          ]
+        }
+      ]
+    },
     {
       "id": "pay_tribute",
       "label": "Pay Kharim 3000 gold",
@@ -231,15 +261,15 @@
             ],
             [
               "Ushari",
-              "The Compact did not send me for the view. Aldren rode east with Kharim's letter. The old passage, he said: a road under the Greyfangs that runs all the way south to Umm'Natur."
+              "Your brother went looking for the old passage with a scholar's letter. He will not find it with a letter."
             ],
             [
               "Ushari",
-              "Whoever holds that road reaches the desert crown first. Every house in the marches has heard the rumour."
+              "I can feel it, commander. East, under the mountains. The way you feel a hearth with your eyes closed."
             ],
             [
               "Ushari",
-              "Your cousin Corvin holds Hallowmere across the Coldwater. House Hale has promised us help. Let us see what a promise weighs."
+              "Your hooded man felt it too, I think. Nobody grows roots that thick over nothing."
             ]
           ]
         },
@@ -254,68 +284,35 @@
         },
         {
           "quest": "aldren"
+        },
+        {
+          "lore": [
+            "Ushari",
+            "The Compact sent Ushari north because she can feel the old passage, faintly, the way you feel heat on your face. She says it lies east, under the Greyfangs. Closer than that, she cannot say. Yet."
+          ]
         }
       ]
     },
     {
-      "id": "ushari_druid",
+      "id": "ushari_road",
       "when": {
-        "event": "cleared",
-        "names": [
-          "Hill Wolves",
-          "Den Wolves",
-          "Hermit's Wolves"
-        ],
-        "after": "druid_speaks"
+        "event": "day",
+        "day": 2,
+        "after": "ushari_arrives",
+        "unless": "hallowmere"
       },
       "do": [
         {
           "say": [
             [
               "Ushari",
-              "A hooded man who talks to wolves and warns you away from a door. The north is full of old men with warnings, commander. The trouble is, most of them are right about something."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "corvin_gift",
-      "when": {
-        "event": "day",
-        "day": 2,
-        "after": "ushari_arrives"
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Corvin",
-              "Cousin! Word reached me that Aldren left you the keys. Good. You were always the steadier of the two."
+              "Whoever holds that road reaches the desert crown first, and every house in the marches has heard the rumour."
             ],
             [
-              "Corvin",
-              "I am sending twelve spears and a wagon of timber. Consider it an apology for the state of the bridge."
-            ],
-            [
-              "Corvin",
-              "Brigands and wolves hold the Coldwater crossing. Clear it and Hallowmere is yours to recruit from, as if it flew your banner."
+              "Ushari",
+              "Your cousin Corvin holds Hallowmere across the Coldwater. House Hale has promised us help. Let us see what a promise weighs."
             ]
           ]
-        },
-        {
-          "troops": [
-            {
-              "id": "levy_spearman",
-              "count": 12
-            }
-          ]
-        },
-        {
-          "give": {
-            "Wood": 5,
-            "Gold": 500
-          }
         },
         {
           "quest": "bridge"
@@ -348,7 +345,7 @@
       "when": {
         "event": "encounter_won",
         "name": "Bridge Wardens",
-        "wait": "corvin_gift"
+        "wait": "ushari_arrives"
       },
       "do": [
         {
@@ -362,9 +359,6 @@
               "Probably nothing. Brigands rob everyone, including cousins."
             ]
           ]
-        },
-        {
-          "quest_done": "bridge"
         }
       ]
     },
@@ -373,14 +367,23 @@
       "when": {
         "event": "visit",
         "name": "Hallowmere",
-        "unless": "betrayal_late"
+        "unless": "betrayal_late",
+        "after": "ushari_arrives"
       },
       "do": [
         {
           "say": [
             [
               "Corvin",
-              "Welcome to Hallowmere, cousin. My gate is yours. My levies are yours. My wine is mostly yours."
+              "Cousin! Welcome to Hallowmere. My gate is yours. My wine is mostly yours."
+            ],
+            [
+              "Corvin",
+              "And this must be the Compact's famous bloodhound. Ushari, is it? They say you can smell gold through a mountain."
+            ],
+            [
+              "Ushari",
+              "Not gold, my lord."
             ],
             [
               "Corvin",
@@ -392,7 +395,7 @@
             ],
             [
               "Corvin",
-              "If you find him, tell him his cousin still waits for that letter."
+              "You will want soldiers where you are going. My household men-at-arms are yours, for what their kit cost me."
             ]
           ]
         },
@@ -400,12 +403,10 @@
           "item": "hale_signet"
         },
         {
-          "troops": [
-            {
-              "id": "armoured_warrior",
-              "count": 4
-            }
-          ]
+          "quest_done": "bridge"
+        },
+        {
+          "offer": "hire_hale"
         }
       ]
     },
@@ -1018,7 +1019,8 @@
       "when": {
         "event": "day",
         "day": 12,
-        "after": "hallowmere"
+        "after": "hallowmere",
+        "delay": 4
       },
       "do": [
         {
@@ -1062,6 +1064,22 @@
           }
         },
         {
+          "turncoats": {
+            "unit": "hale_man_at_arms",
+            "band": "Hale men-at-arms",
+            "say": [
+              [
+                "Scout",
+                "Commander! The Hale men-at-arms, the ones we paid for. They have drawn steel inside the camp!"
+              ],
+              [
+                "Ushari",
+                "The heron was on their shields the whole time. To arms!"
+              ]
+            ]
+          }
+        },
+        {
           "quest_text": [
             "aldren",
             "Corvin Hale murdered Aldren for the passage and has sided with the Shariw. Hallowmere is closed. Break the Hale household."
@@ -1070,7 +1088,7 @@
         {
           "lore": [
             "The Cousin",
-            "Corvin Hale smiled, sent spears, gave you his signet, and had your brother shot at the foot of the pass. He has sold the north to the Shariw for the promise of ruling it."
+            "Corvin Hale smiled, sold you his own soldiers, gave you his signet, and had your brother shot at the foot of the pass. He has sold the north to the Shariw for the promise of ruling it."
           ]
         }
       ]
@@ -1080,7 +1098,7 @@
       "when": {
         "event": "day",
         "day": 16,
-        "unless": "betrayal"
+        "unless": "hallowmere"
       },
       "do": [
         {
@@ -1124,6 +1142,22 @@
           }
         },
         {
+          "turncoats": {
+            "unit": "hale_man_at_arms",
+            "band": "Hale men-at-arms",
+            "say": [
+              [
+                "Scout",
+                "Commander! The Hale men-at-arms, the ones we paid for. They have drawn steel inside the camp!"
+              ],
+              [
+                "Ushari",
+                "The heron was on their shields the whole time. To arms!"
+              ]
+            ]
+          }
+        },
+        {
           "quest_text": [
             "aldren",
             "Corvin Hale murdered Aldren for the passage and has sided with the Shariw. Hallowmere is closed. Break the Hale household."
@@ -1132,7 +1166,7 @@
         {
           "lore": [
             "The Cousin",
-            "Corvin Hale smiled, sent spears, gave you his signet, and had your brother shot at the foot of the pass. He has sold the north to the Shariw for the promise of ruling it."
+            "Corvin Hale smiled, sold you his own soldiers, gave you his signet, and had your brother shot at the foot of the pass. He has sold the north to the Shariw for the promise of ruling it."
           ]
         }
       ]

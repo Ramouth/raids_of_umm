@@ -323,6 +323,9 @@ func _turn_done(scene: Node2D) -> void:
     await process_frame
     while scene.turn_busy: await process_frame
     await process_frame
+    if scene.state.get("encounter") != null and scene.dialogue.is_speaking():   # an ambush waits for its line
+        scene.dialogue.skip_all()
+        await process_frame
 
 ## Tiny map with a Shariw town: the war-band rides out, steals a mine, and
 ## its visible moves animate; a weak hero gets ambushed on screen.

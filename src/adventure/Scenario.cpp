@@ -49,6 +49,7 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         m_won.clear();
         m_vanished.clear();
         m_waiting.clear();
+        m_firedOn.clear();
         m_loaded = true;
         return std::nullopt;
     } catch (const std::exception& e) {
@@ -83,6 +84,8 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
         if (m_fired.count(id) || !matches(trigger.value("when", Json::object()), event, detail)) continue;
         std::string after = trigger.value("when", Json::object()).value("after", "");
         if (!after.empty() && !m_fired.count(after)) continue;   // story order
+        int delay = trigger.value("when", Json::object()).value("delay", 0);
+        if (delay > 0 && (after.empty() || s.day() < m_firedOn[after] + delay)) continue;   // days after it
         std::string unless = trigger.value("when", Json::object()).value("unless", "");
         if (!unless.empty() && m_fired.count(unless)) { m_fired.insert(id); continue; }  // overtaken by events
         std::string wait = trigger.value("when", Json::object()).value("wait", "");
@@ -98,6 +101,7 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
 void Scenario::fireTrigger(AdventureSession& s, const Json& trigger) {
     std::string id = trigger.value("id", "");
     m_fired.insert(id);
+    m_firedOn[id] = s.day();
     run(s, trigger.value("do", Json::array()));
     // Beats that were waiting for this one play now, in the order they came up.
     std::vector<std::string> ready;
@@ -166,6 +170,12 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 army.push_back({st.value("id", ""), st.value("count", 0)});
             s.betray(b.value("at", ""), b.value("band", "war-band"), army);
         }
+        if (a.contains("turncoats")) {                // hired men turn; their lines only if any did
+            const auto& t = a["turncoats"];
+            if (s.turncoats(t.value("unit", ""), t.value("band", "turncoats")) > 0)
+                for (const auto& line : t.value("say", Json::array()))
+                    m_lines.push_back({line.at(0).get<std::string>(), line.at(1).get<std::string>()});
+        }
         if (a.contains("vanish")) m_vanished.insert(a["vanish"].get<std::string>());
         if (a.contains("offer"))
             for (const auto& def : m_offerDefs)
@@ -184,7 +194,7 @@ Scenario::Json Scenario::saveState() const {
             {"quests", quests}, {"offers", offers}, {"lore", lore},
             {"won", Json(std::vector<std::string>(m_won.begin(), m_won.end()))},
             {"vanished", Json(std::vector<std::string>(m_vanished.begin(), m_vanished.end()))},
-            {"waiting", Json(m_waiting)}};
+            {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)}};
 }
 
 void Scenario::loadState(const Json& state) {
@@ -212,6 +222,7 @@ void Scenario::loadState(const Json& state) {
     m_vanished.clear();
     for (const auto& n : state.value("vanished", Json::array())) m_vanished.insert(n.get<std::string>());
     m_waiting = state.value("waiting", std::vector<std::string>{});
+    m_firedOn = state.value("fired_on", std::unordered_map<std::string, int>{});
     m_lore.clear();
     for (const auto& l : state.value("lore", Json::array()))
         m_lore.push_back({l.at(0).get<std::string>(), l.at(1).get<std::string>()});
