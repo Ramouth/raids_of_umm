@@ -25,12 +25,14 @@ public:
     Json companions_fell(const Json& fallen, bool lost);
     Json recruit(int q, int r, const std::string& unit_id, int count);
     Json accept_offer(const std::string& id);
+    Json choose_story(const std::string& id);
     Json transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison);
     Json station(const std::string& id, bool stay);
     // Writes the session (+ caller extras, e.g. Godot inventory) to path.
     Json save(const std::string& path, const Json& extra);
     Json load(const std::string& path);   // snapshot + "extra"
     Json add_item(const std::string& id);
+    Json buy_fieldwork(const std::string& kind);
     Json choose_path(const std::string& id);    // the commander's path, chosen once at level 2
     Json join_special(const std::string& id);   // a companion joins (tests, story tools)
     Json claim_chest(bool gold);          // snapshot + "found"

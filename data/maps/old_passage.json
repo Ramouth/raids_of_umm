@@ -5117,9 +5117,8 @@
     {
       "q": -13,
       "r": 10,
-      "type": "pickup",
-      "name": "Fallen Standing Stone",
-      "kind": "stone"
+      "type": "quarry",
+      "name": "Vale Quarry"
     },
     {
       "q": -10,
@@ -5129,8 +5128,8 @@
       "kind": "wood"
     },
     {
-      "q": -12,
-      "r": 11,
+      "q": -9,
+      "r": 1,
       "type": "pickup",
       "name": "Cut Stone",
       "kind": "stone"
@@ -5279,15 +5278,15 @@
       "q": -3,
       "r": -2,
       "type": "pickup",
-      "name": "Tithe Silver",
-      "kind": "gold"
+      "name": "Hale Supply Cart",
+      "kind": "wood"
     },
     {
       "q": 1,
       "r": -8,
       "type": "pickup",
-      "name": "Felled Oaks",
-      "kind": "wood"
+      "name": "Old Forge Stock",
+      "kind": "obsidian"
     },
     {
       "q": -3,
@@ -5371,7 +5370,7 @@
       "q": 8,
       "r": -9,
       "type": "quest_giver",
-      "name": "Kharim's Camp"
+      "name": "Aldren's Camp"
     },
     {
       "q": 9,
@@ -5461,8 +5460,8 @@
       "q": 7,
       "r": -10,
       "type": "pickup",
-      "name": "Blackglass Heap",
-      "kind": "obsidian"
+      "name": "Pass Masons' Cache",
+      "kind": "stone"
     },
     {
       "q": 13,
@@ -5519,18 +5518,11 @@
       "name": "Hermit's Wolves"
     },
     {
-      "q": -7,
-      "r": -5,
-      "type": "quest_giver",
-      "name": "Hooded Stranger",
-      "kind": "druid"
-    },
-    {
       "q": 9,
       "r": -6,
       "type": "pickup",
-      "name": "Pilgrims' Alms",
-      "kind": "gold"
+      "name": "Abandoned Timber Cart",
+      "kind": "wood"
     },
     {
       "q": -13,

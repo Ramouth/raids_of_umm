@@ -31,6 +31,9 @@ class AdventureSession;
  *              "give": {"Gold": 500, ...}       — resources
  *              "clue": true                     — rule out one wrong old mine
  *              "offer": id                      — a choice the UI shows at a visit
+ *              "choice": {id, title, text, options: [{id, label, detail, then}]}
+ *              "ending": {id, heading, body, frames, return_to?} — complete the chapter
+ *              "leave": id — companion departs, retaining progression for a reunion
  *              "join": id                       — a special character joins the hero
  *              "troops": [{"id","count"}]      — soldiers join the hero's army
  *              "item": id                       — an item is handed to the hero
@@ -49,6 +52,9 @@ class AdventureSession;
  * when.delay: N — with "after": only N or more days after that trigger fired.
  * when.wait: id — if that trigger has not fired yet, hold this one and run it
  *                 right after it does (e.g. a companion's line before she has joined).
+ * Root passage_ends_scenario defaults to true; false emits passage_found instead.
+ * Root essential_companions keeps named companions with the search until a leave action.
+ * Pending choices and outcomes persist in saves.
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
  * made through AdventureSession::acceptOffer().
  */
@@ -71,6 +77,12 @@ public:
 
     std::optional<std::string> load(const std::string& path);
     bool loaded() const { return m_loaded; }
+    bool essential(const std::string& id) const { return m_essential.count(id) > 0; }
+    bool passageEndsScenario() const { return m_passageEndsScenario; }
+    const Json& choice() const { return m_choice; }
+    const Json& outcome() const { return m_outcome; }
+    bool awaitingChoice() const { return !m_choice.empty(); }
+    std::optional<std::string> choose(AdventureSession& s, const std::string& id);
     // Companions with the hero at the start; nullopt = the file does not say.
     const std::optional<std::vector<std::string>>& startCompanions() const { return m_startCompanions; }
     // Map objects a "vanish" action has taken off the map.
@@ -98,6 +110,10 @@ private:
     void fireTrigger(AdventureSession& s, const Json& trigger);
 
     bool                            m_loaded = false;
+    bool                            m_passageEndsScenario = true;
+    std::unordered_set<std::string> m_essential;
+    Json                            m_choice = Json::object();
+    Json                            m_outcome = Json::object();
     Json                            m_triggers = Json::array();
     std::unordered_set<std::string> m_fired;
     std::vector<Quest>              m_quests;       // active or done, in order added

@@ -56,12 +56,15 @@ See `economy.md` for economy decisions and implementation plan.
 The old passage under the Greyfangs is the road from stage 1 to stage 2.
 Map density for every stage follows HoMM3; see `docs/map_density.md`.
 
-### Stage 1 — story (draft, see the story doc)
-- **The families:** House Varen (the player) at Varenhold and House Hale (cousin Corvin) at Hallowmere hold the marches for the Ivory Compact.
-- **The brother's fall:** Aldren rode east with Kharim's letter. His horse comes home on day 5, and his body is found on day 7, killed by crossbow bolts.
-- **The ally:** Corvin sends spears and timber, lends Hallowmere, and gives the Hale signet.
-- **The betrayal** (day 12+, after you have visited Hallowmere; day 16 at the latest): Corvin admits he killed Aldren and has sided with the Shariw. Hallowmere turns rival and the Hale household rides out.
-- **The mythos, in layers:** four obelisks (inscription + Lore entry + rules out a false mine), relics (the Warm Stone, the Listening Shard), the Drowned King's barrow and crown. The deepest layer: the Veined, whose roads are the old passages. The journal (Q) has a **Lore** page.
+### Stage 1 — story
+- **Opening:** clear three wolf packs so Ushari can reach Varenhold. She expected to leave with Aldren; he has already gone east. Your father wants you to bring him home.
+- **Search:** visit Corvin at Hallowmere, then trace Aldren's camp and the old shafts. Corvin supplies a signet, timber and affordable soldiers. He remains an ally throughout this chapter.
+- **Ushari:** Aldren's lover, from a family that keeps the old rites. She accompanies the search, rather than serving as a general lore narrator. She cannot govern a town or abandon this chapter over unpaid upkeep; unpaid abilities still lapse and battle injuries still matter.
+- **At the entrance:** nobody has crossed the dust. Aldren is already dead, but neither route reveals that yet. Finding the passage opens a choice rather than an automatic victory.
+- **Return to your father:** Ushari leaves the party. At Varenhold that night, Aldren's riderless horse returns with blood beneath its saddle. Ushari enters the tunnel alone that same night.
+- **Follow Ushari:** you enter the untouched passage together that night, still unaware of the horse or Aldren's fate.
+- **Continuity:** the choice, night, knowledge and companion progression survive save/load. A committed ending also writes `user://chapter_one.json`. The later reunion and subsequent chapters remain future work.
+- **Deferred:** Kharim, the speaking druid, Maerwen, the body discovery and Corvin's betrayal. Optional stones and relics retain brief, unexplained details.
 
 ### Stage 1 — HoMM3-style adventure objects (native, tested)
 Resource piles, campfires, chests (gold **or** experience), windmills/watermills (weekly),
@@ -73,15 +76,14 @@ routes go around camps when they can).
 ## Demo — "The Old Passage" (Godot) ◀ current focus
 
 A 20–30 min handcrafted scenario that shows off the core loop:
-explore → capture mines → recruit → grow SCs → find the passage.
+clear the vale → search for Aldren → find the entrance → choose your route.
 Built in the Godot slice (`godot/`); turn/economy/fog logic moves into the native
 GDExtension like CombatEngine did, so it stays covered by `raids_tests`.
 
 ### Locked decisions
 - **Engine:** Godot. SDL build stays as reference/test host.
 - **Player faction:** Ivory Compact (Gold + Wood emphasis).
-- **Win:** find the old passage hidden in one of 3–4 **Old Mines**. The passage mine is
-  picked at random from the candidates on each New Game. Finding it wins — no resource cost to open.
+- **Complete the chapter:** find the passage hidden in one of four **Old Mines**, then choose to return to your father or follow Ushari. The entrance is selected each New Game; neither choice costs resources.
 - **Lose:** hero's army destroyed, **or a Shariw hero finds the passage first**.
 - **Rival:** one AI faction — the **Shariw** (locals who know the land; also hunting the passage).
 - **Mine defence:** HoMM3-style garrisons — leave troops in a mine.

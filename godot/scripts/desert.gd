@@ -15,6 +15,9 @@ var _preview: Array[Vector2i] = []
 var _zoom_index := 1
 var _zoom_levels := [0.5, 0.75, 1.0, 1.5, 2.0]
 const STARTING_ARMY := [{"id": "woad_runner", "count": 24}, {"id": "cruth_slinger", "count": 10}, {"id": "painted_blade", "count": 3}]
+const ChapterScene = preload("res://scripts/chapter_scene.gd")
+var _story_screen: Control
+
 const EndScreen = preload("res://scripts/end_screen.gd")
 ## Fixed passage seed for tests; -1 picks a random old mine per expedition.
 var passage_seed := -1
@@ -591,7 +594,7 @@ func _update_offers() -> void:
 func accept_offer(id: String) -> bool:
     var reply: Dictionary = JSON.parse_string(adventure.accept_offer(id))
     if not reply.get("ok", false):
-        notice.text = str(reply.get("error", "Kharim shakes his head."))
+        notice.text = str(reply.get("error", "That offer is not available."))
         return false
     _apply_state(reply)
     _say(reply)
@@ -744,12 +747,13 @@ func _update_turn_hud() -> void:
         else:
             _xp_detail.text = "%d / %d XP  ·  %d to level %d" % [
                 int(hp.xp) - int(hp.prev), span, int(hp.next) - int(hp.xp), int(hp.level) + 1]
-    _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy
+    _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy or not state.get("story_choice", {}).is_empty() or state.get("won", false)
 
 ## True while the Shariw turn animates; blocks another End Day.
 var turn_busy := false
 
 func end_day() -> void:
+    if not state.get("story_choice", {}).is_empty() or state.get("won", false): return
     if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return
     var next: Dictionary = JSON.parse_string(adventure.end_day())
     if not next.get("ok", false): return
@@ -778,6 +782,7 @@ func _resize_hud() -> void:
     $HUD/Layout/Notice.offset_right = width - 324.0
 
 func _process(delta: float) -> void:
+    _present_story()
     var direction := Vector2(
         float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
         float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
@@ -1021,7 +1026,7 @@ func _journey_finished() -> void:
             "dungeon": notice.text = "%s · A cold wind rises from the sealed entrance." % object.name
             "artifact": notice.text = "%s · Only a hollow in the earth remains." % object.name
             "old_mine": notice.text = "%s · The shaft is empty and cold. Something below is breathing, slowly." % object.name
-            "quest_giver": notice.text = "%s · The camp is quiet. Nothing here yet." % object.name
+            "quest_giver": notice.text = "%s · An abandoned camp. Check the journal for what you found." % object.name
             "guard": notice.text = "%s · Their fires are cold. Nothing here yet." % object.name
             _: notice.text = "The expedition has arrived. Choose the next stretch of your journey."
     _hover = NO_CELL
@@ -1115,6 +1120,7 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         stack["defense_bonus"] = int(bonus.get("defense", 0))
         stack["speed_bonus"] = int(bonus.get("speed", 0))
         stack["readied_shot"] = bool(bonus.get("readied_shot", false))   # Marksmen's Tower
+    guards["fieldworks"] = state.get("fieldwork_stock", {}).duplicate()
     guards["tactics"] = int(state.get("tactics_rank", 0))   # opening orders the commander may give
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
@@ -1202,7 +1208,7 @@ func _encounter_finished(result: Dictionary) -> void:
     match str(reply.get("find", "none")):
         "passage":
             notice.text = "Beneath %s, a stairway plunges into the dark: the old passage!" % place
-            _show_end(true)
+            if state.get("won", false): _show_end(true)
         "loot":
             notice.text = "%s is empty of secrets, but a forgotten cache of gold and crystal lies within." % place
         "collapse":
@@ -1217,6 +1223,37 @@ func _check_defeat() -> void:
 
 var _end_screen: Control
 
+func _present_story() -> void:
+    if state.is_empty() or is_instance_valid(_story_screen) or is_instance_valid(_end_screen): return
+    if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup): return
+    if screens.depth() > 0 or dialogue.is_speaking(): return
+    var choice: Dictionary = state.get("story_choice", {})
+    var outcome: Dictionary = state.get("story_outcome", {})
+    if choice.is_empty() and outcome.is_empty(): return
+    var scene := ChapterScene.new()
+    scene.theme = $HUD/Layout.theme
+    _story_screen = scene
+    scene.choice = choice
+    scene.outcome = outcome
+    screens.push(scene, func(result: Dictionary):
+        _story_screen = null
+        if result.has("choice"):
+            var reply: Dictionary = JSON.parse_string(adventure.choose_story(str(result.choice)))
+            if not reply.get("ok", false):
+                notice.text = str(reply.get("error", "The choice could not be made."))
+                return
+            _apply_state(reply)
+            hero.place_at(_hero_cell())
+            _say(reply)
+            # Keep the committed branch for the next chapter, even after restarting the demo.
+            var saved: Dictionary = JSON.parse_string(adventure.save_game(
+                ProjectSettings.globalize_path("user://chapter_one.json"),
+                JSON.stringify({"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])})))
+            if not saved.get("ok", false): push_warning("Could not save chapter outcome: " + str(saved.get("error", "")))
+            _present_story()
+        else:
+            _show_end(true))
+
 func _show_end(victory: bool, reason := "") -> void:
     if is_instance_valid(_end_screen): return  # already showing
     var screen := EndScreen.new()
@@ -1226,7 +1263,11 @@ func _show_end(victory: bool, reason := "") -> void:
     screen.illustration = "res://content/textures/screens/%s.png" % ("victory" if victory else ("sealed" if not reason.is_empty() else ""))
     if not reason.is_empty():
         screen.heading = "The Passage Is Sealed"
-        screen.body = reason + " The Shariw have sealed the old passage, and House Hale holds the north. The Compact will have to find another way south."
+        screen.body = reason + " The Shariw have sealed the old passage, your search for Aldren cannot continue along this road."
+    elif victory and not state.get("story_outcome", {}).is_empty():
+        screen.heading = str(state.story_outcome.heading)
+        screen.body = str(state.story_outcome.body)
+        screen.illustration = ""
     elif victory:
         screen.heading = "The Old Passage Is Found"
         screen.body = "Below the old mine, steps too even for any mason lead down into warm dark. The veins in the walls brighten as you pass, as if something has been expecting you. Far to the south, the air tastes of sand. Umm'Natur is waiting."
@@ -1254,6 +1295,8 @@ func new_expedition() -> void:
     _restart()
 
 func _restart() -> void:
+    _end_screen = null
+    _story_screen = null
     if dialogue != null: dialogue.skip_all()
     for id in _rival_sprites: _rival_sprites[id].queue_free()
     _rival_sprites.clear()

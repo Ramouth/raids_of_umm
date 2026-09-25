@@ -77,6 +77,13 @@ public:
     // shifts damage rolls).
     std::mt19937& aiRng() { return m_aiRng; }
 
+    struct Fieldwork { HexCoord cell; bool opaque = true; };
+    const std::vector<Fieldwork>& fieldworks() const { return m_fieldworks; }
+    bool placeFieldwork(HexCoord cell, bool opaque);
+    bool removeFieldwork(HexCoord cell);
+    bool fieldworkAt(HexCoord cell) const;
+    bool clearTerrainSight(HexCoord from, HexCoord to) const;
+
     // ── Queries ──────────────────────────────────────────────────────────────
 
     CombatResult      result()      const { return m_result; }
@@ -289,6 +296,7 @@ public:
     void resolveScChoice(bool isPlayer, int stackIdx, const std::string& branchId);
 
 private:
+    std::vector<Fieldwork> m_fieldworks;
     // Award XP to a SC stack; handles level-up logic and emits ScXpGained /
     // ScLevelUp events.  No-ops if the unit has no SC def or amount <= 0.
     void awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount);

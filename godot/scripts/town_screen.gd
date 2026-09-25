@@ -26,12 +26,17 @@ var _treasury: Label
 var _army: HBoxContainer
 var _cards: HBoxContainer
 var _message: Label
+var _home_report: Label
+var _home_ledger: Label
+var _is_home := false
 var _amounts: Dictionary = {}  # unit id -> SpinBox
 
 func _ready() -> void:
-    set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    size = Vector2(1280, 800)
     theme = host.get_node("HUD/Layout").theme  # same fonts and buttons as the adventure HUD
     var town := _town()
+    _is_home = can_build and town.get("name", "") == "Varenhold"
+    if _is_home: tab = "hall"
     if can_build and not str(town.get("title", "")).is_empty(): eyebrow_text = "IVORY COMPACT  ·  " + str(town.title).to_upper()
     if can_build and not str(town.get("art", "")).is_empty(): view_art = "res://content/textures/" + str(town.art)
     _panel(Rect2(24, 18, 1232, 96))
@@ -68,16 +73,19 @@ func _ready() -> void:
     growth.size = Vector2(252, 80)
     growth.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     add_child(growth)
+    if _is_home:
+        growth.text = "HOUSE VAREN\nYour family's seat in the northern marches."
+        growth.add_theme_color_override("font_color", Color("e6ca8e"))
 
     _panel(Rect2(338, 128, 918, 520))
     var tabs := HBoxContainer.new()
     tabs.position = Vector2(352, 136)
     tabs.add_theme_constant_override("separation", 6)
     add_child(tabs)
-    for name in (["recruit", "build", "market"] if can_build else ["recruit"]):
+    for name in (["hall", "recruit", "build", "market"] if _is_home else (["recruit", "build", "market"] if can_build else ["recruit"])):
         var button := Button.new()
         button.name = name.capitalize()
-        button.text = {"recruit": "Recruit   R", "build": "Build   B", "market": "Market   M"}[name]
+        button.text = {"hall": "Great Hall   H", "recruit": "Recruit   R", "build": "Build   B", "market": "Market   M"}[name]
         button.toggle_mode = true
         button.custom_minimum_size = Vector2(130, 30)
         button.pressed.connect(show_tab.bind(name))
@@ -97,6 +105,7 @@ func _ready() -> void:
     if can_build:
         _pages["build"] = _build_page()
         _pages["market"] = _market_page()
+    if _is_home: _pages["hall"] = _home_page()
     _message = _label("", 15, Color("f0c870"))
     _message.position = Vector2(358, 596)
     _message.size = Vector2(880, 40)
@@ -120,13 +129,20 @@ func _ready() -> void:
     _build_cards()
     refresh()
     show_tab(tab)
+    get_viewport().size_changed.connect(_resize)
+    _resize()
+
+func _resize() -> void:
+    var viewport := get_viewport_rect().size
+    scale = Vector2.ONE * minf(viewport.x / 1280.0, viewport.y / 800.0)
+    position = (viewport - size * scale) / 2.0
 
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         finished.emit({})
         get_viewport().set_input_as_handled()
     elif event is InputEventKey and event.pressed and not event.echo and can_build:
-        var key: String = {KEY_R: "recruit", KEY_B: "build", KEY_M: "market"}.get(event.keycode, "")
+        var key: String = {KEY_H: "hall", KEY_R: "recruit", KEY_B: "build", KEY_M: "market"}.get(event.keycode, "")
         if not key.is_empty():
             show_tab(key)
             get_viewport().set_input_as_handled()
@@ -139,6 +155,66 @@ func show_tab(name: String) -> void:
         if _tabs.has(key): _tabs[key].set_pressed_no_signal(key == name)
     _message.text = ""
     refresh()
+
+func _home_page() -> Control:
+    var page := Control.new()
+    page.name = "GreatHall"
+    page.position = Vector2(350, 180)
+    page.size = Vector2(894, 409)
+    page.clip_contents = true
+    add_child(page)
+    var art := TextureRect.new()
+    art.name = "VarenholdVista"
+    var path := "res://content/textures/screens/varenhold_home.png"
+    art.texture = load(path if ResourceLoader.exists(path) else view_art)
+    art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+    art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    art.size = Vector2(894, 503)
+    art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    page.add_child(art)
+    var shade := ColorRect.new()
+    shade.position = Vector2(0, 237)
+    shade.size = Vector2(894, 172)
+    shade.color = Color(0.04, 0.07, 0.09, 0.93)
+    shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    page.add_child(shade)
+    var title := _label("THE HOUSEHOLD", 13, Color("d5b578"))
+    title.position = Vector2(20, 251)
+    page.add_child(title)
+    _home_report = _label("", 17, Color("eee4d0"))
+    _home_report.position = Vector2(20, 280)
+    _home_report.size = Vector2(520, 109)
+    _home_report.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    page.add_child(_home_report)
+    _home_ledger = _label("", 14, Color("bdc9b5"))
+    _home_ledger.position = Vector2(577, 251)
+    _home_ledger.size = Vector2(297, 138)
+    page.add_child(_home_ledger)
+    return page
+
+func _refresh_home() -> void:
+    if _home_report == null: return
+    var searching := false
+    var road_clear := false
+    for quest in host.state.get("quests", []):
+        if quest.id == "aldren": searching = true
+        if quest.id == "wolves" and quest.done: road_clear = true
+    if not road_clear:
+        _home_report.text = "Aldren's rooms are ready for his guest. The steward is waiting for word that the west road is safe."
+    elif searching:
+        _home_report.text = "Your father expects you to bring Aldren home. If the trail fails, return here and wait. His place at the table is still set."
+    else:
+        _home_report.text = "The gates are open to your expedition. Muster your household, provision the wagons, and prepare for the road."
+    var garrison := 0
+    for entry in host.state.get("garrisons", []):
+        if Vector2i(entry.cell[0], entry.cell[1]) == cell:
+            for stack in entry.army: garrison += int(stack.count)
+    var town := _town()
+    var dawns := 7 - int(host.state.get("day_of_week", 1))
+    if dawns == 0: dawns = 7
+    _home_ledger.text = "THE ESTATE\n\n%d gold each dawn\n%d buildings standing\n%d troops in the garrison\nNext muster in %d day%s" % [
+        int(town.get("gold", 0)), town.get("buildings", []).size(), garrison, dawns, "" if dawns == 1 else "s"]
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
@@ -358,6 +434,7 @@ func recruit(unit_id: String, count: int) -> bool:
 
 func refresh() -> void:
     var state: Dictionary = host.state
+    if _is_home: _refresh_home()
     var parts: Array[String] = []
     for r in RESOURCES: parts.append("%s %d" % [r, state.treasury[r]])
     _treasury.text = "    ".join(parts)

@@ -23,6 +23,13 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         if (!f.is_open()) return "Cannot open triggers: " + path;
         Json root = Json::parse(f);
         m_triggers = root.value("triggers", Json::array());
+        m_passageEndsScenario = root.value("passage_ends_scenario", true);
+        m_choice = Json::object();
+        m_outcome = Json::object();
+        m_lore.clear();
+        m_essential.clear();
+        for (const auto& id : root.value("essential_companions", Json::array()))
+            m_essential.insert(id.get<std::string>());
         m_startCompanions.reset();
         if (root.contains("start_companions"))
             m_startCompanions = root["start_companions"].get<std::vector<std::string>>();
@@ -133,6 +140,14 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 fire(s, "quests_done", {{"count", optional}});
             }
         if (a.contains("join")) s.joinSpecial(a["join"].get<std::string>());
+        if (a.contains("leave")) s.leaveSpecial(a["leave"].get<std::string>());
+        if (a.contains("choice") && m_outcome.empty()) m_choice = a["choice"];
+        if (a.contains("ending")) {
+            m_outcome = a["ending"];
+            m_outcome["night"] = s.day();
+            m_choice = Json::object();
+            s.completeChapter(m_outcome.value("return_to", ""));
+        }
         if (a.contains("quest_text"))
             if (Quest* q = quest(a["quest_text"].at(0))) q->text = a["quest_text"].at(1).get<std::string>();
         if (a.contains("reveal")) {
@@ -141,10 +156,13 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         }
         if (a.contains("give")) s.give(poolFrom(a["give"]));
         if (a.contains("clue")) {
-            if (auto name = s.giveClue())
-                m_lines.push_back({"Kharim", "The " + *name + " is a dead end. I would stake my maps on it."});
-            else
-                m_lines.push_back({"Kharim", "You have already ruled out every false mine. Trust the one that remains."});
+            auto name = s.giveClue();
+            if (!a.value("silent", false)) {
+                if (name)
+                    m_lines.push_back({"Kharim", "The " + *name + " is a dead end. I would stake my maps on it."});
+                else
+                    m_lines.push_back({"Kharim", "You have already ruled out every false mine. Trust the one that remains."});
+            }
         }
         if (a.contains("item")) s.addItem(a["item"].get<std::string>());
         if (a.contains("lore")) {
@@ -184,6 +202,19 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
     }
 }
 
+std::optional<std::string> Scenario::choose(AdventureSession& s, const std::string& id) {
+    if (!awaitingChoice() || !m_outcome.empty() || s.won() || s.lost())
+        return "There is no story choice to make.";
+    for (const auto& option : m_choice.value("options", Json::array())) {
+        if (option.value("id", "") != id) continue;
+        Json actions = option.value("then", Json::array());
+        m_choice = Json::object();  // commit before executing; a second click cannot take the other path
+        run(s, actions);
+        return std::nullopt;
+    }
+    return "That is not one of the available choices.";
+}
+
 Scenario::Json Scenario::saveState() const {
     Json quests = Json::array();
     for (const auto& q : m_quests) quests.push_back({{"id", q.id}, {"text", q.text}, {"done", q.done}});
@@ -195,10 +226,13 @@ Scenario::Json Scenario::saveState() const {
             {"quests", quests}, {"offers", offers}, {"lore", lore},
             {"won", Json(std::vector<std::string>(m_won.begin(), m_won.end()))},
             {"vanished", Json(std::vector<std::string>(m_vanished.begin(), m_vanished.end()))},
-            {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)}};
+            {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)},
+            {"choice", m_choice}, {"outcome", m_outcome}};
 }
 
 void Scenario::loadState(const Json& state) {
+    m_choice = state.value("choice", Json::object());
+    m_outcome = state.value("outcome", Json::object());
     m_fired.clear();
     for (const auto& id : state.value("fired", Json::array())) m_fired.insert(id.get<std::string>());
     m_quests.clear();

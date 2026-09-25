@@ -207,11 +207,14 @@ Json AdventureBridge::snapshot() const {
         {"vanished", vanished},
         {"encounter_xp", encounter_xp},
         {"hero_progress", hero_progress},
+        {"fieldwork_stock", session_.fieldworkStock()}, {"fieldwork_capacity", session_.fieldworkCapacity()},
         {"tree", tree}, {"tactics_rank", session_.tacticsRank()},
         {"encounter", pending},
         {"sites", sites},
         {"chest", chest},
         {"won", session_.won()},
+        {"story_choice", session_.scenario().choice()},
+        {"story_outcome", session_.scenario().outcome()},
         {"army", army},
         {"towns", towns},
         {"building_defs", building_defs},
@@ -334,6 +337,13 @@ Json AdventureBridge::recruit(int q, int r, const std::string& unit_id, int coun
     return with_lines(out);
 }
 
+Json AdventureBridge::choose_story(const std::string& id) {
+    auto err = session_.scenario().choose(session_, id);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return with_lines(out);
+}
+
 Json AdventureBridge::accept_offer(const std::string& id) {
     auto err = session_.acceptOffer(id);
     Json out = snapshot();
@@ -343,6 +353,13 @@ Json AdventureBridge::accept_offer(const std::string& id) {
 
 Json AdventureBridge::transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison) {
     auto err = session_.transfer({q, r}, unit_id, count, to_garrison);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return out;
+}
+
+Json AdventureBridge::buy_fieldwork(const std::string& kind) {
+    auto err = session_.buyFieldwork(kind);
     Json out = snapshot();
     if (err) { out["ok"] = false; out["error"] = *err; }
     return out;

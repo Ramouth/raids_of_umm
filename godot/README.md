@@ -33,6 +33,44 @@ Alternatively, run `./scripts/run_godot.sh --prepare`, then import
 `godot/project.godot` through Godot's project manager. Open `scenes/desert.tscn`
 and press F6 to run the scene (F5 runs the project).
 
+## First chapter: the search for Aldren
+
+The northern demo begins by clearing the road for Ushari, then follows Aldren's
+trail through Corvin's country. Finding the untouched tunnel opens a permanent
+choice: return to your father, or enter with Ushari. Each route ends in a short
+night scene. On the home route she enters alone; her progression is retained for
+a later reunion. The chapter outcome is saved to `user://chapter_one.json`.
+Later chapters and the reunion are not yet playable.
+
+Story source: `scripts/north_story.py`; regenerate with `python3 scripts/north_story.py`.
+Map source: `scripts/gen_north_map.py`; hand-tuned playable map: `data/maps/old_passage.json`.
+The vale now has a quarry, northern routes have stone and obsidian supplies, and
+wood/stone resupply replaces redundant gold piles. Starting resources and prices
+are unchanged.
+
+Run the native story/save regressions with `./scripts/build_godot_combat.sh --test`
+and both ending flows with `./scripts/run_godot.sh --headless --script res://tests/demo_smoke.gd`.
+
+## Home and fieldworks
+
+Varenhold opens on a Great Hall view with a dedicated castle illustration,
+quest-aware household news, and an estate ledger. Recruitment, construction,
+and trading remain available through the adjacent tabs.
+
+The commander screen presents three progression paths. Siegemaster unlocks
+reusable fieldworks: level 2 grants one wagon slot and barricades (250 gold,
+3 wood); level 4 adds a slot and stakes (150 gold, 2 wood); level 5 adds a third
+slot. Purchases and stock survive saves. Barricades block movement and arrows;
+stakes block movement only. Place them in the highlighted deployment area,
+right-click to recover them, then press Enter to begin. Construction during
+combat is not implemented. Placement cannot seal off the battlefield.
+
+The intro uses static paintings with fades, and cancels interrupted transitions
+to prevent shaking or duplicate title cards when skipping quickly.
+
+Run `res://tests/fieldworks_smoke.gd` for shop, deployment, combat, and intro
+checks. Add `-- --capture` with a display to save screenshots to `godot/artifacts`.
+
 ## What is working
 
 - Imports all 169 cells and 11 landmarks from `data/maps/default.json`.

@@ -29,6 +29,7 @@ func _run() -> void:
         screen.host = scene
         screen.cell = towns[name]
         scene.screens.push(screen, func(_r): pass)
+        if name == "Varenhold": await _shot("varenhold_home")
         screen.show_tab("build")
         if name == "Varenhold": screen.build("town_hall")
         print(name, ": ", screen._town().get("buildings"), " today=", screen._town().get("built_today"), " title=", screen.get_child(1).text if screen.get_child_count() > 1 else "")

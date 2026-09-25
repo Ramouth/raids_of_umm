@@ -12,7 +12,7 @@ namespace {
 
 struct SpecialDef { const char* id; const char* name; const char* title; };
 constexpr SpecialDef kSpecials[] = {
-    {"ushari", "Ushari", "Veteran commander"},
+    {"ushari", "Ushari", "Keeper of the old ways"},
     {"kharim", "Kharim", "Scholar of Pha'raxh"},
     {"maerwen", "Maerwen Hale", "Shield-captain of the heron"},
 };
@@ -54,6 +54,14 @@ int AdventureSession::upkeepFor(int level) {
 
 void AdventureSession::joinSpecial(const std::string& id) {
     for (const auto& sc : m_specials) if (sc.id == id) return;
+    auto returning = std::find_if(m_departedSpecials.begin(), m_departedSpecials.end(),
+                                 [&](const Special& sc) { return sc.id == id; });
+    if (returning != m_departedSpecials.end()) {
+        m_specials.push_back(*returning);
+        m_specials.back().stationed.reset();
+        m_departedSpecials.erase(returning);
+        return;
+    }
     for (const auto& def : kSpecials) {
         if (id != def.id) continue;
         m_specials.push_back({def.id, def.name, def.title, 1, 0, std::nullopt, 0});
@@ -61,6 +69,15 @@ void AdventureSession::joinSpecial(const std::string& id) {
             report(def.name, std::string("I will ride with the Compact. My upkeep is modest, for now."));
         return;
     }
+}
+
+void AdventureSession::leaveSpecial(const std::string& id) {
+    auto it = std::find_if(m_specials.begin(), m_specials.end(), [&](const Special& sc) { return sc.id == id; });
+    if (it == m_specials.end()) return;
+    m_departedSpecials.push_back(*it);
+    m_departedSpecials.back().stationed.reset();
+    m_specials.erase(it);
+    recomputeVisibility();
 }
 
 std::vector<AdventureSession::Companion> AdventureSession::battleCompanions() const {
@@ -75,7 +92,7 @@ void AdventureSession::companionsFell(const std::vector<std::string>& fallen, bo
     for (const auto& id : fallen) {
         auto sc = std::find_if(m_specials.begin(), m_specials.end(), [&](const Special& s) { return s.id == id; });
         if (sc == m_specials.end()) continue;
-        if (battleLost) {
+        if (battleLost && !m_scenario.essential(id)) {
             report("Commander", sc->name + " fell, and no one was left to carry " + sc->name
                    + " from the field. " + sc->name + " is gone.");
             m_specials.erase(sc);
@@ -167,7 +184,7 @@ void AdventureSession::payUpkeep() {
             ++it->unpaidDays;
             if (it->unpaidDays == SULK_DAYS)
                 report(it->name, "Three days without pay. Do not expect my best until the treasury remembers me.");
-            if (it->unpaidDays >= LEAVE_DAYS) {
+            if (it->unpaidDays >= LEAVE_DAYS && !m_scenario.essential(it->id)) {
                 report(it->name, "A week unpaid. I have served better paymasters. Farewell.");
                 it = m_specials.erase(it);
                 continue;
@@ -180,6 +197,7 @@ void AdventureSession::payUpkeep() {
 std::optional<std::string> AdventureSession::station(const std::string& id, bool stay) {
     auto sc = std::find_if(m_specials.begin(), m_specials.end(), [&](const Special& s) { return s.id == id; });
     if (sc == m_specials.end()) return "No such companion.";
+    if (stay && m_scenario.essential(id)) return sc->name + " must stay with the expedition until the search is settled.";
     if (stay) {
         const MapObjectDef* here = m_map.objectAt(m_hero.pos);
         if (!here || here->type != ObjType::Town || owner(m_hero.pos) != Faction::Player)
@@ -214,6 +232,7 @@ void AdventureSession::loadHeroTree(const std::string& path) {
             if (n.contains("effect")) {
                 const auto& e = n["effect"];
                 node.live = true;
+                node.effect.fieldworks = e.value("fieldworks", 0);
                 node.effect.tactics     = e.value("tactics", 0);
                 node.effect.attack      = e.value("attack", 0);
                 node.effect.defense     = e.value("defense", 0);
@@ -244,6 +263,24 @@ std::optional<std::string> AdventureSession::choosePath(const std::string& pathI
     return "No such path.";
 }
 
+std::optional<std::string> AdventureSession::buyFieldwork(const std::string& kind) {
+    if (won() || lost() || m_scenario.awaitingChoice()) return "Finish the current story first.";
+    if (kind != "barricade" && kind != "stakes") return "Unknown fieldwork.";
+    if (fieldworkCapacity() == 0 || (kind == "stakes" && fieldworkCapacity() < 2))
+        return "Learn the required Siegemaster skill first.";
+    int owned = 0;
+    for (const auto& [id, count] : m_fieldworkStock) owned += count;
+    if (owned >= fieldworkCapacity()) return "Your fieldwork wagons are full.";
+    ResourcePool cost;
+    cost[Resource::Gold] = kind == "barricade" ? 250 : 150;
+    cost[Resource::Wood] = kind == "barricade" ? 3 : 2;
+    auto& treasury = m_turns.playerFaction().treasury;
+    if (!treasury.canAfford(cost)) return "Not enough gold or wood.";
+    treasury -= cost;
+    ++m_fieldworkStock[kind];
+    return std::nullopt;
+}
+
 bool AdventureSession::learned(const std::string& nodeId) const {
     return std::find(m_learned.begin(), m_learned.end(), nodeId) != m_learned.end();
 }
@@ -253,6 +290,7 @@ AdventureSession::HeroEffects AdventureSession::heroEffects() const {
     for (const auto& p : m_paths)
         for (const auto& n : p.nodes) {
             if (!n.live || !learned(n.id)) continue;
+            total.fieldworks += n.effect.fieldworks;
             total.tactics += n.effect.tactics;
             total.attack  += n.effect.attack;
             total.defense += n.effect.defense;

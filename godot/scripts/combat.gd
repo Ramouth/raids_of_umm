@@ -43,6 +43,8 @@ var waypoints: Array = []
 ## Pointer over the Defend button: the status line explains the stance.
 var _defend_hover := false
 var begin_button: Button
+var _fieldwork_box: VBoxContainer
+var _fieldwork_kind := "barricade"
 var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
 
 func _ready() -> void:
@@ -91,6 +93,20 @@ func _ready() -> void:
     defend.mouse_exited.connect(func():
         _defend_hover = false
         _update_status())
+    _fieldwork_box = VBoxContainer.new()
+    _fieldwork_box.position = Vector2(830, 341)
+    _fieldwork_box.size = Vector2(400, 84)
+    _fieldwork_box.add_theme_constant_override("separation", 8)
+    add_child(_fieldwork_box)
+    for kind in ["barricade", "stakes"]:
+        var button := Button.new()
+        button.name = kind
+        button.custom_minimum_size.y = 36
+        button.pressed.connect(func():
+            _fieldwork_kind = kind
+            _refresh())
+        _fieldwork_box.add_child(button)
+    _fieldwork_box.hide()
     begin_button = _button("Begin the battle · Enter", Vector2(830, 440), give_orders)
     begin_button.hide()
     retreat = _button("Retreat…", Vector2(830, 494), func(): confirm_retreat.popup_centered())
@@ -221,6 +237,7 @@ func _decode_reply(raw: String) -> Dictionary:
         var cells: Array = reply.state.reachable + reply.state.attackable
         for entry in reply.state.get("reaction_fire", []): cells.append(entry.cell)
         for unit in reply.state.units: cells.append(unit.cell)
+        for work in reply.state.get("fieldworks", []): cells.append(work.cell)
         for preview in reply.state.get("previews", []):
             cells.append(preview.cell)
             if preview.has("best"): cells.append(preview.best)
@@ -312,14 +329,17 @@ func _companion_warnings() -> String:
     return "[color=#%s]⚠ %s.[/color]" % [Board.DANGER_COLOR.to_html(false), "; ".join(lines)]
 
 func _refresh() -> void:
-    board.locked = busy or auto_battle or _opening() > 0   # no move range while orders are given
+    board.locked = busy or auto_battle or _opening() > 0 or _deploying()   # no move range while orders are given
     board.queue_redraw()
     var ongoing: bool = state.get("result", "") == "ongoing"
     if ongoing:
         var player_turn: bool = state.get("player_turn", false)
         var whose := "YOUR TURN" if player_turn and not auto_battle else ("AUTO-BATTLE" if player_turn else "ENEMY TURN")
         if busy: whose = "resolving…"
-        if _opening() > 0 and not auto_battle:
+        if _deploying():
+            turn_label.text = "BEFORE BATTLE   ·   PLACE YOUR FIELDWORKS"
+            turn_label.add_theme_color_override("font_color", GOLD)
+        elif _opening() > 0 and not auto_battle:
             turn_label.text = "ROUND 1   ·   OPENING ORDERS"
             turn_label.add_theme_color_override("font_color", GOLD)
         else:
@@ -327,7 +347,20 @@ func _refresh() -> void:
             turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
     _build_initiative()
     defend.disabled = busy or auto_battle or not state.get("player_turn", false) or not ongoing
-    begin_button.visible = _opening() > 0 and ongoing
+    begin_button.visible = (_opening() > 0 or _deploying()) and ongoing
+    begin_button.text = "Finish placement · Enter" if _deploying() else "Begin the battle · Enter"
+    _fieldwork_box.visible = _deploying() and ongoing
+    if int(state.get("fieldwork_stock", {}).get(_fieldwork_kind, 0)) == 0:
+        _fieldwork_kind = "stakes" if int(state.get("fieldwork_stock", {}).get("stakes", 0)) > 0 else "barricade"
+    for button in _fieldwork_box.get_children():
+        var kind: String = button.name
+        var stock := int(state.get("fieldwork_stock", {}).get(kind, 0))
+        var used := 0
+        for work in state.get("fieldworks", []):
+            if work.kind == kind: used += 1
+        button.text = ("› " if kind == _fieldwork_kind else "") + kind.capitalize() + "  ·  %d / %d placed" % [used, stock]
+        button.disabled = busy or stock == 0
+        button.tooltip_text = "Blocks movement and all arrows." if kind == "barricade" else "Blocks movement; arrows pass over it."
     defend.visible = not begin_button.visible
     begin_button.disabled = busy or auto_battle
     retreat.disabled = busy or not ongoing
@@ -407,6 +440,9 @@ func _portrait(key: String, active: bool, upcoming := false) -> Control:
 # ── Stack inspection ──────────────────────────────────────────────────────────
 
 func _update_inspection() -> void:
+    if _deploying():
+        inspection.text = "[color=#f7d580][b]FIELD ENGINEERING[/b][/color]\n\nChoose a fieldwork, then click a highlighted hex. Right-click a placed piece to recover it.\n\nBarricades block everyone's arrows. Stakes block movement only. Equipment is reused next battle."
+        return
     if state.get("result", "") != "ongoing" and not state.is_empty(): return
     for key in [_hover_key, _pinned_key, state.get("active", "")]:
         if units.has(key) and int(units[key].count) > 0:
@@ -479,6 +515,7 @@ func _pointer_moved(point: Vector2) -> void:
 
 func _occupied() -> Dictionary:
     var taken := {}
+    for work in state.get("fieldworks", []): taken[Vector2i(work.cell[0], work.cell[1])] = true
     for unit in state.get("units", []):
         if int(unit.count) > 0 and unit.key != state.get("active", ""): taken[Vector2i(unit.cell[0], unit.cell[1])] = true
     return taken
@@ -642,6 +679,9 @@ func _update_status() -> void:
     var active: Dictionary = units.get(state.get("active", ""), {})
     if not ongoing:
         text = "The battle is over."
+    elif _deploying():
+        text = "[b]FIELDWORKS[/b]: click highlighted hex to place · right-click to recover · Enter to finish"
+        kind = "move" if not _hover_cell.is_empty() and int(_hover_cell[0]) >= 2 and int(_hover_cell[0]) <= 4 else "blocked"
     elif _opening() > 0 and not auto_battle:
         var chosen: Array[String] = []
         for key in _orders: chosen.append(_unit_name(key))
@@ -819,6 +859,9 @@ static func _hex_distance(a: Array, b: Array) -> int:
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 ## Tactics rank still to use: how many of your stacks you may order to act first.
+func _deploying() -> bool:
+    return bool(state.get("deploying", false))
+
 func _opening() -> int:
     return int(state.get("opening", 0))
 
@@ -838,6 +881,7 @@ func _toggle_order(coordinates: Array) -> void:
 
 ## Sends the opening orders (none chosen = initiative as usual) and starts round 1.
 func give_orders() -> bool:
+    if _deploying(): return issue("deploy_done")
     if _opening() == 0: return false
     var route: Array = []
     for key in _orders: route.append(units[key].cell)
@@ -852,6 +896,9 @@ func give_orders() -> bool:
 
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
+    if _deploying():
+        if not busy and not auto_battle: issue("place_" + _fieldwork_kind, cell)
+        return
     if _opening() > 0:
         if not busy and not auto_battle: _toggle_order(coordinates)
         return
@@ -875,6 +922,9 @@ func _cell_clicked(cell: Vector2i) -> void:
     elif coordinates in state.reachable: issue("move", cell)
 
 func _cell_right_clicked(cell: Vector2i) -> void:
+    if _deploying():
+        if not busy and not auto_battle: issue("remove_fieldwork", cell)
+        return
     var unit := _unit_at([cell.x, cell.y])
     _pinned_key = unit.key if not unit.is_empty() else ""
     if unit.is_empty() and not waypoints.is_empty():
@@ -887,7 +937,7 @@ func _defend() -> void:
     if not defend.disabled: issue("defend")
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and _opening() > 0 \
+    if event is InputEventKey and event.pressed and not event.echo and (_opening() > 0 or _deploying()) \
             and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
         give_orders()
         get_viewport().set_input_as_handled()
@@ -902,6 +952,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _schedule_ai() -> void:
     if _ai_scheduled or busy or state.is_empty() or state.result != "ongoing": return
+    if _deploying():
+        if auto_battle: issue("deploy_done")
+        return
     if _opening() > 0:              # nobody moves before the opening orders
         if auto_battle:
             _orders.clear()

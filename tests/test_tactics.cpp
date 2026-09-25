@@ -333,3 +333,80 @@ SUITE("Maerwen — joins as a companion who fights with the opportunity strike")
     CHECK(u != nullptr);
     if (u) { CHECK(u->isCompanion()); CHECK(CombatEngine::hasOpportunityStrike(CombatUnit::companion(u, 1, true))); }
 }
+
+SUITE("Fieldworks — purchases require skills, cost resources, respect capacity, and survive saves") {
+    AdventureSession s;
+    CHECK(!s.start("data/maps/old_passage.json", "data"));
+    CHECK(s.buyFieldwork("barricade").has_value());
+    s.grantXp(AdventureSession::xpForLevel(2));
+    CHECK(!s.choosePath("siegemaster"));
+    const int gold = s.treasury()[Resource::Gold];
+    const int wood = s.treasury()[Resource::Wood];
+    CHECK(s.buyFieldwork("stakes").has_value());
+    CHECK(!s.buyFieldwork("barricade"));
+    CHECK_EQ(s.treasury()[Resource::Gold], gold - 250);
+    CHECK_EQ(s.treasury()[Resource::Wood], wood - 3);
+    CHECK(s.buyFieldwork("barricade").has_value());
+    CHECK_EQ(s.treasury()[Resource::Gold], gold - 250);
+    s.grantXp(AdventureSession::xpForLevel(4) - s.heroProgress().xp);
+    CHECK_EQ(s.fieldworkCapacity(), 2);
+    CHECK(!s.buyFieldwork("stakes"));
+    CHECK(s.buyFieldwork("nonsense").has_value());
+    s.grantXp(AdventureSession::xpForLevel(5) - s.heroProgress().xp);
+    CHECK_EQ(s.fieldworkCapacity(), 3);
+    CHECK(s.buyFieldwork("barricade").has_value()); // wood exhausted; no charge
+    AdventureSession loaded;
+    CHECK(!loaded.loadState(Scenario::Json::parse(s.saveState().dump())));
+    CHECK_EQ(loaded.fieldworkCapacity(), 3);
+    CHECK_EQ(loaded.fieldworkStock().at("barricade"), 1);
+    CHECK_EQ(loaded.fieldworkStock().at("stakes"), 1);
+    for (const auto& path : s.heroPaths())
+        for (const auto& node : path.nodes) CHECK(node.live);
+}
+
+SUITE("Fieldworks — barricades stop shots and reactions; stakes allow shots; both block routes") {
+    UnitType bow;
+    bow.id = bow.name = "Test bow"; bow.speed = 9; bow.hitPoints = 100;
+    bow.attack = 5; bow.defense = 5; bow.minDamage = bow.maxDamage = 5;
+    bow.moveRange = 5; bow.shots = 12; bow.abilities = {"ranged", "readied_shot"};
+    const UnitType* dummy = type("Fieldwork target", 1, 1, 100, 5);
+    CombatArmy p; p.isPlayer = true; p.stacks.push_back(CombatUnit::make(&bow, 1, true));
+    CombatArmy e; e.isPlayer = false; e.stacks.push_back(CombatUnit::make(dummy, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord barrier = CombatMap::toHex(2, 2);
+    CHECK(eng.canShoot(eng.activeUnit()));
+    CHECK(eng.canAttack(0));
+    CHECK(eng.placeFieldwork(barrier, true));
+    CHECK(!eng.canMoveTo(barrier));
+    CHECK(!eng.canAttack(0));
+    CHECK(!eng.previewAttack(0).valid);
+    CHECK(!eng.canAttackFrom(eng.activeUnit().pos, 0));
+    CHECK(!eng.hasLineOfSight(eng.playerArmy().stacks[0].pos, eng.enemyArmy().stacks[0].pos));
+    eng.doDefend(); // enemy moves toward our readied archer
+    CHECK(eng.reactionsTo(CombatMap::toHex(6, 2)).empty());
+    CHECK(eng.removeFieldwork(barrier));
+    CHECK(eng.placeFieldwork(barrier, false));
+    CHECK(!eng.reactionsTo(CombatMap::toHex(6, 2)).empty());
+    eng.doDefend();
+    CHECK(eng.canAttack(0));
+    CHECK(!eng.previewAttack(0).blocked);
+    CHECK(!eng.canMoveTo(barrier));
+    CHECK(eng.canMoveTo(CombatMap::toHex(3, 2)));
+    eng.drainEvents();
+    eng.doMove(CombatMap::toHex(3, 2));
+    for (const auto& event : eng.drainEvents())
+        if (event.type == CombatEvent::Type::UnitMoved)
+            for (const auto& cell : event.path) CHECK(cell != barrier);
+}
+
+SUITE("Fieldworks — cannot seal off the battlefield") {
+    const UnitType* unit = type("Builder test", 3, 1, 100);
+    CombatArmy p; p.isPlayer = true; p.stacks.push_back(CombatUnit::make(unit, 1, true));
+    CombatArmy e; e.isPlayer = false; e.stacks.push_back(CombatUnit::make(unit, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    CHECK(!eng.placeFieldwork({0, 2}, true));
+    CHECK(!eng.placeFieldwork({99, 99}, true));
+    for (int row = 0; row < 4; ++row) CHECK(eng.placeFieldwork(CombatMap::toHex(3, row), true));
+    CHECK(!eng.placeFieldwork(CombatMap::toHex(3, 4), true));
+    CHECK_EQ((int)eng.fieldworks().size(), 4);
+}

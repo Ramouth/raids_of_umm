@@ -1,6 +1,6 @@
 extends Control
 ## The opening, Baldur's Gate II style: painted slides that fade into each
-## other and drift slowly, with the narration appearing line by line beneath.
+## other, with steady framing and narration appearing line by line beneath.
 ## Click, Space or Enter moves on; Esc skips the whole intro.
 
 signal finished
@@ -31,7 +31,9 @@ const SLIDES := [
 ]
 const TITLE := "RAIDS OF UMM'NATUR"
 const FADE := 1.4        # seconds for a slide to fade in or out
-const DRIFT := 1.07      # how far a slide slowly zooms while it is shown
+var _transition: Tween
+var _line_tween: Tween
+var _title_active := false
 
 var _slide := -1
 var _line := -1
@@ -101,7 +103,7 @@ func _picture() -> TextureRect:
     rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    # Paintings, not pixel art: smooth filtering, or the slow zoom shimmers.
+    # Smooth filtering preserves the painted artwork at different window sizes.
     rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
     rect.modulate.a = 0.0
     add_child(rect)
@@ -110,6 +112,10 @@ func _picture() -> TextureRect:
 ## The next line of narration, or the next slide when this one is told.
 func advance() -> void:
     if _done: return
+    _timer.stop()
+    if _title_active:
+        skip()
+        return
     if _slide >= 0 and _line + 1 < SLIDES[_slide].lines.size():
         _line += 1
         _show_line(_line)
@@ -123,6 +129,7 @@ func advance() -> void:
     _show_line(0)
 
 func _show_slide(image: String) -> void:
+    if _transition != null: _transition.kill()
     _clear_lines()
     # Every line of the slide is laid out now, unseen, so nothing moves as they appear.
     for text in SLIDES[_slide].lines: _lines.add_child(_line_label(str(text)))
@@ -132,14 +139,14 @@ func _show_slide(image: String) -> void:
     _back = old
     move_child(_back, 1)                 # always: black, back, front, shade, words
     move_child(_front, 2)
-    create_tween().tween_property(_back, "modulate:a", 0.0, FADE)
     _front.texture = _textures.get(image, null)
     _front.modulate.a = 0.0
-    _front.pivot_offset = size / 2.0
+    # Static image geometry avoids subpixel resampling shimmer during slow zooms.
     _front.scale = Vector2.ONE
-    var tween := create_tween().set_parallel()
-    tween.tween_property(_front, "modulate:a", 1.0, FADE)
-    tween.tween_property(_front, "scale", Vector2.ONE * DRIFT, 24.0).set_trans(Tween.TRANS_SINE)
+    _back.scale = Vector2.ONE
+    _transition = create_tween().set_parallel()
+    _transition.tween_property(_back, "modulate:a", 0.0, FADE)
+    _transition.tween_property(_front, "modulate:a", 1.0, FADE)
 
 func _line_label(text: String) -> Label:
     var label := Label.new()
@@ -157,6 +164,7 @@ func _line_label(text: String) -> Label:
     return label
 
 func _clear_lines() -> void:
+    if _line_tween != null: _line_tween.kill()
     for child in _lines.get_children():
         _lines.remove_child(child)
         child.queue_free()
@@ -164,17 +172,26 @@ func _clear_lines() -> void:
 ## Reveals line `index` of the current slide; the ones before it dim, BG2 style.
 func _show_line(index: int) -> void:
     var labels := _lines.get_children()
-    for i in index: create_tween().tween_property(labels[i], "modulate:a", 0.45, 0.6)
+    if _line_tween != null: _line_tween.kill()
+    _line_tween = create_tween().set_parallel()
+    for i in index: _line_tween.tween_property(labels[i], "modulate:a", 0.45, 0.6)
     var first := index == 0
-    create_tween().tween_property(labels[index], "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
+    _line_tween.tween_property(labels[index], "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
     var text := str(SLIDES[_slide].lines[index])
     var pace: float = SLIDES[_slide].get("pace", 1.0)   # < 1: a slide that moves on sooner
     _timer.start((3.5 + text.length() / 18.0) * pace + (FADE if first else 0.0))
 
 func _title() -> void:
+    if _title_active: return
+    _title_active = true
+    _timer.stop()
     _clear_lines()
-    create_tween().tween_property(_front, "modulate:a", 0.0, FADE)
+    if _transition != null: _transition.kill()
+    _transition = create_tween().set_parallel()
+    _transition.tween_property(_front, "modulate:a", 0.0, FADE)
+    _transition.tween_property(_back, "modulate:a", 0.0, FADE)
     var title := Label.new()
+    title.name = "Title"
     title.text = TITLE
     var font := SystemFont.new()
     font.font_names = PackedStringArray(["Noto Serif", "DejaVu Serif", "Georgia"])
@@ -197,6 +214,8 @@ func skip() -> void:
     if _done: return
     _done = true
     _timer.stop()
+    if _transition != null: _transition.kill()
+    if _line_tween != null: _line_tween.kill()
     finished.emit()
 
 func _gui_input(event: InputEvent) -> void:

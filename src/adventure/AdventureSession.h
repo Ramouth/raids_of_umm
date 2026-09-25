@@ -206,6 +206,7 @@ public:
     // one for good; every level then grants that path's skill for the level.
     // The Veined is the wildcard: shown, offered by the story, never chosen here.
     struct HeroEffects {
+        int fieldworks = 0;
         int tactics = 0, attack = 0, defense = 0, moves = 0, sight = 0, gold = 0;
         double growth = 0;
         bool readiedShot = false;
@@ -224,6 +225,9 @@ public:
     std::optional<std::string> choosePath(const std::string& pathId);
     bool learned(const std::string& nodeId) const;
     HeroEffects heroEffects() const;          // everything the commander's skills add up to
+    int fieldworkCapacity() const { return std::min(3, heroEffects().fieldworks); }
+    const std::map<std::string, int>& fieldworkStock() const { return m_fieldworkStock; }
+    std::optional<std::string> buyFieldwork(const std::string& kind);
     int tacticsRank() const { return heroEffects().tactics; }   // stacks ordered first (0–3)
     // Level-ups since the last drain, for the UI's pop-up. skill "" = choose a path.
     struct LevelUp { int level = 0; std::string skill, text; };
@@ -248,6 +252,8 @@ public:
     static int upkeepFor(int level);       // gold per day
     bool hasAbility(const std::string& abilityName) const;  // active on an SC travelling with the hero
     void joinSpecial(const std::string& id);
+    void leaveSpecial(const std::string& id);  // retain progression for a later reunion
+    void completeChapter(const std::string& returnTo = "");
     bool isWounded(const Special& sc) const { return day() < sc.woundedUntil; }
     // Companions who ride into the hero's next battle: travelling, unwounded, paid.
     struct Companion { std::string id; int level = 1; };
@@ -366,7 +372,9 @@ private:
     std::unordered_set<std::string>  m_items;
     std::map<std::string, std::string> m_equipped;   // slot → item id
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
+    std::map<std::string, int>        m_fieldworkStock;
     std::vector<Special>             m_specials;
+    std::vector<Special>             m_departedSpecials;
     HeroProgress                     m_heroProgress;
     std::vector<TreePath>            m_paths;
     TreePath                         m_wildcard;

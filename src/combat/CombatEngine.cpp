@@ -33,6 +33,54 @@ void CombatEngine::setSeed(uint32_t seed) {
     m_aiRng.seed(seed ^ 0x9E3779B9u);
 }
 
+bool CombatEngine::fieldworkAt(HexCoord cell) const {
+    for (const auto& work : m_fieldworks) if (work.cell == cell) return true;
+    return false;
+}
+
+bool CombatEngine::placeFieldwork(HexCoord cell, bool opaque) {
+    if (!CombatMap::inBounds(cell) || cell.q < 2 || cell.q > 4 || fieldworkAt(cell)) return false;
+    for (const auto* army : {&m_player, &m_enemy})
+        for (const auto& unit : army->stacks)
+            if (!unit.isDead() && unit.pos == cell) return false;
+    m_fieldworks.push_back({cell, opaque});
+    // Leave every open hex connected, so a fortification cannot make a battle unwinnable.
+    std::unordered_set<HexCoord> reached;
+    std::queue<HexCoord> frontier;
+    frontier.push({0, 0}); reached.insert({0, 0});
+    while (!frontier.empty()) {
+        const auto at = frontier.front(); frontier.pop();
+        for (int d = 0; d < 6; ++d) {
+            const auto next = at.neighbor(d);
+            if (!CombatMap::inBounds(next) || fieldworkAt(next) || reached.count(next)) continue;
+            reached.insert(next); frontier.push(next);
+        }
+    }
+    if (reached.size() + m_fieldworks.size() != CombatMap::allHexes().size()) {
+        m_fieldworks.pop_back(); return false;
+    }
+    return true;
+}
+
+bool CombatEngine::removeFieldwork(HexCoord cell) {
+    auto it = std::find_if(m_fieldworks.begin(), m_fieldworks.end(), [&](const Fieldwork& work) { return work.cell == cell; });
+    if (it == m_fieldworks.end()) return false;
+    m_fieldworks.erase(it);
+    return true;
+}
+
+bool CombatEngine::clearTerrainSight(HexCoord from, HexCoord to) const {
+    for (int nudge : {1, -1}) {
+        const auto line = from.lineTo(to, nudge);
+        bool clear = true;
+        for (size_t i = 1; i + 1 < line.size() && clear; ++i)
+            for (const auto& work : m_fieldworks)
+                if (work.opaque && work.cell == line[i]) { clear = false; break; }
+        if (clear) return true;
+    }
+    return false;
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 const CombatUnit& CombatEngine::activeUnit() const {
@@ -48,6 +96,7 @@ std::vector<HexCoord> CombatEngine::reachableTiles() const {
 
 std::vector<HexCoord> CombatEngine::walkTo(const CombatUnit& unit, HexCoord to) const {
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : m_fieldworks) occupied.insert(work.cell);
     for (const auto* army : {&m_player, &m_enemy})
         for (const auto& s : army->stacks)
             if (!s.isDead() && &s != &unit) occupied.insert(s.pos);
@@ -76,6 +125,7 @@ std::vector<HexCoord> CombatEngine::reachableFor(const CombatUnit& unit) const {
     // Build a set of all occupied hexes (any living stack, friend or foe).
     // A unit cannot move through or onto an occupied hex.
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : m_fieldworks) occupied.insert(work.cell);
     for (const auto& s : m_player.stacks)
         if (!s.isDead()) occupied.insert(s.pos);
     for (const auto& s : m_enemy.stacks)
@@ -156,7 +206,7 @@ bool CombatEngine::canAttackFrom(HexCoord from, int targetIndex) const {
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
     if (enemies[targetIndex].isDead()) return false;
-    if (from == actor.pos && canShoot(actor)) return true;
+    if (from == actor.pos && canShoot(actor)) return clearTerrainSight(from, enemies[targetIndex].pos);
     for (const HexCoord& h : attackHexesFor(targetIndex))
         if (h == from) return true;
     return false;
@@ -173,6 +223,7 @@ HexCoord CombatEngine::bestAttackHex(int targetIndex) const {
     const int self = currentTurn().stackIndex;
     // Walking distance from the actor over free hexes (BFS, same rules as reachableTiles).
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : m_fieldworks) occupied.insert(work.cell);
     for (const auto* army : {&m_player, &m_enemy})
         for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
     std::unordered_map<HexCoord, int> dist{{actor.pos, 0}};
@@ -225,6 +276,7 @@ bool CombatEngine::isLegalRoute(const std::vector<HexCoord>& route) const {
     const CombatUnit& actor = activeUnit();
     if (static_cast<int>(route.size()) > actor.type->moveRange) return false;
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : m_fieldworks) occupied.insert(work.cell);
     for (const auto* army : {&m_player, &m_enemy})
         for (const auto& s : army->stacks) if (!s.isDead()) occupied.insert(s.pos);
     std::unordered_set<HexCoord> seen{actor.pos};
@@ -518,7 +570,7 @@ bool CombatEngine::canAttack(int targetIndex) const {
     const auto& enemies = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemies.size())) return false;
     if (enemies[targetIndex].isDead()) return false;
-    if (canShoot(actor)) return true;
+    if (canShoot(actor)) return clearTerrainSight(actor.pos, enemies[targetIndex].pos);
     return !attackHexesFor(targetIndex).empty();
 }
 
@@ -820,7 +872,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
         const CombatUnit& s = shooters[i];
         if (!s.isDead() && hasReadiedShot(s) && canShoot(s) && !s.hasReacted
-            && s.pos.distanceTo(to) < s.pos.distanceTo(from)) ready.push_back(i);
+            && s.pos.distanceTo(to) < s.pos.distanceTo(from) && clearTerrainSight(s.pos, to)) ready.push_back(i);
     }
     CombatEvent ev;
     ev.type       = CombatEvent::Type::UnitMoved;
@@ -887,7 +939,7 @@ std::vector<CombatEngine::ReactionPreview> CombatEngine::reactionsTo(HexCoord to
     for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
         const CombatUnit& s = shooters[i];
         if (s.isDead() || !hasReadiedShot(s) || !canShoot(s) || s.hasReacted) continue;
-        if (s.pos.distanceTo(to) >= s.pos.distanceTo(actor.pos)) continue;
+        if (s.pos.distanceTo(to) >= s.pos.distanceTo(actor.pos) || !clearTerrainSight(s.pos, to)) continue;
         CombatUnit moved = actor;
         moved.pos = to;
         ReactionPreview r;
@@ -903,6 +955,7 @@ std::vector<CombatEngine::ReactionPreview> CombatEngine::reactionsTo(HexCoord to
 
 bool CombatEngine::hasLineOfSight(HexCoord from, HexCoord to, const CombatUnit* mover) const {
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : m_fieldworks) if (work.opaque) occupied.insert(work.cell);
     for (const auto* army : {&m_player, &m_enemy})
         for (const auto& s : army->stacks)
             if (!s.isDead() && &s != mover) occupied.insert(s.pos);

@@ -34,6 +34,8 @@ private:
     std::unique_ptr<CombatEngine> engine_;
     std::string reward_;
     bool awaiting_animation_ = false;
+    bool deploying_ = false;
+    int barricades_ = 0, stakes_ = 0;
     int opening_ = 0;   // Tactics rank: stacks the player may order first, until the orders are given
     int64_t ticket_ = 0;
 };

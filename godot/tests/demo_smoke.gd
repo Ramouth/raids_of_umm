@@ -83,6 +83,7 @@ func _run() -> void:
     await _route_planning()
     await _ridge_pass()
     await _passage_wins()
+    await _branch_endings()
     await _defeat_ends()
     await _rival_raids()
     await _save_load()
@@ -143,11 +144,11 @@ func _story() -> void:
     scene.dialogue.skip_all()
     check(not scene.dialogue.is_speaking(), "Dialogue can be dismissed")
     var druid := Vector2i(-7, -5)
-    check(scene.map_view.anchors.has(druid), "The hooded druid stands by the Hermit's Wolves")
+    check(not scene.map_view.anchors.has(druid), "The opening has no druid subplot")
     for camp in [Vector2i(-8, -3), Vector2i(-10, -2), Vector2i(-7, -6)]:   # Hill, Den, Hermit's
         await _clear_camp(scene, camp)
         check(not scene._guarded(camp), "Wolf pack at %s is cleared" % camp)
-    check("HOODED DRUID" in _heard or "Hooded Druid" in _heard, "The druid speaks before his pack fights")
+    check(not "HOODED DRUID" in _heard and not "Hooded Druid" in _heard, "Wolves need no exposition")
     check(not scene.map_view.anchors.has(druid), "The druid walks off once his wolves fall")
     check(scene.state.quests.any(func(q): return q.main), "The main quest is given")
     check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
@@ -162,7 +163,7 @@ func _story() -> void:
     await process_frame
     var tree: Control = scene.screens.top()
     check(tree != null and tree.has_method("choose"), "The path screen opens from the level-up pop-up")
-    check(tree._columns.get_child_count() == 4, "Three paths and the wildcard are shown")
+    check(tree._columns.get_child_count() == 3, "Three readable path tabs are shown")
     check(not tree.choose("veined"), "The Veined is not chosen at level 2")
     check(tree.choose("marshal"), "The Marshal's path can be chosen")
     check(int(scene.state.tactics_rank) == 1, "First Orders comes with the Marshal's path")
@@ -181,9 +182,7 @@ func _story() -> void:
     check(scene.open_party(), "The companions screen opens")
     var party: Control = scene.screens.top()
     party._station("ushari", true)
-    check(scene.state.specials[0].stationed != null, "Ushari can govern Varenhold")
-    party._station("ushari", false)
-    check(scene.state.specials[0].stationed == null, "Ushari can be recalled")
+    check(scene.state.specials[0].stationed == null, "Ushari stays with the search instead of governing")
     party.find_child("Done", true, false).pressed.emit()
     await process_frame
     scene.queue_free()
@@ -239,6 +238,9 @@ func _town_recruiting() -> void:
     var town: Control = scene.screens.top()
     check(town != null and town.has_method("recruit"), "Town screen is pushed")
     check(town._cards.get_child_count() == 5, "Varenhold offers the five Cruth tiers")
+    check(town.tab == "hall" and town._pages["hall"].visible, "Varenhold opens on its Great Hall")
+    check(not town._home_report.text.is_empty(), "The household reports the current search")
+    town.show_tab("recruit")
     var gold := int(scene.state.treasury.Gold)
     check(town.recruit("woad_runner", 6), "Recruiting levies succeeds")
     check(int(scene.state.treasury.Gold) == gold - 270, "Recruiting spends 45 gold per runner")
@@ -355,6 +357,52 @@ func _passage_wins() -> void:
     check(scene._guarded(Vector2i(1, 0)), "Restart restores the guards")
     scene.queue_free()
     await process_frame
+
+## Use the production choice and ending scripts on a short combat map.
+func _branch_endings() -> void:
+    var production: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://content/maps/old_passage.triggers.json"))
+    for branch in ["return_to_father", "follow_ushari"]:
+        var path := _tiny_map("demo_branch_" + branch, [{"id": "skeleton_warrior", "count": 3}])
+        var map: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+        map.objects[0].name = "Varenhold"
+        FileAccess.open(path, FileAccess.WRITE).store_string(JSON.stringify(map))
+        var script: Dictionary = production.duplicate(true)
+        script.triggers = [
+            {"id": "hallowmere", "when": {"event": "start"}, "do": [{"join": "ushari"}, {"quest": "aldren"}]},
+            production.triggers.filter(func(t): return t.id == "passage")[0]]
+        FileAccess.open(path.get_basename() + ".triggers.json", FileAccess.WRITE).store_string(JSON.stringify(script))
+        var scene := await _scene(path, WEEK2_ARMY)
+        scene.dialogue.skip_all()
+        scene.travel_to(Vector2i(1, 0))
+        await _walk(scene)
+        check(await _auto_battle(scene) == "victory", "The search reaches the entrance")
+        check(not scene.state.won, "Finding the passage awaits a choice")
+        scene.dialogue.skip_all()
+        await process_frame
+        await process_frame
+        var choice: Control = scene.screens.top()
+        check(choice != null and choice.get("choice") != null, "The branch choice is shown")
+        if choice == null: scene.queue_free(); continue
+        if capture: await _capture("story_choice")
+        var night: int = scene.state.day
+        choice.select(branch)
+        await process_frame
+        var film: Control = scene.screens.top()
+        check(film != null and film.get("outcome") != null, "The selected night scene plays")
+        check(scene.state.won and scene.state.story_outcome.night == night, "Both routes commit on the decision night")
+        check(scene.state.specials.size() == (0 if branch == "return_to_father" else 1), "Ushari leaves only on the father route")
+        if film != null:
+            film.advance()
+            film.advance()
+            if capture: await _capture("story_" + branch)
+            for i in 8:
+                if film._closed: break
+                film.advance()
+        await process_frame
+        check(scene.screens.top() != null and scene.screens.top().get("victory") == true, "The night scene leads to the chapter result")
+        check(not JSON.parse_string(scene.adventure.choose_story(branch)).ok, "A committed choice cannot be taken twice")
+        scene.queue_free()
+        await process_frame
 
 func _defeat_ends() -> void:
     var scene := await _scene(_tiny_map("demo_loss", [{"id": "ancient_guardian", "count": 3}]),

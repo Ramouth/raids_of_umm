@@ -3,7 +3,7 @@
 // greedy strategy, to check the demo is winnable and how long it takes.
 // Usage: demo_bot <repo_root> [seeds] [verbose]
 // Strategy: clear the vale's wolves (level 1), recruit on growth days, take mines and towns in order, fight any
-// guard it is clearly stronger than, visit Kharim, search old mines (ruled-
+// guard it is clearly stronger than, search Aldren's camp, search old mines (ruled-
 // out ones last). Battles are auto-resolved with the real CombatEngine.
 #include "adventure/AdventureSession.h"
 #include <iostream>
@@ -56,15 +56,19 @@ int main(int argc, char** argv) {
                              seed, root + "/data/maps/old_passage.triggers.json")) { std::cerr << *e << "\n"; return 1; }
         s.setArmy({{"woad_runner", 24}, {"cruth_slinger", 10}, {"painted_blade", 3}});
         recruitAll(s);
-        bool visitedCamp = false;
+        bool visitedCamp = false, visitedCorvin = false;
         std::vector<std::string> plan = {"Hill Wolves", "Den Wolves", "Hermit's Wolves",   // level 1: Ushari's road
             "Varen Gold Mine", "Log Pile", "Pinewood Sawmill", "Hunters' Camp",
-            "Varen Windmill", "Fallen Standing Stone", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
-            "Tithe Silver", "A Sergeant's Field Book", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
+            "Varen Windmill", "Vale Quarry", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
+            "Hale Supply Cart", "A Sergeant's Field Book", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
             "Drowned Obelisk", "Blackglass Seam", "Old Mine of Dunmere", "Old Mine of Carrow", "Greyfang Pass",
-            "Greyfang Watch", "The Greyfang Campaigns", "Kharim's Camp", "Frostglass Cavern", "Greyfang Obelisk", "Old Mine of Kaldur",
+            "Greyfang Watch", "The Greyfang Campaigns", "Aldren's Camp", "Frostglass Cavern", "Greyfang Obelisk", "Old Mine of Kaldur",
             "Old Mine of Brannoc"};
         for (int guard = 0; guard < 400 && !s.won() && !s.lost() && !s.army().empty() && s.day() < 60; ++guard) {
+            if (s.scenario().awaitingChoice()) {
+                s.scenario().choose(s, seed % 2 ? "follow_ushari" : "return_to_father");
+                break;
+            }
             // Weekly: walk home to recruit.
             if (s.dayOfWeek() == 7 || s.dayOfWeek() == 1) {
                 HexCoord home = s.heroPos();
@@ -87,6 +91,10 @@ int main(int argc, char** argv) {
                          || (obj->type == ObjType::OldMine && !s.isEncounter(obj->pos))
                          || (obj->type == ObjType::QuestGiver && visitedCamp)
                          || (obj->type >= ObjType::Pickup && obj->type != ObjType::Dwelling && s.siteUsed(obj->pos));
+                if (name == "Hallowmere") {
+                    if (s.heroPos() == obj->pos) visitedCorvin = true;
+                    done = visitedCorvin;
+                }
                 if (obj->type == ObjType::QuestGiver && s.heroPos() == obj->pos) {
                     std::vector<std::string> ids;
                     for (const auto* o : s.scenario().offersAt(name)) ids.push_back(o->id);

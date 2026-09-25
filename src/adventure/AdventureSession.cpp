@@ -101,6 +101,8 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_rivalMoves.clear();
     m_garrisons.clear();
     m_specials.clear();
+    m_fieldworkStock.clear();
+    m_departedSpecials.clear();
     m_heroProgress = HeroProgress{};
     m_learned.clear();
     m_path.clear();
@@ -262,6 +264,7 @@ int AdventureSession::affordableSteps(const std::vector<HexCoord>& path) const {
 
 std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to) {
     std::vector<Step> steps;
+    if (m_won || m_lost || m_scenario.awaitingChoice()) return steps;
     m_pending.reset();
     m_pendingZone = false;
     if (m_pendingChest) claimChest(true);  // walked away from the choice: take the gold
@@ -291,7 +294,7 @@ std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to)
             m_scenario.fire(*this, "mines_held", {{"count", minesHeld()}});  // gated triggers may now apply
         }
         steps.push_back(std::move(step));
-        if (m_pendingChest) break;   // the chest's choice waits for the player
+        if (m_pendingChest || m_scenario.awaitingChoice() || m_won) break;   // stop at decisions and chapter transitions
         if (auto guard = guardZoneAt(path[i])) {
             // Walking at the camp is an attack; passing by, the camp attacks you.
             m_pending     = *guard;
@@ -562,7 +565,10 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
         loot[Resource::Crystal]  = 2;
         m_turns.playerFaction().treasury += loot;
     }
-    if (result == MineFind::Passage) m_won = true;
+    if (result == MineFind::Passage) {
+        if (m_scenario.passageEndsScenario()) m_won = true;
+        else m_scenario.fire(*this, "passage_found");
+    }
     m_mineFinds.erase(find);
     return result;
 }
@@ -607,7 +613,16 @@ void AdventureSession::addItem(const std::string& id) {
     m_scenario.fire(*this, "item", {{"item", id}});
 }
 
+void AdventureSession::completeChapter(const std::string& returnTo) {
+    for (const auto& object : m_map.objects())
+        if (!returnTo.empty() && object.name == returnTo) { m_hero.pos = object.pos; break; }
+    m_won = true;
+    m_pending.reset();
+    recomputeVisibility();
+}
+
 std::optional<std::string> AdventureSession::acceptOffer(const std::string& id) {
+    if (m_won || m_lost || m_scenario.awaitingChoice()) return "Resolve the story first.";
     Scenario::Offer* offer = m_scenario.offer(id);
     if (!offer || offer->taken) return "That offer is no longer open.";
     const MapObjectDef* here = m_map.objectAt(m_hero.pos);
@@ -634,6 +649,7 @@ int AdventureSession::minesHeld(int faction) const {
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
 std::string AdventureSession::endDay() {
+    if (m_won || m_lost || m_scenario.awaitingChoice()) return "The expedition awaits your decision.";
     runRivals();
     TownStateMap none;  // weekly growth is per-roster here, not TurnManager's all-units tick
     payUpkeep();

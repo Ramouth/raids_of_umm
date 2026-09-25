@@ -59,6 +59,11 @@ Json AdventureSession::saveState() const {
         specials.push_back({{"id", sc.id}, {"level", sc.level}, {"xp", sc.xp}, {"unpaid", sc.unpaidDays},
                             {"wounded_until", sc.woundedUntil},
                             {"stationed", sc.stationed ? cellJson(*sc.stationed) : Json(nullptr)}});
+    Json departed = Json::array();
+    for (const auto& sc : m_departedSpecials)
+        departed.push_back({{"id", sc.id}, {"name", sc.name}, {"title", sc.title},
+                           {"level", sc.level}, {"xp", sc.xp}, {"unpaid", sc.unpaidDays},
+                           {"wounded_until", sc.woundedUntil}});
     Json rivals = Json::array();
     for (const auto& r : m_rivals)
         rivals.push_back({{"id", r.id}, {"name", r.name}, {"pos", cellJson(r.pos)}, {"home", cellJson(r.home)},
@@ -71,6 +76,7 @@ Json AdventureSession::saveState() const {
     for (const auto& c : m_visitedOnce) visited.push_back(cellJson(c));
     return {
         {"version", 1},
+        {"fieldwork_stock", m_fieldworkStock},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
         {"stables_week", m_stablesWeek},
         {"hero_progress", {m_heroProgress.level, m_heroProgress.xp}},
@@ -87,7 +93,7 @@ Json AdventureSession::saveState() const {
         {"won", m_won}, {"lost", m_lost}, {"lost_reason", m_lostReason},
         {"ruled_out", ruled}, {"items", Json(std::vector<std::string>(m_items.begin(), m_items.end()))},
         {"equipped", Json(m_equipped)},
-        {"garrisons", garrisons}, {"specials", specials}, {"rivals", rivals},
+        {"garrisons", garrisons}, {"specials", specials}, {"departed_specials", departed}, {"rivals", rivals},
         {"scenario", m_scenario.saveState()},
     };
 }
@@ -152,6 +158,13 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             sc.woundedUntil = s.value("wounded_until", 0);
             if (!s.at("stationed").is_null()) sc.stationed = cellFrom(s.at("stationed"));
         }
+        m_departedSpecials.clear();
+        for (const auto& sc : save.value("departed_specials", Json::array())) {
+            Special departed{sc.at("id"), sc.at("name"), sc.at("title"), sc.at("level"), sc.at("xp"),
+                             std::nullopt, sc.value("unpaid", 0)};
+            departed.woundedUntil = sc.value("wounded_until", 0);
+            m_departedSpecials.push_back(departed);
+        }
         m_rivals.clear();
         for (const auto& r : save.at("rivals"))
             m_rivals.push_back({r.at("id").get<int>(), r.at("name").get<std::string>(), cellFrom(r.at("pos")),
@@ -170,6 +183,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             const Json& hp = save.at("hero_progress");
             m_heroProgress = {hp.at(0).get<int>(), hp.at(1).get<int>()};
         }
+        m_fieldworkStock = save.value("fieldwork_stock", std::map<std::string, int>{});
         m_path = save.value("path", std::string{});
         m_learned = save.value("learned", std::vector<std::string>{});
         m_levelUps.clear();

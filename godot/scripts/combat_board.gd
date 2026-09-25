@@ -115,19 +115,49 @@ func set_hover(kind: String, label: String) -> void:
         "blocked": Control.CURSOR_FORBIDDEN}.get(kind, Control.CURSOR_ARROW)
     queue_redraw()
 
+func _draw_fieldworks() -> void:
+    for work in state.get("fieldworks", []):
+        var at := cell_point(work.cell)
+        draw_ellipse_shadow(at)
+        if work.kind == "barricade":
+            for i in range(-2, 3):
+                var x := at.x + i * 10
+                var top: float = at.y - 23 - (absi(i) % 2) * 3
+                draw_colored_polygon(PackedVector2Array([Vector2(x - 4, at.y + 14), Vector2(x - 4, top), Vector2(x, top - 6), Vector2(x + 4, top), Vector2(x + 4, at.y + 14)]), Color("a28b61"))
+                draw_line(Vector2(x - 2, top + 4), Vector2(x - 2, at.y + 10), Color("68583f"), 1, true)
+            draw_line(at + Vector2(-28, -8), at + Vector2(28, -8), Color("4b4234"), 5, true)
+            draw_line(at + Vector2(-28, 8), at + Vector2(28, 8), Color("4b4234"), 4, true)
+        else:
+            for i in range(-2, 3):
+                var foot := at + Vector2(i * 11, 14)
+                draw_line(foot, foot + Vector2(9, -31), Color("beac86"), 5, true)
+                draw_line(foot + Vector2(-4, -2), foot + Vector2(12, -10), Color("69583f"), 3, true)
+        var outline := hex_points(at)
+        outline.append(outline[0])
+        draw_polyline(outline, Color("d5b578"), 1.5, true)
+
+func draw_ellipse_shadow(at: Vector2) -> void:
+    var points := PackedVector2Array()
+    for i in 24:
+        var angle := i * TAU / 24.0
+        points.append(at + Vector2(cos(angle) * 33, sin(angle) * 12 + 16))
+    draw_colored_polygon(points, Color(0.02, 0.03, 0.03, 0.45))
+
 func _draw() -> void:
     for col in range(11):
         for row in range(5):
             var cell := [col, row - (col - (col & 1)) / 2]
             var points := hex_points(cell_point(cell))
-            var fill := Color("55402a") if (col + row) % 2 else Color("5e472f")
+            var fill := Color("38413c") if (col + row) % 2 else Color("3c4540")
+            if state.get("deploying", false) and col >= 2 and col <= 4: fill = Color("58614c")
             if not locked and state.get("player_turn", false):
                 var reach: Array = route_reach if not waypoints.is_empty() else state.get("reachable", [])
                 if cell in reach: fill = Color("405347")
                 if cell in state.get("attackable", []): fill = Color("854637")
             draw_colored_polygon(points, fill)
             points.append(points[0])
-            draw_polyline(points, Color("947044"), 1.0, true)
+            draw_polyline(points, Color("667267"), 1.0, true)
+    _draw_fieldworks()
     _draw_companions()
     var playing: bool = not locked and state.get("player_turn", false)
     if not hover_cell.is_empty():

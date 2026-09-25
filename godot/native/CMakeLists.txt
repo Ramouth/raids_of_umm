@@ -62,3 +62,17 @@ target_link_libraries(battle_sim PRIVATE umm_combat_core)
 
 add_executable(demo_bot demo_bot.cpp)
 target_link_libraries(demo_bot PRIVATE umm_combat_core)
+
+# Adventure regressions use the same native core as the playable Godot demo.
+add_executable(adventure_regression_tests
+    "${UMM_ROOT}/tests/main.cpp"
+    "${UMM_ROOT}/tests/test_adventure_session.cpp"
+    "${UMM_ROOT}/tests/test_adventure_sites.cpp"
+    "${UMM_ROOT}/tests/test_level_one.cpp"
+    "${UMM_ROOT}/tests/test_tactics.cpp"
+    "${UMM_ROOT}/tests/test_town_buildings.cpp"
+    "${UMM_ROOT}/tests/test_hero_equipment.cpp")
+target_include_directories(adventure_regression_tests PRIVATE "${UMM_ROOT}/tests")
+target_link_libraries(adventure_regression_tests PRIVATE umm_combat_core)
+add_test(NAME adventure_regression COMMAND adventure_regression_tests)
+set_tests_properties(adventure_regression PROPERTIES WORKING_DIRECTORY "${UMM_ROOT}")

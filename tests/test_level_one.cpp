@@ -1,5 +1,5 @@
 // test_level_one.cpp — the demo's opening level: no companion at the start,
-// clear the vale's wolves (a hooded druid speaks before the last pack), and
+// clear the vale's wolves, then search for Aldren with Ushari.
 // Ushari rides in once every pack is dead. Also the trigger tools it needs:
 // "start_companions", the "cleared" and "engage" events, "wait" and "vanish".
 #include "test_runner.h"
@@ -68,10 +68,11 @@ SUITE("Level 1 — the expedition starts without Ushari, sent after the vale's w
     auto lines = s.scenario().drainLines();
     CHECK(spoke(lines, "Steward"));
     CHECK(!spoke(lines, "Ushari"));
-    CHECK(s.map().objectAt(cellOf(s, "Hooded Stranger")) != nullptr);
+    CHECK(s.map().objectAt(cellOf(s, "Hooded Stranger")) == nullptr);
+    CHECK(s.map().objectAt(cellOf(s, "Kharim's Camp")) == nullptr);
 }
 
-SUITE("Level 1 — the druid speaks before his pack fights, then walks off; Ushari arrives") {
+SUITE("Level 1 — clearing all three packs brings Ushari and the search for Aldren") {
     AdventureSession s;
     CHECK(!s.start(kMap, "data", kEncounters, 1, kTriggers));
     s.setArmy({{"levy_spearman", 24}, {"desert_archer", 10}, {"armoured_warrior", 3}});
@@ -79,15 +80,15 @@ SUITE("Level 1 — the druid speaks before his pack fights, then walks off; Usha
     beat(s, "Den Wolves");
     CHECK(s.specials().empty());                         // one pack still hunts the vale
     auto heard = beat(s, "Hermit's Wolves");
-    CHECK(spoke(heard, "Hooded Druid"));
-    CHECK(s.scenario().vanished().count("Hooded Stranger") == 1);
+    CHECK(!spoke(heard, "Hooded Druid"));
+    CHECK(s.scenario().vanished().empty());
     auto after = s.scenario().drainLines();
     CHECK(spoke(after, "Ushari"));
     CHECK(!spoke(after, "Corvin"));                      // his letter comes the next morning
     CHECK_EQ((int)s.specials().size(), 1);
     if (!s.specials().empty()) CHECK(s.specials()[0].id == "ushari");
     CHECK(hasQuest(s, "wolves", true));
-    CHECK(hasQuest(s, "main", false));
+    CHECK(hasQuest(s, "aldren", false));
     CHECK_EQ(s.heroProgress().level, 2);                 // the first area is worth a level
     CHECK(s.scenario().quests().size() > 0 && s.needsPath());   // level 2: time to choose a path
     CHECK_EQ(s.specials()[0].xp, 0);                     // she arrives after the reward
@@ -99,7 +100,7 @@ SUITE("Level 1 — the druid speaks before his pack fights, then walks off; Usha
     AdventureSession c;
     CHECK(!c.loadState(Scenario::Json::parse(s.saveState().dump())));
     CHECK_EQ((int)c.specials().size(), 1);
-    CHECK(c.scenario().vanished().count("Hooded Stranger") == 1);
+    CHECK(c.scenario().vanished().empty());
     CHECK(hasQuest(c, "wolves", true));
 }
 
@@ -123,7 +124,7 @@ SUITE("Level 1 — Ushari's lines wait for her; other beats do not") {
     CHECK_EQ((int)c.specials().size(), 1);
     bool remark = false;
     for (const auto& l : c.scenario().drainLines())
-        remark = remark || (l.speaker == "Ushari" && l.text.find("It is not carved") != std::string::npos);
+        remark = remark || (l.speaker == "Ushari" && l.text.find("My mother") != std::string::npos);
     CHECK(remark);
 }
 
@@ -164,45 +165,100 @@ SUITE("Scenario — wait holds a beat until its cue; cleared needs every camp; v
     CHECK(s.scenario().vanished().count("Stranger") == 1);
 }
 
-SUITE("Level 1 — Corvin sells his men at Hallowmere; they turn on you when he does") {
+SUITE("Level 1 — Corvin remains a useful ally, even after the old betrayal deadline") {
     AdventureSession s;
     CHECK(!s.start(kMap, "data", kEncounters, 1, kTriggers));
     s.setArmy({{"rider_knight", 30}, {"levy_spearman", 40}, {"desert_archer", 20}});
     for (const char* pack : {"Hill Wolves", "Den Wolves", "Hermit's Wolves"}) beat(s, pack);
-    s.scenario().drainLines();
     reach(s, cellOf(s, "Hallowmere"));
-    CHECK(s.heroPos() == cellOf(s, "Hallowmere"));
-    auto scene = s.scenario().drainLines();
-    CHECK(spoke(scene, "Corvin"));
     CHECK(s.hasItem("hale_signet"));
     CHECK(hasQuest(s, "bridge", true));
-    CHECK_EQ((int)s.scenario().offersAt("Hallowmere").size(), 1);
     CHECK(!s.acceptOffer("hire_hale"));
-    int hired = 0;
-    for (const auto& st : s.army()) if (st.id == "hale_man_at_arms") hired = st.count;
-    CHECK_EQ(hired, 16);
-    int hiredOn = s.day();
-    // Wait out the days until Corvin turns; his men turn with him.
-    bool turned = false;
-    for (int i = 0; i < 20 && !turned; ++i) {
-        s.scenario().drainLines();
+    for (int i = 0; i < 20; ++i) {
         s.endDay();
-        for (const auto& r : s.rivals()) turned = turned || r.name == "Hale men-at-arms";
-        if (!turned) while (s.pendingEncounter()) s.resolveEncounter(true);
+        while (s.pendingEncounter()) s.resolveEncounter(true);
     }
-    CHECK(turned);
-    CHECK(s.day() >= hiredOn + 4);                      // his men ride with you a while first
-    for (const auto& st : s.army()) CHECK(st.id != "hale_man_at_arms");
-    CHECK(s.pendingIsAmbush());
-    if (auto at = s.pendingEncounter())
-        if (const auto* band = s.rivalAt(*at)) {
-            CHECK(band->name == "Hale men-at-arms");
-            CHECK_EQ(band->army[0].count, 16);
-        }
-    auto lines = s.scenario().drainLines();
-    bool steel = false;
-    for (const auto& l : lines) steel = steel || l.text.find("drawn steel") != std::string::npos;
-    CHECK(steel);
+    bool stillHired = false;
+    for (const auto& st : s.army()) if (st.id == "hale_man_at_arms") stillHired = true;
+    CHECK(stillHired);
+    CHECK_EQ(s.owner(cellOf(s, "Hallowmere")), 1);
+    for (const auto& r : s.rivals()) CHECK(r.name != "Hale household" && r.name != "Hale men-at-arms");
+    for (const auto& line : s.scenario().drainLines())
+        CHECK(line.text.find("He is dead") == std::string::npos);
+}
+
+SUITE("Level 1 — both branches persist, take the same night, and cannot be combined") {
+    AdventureSession s;
+    CHECK(!s.start(kMap, "data", kEncounters, 1, kTriggers));
+    s.setArmy({{"rider_knight", 60}});
+    for (const char* pack : {"Hill Wolves", "Den Wolves", "Hermit's Wolves"}) beat(s, pack);
+    reach(s, cellOf(s, "Hallowmere"));
+    CHECK(s.passageMine().has_value());
+    auto passage = *s.passageMine();
+    beat(s, s.map().objectAt(passage)->name);
+    CHECK(!s.won());
+    CHECK(s.scenario().awaitingChoice());
+    if (!s.scenario().awaitingChoice()) return;
+    const int night = s.day();
+    const auto here = s.heroPos();
+    s.endDay();
+    CHECK_EQ(s.day(), night);
+    CHECK(s.travel(cellOf(s, "Varenhold")).empty());
+    CHECK(s.heroPos() == here);
+    CHECK(s.scenario().choose(s, "invalid").has_value());
+    CHECK(s.scenario().awaitingChoice());
+    const auto pending = Scenario::Json::parse(s.saveState().dump());
+    const auto ushariXp = s.specials()[0].xp;
+    for (const std::string branch : {"return_to_father", "follow_ushari"}) {
+        AdventureSession route;
+        CHECK(!route.loadState(pending));
+        CHECK(route.scenario().awaitingChoice());
+        CHECK(!route.scenario().choose(route, branch));
+        CHECK(route.won());
+        CHECK(!route.scenario().awaitingChoice());
+        CHECK_EQ(route.scenario().outcome().at("night").get<int>(), night);
+        CHECK(route.scenario().choose(route, "follow_ushari").has_value());
+        CHECK(!hasQuest(route, "aldren", true)); // we have not found our brother
+        const bool home = branch == "return_to_father";
+        CHECK_EQ((int)route.specials().size(), home ? 0 : 1);
+        if (home) CHECK(route.heroPos() == cellOf(route, "Varenhold"));
+        CHECK(route.scenario().outcome().at("ushari") == (home ? "entered_alone" : "with_player"));
+        AdventureSession loaded;
+        CHECK(!loaded.loadState(Scenario::Json::parse(route.saveState().dump())));
+        CHECK(loaded.won());
+        CHECK(loaded.scenario().outcome() == route.scenario().outcome());
+        CHECK_EQ((int)loaded.specials().size(), home ? 0 : 1);
+        loaded.joinSpecial("ushari"); // future reunion retains her progression
+        CHECK_EQ((int)loaded.specials().size(), 1);
+        CHECK_EQ(loaded.specials()[0].xp, ushariXp);
+    }
+}
+
+SUITE("Level 1 — an early passage discovery waits for the family visit") {
+    AdventureSession s;
+    CHECK(!s.start(kMap, "data", kEncounters, 2, kTriggers));
+    s.scenario().fire(s, "passage_found");
+    CHECK(!s.scenario().awaitingChoice());
+    AdventureSession loaded;
+    CHECK(!loaded.loadState(Scenario::Json::parse(s.saveState().dump())));
+    for (const auto* name : {"Hill Wolves", "Den Wolves", "Hermit's Wolves"})
+        loaded.scenario().fire(loaded, "encounter_won", {{"name", name}});
+    loaded.scenario().fire(loaded, "cleared");
+    CHECK(!loaded.scenario().awaitingChoice());
+    loaded.scenario().fire(loaded, "visit", {{"name", "Hallowmere"}});
+    CHECK(loaded.scenario().awaitingChoice());
+}
+
+SUITE("Level 1 — Ushari stays on the search despite wounds or unpaid upkeep") {
+    AdventureSession s;
+    CHECK(!s.start(kMap, "data", kEncounters, 1, kTriggers));
+    s.joinSpecial("ushari");
+    CHECK(s.station("ushari", true).has_value());
+    s.companionsFell({"ushari"}, true);
+    CHECK_EQ((int)s.specials().size(), 1);
+    CHECK(s.isWounded(s.specials()[0]));
+    for (int day = 0; day < 8; ++day) { ResourcePool drain; drain[Resource::Gold] = -s.treasury()[Resource::Gold]; s.give(drain); s.endDay(); }
+    CHECK_EQ((int)s.specials().size(), 1);
 }
 
 SUITE("Scenario — turncoats: nobody hired, nothing happens; hired men leave army and garrisons") {

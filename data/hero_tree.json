@@ -1,60 +1,303 @@
 {
-  "_comment": "The player's commander paths (a British noble leading the Cruths). At level 2 the player chooses one path for good; each later level grants that path's skill for the level. Effects: tactics (stacks ordered first), attack/defense (every troop stack), readied_shot (archers fire at stacks moving closer), moves (per day), sight, gold (a day), growth (weekly recruits, +fraction). A skill without an effect is not in the demo yet. The Veined is the wildcard: offered by the story, never chosen at level 2.",
+  "_comment": "Choose one path at level 2. Later levels grant its skills automatically. All standard-path skills have working effects. Fieldworks are purchased reusable equipment, placed before combat; at most three may be carried. Barricades stop movement and shots, stakes stop movement only. The Veined remains story-only.",
   "paths": [
     {
-      "id": "marshal", "name": "Marshal",
+      "id": "marshal",
+      "name": "Marshal",
       "text": "Leads the line: who moves first, and how hard they hit.",
       "nodes": [
-        {"level": 2,  "id": "first_orders", "name": "First Orders", "text": "Before each battle, order one of your stacks to act first, ahead of every enemy.", "effect": {"tactics": 1}},
-        {"level": 3,  "id": "rally",        "name": "Rally",        "text": "+1 attack for every troop stack.", "effect": {"attack": 1}},
-        {"level": 4,  "id": "vanguard",     "name": "Vanguard",     "text": "Order two stacks to open the battle, in the order you set.", "effect": {"tactics": 1}},
-        {"level": 5,  "id": "battle_plan",  "name": "Battle Plan",  "text": "Order three stacks to open the battle.", "effect": {"tactics": 1}},
-        {"level": 6,  "id": "banner",       "name": "Banner",       "text": "One stack carries a banner: +2 defence to stacks beside it."},
-        {"level": 7,  "id": "hold_the_line","name": "Hold the Line","text": "Defending stacks also strike anyone who steps away from them."},
-        {"level": 8,  "id": "wider_banner", "name": "Wider Banner", "text": "The banner reaches two hexes, and companions' auras grow too."},
-        {"level": 9,  "id": "oathbound",    "name": "Oathbound",    "text": "Once per battle, a stack cannot be wiped out this round."},
-        {"level": 10, "id": "marshal_legend","name": "Marshal of the North", "text": "Your name alone steadies a wavering line."}
+        {
+          "level": 2,
+          "id": "first_orders",
+          "name": "First Orders",
+          "text": "Before each battle, order one of your stacks to act first, ahead of every enemy.",
+          "effect": {
+            "tactics": 1
+          }
+        },
+        {
+          "level": 3,
+          "id": "rally",
+          "name": "Rally",
+          "text": "+1 attack for every troop stack.",
+          "effect": {
+            "attack": 1
+          }
+        },
+        {
+          "level": 4,
+          "id": "vanguard",
+          "name": "Vanguard",
+          "text": "Order two stacks to open the battle, in the order you set.",
+          "effect": {
+            "tactics": 1
+          }
+        },
+        {
+          "level": 5,
+          "id": "battle_plan",
+          "name": "Battle Plan",
+          "text": "Order three stacks to open the battle.",
+          "effect": {
+            "tactics": 1
+          }
+        },
+        {
+          "level": 6,
+          "id": "banner",
+          "name": "Battle Standard",
+          "text": "+2 defence for every troop stack.",
+          "effect": {
+            "defense": 2
+          }
+        },
+        {
+          "level": 7,
+          "id": "hold_the_line",
+          "name": "Hold the Line",
+          "text": "+1 defence for every troop stack.",
+          "effect": {
+            "defense": 1
+          }
+        },
+        {
+          "level": 8,
+          "id": "wider_banner",
+          "name": "Veteran Command",
+          "text": "+2 attack for every troop stack.",
+          "effect": {
+            "attack": 2
+          }
+        },
+        {
+          "level": 9,
+          "id": "oathbound",
+          "name": "Oathbound",
+          "text": "+2 defence for every troop stack.",
+          "effect": {
+            "defense": 2
+          }
+        },
+        {
+          "level": 10,
+          "id": "marshal_legend",
+          "name": "Marshal of the North",
+          "text": "+2 attack and +2 defence for every troop stack.",
+          "effect": {
+            "attack": 2,
+            "defense": 2
+          }
+        }
       ]
     },
     {
-      "id": "siegemaster", "name": "Siegemaster",
-      "text": "Steel and timber: the battlefield is built before the battle.",
+      "id": "siegemaster",
+      "name": "Siegemaster",
+      "text": "Shape the battlefield. Buy portable fieldworks and place them before the first turn.",
       "nodes": [
-        {"level": 2,  "id": "palisade",     "name": "Palisade",     "text": "+2 defence for every troop stack.", "effect": {"defense": 2}},
-        {"level": 3,  "id": "stakes",       "name": "Stakes and Pavises", "text": "Your archers fire at any stack that moves closer (once a round).", "effect": {"readied_shot": true}},
-        {"level": 4,  "id": "earthworks",   "name": "Earthworks",   "text": "+1 more defence for every troop stack.", "effect": {"defense": 1}},
-        {"level": 5,  "id": "siege_drill",  "name": "Siege Drill",  "text": "+1 attack for every troop stack.", "effect": {"attack": 1}},
-        {"level": 6,  "id": "caltrops",     "name": "Caltrops",     "text": "Scatter caltrops: hexes that stop whoever walks in."},
-        {"level": 7,  "id": "field_wall",   "name": "Field Wall",   "text": "Raise a timber wall across three hexes."},
-        {"level": 8,  "id": "ballista",     "name": "Ballista Crew","text": "A ballista fights from your back line."},
-        {"level": 9,  "id": "undermine",    "name": "Undermine",    "text": "Sappers weaken a town's walls before you attack."},
-        {"level": 10, "id": "siege_legend", "name": "Master of Sieges", "text": "No wall stands long against you."}
+        {
+          "level": 2,
+          "id": "palisade",
+          "name": "Field Carpentry",
+          "text": "+2 defence. Unlock one reusable barricade: blocks movement and line of sight. Buy it below for 250 gold and 3 wood.",
+          "effect": {
+            "defense": 2,
+            "fieldworks": 1
+          }
+        },
+        {
+          "level": 3,
+          "id": "stakes",
+          "name": "Prepared Volleys",
+          "text": "Your archers fire at an enemy that moves closer, once per round. Barricades also block these shots.",
+          "effect": {
+            "readied_shot": true
+          }
+        },
+        {
+          "level": 4,
+          "id": "earthworks",
+          "name": "Field Engineering",
+          "text": "+1 defence. Carry two fieldworks. Unlock stakes: block movement while arrows pass over them.",
+          "effect": {
+            "defense": 1,
+            "fieldworks": 1
+          }
+        },
+        {
+          "level": 5,
+          "id": "siege_drill",
+          "name": "Supply Wagons",
+          "text": "+1 attack. Carry up to three fieldworks into each battle.",
+          "effect": {
+            "attack": 1,
+            "fieldworks": 1
+          }
+        },
+        {
+          "level": 6,
+          "id": "caltrops",
+          "name": "Iron Bracing",
+          "text": "+1 defence for every troop stack.",
+          "effect": {
+            "defense": 1
+          }
+        },
+        {
+          "level": 7,
+          "id": "field_wall",
+          "name": "Fortification Drill",
+          "text": "+2 defence for every troop stack.",
+          "effect": {
+            "defense": 2
+          }
+        },
+        {
+          "level": 8,
+          "id": "ballista",
+          "name": "Siege Ammunition",
+          "text": "+2 attack for every troop stack.",
+          "effect": {
+            "attack": 2
+          }
+        },
+        {
+          "level": 9,
+          "id": "undermine",
+          "name": "Marching Engineers",
+          "text": "+1 movement each day and +1 troop defence.",
+          "effect": {
+            "moves": 1,
+            "defense": 1
+          }
+        },
+        {
+          "level": 10,
+          "id": "siege_legend",
+          "name": "Master of Sieges",
+          "text": "+2 attack and +2 defence for every troop stack.",
+          "effect": {
+            "attack": 2,
+            "defense": 2
+          }
+        }
       ]
     },
     {
-      "id": "quartermaster", "name": "Quartermaster",
+      "id": "quartermaster",
+      "name": "Quartermaster",
       "text": "Wars are won on the road: marches, scouts, silver and supply.",
       "nodes": [
-        {"level": 2,  "id": "forced_march", "name": "Forced March", "text": "+2 movement every day.", "effect": {"moves": 2}},
-        {"level": 3,  "id": "pathfinders",  "name": "Pathfinders",  "text": "+2 sight: outriders see what waits ahead.", "effect": {"sight": 2}},
-        {"level": 4,  "id": "requisition",  "name": "Requisition",  "text": "+250 gold a day.", "effect": {"gold": 250}},
-        {"level": 5,  "id": "supply_lines", "name": "Supply Lines", "text": "+25% weekly recruits in your towns.", "effect": {"growth": 0.25}},
-        {"level": 6,  "id": "caravans",     "name": "Caravans",     "text": "Trade at a better rate at your markets."},
-        {"level": 7,  "id": "remounts",     "name": "Remounts",     "text": "Stables refresh your horses for the whole week, everywhere."},
-        {"level": 8,  "id": "spymaster",    "name": "Spymaster",    "text": "See rival war-bands through the fog."},
-        {"level": 9,  "id": "war_chest",    "name": "War Chest",    "text": "Companions' upkeep halved."},
-        {"level": 10, "id": "qm_legend",    "name": "Quartermaster-General", "text": "Your roads run wherever you ride."}
+        {
+          "level": 2,
+          "id": "forced_march",
+          "name": "Forced March",
+          "text": "+2 movement every day.",
+          "effect": {
+            "moves": 2
+          }
+        },
+        {
+          "level": 3,
+          "id": "pathfinders",
+          "name": "Pathfinders",
+          "text": "+2 sight: outriders see what waits ahead.",
+          "effect": {
+            "sight": 2
+          }
+        },
+        {
+          "level": 4,
+          "id": "requisition",
+          "name": "Requisition",
+          "text": "+250 gold a day.",
+          "effect": {
+            "gold": 250
+          }
+        },
+        {
+          "level": 5,
+          "id": "supply_lines",
+          "name": "Supply Lines",
+          "text": "+25% weekly recruits in your towns.",
+          "effect": {
+            "growth": 0.25
+          }
+        },
+        {
+          "level": 6,
+          "id": "caravans",
+          "name": "Caravans",
+          "text": "+250 gold each day.",
+          "effect": {
+            "gold": 250
+          }
+        },
+        {
+          "level": 7,
+          "id": "remounts",
+          "name": "Remounts",
+          "text": "+1 movement each day.",
+          "effect": {
+            "moves": 1
+          }
+        },
+        {
+          "level": 8,
+          "id": "spymaster",
+          "name": "Far Scouts",
+          "text": "+2 sight on the adventure map.",
+          "effect": {
+            "sight": 2
+          }
+        },
+        {
+          "level": 9,
+          "id": "war_chest",
+          "name": "War Chest",
+          "text": "+500 gold each day.",
+          "effect": {
+            "gold": 500
+          }
+        },
+        {
+          "level": 10,
+          "id": "qm_legend",
+          "name": "Quartermaster-General",
+          "text": "+1 movement each day and +25% weekly recruits.",
+          "effect": {
+            "moves": 1,
+            "growth": 0.25
+          }
+        }
       ]
     }
   ],
   "wildcard": {
-    "id": "veined", "name": "The Veined",
+    "id": "veined",
+    "name": "The Veined",
     "text": "Not the Compact's. What the obelisks teach, offered by the story, to anyone, at a price.",
     "nodes": [
-      {"id": "vein_sight",    "name": "Vein Sight",    "text": "See through the fog along the veins."},
-      {"id": "grave_harvest", "name": "Grave Harvest", "text": "Raise the lowest dead of your enemies after battle."},
-      {"id": "listen_below",  "name": "Listen Below",  "text": "Hear what is under the map."},
-      {"id": "the_door",      "name": "The Door",      "text": "..."}
+      {
+        "id": "vein_sight",
+        "name": "Vein Sight",
+        "text": "See through the fog along the veins."
+      },
+      {
+        "id": "grave_harvest",
+        "name": "Grave Harvest",
+        "text": "Raise the lowest dead of your enemies after battle."
+      },
+      {
+        "id": "listen_below",
+        "name": "Listen Below",
+        "text": "Hear what is under the map."
+      },
+      {
+        "id": "the_door",
+        "name": "The Door",
+        "text": "..."
+      }
     ]
   }
 }

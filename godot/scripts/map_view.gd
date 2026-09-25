@@ -206,7 +206,7 @@ func remove_objects(cells: Array) -> void:
             anchors.erase(cell)
         data.objects.erase(cell)
 
-## Old mines Kharim has ruled out get a "dead end" tag and fade.
+## Old mines the expedition has ruled out get a "dead end" tag and fade.
 func mark_ruled_out(ruled: Dictionary) -> void:
     for cell: Vector2i in anchors:
         if data.objects[cell].type != "old_mine": continue
@@ -268,6 +268,9 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
         if object.type == "town":
             sprite.scale = Vector2.ONE
             sprite.position.y = -49
+            if object.get("name", "") == "Varenhold":
+                sprite.scale = Vector2.ONE * 1.28
+                sprite.position.y = -62
         anchor.add_child(sprite)
     else:
         # Missing art remains an explicit map marker, never a different building.
@@ -275,9 +278,20 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
         marker.polygon = PackedVector2Array([Vector2(0, -22), Vector2(13, -9), Vector2(0, 4), Vector2(-13, -9)])
         marker.color = Color("685040")
         anchor.add_child(marker)
+    if object.get("name", "") == "Varenhold":
+        var pole := Line2D.new()
+        pole.points = PackedVector2Array([Vector2(43, -37), Vector2(43, -105)])
+        pole.width = 2
+        pole.default_color = Color("b9a37b")
+        anchor.add_child(pole)
+        var banner := Polygon2D.new()
+        banner.polygon = PackedVector2Array([Vector2(44, -105), Vector2(68, -101), Vector2(68, -77), Vector2(56, -82), Vector2(44, -80)])
+        banner.color = Color("496c5b")
+        anchor.add_child(banner)
     var label := Label.new()
     label.name = "Label"
     label.text = str(object.get("name", object.type))
+    if object.get("name", "") == "Varenhold": label.text = "VARENHOLD  ·  HOME"
     label.visible = show_landmark_names
     label.position = Vector2(-95, 7)
     label.size = Vector2(190, 24)

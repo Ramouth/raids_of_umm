@@ -82,6 +82,35 @@ int main(int argc, char** argv) {
         check(tactics.acknowledge(reply["ticket"]), "Opening acknowledged");
         check(!tactics.command_route("opening", Json::array()).at("ok"), "Orders are given once");
 
+        CombatSession fieldworks;
+        Json prepared = guards;
+        prepared["fieldworks"] = {{"barricade", 1}, {"stakes", 1}};
+        prepared["tactics"] = 1;
+        reply = fieldworks.start(argv[1], army, prepared);
+        check(reply["state"]["deploying"], "Purchased fieldworks open deployment");
+        fieldworks.acknowledge(reply["ticket"]);
+        check(!fieldworks.command("ai")["ok"], "AI cannot act during deployment");
+        check(!fieldworks.command_route("opening", Json::array())["ok"], "Tactics waits until fieldworks are placed");
+        check(!fieldworks.command("place_barricade", 9, -2)["ok"], "Cannot build in enemy deployment zone");
+        reply = fieldworks.command("place_barricade", 2, 1);
+        check(reply["ok"] && reply["state"]["fieldworks"].size() == 1, "Barricade placed");
+        fieldworks.acknowledge(reply["ticket"]);
+        check(!fieldworks.command("place_barricade", 3, 0)["ok"], "Cannot place more equipment than owned");
+        check(!fieldworks.command("place_stakes", 2, 1)["ok"], "Cannot overlap fieldworks");
+        reply = fieldworks.command("remove_fieldwork", 2, 1);
+        fieldworks.acknowledge(reply["ticket"]);
+        reply = fieldworks.command("place_barricade", 2, 1);
+        check(reply["ok"], "Recovered equipment can be repositioned");
+        fieldworks.acknowledge(reply["ticket"]);
+        reply = fieldworks.command("deploy_done");
+        check(reply["ok"] && !reply["state"]["deploying"].get<bool>() && reply["state"]["opening"] == 1,
+              "Deployment ends before opening orders");
+        fieldworks.acknowledge(reply["ticket"]);
+        reply = fieldworks.command_route("opening", Json::array());
+        fieldworks.acknowledge(reply["ticket"]);
+        check(!fieldworks.command("place_stakes", 3, 0)["ok"], "No construction once battle starts");
+        check(!fieldworks.command("remove_fieldwork", 2, 1)["ok"], "No removal once battle starts");
+
         CombatSession invalid;
         check(!invalid.start(argv[1], {{{"id", "not_a_unit"}, {"count", 1}}}, guards).at("ok"), "Invalid registry references rejected");
         check(!invalid.start(argv[1], Json::array(), guards).at("ok"), "Empty army rejected");

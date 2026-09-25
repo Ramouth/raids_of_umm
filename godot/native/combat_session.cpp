@@ -67,6 +67,10 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
         auto player = make_army(army, true);
         auto enemy = make_army(encounter.at("guards"), false);
         engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy));
+        const Json works = encounter.value("fieldworks", Json::object());
+        barricades_ = std::clamp(works.value("barricade", 0), 0, 3);
+        stakes_ = std::clamp(works.value("stakes", 0), 0, 3 - barricades_);
+        deploying_ = barricades_ + stakes_ > 0;
         opening_ = std::clamp(encounter.value("tactics", 0), 0, 3);   // commander's Tactics rank
         // Tests and replays may fix the dice and the AI's choices.
         if (encounter.contains("seed")) engine_->setSeed(encounter.at("seed").get<uint32_t>());
@@ -92,6 +96,20 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
     if (engine_->hasPendingChoice()) return failure("Resolve the pending character choice first.");
+    if (deploying_ && action != "retreat") {
+        const HexCoord at{q, r};
+        if (action == "deploy_done") deploying_ = false;
+        else if (action == "remove_fieldwork") {
+            if (!engine_->removeFieldwork(at)) return failure("There is no fieldwork on that hex.");
+        } else if (action == "place_barricade" || action == "place_stakes") {
+            const bool opaque = action == "place_barricade";
+            int used = 0;
+            for (const auto& work : engine_->fieldworks()) if (work.opaque == opaque) ++used;
+            if (used >= (opaque ? barricades_ : stakes_)) return failure("All of those fieldworks are already placed.");
+            if (!engine_->placeFieldwork(at, opaque)) return failure("Place on an empty highlighted hex and leave a route through the battlefield.");
+        } else return failure("Finish placing your fieldworks first.");
+        return response();
+    }
     if (opening_ > 0 && action != "retreat") return failure("Give your opening orders first (or skip them).");
     const HexCoord cell{q, r};
     if (action == "retreat") {
@@ -128,6 +146,7 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (!engine_) return failure("No battle has started.");
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
+    if (deploying_) return failure("Finish placing your fieldworks first.");
     std::vector<HexCoord> path;
     try {
         for (const auto& cell : route) path.push_back({cell.at(0).get<int>(), cell.at(1).get<int>()});
@@ -174,7 +193,11 @@ Json CombatSession::snapshot() const {
         {"units", Json::array()}, {"initiative", Json::array()}, {"reachable", Json::array()},
         {"attackable", Json::array()}, {"survivors", Json::array()}, {"rewards", Json::array()},
         {"fallen", Json::array()},
+        {"deploying", deploying_}, {"fieldwork_stock", {{"barricade", barricades_}, {"stakes", stakes_}}},
+        {"fieldworks", Json::array()},
         {"active", ""}, {"player_turn", false}, {"opening", opening_}};
+    for (const auto& work : engine_->fieldworks())
+        state["fieldworks"].push_back({{"cell", hex(work.cell)}, {"kind", work.opaque ? "barricade" : "stakes"}});
     for (bool player : {true, false}) {
         const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
         for (int index = 0; index < static_cast<int>(army.stacks.size()); ++index) {
@@ -314,6 +337,7 @@ Json CombatSession::reactions(HexCoord to) const {
 
 Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int index) const {
     std::unordered_set<HexCoord> occupied;
+    for (const auto& work : engine_->fieldworks()) occupied.insert(work.cell);
     for (bool side : {true, false}) {
         const auto& army = side ? engine_->playerArmy() : engine_->enemyArmy();
         for (int i = 0; i < static_cast<int>(army.stacks.size()); ++i)
