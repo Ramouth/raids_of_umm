@@ -31,11 +31,14 @@ bool blocksSight(Terrain t) {
 }
 
 // HoMM3-sized defaults; <map>.encounters.json "pickups" overrides them by name.
+// Unlike HoMM3, experience is rare off the battlefield: chests hold gold, and
+// only a "tome" (a war journal) teaches.
 AdventureSession::Pickup defaultPickup(const MapObjectDef& obj) {
     AdventureSession::Pickup p;
     const std::string& k = obj.kind;
     if (obj.type == ObjType::Artifact) { p.item = k; return p; }
-    if (k == "chest")         { p.chest = true; p.reward[Resource::Gold] = 1000; p.xp = 500; }
+    if (k == "chest")         p.reward[Resource::Gold] = 1000;
+    else if (k == "tome")     p.xp = AdventureSession::TOME_XP;
     else if (k == "campfire") { p.reward[Resource::Gold] = 400; p.reward[Resource::Wood] = 3; }
     else if (k == "wood")     p.reward[Resource::Wood] = 6;
     else if (k == "stone")    p.reward[Resource::Stone] = 6;
@@ -100,7 +103,9 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_specials.clear();
     m_heroProgress = HeroProgress{};
     m_learned.clear();
-    m_tree = loadHeroTree(dataDir + "/hero_tree.json");   // no file: an empty tree
+    m_path.clear();
+    m_levelUps.clear();
+    loadHeroTree(dataDir + "/hero_tree.json");   // no file: no paths
     m_startArgs.reset();
     m_pendingAmbush = false;
     m_lost = false;
@@ -209,6 +214,7 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
             if (e.contains("reward")) pickup.reward = parsed.reward;
             if (e.contains("item"))   pickup.item = parsed.item;
             pickup.xp = e.value("xp", pickup.xp);
+            pickup.chest = obj->kind == "chest" && pickup.xp > 0;   // a chest that offers a choice
         }
         return std::nullopt;
     } catch (const std::exception& e) {
@@ -387,6 +393,10 @@ std::string AdventureSession::collect(const HexCoord& cell, bool gold) {
     } else {
         give(p.reward);
         text += describe(p.reward);
+        if (!p.chest && p.xp > 0) {                  // a tome: read, and remembered
+            grantXp(p.xp);
+            text += (describe(p.reward).empty() ? "" : ", ") + std::string("+") + std::to_string(p.xp) + " experience";
+        }
     }
     if (!p.item.empty()) {
         addItem(p.item);
@@ -745,6 +755,7 @@ double AdventureSession::growthBonus(const HexCoord& c) const {
     if (const TownState* t = town(c))
         for (const auto& id : t->buildings)
             if (const BuildingDef* b = m_resources->building(id)) best = std::max(best, b->growth);
+    if (owner(c) == Faction::Player) best += heroEffects().growth;   // Quartermaster: Supply Lines
     return best;
 }
 
@@ -775,6 +786,10 @@ AdventureSession::ArmyBonus AdventureSession::armyBonus() const {
                 out.readiedShot |= b->readiedShot;
             }
     }
+    const HeroEffects skills = heroEffects();       // the commander's path
+    out.attack  += skills.attack;
+    out.defense += skills.defense;
+    out.readiedShot |= skills.readiedShot;
     for (const auto& [slot, id] : m_equipped)
         if (const WondrousItem* item = m_resources->item(id))
             for (const auto& e : item->passiveEffects) {
@@ -903,6 +918,7 @@ ResourcePool AdventureSession::extraIncome(int faction) const {
     for (const auto& sc : m_specials)   // governors
         if (sc.stationed && owner(*sc.stationed) == Faction::Player && sc.unpaidDays < SULK_DAYS)
             extra[Resource::Gold] += 100 * sc.level;
+    extra[Resource::Gold] += heroEffects().gold;   // Quartermaster: Requisition
     return extra;
 }
 

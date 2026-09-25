@@ -39,8 +39,10 @@ std::vector<AdventureSession::Ability> AdventureSession::abilitiesOf(const std::
 }
 
 int AdventureSession::xpForLevel(int level) {
-    static const int table[] = {0, 0, 100, 250, 450, 700, 1000, 1400, 1900};
-    return level <= 8 ? table[std::max(level, 1)] : 1900 + (level - 8) * 600;
+    // Fewer, weightier levels: the north takes a commander to about level 5,
+    // the whole campaign to 10.
+    static const int table[] = {0, 0, 100, 250, 450, 700, 1500, 2400, 3600, 5200, 7200};
+    return level <= 10 ? table[std::max(level, 1)] : 7200 + (level - 10) * 2500;
 }
 
 int AdventureSession::upkeepFor(int level) {
@@ -100,6 +102,7 @@ float AdventureSession::movesBonus() const {
     if (hasAbility("Legend of the Sands")) bonus += 2;
     if (hasAbility("Surveyor")) bonus += 1;
     if (hasAbility("Lowland Roads")) bonus += 1;
+    bonus += heroEffects().moves;
     if (m_stablesWeek != 0 && m_stablesWeek == week()) bonus += STABLES_BONUS;
     return bonus;
 }
@@ -109,7 +112,7 @@ int AdventureSession::sightBonus() const {
     if (hasAbility("Eagle Eye")) bonus += 2;
     if (hasAbility("Old Maps")) bonus += 1;
     if (hasAbility("Deep Reading")) bonus += 2;
-    return bonus;
+    return bonus + heroEffects().sight;
 }
 
 int AdventureSession::encounterXp(const HexCoord& c) const {
@@ -121,11 +124,13 @@ int AdventureSession::encounterXp(const HexCoord& c) const {
 void AdventureSession::grantXp(int xp) {
     if (xp <= 0) return;
     m_heroProgress.xp += xp;
-    while (m_heroProgress.xp >= xpForLevel(m_heroProgress.level + 1)) {
-        ++m_heroProgress.level;
-        ++m_heroProgress.points;
-        report("Commander", "You reach level " + std::to_string(m_heroProgress.level)
-               + ". One point to spend in the commander's tree (K).");
+    while (m_heroProgress.level < MAX_HERO_LEVEL && m_heroProgress.xp >= xpForLevel(m_heroProgress.level + 1)) {
+        LevelUp up{++m_heroProgress.level, "", ""};
+        for (const auto& p : m_paths)
+            if (p.id == m_path)
+                for (const auto& n : p.nodes)
+                    if (n.level == up.level) { m_learned.push_back(n.id); up.skill = n.name; up.text = n.text; }
+        m_levelUps.push_back(up);
     }
     for (auto& sc : m_specials) {
         if (sc.stationed) continue;
@@ -189,49 +194,79 @@ std::optional<std::string> AdventureSession::station(const std::string& id, bool
     return std::nullopt;
 }
 
-// ── Commander tree ───────────────────────────────────────────────────────────
+// ── Commander's paths ────────────────────────────────────────────────────────
 
-std::vector<AdventureSession::TreeBranch> AdventureSession::loadHeroTree(const std::string& path) {
-    std::vector<TreeBranch> tree;
+void AdventureSession::loadHeroTree(const std::string& path) {
+    m_paths.clear();
+    m_wildcard = TreePath{};
     std::ifstream f(path);
-    if (!f.is_open()) return tree;
+    if (!f.is_open()) return;
     const auto root = nlohmann::json::parse(f, nullptr, false);
-    if (root.is_discarded()) return tree;
-    for (const auto& b : root.value("branches", nlohmann::json::array())) {
-        TreeBranch branch{b.value("id", ""), b.value("name", ""), b.value("text", ""), b.value("live", false), {}};
-        for (const auto& n : b.value("nodes", nlohmann::json::array()))
-            branch.nodes.push_back({n.value("id", ""), n.value("name", ""), n.value("text", "")});
-        tree.push_back(std::move(branch));
+    if (root.is_discarded()) return;
+    auto parsePath = [](const nlohmann::json& p) {
+        TreePath out{p.value("id", ""), p.value("name", ""), p.value("text", ""), {}};
+        for (const auto& n : p.value("nodes", nlohmann::json::array())) {
+            TreeNode node;
+            node.level = n.value("level", 0);
+            node.id    = n.value("id", "");
+            node.name  = n.value("name", "");
+            node.text  = n.value("text", "");
+            if (n.contains("effect")) {
+                const auto& e = n["effect"];
+                node.live = true;
+                node.effect.tactics     = e.value("tactics", 0);
+                node.effect.attack      = e.value("attack", 0);
+                node.effect.defense     = e.value("defense", 0);
+                node.effect.moves       = e.value("moves", 0);
+                node.effect.sight       = e.value("sight", 0);
+                node.effect.gold        = e.value("gold", 0);
+                node.effect.growth      = e.value("growth", 0.0);
+                node.effect.readiedShot = e.value("readied_shot", false);
+            }
+            out.nodes.push_back(node);
+        }
+        return out;
+    };
+    for (const auto& p : root.value("paths", nlohmann::json::array())) m_paths.push_back(parsePath(p));
+    if (root.contains("wildcard")) m_wildcard = parsePath(root["wildcard"]);
+}
+
+std::optional<std::string> AdventureSession::choosePath(const std::string& pathId) {
+    if (m_heroProgress.level < 2) return "Your path opens at level 2.";
+    if (!m_path.empty())          return "Your path is already chosen.";
+    for (const auto& p : m_paths) {
+        if (p.id != pathId) continue;
+        m_path = pathId;
+        for (const auto& n : p.nodes)                 // every skill up to the current level
+            if (n.level <= m_heroProgress.level) m_learned.push_back(n.id);
+        return std::nullopt;
     }
-    return tree;
+    return "No such path.";
 }
 
 bool AdventureSession::learned(const std::string& nodeId) const {
     return std::find(m_learned.begin(), m_learned.end(), nodeId) != m_learned.end();
 }
 
-std::string AdventureSession::learnBlocker(const std::string& nodeId) const {
-    for (const auto& branch : m_tree)
-        for (size_t i = 0; i < branch.nodes.size(); ++i) {
-            if (branch.nodes[i].id != nodeId) continue;
-            if (learned(nodeId))                            return "Already learned.";
-            if (!branch.live)                               return "Not in the demo yet.";
-            if (i > 0 && !learned(branch.nodes[i - 1].id))  return "Learn " + branch.nodes[i - 1].name + " first.";
-            if (m_heroProgress.points <= 0)                 return "No points to spend: gain a level.";
-            return "";
+AdventureSession::HeroEffects AdventureSession::heroEffects() const {
+    HeroEffects total;
+    for (const auto& p : m_paths)
+        for (const auto& n : p.nodes) {
+            if (!n.live || !learned(n.id)) continue;
+            total.tactics += n.effect.tactics;
+            total.attack  += n.effect.attack;
+            total.defense += n.effect.defense;
+            total.moves   += n.effect.moves;
+            total.sight   += n.effect.sight;
+            total.gold    += n.effect.gold;
+            total.growth  += n.effect.growth;
+            total.readiedShot = total.readiedShot || n.effect.readiedShot;
         }
-    return "No such skill.";
+    return total;
 }
 
-std::optional<std::string> AdventureSession::learn(const std::string& nodeId) {
-    if (auto why = learnBlocker(nodeId); !why.empty()) return why;
-    m_learned.push_back(nodeId);
-    --m_heroProgress.points;
-    return std::nullopt;
-}
-
-int AdventureSession::tacticsRank() const {
-    int rank = 0;
-    for (const char* id : {"first_orders", "vanguard", "battle_plan"}) rank += learned(id) ? 1 : 0;
-    return rank;
+std::vector<AdventureSession::LevelUp> AdventureSession::drainLevelUps() {
+    std::vector<LevelUp> out;
+    out.swap(m_levelUps);
+    return out;
 }

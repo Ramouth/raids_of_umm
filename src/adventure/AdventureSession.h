@@ -64,12 +64,13 @@ public:
     struct Pickup {
         ResourcePool reward;
         std::string  item;       // artifact item id ("" = none)
-        int          xp = 0;     // chest: the experience alternative
-        bool         chest = false;
+        int          xp = 0;     // tome: experience; chest: the experience alternative
+        bool         chest = false;   // a choice of gold or experience (only if data gives it xp)
     };
     static constexpr int   WATCHTOWER_RADIUS = 9;
     static constexpr float STABLES_BONUS     = 3.0f;  // extra moves per day until week's end
     static constexpr int   LEARNING_XP       = 400;
+    static constexpr int   TOME_XP           = 150;   // a war journal, read once
 
     // Loads the map + data registry and seeds ownership from map factionIds.
     // Hero starts at the first player-owned town (else first town, else first passable tile).
@@ -190,26 +191,43 @@ public:
     int minesHeld(int faction = Faction::Player) const;
 
     // ── Hero growth (Specials.cpp) ───────────────────────────────────────────
-    // The commander levels from the same experience as the companions; each
-    // level after the first is one point to spend in the spell tree.
-    struct HeroProgress { int level = 1; int xp = 0; int points = 0; };
+    // The commander levels from the same experience as the companions, up to
+    // MAX_HERO_LEVEL (then the campaign hands you a new hero). Experience is
+    // rare off the battlefield: fights, quests and the odd war journal.
+    static constexpr int MAX_HERO_LEVEL = 10;
+    struct HeroProgress { int level = 1; int xp = 0; };
     const HeroProgress& heroProgress() const { return m_heroProgress; }
     // Experience a victory at 'c' would give (guards, old mines, war-bands); 0 = none.
     int encounterXp(const HexCoord& c) const;
     // Experience for the commander and every travelling companion (victories, story rewards).
     void grantXp(int xp);
 
-    // The commander's tree (data/hero_tree.json): branches learned top to
-    // bottom, one point per node; only "live" branches can be learned yet.
-    struct TreeNode   { std::string id, name, text; };
-    struct TreeBranch { std::string id, name, text; bool live = false; std::vector<TreeNode> nodes; };
-    const std::vector<TreeBranch>& heroTree() const { return m_tree; }
+    // The faction's paths (data/hero_tree.json). At level 2 the player chooses
+    // one for good; every level then grants that path's skill for the level.
+    // The Veined is the wildcard: shown, offered by the story, never chosen here.
+    struct HeroEffects {
+        int tactics = 0, attack = 0, defense = 0, moves = 0, sight = 0, gold = 0;
+        double growth = 0;
+        bool readiedShot = false;
+    };
+    struct TreeNode {
+        int level = 0;
+        std::string id, name, text;
+        bool live = false;          // has an effect in the demo
+        HeroEffects effect;
+    };
+    struct TreePath { std::string id, name, text; std::vector<TreeNode> nodes; };
+    const std::vector<TreePath>& heroPaths() const { return m_paths; }
+    const TreePath& wildcardPath() const { return m_wildcard; }
+    const std::string& heroPath() const { return m_path; }
+    bool needsPath() const { return m_path.empty() && m_heroProgress.level >= 2; }
+    std::optional<std::string> choosePath(const std::string& pathId);
     bool learned(const std::string& nodeId) const;
-    // Why `nodeId` cannot be learned now ("" = it can).
-    std::string learnBlocker(const std::string& nodeId) const;
-    std::optional<std::string> learn(const std::string& nodeId);
-    // Tactics: how many stacks the commander may order to act first (0–3).
-    int tacticsRank() const;
+    HeroEffects heroEffects() const;          // everything the commander's skills add up to
+    int tacticsRank() const { return heroEffects().tactics; }   // stacks ordered first (0–3)
+    // Level-ups since the last drain, for the UI's pop-up. skill "" = choose a path.
+    struct LevelUp { int level = 0; std::string skill, text; };
+    std::vector<LevelUp> drainLevelUps();
 
     // ── Special characters (see Specials.cpp) ────────────────────────────────
     struct Ability { int level; std::string name, text; };
@@ -320,7 +338,7 @@ private:
     std::vector<Stack> guardsOf(const HexCoord& c) const;
     void report(const std::string& speaker, const std::string& text);
     std::string adviser() const;   // who reports news: Ushari once she rides with you
-    static std::vector<TreeBranch> loadHeroTree(const std::string& path);
+    void loadHeroTree(const std::string& path);
     void payUpkeep();
     float movesBonus() const;
     int   sightBonus() const;
@@ -350,8 +368,11 @@ private:
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::vector<Special>             m_specials;
     HeroProgress                     m_heroProgress;
-    std::vector<TreeBranch>          m_tree;
-    std::vector<std::string>         m_learned;   // tree node ids, in the order learned
+    std::vector<TreePath>            m_paths;
+    TreePath                         m_wildcard;
+    std::string                      m_path;      // chosen at level 2 ("" = not yet)
+    std::vector<std::string>         m_learned;   // path skills granted, in order
+    std::vector<LevelUp>             m_levelUps;  // for the pop-up
     struct StartArgs { std::string map, data, encounters, triggers; uint32_t seed = 0; };
     std::optional<StartArgs>         m_startArgs;   // set when started from files
     std::vector<Rival>               m_rivals;

@@ -83,7 +83,7 @@ OBJECTS = [
     ("sawmill",        "Pinewood Sawmill",         -8,  5, 0, ""),
     ("mill",           "Varen Windmill",           -9, -3, 0, "windmill"),
     ("stables",        "Varen Stables",           -10, -2, 0, ""),
-    ("learning_stone", "Standing Stone of Varen", -13,  3, 0, ""),
+    ("pickup",         "Fallen Standing Stone",   -13,  3, 0, "stone"),
     ("pickup",         "Log Pile",                -10,  3, 0, "wood"),
     ("pickup",         "Cut Stone",               -12,  5, 0, "stone"),
     ("pickup",         "Hunters' Camp",            -8, -1, 0, "campfire"),
@@ -107,7 +107,7 @@ OBJECTS = [
     ("watchtower",     "Hallow Watch",             -3,  3, 0, ""),
     ("mill",           "Mere Watermill",            1,  4, 0, "watermill"),
     ("stables",        "Hale Stables",              3, -4, 0, ""),
-    ("learning_stone", "Weeping Stone",            -1, -5, 0, ""),
+    ("pickup",         "A Sergeant's Field Book",  -1, -5, 0, "tome"),     # rare XP: a war journal
     ("dwelling",       "Brigand Camp",              4, -9, 0, "brigand"),
     ("guard",          "Brigand Band",              3, -8, 0, ""),
     ("pickup",         "Tithe Silver",             -3, -3, 0, "gold"),
@@ -133,7 +133,7 @@ OBJECTS = [
     ("old_mine",       "Old Mine of Brannoc",       8,  9, 0, ""),
     ("watchtower",     "Greyfang Watch",            8, -1, 0, ""),
     ("mill",           "Moor Windmill",            12,  5, 0, "windmill"),
-    ("learning_stone", "Stone of the First Oath",   7,  5, 0, ""),
+    ("pickup",         "The Greyfang Campaigns",    7,  5, 0, "tome"),     # rare XP: a war journal
     ("guard",          "Treant Grove",              9,  2, 0, ""),
     ("guard",          "Troll Warband",            10, -2, 0, ""),
     ("pickup",         "Raiders' Hoard",           11, -2, 0, "gold"),

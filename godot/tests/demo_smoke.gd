@@ -141,14 +141,20 @@ func _story() -> void:
     check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
     scene.dialogue.skip_all()
     check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari rides with the hero")
-    # Three wolf fights are worth a level: spend the point in the commander's tree.
-    check(int(scene.state.hero_progress.points) >= 1, "Clearing the vale earns a tree point")
-    check(scene.open_tree(), "The commander's tree opens (K)")
+    # Clearing the vale is worth level 2: the pop-up asks for a path.
+    check(int(scene.state.hero_progress.level) == 2, "Clearing the vale reaches level 2")
+    check(scene.state.tree.needs_path, "Level 2 asks for a path")
+    while is_instance_valid(scene.popup):
+        scene.popup.choose(0)                            # "Choose a path" opens the path screen
+        await process_frame
+    await process_frame
     var tree: Control = scene.screens.top()
-    check(tree._columns.get_child_count() == 4, "Four branches are shown")
-    check(not tree.learn("banner"), "Command is not in the demo yet")
-    check(tree.learn("first_orders"), "First Orders can be learned")
-    check(int(scene.state.tactics_rank) == 1, "Tactics rank 1 after First Orders")
+    check(tree != null and tree.has_method("choose"), "The path screen opens from the level-up pop-up")
+    check(tree._columns.get_child_count() == 4, "Three paths and the wildcard are shown")
+    check(not tree.choose("veined"), "The Veined is not chosen at level 2")
+    check(tree.choose("marshal"), "The Marshal's path can be chosen")
+    check(int(scene.state.tactics_rank) == 1, "First Orders comes with the Marshal's path")
+    check(not scene.state.tree.needs_path, "The path is chosen for good")
     tree.find_child("Done", true, false).pressed.emit()
     await process_frame
     for day in 6:                                        # home to Varenhold, to leave her in charge
@@ -392,8 +398,9 @@ func _save_load() -> void:
     scene.queue_free()
     await process_frame
 
-## Northern sites: a chest asks gold-or-experience, an obelisk rules out a
-## false mine, and a dwelling opens a one-creature recruit screen.
+## Northern sites: a chest holds gold (no experience off the battlefield), a
+## war journal teaches, an obelisk rules out a false mine, and a dwelling opens
+## a one-creature recruit screen.
 func _sites() -> void:
     var tiles := []
     for q in range(-3, 4):
@@ -403,26 +410,34 @@ func _sites() -> void:
     var map := {"version": 1, "name": "Sites", "radius": 3, "ground": "grass", "tiles": tiles, "objects": [
         {"q": -3, "r": 0, "type": "town", "name": "Camp", "factionId": 1},
         {"q": -2, "r": 0, "type": "pickup", "name": "Strongbox", "kind": "chest"},
+        {"q": -1, "r": 0, "type": "pickup", "name": "Field Book", "kind": "tome"},
         {"q": -1, "r": 2, "type": "dwelling", "name": "Wolf Den", "kind": "grey_wolf"},
         {"q": 0, "r": -2, "type": "obelisk", "name": "Stone"},
         {"q": 3, "r": -3, "type": "old_mine", "name": "Mine A"},
         {"q": 3, "r": 0, "type": "old_mine", "name": "Mine B"}]}
     FileAccess.open("user://demo_sites.json", FileAccess.WRITE).store_string(JSON.stringify(map))
     var scene := await _scene("user://demo_sites.json", WEEK2_ARMY)
+    var gold := int(scene.state.treasury.Gold)
+    var hero_xp := int(scene.state.hero_progress.xp)
     check(scene.travel_to(Vector2i(-2, 0)), "Walk to the chest")
     await _walk(scene)
-    check(is_instance_valid(scene._chest_panel), "The chest offers a choice")
-    var xp: int = scene.state.specials[0].xp
-    check(scene._xp_bar.visible and scene._xp_title.text.contains("Level 1"), "The XP bar shows the commander's level")
-    var hero_xp := int(scene.state.hero_progress.xp)
-    check(scene.claim_chest(false), "Taking the experience works")
-    check(int(scene.state.hero_progress.xp) == hero_xp + 500, "The commander gains the chest's experience too")
-    check(int(scene.state.hero_progress.level) >= 3, "500 XP is enough for level 3")
-    check(scene._xp_title.text.contains("tree point"), "Unspent tree points are shown")
-    check(int(scene.state.specials[0].xp) == xp + 500, "The companions gain the chest's experience")
-    await process_frame
-    check(not is_instance_valid(scene._chest_panel), "The choice closes")
+    check(not is_instance_valid(scene._chest_panel), "A chest asks nothing: it holds gold")
+    check(int(scene.state.treasury.Gold) == gold + 1000, "The chest's gold is taken")
+    check(int(scene.state.hero_progress.xp) == hero_xp, "A chest gives no experience")
     check(not scene.map_view.anchors[Vector2i(-2, 0)].visible, "The opened chest leaves the map")
+    check(scene._xp_bar.visible and scene._xp_title.text.contains("Level 1"), "The XP bar shows the commander's level")
+    var xp: int = scene.state.specials[0].xp
+    check(scene.travel_to(Vector2i(-1, 0)), "Walk to the war journal")
+    while scene.hero.moving and not is_instance_valid(scene.popup): await process_frame
+    await _walk(scene)
+    await process_frame
+    while scene.screens.depth() > 0:                     # level 2's path screen: decide later
+        scene.screens.top().finished.emit({})
+        await process_frame
+    check(int(scene.state.hero_progress.xp) == hero_xp + 150, "The journal teaches the commander")
+    check(int(scene.state.specials[0].xp) == xp + 150, "... and the companions")
+    check(int(scene.state.hero_progress.level) == 2, "150 XP is level 2")
+    check(scene._xp_title.text.contains("choose your path"), "An unchosen path is shown on the XP bar")
     check(scene.travel_to(Vector2i(0, -2)), "Walk to the obelisk")
     while scene.hero.moving and not is_instance_valid(scene.popup): await process_frame
     # HoMM3 pop-up: the walk waits on it; the map ignores clicks until OK.

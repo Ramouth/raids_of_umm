@@ -380,26 +380,22 @@
     "Brigand Strongbox": {
       "reward": {
         "Gold": 1000
-      },
-      "xp": 500
+      }
     },
     "Drowned Chest": {
       "reward": {
         "Gold": 1500
-      },
-      "xp": 1000
+      }
     },
     "Frozen Chest": {
       "reward": {
         "Gold": 2000
-      },
-      "xp": 1500
+      }
     },
     "Hermit's Chest": {
       "reward": {
         "Gold": 1000
-      },
-      "xp": 500
+      }
     }
   }
 }

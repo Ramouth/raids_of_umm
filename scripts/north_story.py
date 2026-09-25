@@ -55,13 +55,13 @@ offers = [
                   ("Ushari", "Men who wear another house's colours fight for that house, commander. Remember whose heron is on those shields."))]},
     {"id": "pay_tribute", "label": "Pay Kharim 3000 gold", "at": "Kharim's Camp",
      "cost": {"Gold": 3000}, "quest": "tribute",
-     "then": [say(("Kharim", "Gold buys ink, and ink buys truth. Listen closely.")), {"clue": True}]},
+     "then": [say(("Kharim", "Gold buys ink, and ink buys truth. Listen closely.")), {"clue": True}, {"xp": 75}]},
     {"id": "give_crown", "label": "Hand over the Drowned Crown", "at": "Kharim's Camp",
      "item": "drowned_crown", "quest": "crown",
      "then": [say(("Kharim", "Look. The inside of the band is engraved with a map, and the map is of the tunnels. "
                              "The king wore the road on his skull."),
                   ("Kharim", "Here. And here. This one is a dead end. I would stake my maps on it.")),
-              {"clue": True}]},
+              {"clue": True}, {"xp": 100}]},
 ]
 
 T = []
@@ -151,7 +151,7 @@ trig("hallowmere", {"event": "visit", "name": "Hallowmere", "unless": "betrayal_
          ("Corvin", "Take this. The Hale signet. Show it anywhere in the lowlands and doors will open."),
          ("Corvin", "Aldren came through here four days ago. He asked about the old mines. Which ones, how deep. He seemed... excited."),
          ("Corvin", "You will want soldiers where you are going. My household men-at-arms are yours, for what their kit cost me.")),
-     {"item": "hale_signet"}, {"quest_done": "bridge"}, {"offer": "hire_hale"})
+     {"item": "hale_signet"}, {"quest_done": "bridge"}, {"xp": 50}, {"offer": "hire_hale"})
 
 trig("shariw_warning", {"event": "day", "day": 3},
      say(("Scout", "Riders in the east, commander. Veiled, on scorpions. Scorpions, commander. In the snow."),
@@ -266,7 +266,7 @@ trig("kharim", {"event": "visit", "name": "Kharim's Camp"},
 
 trig("hold_three", {"event": "mines_held", "count": 3, "after": "kharim"},
      say(("Kharim", "Three mines under Varen banners! You can hold these marches after all. A promise is a promise.")),
-     {"quest": "hold"}, {"quest_done": "hold"}, {"clue": True})
+     {"quest": "hold"}, {"quest_done": "hold"}, {"clue": True}, {"xp": 75})
 
 trig("kharim_joins", {"event": "quests_done", "count": 5},   # the vale's wolves + four of Kharim's era
      say(("Kharim", "My debts are paid and my maps are thinner. You have earned more than a clue, commander."),
@@ -295,7 +295,7 @@ trig("betrayal_late", {"event": "day", "day": 16, "unless": "hallowmere"}, *BETR
 trig("hale_broken", {"event": "rival_beaten", "name": "Hale household"},
      say(("Corvin", "...Tell the Compact the north was never theirs."),
          ("Ushari", "He is dead, commander. The signet still fits your hand. Hallowmere will need a new lord.")),
-     {"quest_done": "aldren"})
+     {"quest_done": "aldren"}, {"xp": 150})
 
 # The third companion: Corvin's sister comes over once his household is broken.
 # She and Ushari do not trust each other (the heron). In battle she punishes

@@ -59,10 +59,10 @@ int main(int argc, char** argv) {
         bool visitedCamp = false;
         std::vector<std::string> plan = {"Hill Wolves", "Den Wolves", "Hermit's Wolves",   // level 1: Ushari's road
             "Varen Gold Mine", "Log Pile", "Pinewood Sawmill", "Hunters' Camp",
-            "Varen Windmill", "Standing Stone of Varen", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
-            "Tithe Silver", "Weeping Stone", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
+            "Varen Windmill", "Fallen Standing Stone", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
+            "Tithe Silver", "A Sergeant's Field Book", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
             "Drowned Obelisk", "Blackglass Seam", "Old Mine of Dunmere", "Old Mine of Carrow", "Greyfang Pass",
-            "Greyfang Watch", "Kharim's Camp", "Frostglass Cavern", "Greyfang Obelisk", "Old Mine of Kaldur",
+            "Greyfang Watch", "The Greyfang Campaigns", "Kharim's Camp", "Frostglass Cavern", "Greyfang Obelisk", "Old Mine of Kaldur",
             "Old Mine of Brannoc"};
         for (int guard = 0; guard < 400 && !s.won() && !s.lost() && !s.army().empty() && s.day() < 60; ++guard) {
             // Weekly: walk home to recruit.
@@ -119,6 +119,7 @@ int main(int argc, char** argv) {
                 if (s.pendingChest()) s.claimChest(true);
                 if (s.pendingEncounter()) fight(s);
             }
+            if (s.needsPath()) s.choosePath(std::getenv("PATH_ID") ? std::getenv("PATH_ID") : "marshal");
             if (s.won() || s.lost() || s.army().empty()) break;
             if (!std::getenv("NO_BUILD")) buildAll(s);
             s.endDay();
@@ -136,7 +137,8 @@ int main(int argc, char** argv) {
                 }
         std::string result = s.won() ? "WON" : s.lost() ? "SEALED" : s.army().empty() ? "ARMY LOST" : "TIMEOUT";
         std::cout << "seed " << seed << ": " << result << " on day " << s.day()
-                  << "  (Ushari L" << (s.specials().empty() ? 0 : s.specials()[0].level) << ", army power "
+                  << "  (hero L" << s.heroProgress().level << " xp " << s.heroProgress().xp
+                  << ", Ushari L" << (s.specials().empty() ? 0 : s.specials()[0].level) << ", army power "
                   << (int)s.power(s.army()) << ", clues " << s.ruledOut().size() << ")\n";
         if (s.won()) { ++wins; totalDays += s.day(); }
         else if (s.lost()) ++sealed; else if (s.army().empty()) ++dead; else ++timeouts;

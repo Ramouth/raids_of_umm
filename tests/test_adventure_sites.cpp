@@ -53,27 +53,25 @@ SUITE("Sites — a resource pile is collected once, on the way past") {
     CHECK(s.siteUsed({-5, 0}));
 }
 
-SUITE("Sites — a chest stops the hero and offers gold or experience") {
+SUITE("Sites — a chest holds gold, not experience (unlike HoMM3)") {
     auto s = started();
-    s.travel({-3, 0});                                   // route passes the chest
-    CHECK(s.heroPos() == HexCoord(-4, 0));               // stopped on it
-    CHECK(s.pendingChest().has_value());
-    int xp = s.specials()[0].xp;
     int gold = s.treasury()[Resource::Gold];
-    std::string found = s.claimChest(false);             // take the experience
-    CHECK(found.find("experience") != std::string::npos);
-    CHECK_EQ(s.specials()[0].xp, xp + 500);
-    CHECK_EQ(s.treasury()[Resource::Gold], gold);
-    CHECK(!s.pendingChest().has_value());
+    int xp = s.heroProgress().xp;
+    s.travel({-3, 0});                                   // route passes the chest
+    CHECK(!s.pendingChest().has_value());                // no choice to make
+    CHECK_EQ(s.treasury()[Resource::Gold], gold + 1000);
+    CHECK_EQ(s.heroProgress().xp, xp);
 }
 
-SUITE("Sites — walking away from a chest takes the gold") {
-    auto s = started();
-    s.travel({-4, 0});
-    CHECK(s.pendingChest().has_value());
-    int gold = s.treasury()[Resource::Gold];
-    s.travel({-3, 0});
-    CHECK_EQ(s.treasury()[Resource::Gold], gold + 1000);
+SUITE("Sites — a war journal (tome) teaches once") {
+    WorldMap map = sitesMap();
+    map.placeObject(site({-5, 1}, ObjType::Pickup, "Field Book", "tome"));
+    auto s = started(std::move(map));
+    int xp = s.heroProgress().xp;
+    auto steps = s.travel({-5, 1});
+    CHECK(!steps.empty() && steps.back().found.find("experience") != std::string::npos);
+    CHECK_EQ(s.heroProgress().xp, xp + AdventureSession::TOME_XP);
+    CHECK(s.pickupAt({-5, 1}) == nullptr);
 }
 
 SUITE("Sites — a mill pays once per week") {
@@ -232,12 +230,11 @@ SUITE("Demo map — day one: the hero can march on the Bridge Wardens") {
               << ", cost " << s.routeCost(path) << ", moves left " << s.moves() << "\n";
 }
 
-SUITE("Hero XP — the preview matches what a victory pays, and levels give tree points") {
+SUITE("Hero XP — the preview matches what a victory pays; levels survive a save") {
     WorldMap map = sitesMap();
     map.placeObject(site({-4, -1}, ObjType::Guard, "Wolves"));
     auto s = started(std::move(map));
     CHECK_EQ(s.heroProgress().level, 1);
-    CHECK_EQ(s.heroProgress().points, 0);
     int preview = s.encounterXp({-4, -1});
     CHECK(preview >= 20);
     CHECK_EQ(s.encounterXp({-5, 0}), 0);                 // a pile is not a fight
@@ -246,23 +243,18 @@ SUITE("Hero XP — the preview matches what a victory pays, and levels give tree
     int before = s.heroProgress().xp;
     s.resolveEncounter(true);
     CHECK_EQ(s.heroProgress().xp, before + preview);
-    s.travel({-4, 0});                                     // the chest: take the experience
-    s.claimChest(false);
-    CHECK(s.heroProgress().xp >= 500);
+    s.grantXp(500);                                        // e.g. a quest reward
     CHECK(s.heroProgress().level >= 3);                  // 250 xp reaches level 3
-    CHECK_EQ(s.heroProgress().points, s.heroProgress().level - 1);
     AdventureSession b;
     const std::string path = "/tmp/raids_test_hero_xp_map.json";
     WorldMap again = sitesMap();
     CHECK(!again.saveJson(path));
     CHECK(!b.start(path, "data"));
-    b.travel({-4, 0});
-    b.claimChest(false);
+    b.grantXp(300);
     AdventureSession c;
     CHECK(!c.loadState(Scenario::Json::parse(b.saveState().dump())));
     CHECK_EQ(c.heroProgress().xp, b.heroProgress().xp);
     CHECK_EQ(c.heroProgress().level, b.heroProgress().level);
-    CHECK_EQ(c.heroProgress().points, b.heroProgress().points);
 }
 
 SUITE("Companions — a fallen companion is wounded for three days, lost if the battle was") {

@@ -121,36 +121,67 @@ SUITE("Opportunity — a stack the blow kills never gets away; staying close is 
     }
 }
 
-// ── The commander's tree ──────────────────────────────────────────────────────
+// ── The commander's path ──────────────────────────────────────────────────────
 
-SUITE("Tree — points buy Tactics in order; other branches wait; the rank drives opening orders") {
+SUITE("Path — chosen once at level 2; each level then grants the path's skill") {
     AdventureSession s;
     CHECK(!s.start(plainMap(), "data"));
-    CHECK_EQ((int)s.heroTree().size(), 4);
-    CHECK_EQ(s.tacticsRank(), 0);
-    CHECK(s.learnBlocker("first_orders").find("points") != std::string::npos);
-    s.grantXp(AdventureSession::xpForLevel(4));           // three levels: three points
-    CHECK_EQ(s.heroProgress().points, 3);
-    CHECK(s.learn("vanguard").has_value());                    // First Orders first
-    CHECK(s.learn("banner").has_value());                      // Command is not in the demo yet
-    CHECK(!s.learn("first_orders"));
-    CHECK(s.learn("first_orders").has_value());                // already learned
-    CHECK(!s.learn("vanguard"));
+    CHECK_EQ((int)s.heroPaths().size(), 3);
+    CHECK(s.wildcardPath().id == "veined");
+    CHECK(!s.needsPath());
+    CHECK(s.choosePath("marshal").has_value());                // not before level 2
+    s.grantXp(AdventureSession::xpForLevel(2));
+    auto ups = s.drainLevelUps();
+    CHECK_EQ((int)ups.size(), 1);
+    if (!ups.empty()) { CHECK_EQ(ups[0].level, 2); CHECK(ups[0].skill.empty()); }   // choose a path
+    CHECK(s.needsPath());
+    CHECK(s.choosePath("veined").has_value());                 // the wildcard is the story's to offer
+    CHECK(!s.choosePath("marshal"));
+    CHECK(s.choosePath("siegemaster").has_value());            // for good
+    CHECK(s.learned("first_orders"));
+    CHECK_EQ(s.tacticsRank(), 1);
+    s.grantXp(AdventureSession::xpForLevel(4) - s.heroProgress().xp);
+    ups = s.drainLevelUps();
+    CHECK_EQ((int)ups.size(), 2);
+    if (ups.size() == 2) { CHECK(ups[0].skill == "Rally"); CHECK(ups[1].skill == "Vanguard"); }
     CHECK_EQ(s.tacticsRank(), 2);
-    CHECK_EQ(s.heroProgress().points, 1);
+    CHECK_EQ(s.armyBonus().attack, 1);
 }
 
-SUITE("Tree — learned skills survive a save") {
+SUITE("Path — a late choice catches up on the skills of every level so far") {
+    AdventureSession s;
+    CHECK(!s.start(plainMap(), "data"));
+    s.grantXp(AdventureSession::xpForLevel(5));
+    CHECK(!s.choosePath("quartermaster"));
+    for (const char* id : {"forced_march", "pathfinders", "requisition", "supply_lines"}) CHECK(s.learned(id));
+    CHECK_EQ(s.heroEffects().moves, 2);
+    CHECK_EQ(s.heroEffects().gold, 250);
+    CHECK(s.dailyIncome()[Resource::Gold] >= 250);
+}
+
+SUITE("Path — Siegemaster's skills reach the army; the level is capped at 10") {
+    AdventureSession s;
+    CHECK(!s.start(plainMap(), "data"));
+    s.grantXp(AdventureSession::xpForLevel(3));
+    CHECK(!s.choosePath("siegemaster"));
+    CHECK_EQ(s.armyBonus().defense, 2);
+    CHECK(s.armyBonus().readiedShot);
+    s.grantXp(1000000);
+    CHECK_EQ(s.heroProgress().level, AdventureSession::MAX_HERO_LEVEL);
+}
+
+SUITE("Path — the choice and its skills survive a save") {
     AdventureSession a;
     CHECK(!a.start("data/maps/old_passage.json", "data", "data/maps/old_passage.encounters.json", 1,
                    "data/maps/old_passage.triggers.json"));
-    a.grantXp(AdventureSession::xpForLevel(2));
-    CHECK(!a.learn("first_orders"));
+    a.grantXp(AdventureSession::xpForLevel(3));
+    CHECK(!a.choosePath("marshal"));
     AdventureSession b;
     CHECK(!b.loadState(Scenario::Json::parse(a.saveState().dump())));
-    CHECK(b.learned("first_orders"));
+    CHECK(b.heroPath() == "marshal");
+    CHECK(b.learned("rally"));
     CHECK_EQ(b.tacticsRank(), 1);
-    CHECK_EQ(b.heroProgress().points, 0);
+    CHECK(!b.needsPath());
 }
 
 // ── Maerwen Hale ──────────────────────────────────────────────────────────────

@@ -73,8 +73,8 @@ Json AdventureSession::saveState() const {
         {"version", 1},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
         {"stables_week", m_stablesWeek},
-        {"hero_progress", {m_heroProgress.level, m_heroProgress.xp, m_heroProgress.points}},
-        {"learned", Json(m_learned)},
+        {"hero_progress", {m_heroProgress.level, m_heroProgress.xp}},
+        {"path", m_path}, {"learned", Json(m_learned)},
         {"start", {{"map", m_startArgs->map}, {"data", m_startArgs->data}, {"encounters", m_startArgs->encounters},
                    {"triggers", m_startArgs->triggers}, {"seed", m_startArgs->seed}}},
         {"day", day()},
@@ -168,9 +168,11 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         }
         if (save.contains("hero_progress")) {
             const Json& hp = save.at("hero_progress");
-            m_heroProgress = {hp.at(0).get<int>(), hp.at(1).get<int>(), hp.at(2).get<int>()};
+            m_heroProgress = {hp.at(0).get<int>(), hp.at(1).get<int>()};
         }
+        m_path = save.value("path", std::string{});
         m_learned = save.value("learned", std::vector<std::string>{});
+        m_levelUps.clear();
         m_scenario.loadState(save.at("scenario"));
         m_scenario.drainLines();
         m_movesMax = DEFAULT_MOVES + movesBonus();

@@ -30,6 +30,18 @@ func _run() -> void:
     root.add_child(scene)
     await process_frame
     scene.dialogue.skip_all()
+    # Staged: level 2 reached, no path yet (the real flow is covered by demo_smoke).
+    scene.state.hero_progress.level = 2
+    scene.state.tree.needs_path = true
+    scene._announce_levels({"level_ups": [{"level": 2, "skill": "", "text": ""}]})
+    await _shot("levelup_popup")
+    scene.popup.queue_free()
+    scene.popup = null
     scene.open_tree()
     await _shot("tactics_tree")
+    scene.screens.top().finished.emit({})
+    scene.state.tree.needs_path = false
+    scene.state.tree.chosen = "marshal"
+    scene._announce_levels({"level_ups": [{"level": 3, "skill": "Rally", "text": "+1 attack for every troop stack."}]})
+    await _shot("levelup_skill")
     quit()

@@ -209,7 +209,7 @@ func open_party() -> bool:
         _update_expedition())
     return true
 
-## The commander's tree (K): spend level points; Tactics is live in the demo.
+## The commander's path (K): chosen at level 2; each level adds its next skill.
 func open_tree() -> bool:
     if hero.moving or is_instance_valid(battle): return false
     var screen := TreeScreen.new()
@@ -219,8 +219,8 @@ func open_tree() -> bool:
         _update_expedition())
     return true
 
-func learn(id: String) -> Dictionary:
-    var reply: Dictionary = JSON.parse_string(adventure.learn(id))
+func choose_path(id: String) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.choose_path(id))
     if reply.has("day"): _apply_state(reply)
     return reply
 
@@ -303,10 +303,30 @@ func _apply_state(next: Dictionary) -> void:
     map_view.remove_objects(state.get("vanished", []))
     map_view.mark_sites(state.get("sites", []))
     _show_xp_gain()
+    _announce_levels(next)
     _sync_inventory()
     if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []))
     _sync_rivals()
     _update_turn_hud()
+
+## Each level-up pops up (HoMM3 style): what the level brought, or, at the
+## first one, the choice of a path, which opens the path screen.
+func _announce_levels(reply: Dictionary) -> void:
+    var ups: Array = reply.get("level_ups", [])
+    reply.erase("level_ups")          # the same reply is applied again later
+    for up in ups:
+        var skill := str(up.get("skill", ""))
+        var spec := {"title": "LEVEL %d" % int(up.level), "picture": "units/armoured_warrior.png"}
+        if skill.is_empty() and state.get("tree", {}).get("needs_path", false):
+            spec.flavour = "Your commander has earned a name among the Compact. Choose a path: Marshal, Siegemaster or Quartermaster. It is chosen for good."
+            spec.buttons = ["Choose a path"]
+            show_popup(spec, func(_choice: int): open_tree.call_deferred())
+        elif not skill.is_empty():
+            spec.flavour = "Your commander grows in the %s's craft." % str(state.get("tree", {}).get("chosen", "")).capitalize()
+            spec.reward = "%s: %s" % [skill, str(up.get("text", ""))]
+            show_popup(spec)
+        else:
+            show_popup(spec)
 
 ## Every experience gain floats over the hero; a level-up says what it bought.
 func _show_xp_gain() -> void:
@@ -317,7 +337,7 @@ func _show_xp_gain() -> void:
         var text := "+%d XP" % (xp - _last_xp)
         if int(hp.level) > _last_level:
             text += "   LEVEL %d!" % int(hp.level)
-            notice.text = "Level %d reached: one point to spend in the spell tree." % int(hp.level)
+            notice.text = "Level %d reached." % int(hp.level)
         _float_text(text, Color("f0d070") if int(hp.level) == _last_level else Color("ffe9a0"))
     _last_xp = xp
     _last_level = int(hp.level)
@@ -631,7 +651,7 @@ func _build_turn_hud() -> void:
     sidebar.move_child(commander, sidebar.get_node("Grid").get_index())
     var tree := Button.new()
     tree.name = "Tree"
-    tree.text = "Commander's tree     K"
+    tree.text = "Commander's path     K"
     tree.pressed.connect(open_tree)
     sidebar.add_child(tree)
     sidebar.move_child(tree, sidebar.get_node("Grid").get_index())
@@ -710,12 +730,15 @@ func _update_turn_hud() -> void:
     var hp: Dictionary = state.get("hero_progress", {})
     if is_instance_valid(_xp_bar) and not hp.is_empty():
         var span := maxi(1, int(hp.next) - int(hp.prev))
-        _xp_title.text = "Commander  ·  Level %d%s" % [int(hp.level),
-            ("   ·   %d tree point%s to spend" % [int(hp.points), "" if int(hp.points) == 1 else "s"]) if int(hp.points) > 0 else ""]
+        var needs: bool = state.get("tree", {}).get("needs_path", false)
+        _xp_title.text = "Commander  ·  Level %d%s" % [int(hp.level), "   ·   choose your path (K)" if needs else ""]
         _xp_bar.max_value = span
         _xp_bar.value = int(hp.xp) - int(hp.prev)
-        _xp_detail.text = "%d / %d XP  ·  %d to level %d (+1 tree point)" % [
-            int(hp.xp) - int(hp.prev), span, int(hp.next) - int(hp.xp), int(hp.level) + 1]
+        if int(hp.level) >= int(hp.get("max", 10)):
+            _xp_detail.text = "The height of a commander's craft: level %d." % int(hp.level)
+        else:
+            _xp_detail.text = "%d / %d XP  ·  %d to level %d" % [
+                int(hp.xp) - int(hp.prev), span, int(hp.next) - int(hp.xp), int(hp.level) + 1]
     _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy
 
 ## True while the Shariw turn animates; blocks another End Day.

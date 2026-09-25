@@ -34,6 +34,10 @@ Json AdventureBridge::with_lines(Json out) {
     for (const auto& l : session_.scenario().drainLines())
         lines.push_back({{"speaker", l.speaker}, {"text", l.text}});
     out["lines"] = lines;
+    Json ups = Json::array();            // level-ups since the last reply: the UI pops them up
+    for (const auto& u : session_.drainLevelUps())
+        ups.push_back({{"level", u.level}, {"skill", u.skill}, {"text", u.text}});
+    out["level_ups"] = ups;
     return out;
 }
 
@@ -52,7 +56,7 @@ Json AdventureBridge::snapshot() const {
         if (r.alive && session_.isVisible(r.pos))
             encounter_xp.push_back({r.pos.q, r.pos.r, session_.encounterXp(r.pos)});
     const auto& hp = session_.heroProgress();
-    Json hero_progress = {{"level", hp.level}, {"xp", hp.xp}, {"points", hp.points},
+    Json hero_progress = {{"level", hp.level}, {"xp", hp.xp}, {"max", AdventureSession::MAX_HERO_LEVEL},
                           {"prev", AdventureSession::xpForLevel(hp.level)},
                           {"next", AdventureSession::xpForLevel(hp.level + 1)}};
     Json army = Json::array();
@@ -105,14 +109,17 @@ Json AdventureBridge::snapshot() const {
     for (const auto& id : session_.items()) items.push_back(id);
     Json lore = Json::array();
     for (const auto& l : session_.scenario().lore()) lore.push_back({{"title", l.title}, {"text", l.text}});
-    Json tree = Json::array();           // the commander's tree, with what can be learned now
-    for (const auto& b : session_.heroTree()) {
+    auto path_json = [&](const AdventureSession::TreePath& p) {
         Json nodes = Json::array();
-        for (const auto& n : b.nodes)
-            nodes.push_back({{"id", n.id}, {"name", n.name}, {"text", n.text},
-                             {"learned", session_.learned(n.id)}, {"blocker", session_.learnBlocker(n.id)}});
-        tree.push_back({{"id", b.id}, {"name", b.name}, {"text", b.text}, {"live", b.live}, {"nodes", nodes}});
-    }
+        for (const auto& n : p.nodes)
+            nodes.push_back({{"id", n.id}, {"name", n.name}, {"text", n.text}, {"level", n.level},
+                             {"live", n.live}, {"learned", session_.learned(n.id)}});
+        return Json{{"id", p.id}, {"name", p.name}, {"text", p.text}, {"nodes", nodes}};
+    };
+    Json paths = Json::array();          // the faction's paths: one is chosen at level 2
+    for (const auto& p : session_.heroPaths()) paths.push_back(path_json(p));
+    Json tree = {{"paths", paths}, {"wildcard", path_json(session_.wildcardPath())},
+                 {"chosen", session_.heroPath()}, {"needs_path", session_.needsPath()}};
     Json vanished = Json::array();       // story figures who have left the map
     for (const auto& obj : session_.map().objects())
         if (session_.scenario().vanished().count(obj.name)) vanished.push_back(cell(obj.pos));
@@ -341,8 +348,8 @@ Json AdventureBridge::transfer(int q, int r, const std::string& unit_id, int cou
     return out;
 }
 
-Json AdventureBridge::learn(const std::string& id) {
-    auto err = session_.learn(id);
+Json AdventureBridge::choose_path(const std::string& id) {
+    auto err = session_.choosePath(id);
     Json out = snapshot();
     if (err) { out["ok"] = false; out["error"] = *err; }
     return out;

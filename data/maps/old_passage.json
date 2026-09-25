@@ -5113,8 +5113,9 @@
     {
       "q": -13,
       "r": 10,
-      "type": "learning_stone",
-      "name": "Standing Stone of Varen"
+      "type": "pickup",
+      "name": "Fallen Standing Stone",
+      "kind": "stone"
     },
     {
       "q": -10,
@@ -5253,8 +5254,9 @@
     {
       "q": -1,
       "r": -4,
-      "type": "learning_stone",
-      "name": "Weeping Stone"
+      "type": "pickup",
+      "name": "A Sergeant's Field Book",
+      "kind": "tome"
     },
     {
       "q": 4,
@@ -5407,8 +5409,9 @@
     {
       "q": 7,
       "r": 2,
-      "type": "learning_stone",
-      "name": "Stone of the First Oath"
+      "type": "pickup",
+      "name": "The Greyfang Campaigns",
+      "kind": "tome"
     },
     {
       "q": 9,
