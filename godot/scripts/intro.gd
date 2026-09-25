@@ -41,6 +41,7 @@ var _lines: VBoxContainer
 var _hint: Label
 var _timer: Timer
 var _done := false
+var _textures := {}       # every slide's painting, loaded before the first fade (no mid-intro hitch)
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -89,6 +90,9 @@ func _ready() -> void:
     _timer.one_shot = true
     _timer.timeout.connect(advance)
     add_child(_timer)
+    for slide in SLIDES:
+        var path := "res://content/textures/" + str(slide.image)
+        if not str(slide.image).is_empty() and ResourceLoader.exists(path): _textures[slide.image] = load(path)
     advance.call_deferred()
 
 func _picture() -> TextureRect:
@@ -108,7 +112,7 @@ func advance() -> void:
     if _done: return
     if _slide >= 0 and _line + 1 < SLIDES[_slide].lines.size():
         _line += 1
-        _show_line(SLIDES[_slide].lines[_line])
+        _show_line(_line)
         return
     _slide += 1
     if _slide >= SLIDES.size():
@@ -116,10 +120,12 @@ func advance() -> void:
         return
     _line = 0
     _show_slide(str(SLIDES[_slide].image))
-    _show_line(SLIDES[_slide].lines[0], true)
+    _show_line(0)
 
 func _show_slide(image: String) -> void:
-    for child in _lines.get_children(): child.queue_free()
+    _clear_lines()
+    # Every line of the slide is laid out now, unseen, so nothing moves as they appear.
+    for text in SLIDES[_slide].lines: _lines.add_child(_line_label(str(text)))
     # The old slide becomes the back layer and fades away beneath the new one.
     var old := _front
     _front = _back
@@ -127,8 +133,7 @@ func _show_slide(image: String) -> void:
     move_child(_back, 1)                 # always: black, back, front, shade, words
     move_child(_front, 2)
     create_tween().tween_property(_back, "modulate:a", 0.0, FADE)
-    var path := "res://content/textures/" + image
-    _front.texture = load(path) if not image.is_empty() and ResourceLoader.exists(path) else null
+    _front.texture = _textures.get(image, null)
     _front.modulate.a = 0.0
     _front.pivot_offset = size / 2.0
     _front.scale = Vector2.ONE
@@ -136,9 +141,7 @@ func _show_slide(image: String) -> void:
     tween.tween_property(_front, "modulate:a", 1.0, FADE)
     tween.tween_property(_front, "scale", Vector2.ONE * DRIFT, 24.0).set_trans(Tween.TRANS_SINE)
 
-func _show_line(text: String, first := false) -> void:
-    for old in _lines.get_children():    # earlier lines of the slide dim, BG2 style
-        create_tween().tween_property(old, "modulate:a", 0.45, 0.6)
+func _line_label(text: String) -> Label:
     var label := Label.new()
     label.text = text
     label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -151,13 +154,25 @@ func _show_line(text: String, first := false) -> void:
     label.add_theme_color_override("font_outline_color", Color.BLACK)
     label.add_theme_constant_override("outline_size", 6)
     label.modulate.a = 0.0
-    _lines.add_child(label)
-    create_tween().tween_property(label, "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
+    return label
+
+func _clear_lines() -> void:
+    for child in _lines.get_children():
+        _lines.remove_child(child)
+        child.queue_free()
+
+## Reveals line `index` of the current slide; the ones before it dim, BG2 style.
+func _show_line(index: int) -> void:
+    var labels := _lines.get_children()
+    for i in index: create_tween().tween_property(labels[i], "modulate:a", 0.45, 0.6)
+    var first := index == 0
+    create_tween().tween_property(labels[index], "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
+    var text := str(SLIDES[_slide].lines[index])
     var pace: float = SLIDES[_slide].get("pace", 1.0)   # < 1: a slide that moves on sooner
     _timer.start((3.5 + text.length() / 18.0) * pace + (FADE if first else 0.0))
 
 func _title() -> void:
-    for child in _lines.get_children(): child.queue_free()
+    _clear_lines()
     create_tween().tween_property(_front, "modulate:a", 0.0, FADE)
     var title := Label.new()
     title.text = TITLE

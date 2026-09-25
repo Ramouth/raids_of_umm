@@ -100,7 +100,7 @@ func _root_scene() -> void:
     check(intro != null and game.adventure == null, "A new game opens on the intro")
     if intro != null:
         await process_frame
-        check(intro._slide == 0 and intro._lines.get_child_count() == 1, "The first slide and its first line show")
+        check(intro._slide == 0 and intro._line == 0 and intro._lines.get_child_count() == 2, "The first slide shows, its lines laid out in advance")
         intro.advance()
         check(intro._line == 1, "Click / Space shows the next line")
         intro.skip()                                   # Esc

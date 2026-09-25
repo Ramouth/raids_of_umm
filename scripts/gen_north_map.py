@@ -27,7 +27,7 @@ OUT = Path(__file__).resolve().parent.parent / "data" / "maps" / "old_passage.js
 # (passable, moveCost) — mirror terrainDefaultMoveCost() in src/world/MapTile.h.
 TERRAIN = {
     "grass":    (True,  1.0),
-    "forest":   (True,  1.5),
+    "forest":   (False, 1.5),   # HoMM3: stands of trees are obstacles; trails are cut (carve_trails)
     "highland": (True,  1.25),
     "swamp":    (True,  1.75),
     "mountain": (False, 1.8),
@@ -267,6 +267,8 @@ def build(seed):
         if tiles.get(entry) in ("mountain", "lake", "river"):
             tiles[entry] = "grass"
 
+    carve_trails(tiles, bridges, [at(*w) for w in ROAD] + [(o["q"], o["r"]) for o in objects])
+
     passable = lambda cell: cell in bridges or TERRAIN[tiles[cell]][0]
     roads = set()
     for a, b in zip(ROAD, ROAD[1:]):
@@ -335,6 +337,53 @@ def route(tiles, bridges, start, goal):
                 prev[nxt] = cell
                 heapq.heappush(pq, (nc, nxt))
     return None
+
+
+def carve_trails(tiles, bridges, goals):
+    """Forests block, so cut the cheapest trail from Varenhold (goals[0]) to each
+    goal it cannot reach: the forest hexes on it become grass. Mountains,
+    lakes and the river stay; only woods are cleared."""
+    start = goals[0]
+    def reachable():
+        seen, stack = {start}, [start]
+        while stack:
+            cell = stack.pop()
+            for dq, dr in DIRS:
+                nxt = (cell[0] + dq, cell[1] + dr)
+                if nxt in tiles and nxt not in seen and (nxt in bridges or TERRAIN[tiles[nxt]][0]):
+                    seen.add(nxt)
+                    stack.append(nxt)
+        return seen
+    for goal in goals[1:]:
+        seen = reachable()
+        if goal in seen:
+            continue
+        # Dijkstra from the reachable area: a forest hex costs 4 to clear.
+        best, prev, pq = {}, {}, []
+        for c in seen:
+            best[c] = 0.0
+            heapq.heappush(pq, (0.0, c))
+        while pq:
+            cost, cell = heapq.heappop(pq)
+            if cell == goal or cost > best.get(cell, 1e9):
+                continue
+            for dq, dr in DIRS:
+                nxt = (cell[0] + dq, cell[1] + dr)
+                if nxt not in tiles:
+                    continue
+                t = tiles[nxt]
+                step = 4.0 if t == "forest" else (TERRAIN[t][1] if (nxt in bridges or TERRAIN[t][0] or nxt == goal) else None)
+                if step is None:
+                    continue
+                if cost + step < best.get(nxt, 1e9):
+                    best[nxt], prev[nxt] = cost + step, cell
+                    heapq.heappush(pq, (cost + step, nxt))
+        assert goal in prev or goal in seen, f"No trail can reach {goal}"
+        cell = goal
+        while cell in prev:
+            if tiles[cell] == "forest":
+                tiles[cell] = "grass"
+            cell = prev[cell]
 
 
 def check_reachable(tiles, bridges, objects):
