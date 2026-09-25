@@ -10,6 +10,7 @@ const PORTRAITS := {
     "Scout": "units/rider_archer.png", "Messenger": "units/levy_spearman.png",
     "Aldren": "portraits/aldren.png", "Corvin": "portraits/corvin.png",
     "Inscription": "objects/obelisk.png", "Hooded Druid": "portraits/druid.png",
+    "Maerwen": "portraits/maerwen.png",
     "Steward": "units/levy_spearman.png",
 }
 

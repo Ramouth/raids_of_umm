@@ -37,6 +37,7 @@ class AdventureSession;
  *              "lore": [title, text]            — a codex entry (the journal's Lore page)
  *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
  *                                               — that site turns rival; a war-band rides out
+ *              "xp": n                          — experience for the commander and travelling companions
  *              "vanish": name                   — that map object leaves the map (a figure walks off)
  *              "turncoats": {"unit": id, "band": name, "say": [[speaker, text], ...]}
  *                                               — hired men of that unit turn and ambush the hero

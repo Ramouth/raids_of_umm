@@ -46,6 +46,7 @@ var move_path: Array = []
 var pin_spots: Array = []
 ## Reaction fire the hovered move would draw: [[shooter cell, destination, blocked], …].
 var reaction_lines: Array = []
+var order_marks: Dictionary = {}   # Tactics: unit key -> place in the opening orders (1, 2, 3)
 var pin_stand: Array = []
 var pin_ally: Array = []
 var _forecast: Label
@@ -150,6 +151,7 @@ func _draw() -> void:
             else: draw_line(from, to, Color(DANGER_COLOR, 0.8), 2.0, true)
             draw_circle(to.lerp(from, 0.12), 5.0, DANGER_COLOR)
     _draw_waypoints()
+    _draw_orders()
     if hover_kind == "attack" and shot_line.size() == 2:
         _draw_shot()
     for unit in state.get("units", []):
@@ -220,6 +222,16 @@ func _draw_waypoints() -> void:
         draw_circle(at, 13.0, Color("16100a"))
         draw_circle(at, 11.0, COMPANION_COLOR)
         draw_string(font, at + Vector2(-5, 6), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("16100a"))
+
+## Tactics: a numbered gold badge on each stack given an opening order.
+func _draw_orders() -> void:
+    var font := get_theme_default_font()
+    for unit in state.get("units", []):
+        if not order_marks.has(unit.key): continue
+        var at := cell_point(unit.cell) + Vector2(-22, -24)
+        draw_circle(at, 13.0, Color("16100a"))
+        draw_circle(at, 11.0, Color("f7d580"))
+        draw_string(font, at + Vector2(-5, 6), str(order_marks[unit.key]), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color("16100a"))
 
 ## Orange markers on every side that would pin the hovered enemy.
 func _draw_pins() -> void:
@@ -438,6 +450,7 @@ func animate(event: Dictionary, speed: float) -> void:
                 if event.flanked: float_text(target, "PINNED", Color("f7d580"), duration * 2)
                 if event.get("blocked", false): float_text(target, "BLOCKED SHOT ½", Color("ffb08a"), duration * 3)
                 if event.get("reaction", false): float_text(actor, "REACTION SHOT", Color("ff9d7a"), duration * 3)
+                if event.get("opportunity", false): float_text(actor, "OPPORTUNITY STRIKE", Color("ff9d7a"), duration * 3)
                 var start := actor.position
                 if start.distance_to(target.position) > 100:
                     var projectile := Polygon2D.new()

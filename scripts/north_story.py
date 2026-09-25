@@ -123,6 +123,7 @@ trig("ushari_arrives", {"event": "cleared", "names": VALE_WOLVES},
          ("Ushari", "Your brother went looking for the old passage with a scholar's letter. He will not find it with a letter."),
          ("Ushari", "I can feel it, commander. East, under the mountains. The way you feel a hearth with your eyes closed."),
          ("Ushari", "Your hooded man felt it too, I think. Nobody grows roots that thick over nothing.")),
+     {"xp": 40},   # the vale cleared: with the three packs, the commander reaches level 2
      {"join": "ushari"}, {"quest_done": "wolves"}, {"quest": "main"}, {"quest": "aldren"},
      lore("Ushari",
           "The Compact sent Ushari north because she can feel the old passage, faintly, the way you feel heat on your face. "
@@ -295,6 +296,19 @@ trig("hale_broken", {"event": "rival_beaten", "name": "Hale household"},
      say(("Corvin", "...Tell the Compact the north was never theirs."),
          ("Ushari", "He is dead, commander. The signet still fits your hand. Hallowmere will need a new lord.")),
      {"quest_done": "aldren"})
+
+# The third companion: Corvin's sister comes over once his household is broken.
+# She and Ushari do not trust each other (the heron). In battle she punishes
+# anyone who turns their back on her (attack of opportunity).
+trig("maerwen_joins", {"event": "rival_beaten", "name": "Hale household", "after": "hale_broken"},
+     say(("Maerwen", "Hold. I am Maerwen Hale, his sister. I held his gate while he sold the passage to the Shariw. I did not know. Or I did not want to."),
+         ("Maerwen", "The heron should still stand for something. Let me carry it where he would not: into the dark, with you."),
+         ("Ushari", "A Hale at our backs. Forgive me if I keep my shield on that side, my lady."),
+         ("Maerwen", "Keep it there. Anyone who turns their back on me learns why herons stand so still.")),
+     {"join": "maerwen"},
+     lore("Maerwen Hale",
+          "Corvin's sister and the shield-captain of Hallowmere. She does not chase an enemy; she waits for it to turn away. "
+          "Ushari does not trust her, and says so."))
 
 trig("recap", {"event": "enter_q", "q_min": 5},
      say(("Ushari", "Before the pass, commander, let us be clear about what we know."),

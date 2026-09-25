@@ -93,6 +93,7 @@ struct CombatEvent {
     bool         wasFlanked      = false;  // true when target was pinned (flanking bonus applied)
     bool         blockedShot     = false;  // a shot through another stack (half damage)
     bool         isReaction      = false;  // a shooter firing at a stack that moved closer
+    bool         isOpportunity   = false;  // a guardian striking a stack that stepped out of its reach
 
     // Damage amount (UnitDamaged only)
     int          damage         = 0;

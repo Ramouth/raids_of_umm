@@ -709,6 +709,42 @@
       "abilities": [
         "companion"
       ]
+    },
+    {
+      "id": "maerwen",
+      "name": "Maerwen Hale",
+      "description": "Corvin's sister, a Hale shield-captain. She does not chase; she waits. Any enemy that steps out of her reach takes a blow on the way (once per round).",
+      "attack": 9,
+      "defense": 13,
+      "minDamage": 12,
+      "maxDamage": 18,
+      "hitPoints": 95,
+      "speed": 5,
+      "moveRange": 3,
+      "shots": 0,
+      "attackType": "physical",
+      "levelGrowth": {
+        "hitPoints": 12,
+        "attack": 1,
+        "defense": 1,
+        "damage": 2
+      },
+      "meshId": "maerwen",
+      "textureId": "maerwen",
+      "tier": 0,
+      "faction": "companion",
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 0,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "abilities": [
+        "companion",
+        "opportunity_strike"
+      ]
     }
   ]
 }

@@ -8,7 +8,7 @@ cp -Ru "$project_root/assets/textures/." "$godot_project/content/textures/"
 for map in default old_passage old_passage.encounters old_passage.triggers; do
     cp -u "$project_root/data/maps/$map.json" "$godot_project/content/maps/$map.json"
 done
-for definition in units spells buildings items; do
+for definition in units spells buildings items hero_tree; do
     cp -u "$project_root/data/$definition.json" "$godot_project/content/data/$definition.json"
 done
 "$project_root/scripts/build_godot_combat.sh"

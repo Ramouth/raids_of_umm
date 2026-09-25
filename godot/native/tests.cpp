@@ -63,6 +63,25 @@ int main(int argc, char** argv) {
         check(reply["state"]["result"] == "retreat", "Retreat ends combat");
         check(reply["state"]["survivors"][0]["count"] == 1 && reply["state"]["rewards"].empty(), "Retreat preserves survivors without loot");
 
+        // Tactics: opening orders come before any other command, once.
+        CombatSession tactics;
+        Json planned = guards;
+        planned["tactics"] = 1;
+        reply = tactics.start(argv[1], army, planned);
+        check(reply["state"]["opening"] == 1, "Tactics rank is reported as opening orders");
+        check(tactics.acknowledge(reply["ticket"]), "Tactics setup acknowledged");
+        check(!tactics.command("ai").at("ok"), "No action before the opening orders");
+        const auto mummies = reply["state"]["units"][1]["cell"];
+        const auto archers = reply["state"]["units"][0]["cell"];
+        check(!tactics.command_route("opening", Json::array({archers, mummies})).at("ok"), "Rank 1 orders one stack");
+        check(!tactics.command_route("opening", Json::array({reply["state"]["units"][2]["cell"]})).at("ok"),
+              "Opening orders name your own stacks");
+        reply = tactics.command_route("opening", Json::array({mummies}));
+        check(reply.at("ok") && reply["state"]["opening"] == 0, "Opening orders accepted");
+        check(reply["state"]["active"] == "p1", "The chosen stack acts first");
+        check(tactics.acknowledge(reply["ticket"]), "Opening acknowledged");
+        check(!tactics.command_route("opening", Json::array()).at("ok"), "Orders are given once");
+
         CombatSession invalid;
         check(!invalid.start(argv[1], {{{"id", "not_a_unit"}, {"count", 1}}}, guards).at("ok"), "Invalid registry references rejected");
         check(!invalid.start(argv[1], Json::array(), guards).at("ok"), "Empty army rejected");

@@ -37,6 +37,7 @@ const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
 const PartyScreen = preload("res://scripts/party_screen.gd")
+const TreeScreen = preload("res://scripts/tree_screen.gd")
 var _garrison_button: Button
 var _town_button: Button
 var dialogue: PanelContainer
@@ -207,6 +208,21 @@ func open_party() -> bool:
         _apply_state(state)
         _update_expedition())
     return true
+
+## The commander's tree (K): spend level points; Tactics is live in the demo.
+func open_tree() -> bool:
+    if hero.moving or is_instance_valid(battle): return false
+    var screen := TreeScreen.new()
+    screen.host = self
+    screens.push(screen, func(_result: Dictionary):
+        _apply_state(state)
+        _update_expedition())
+    return true
+
+func learn(id: String) -> Dictionary:
+    var reply: Dictionary = JSON.parse_string(adventure.learn(id))
+    if reply.has("day"): _apply_state(reply)
+    return reply
 
 func open_hero() -> bool:
     if hero.moving or is_instance_valid(battle): return false
@@ -613,6 +629,12 @@ func _build_turn_hud() -> void:
     commander.pressed.connect(open_hero)
     sidebar.add_child(commander)
     sidebar.move_child(commander, sidebar.get_node("Grid").get_index())
+    var tree := Button.new()
+    tree.name = "Tree"
+    tree.text = "Commander's tree     K"
+    tree.pressed.connect(open_tree)
+    sidebar.add_child(tree)
+    sidebar.move_child(tree, sidebar.get_node("Grid").get_index())
     var party := Button.new()
     party.name = "Party"
     party.text = "Companions     P"
@@ -775,6 +797,8 @@ func _unhandled_input(event: InputEvent) -> void:
                 open_party()
             KEY_H:
                 open_hero()
+            KEY_K:
+                open_tree()
             KEY_F5:
                 save_game()
             KEY_F9:
@@ -1025,6 +1049,7 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         stack["defense_bonus"] = int(bonus.get("defense", 0))
         stack["speed_bonus"] = int(bonus.get("speed", 0))
         stack["readied_shot"] = bool(bonus.get("readied_shot", false))   # Marksmen's Tower
+    guards["tactics"] = int(state.get("tactics_rank", 0))   # opening orders the commander may give
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})

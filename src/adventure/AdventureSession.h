@@ -196,6 +196,20 @@ public:
     const HeroProgress& heroProgress() const { return m_heroProgress; }
     // Experience a victory at 'c' would give (guards, old mines, war-bands); 0 = none.
     int encounterXp(const HexCoord& c) const;
+    // Experience for the commander and every travelling companion (victories, story rewards).
+    void grantXp(int xp);
+
+    // The commander's tree (data/hero_tree.json): branches learned top to
+    // bottom, one point per node; only "live" branches can be learned yet.
+    struct TreeNode   { std::string id, name, text; };
+    struct TreeBranch { std::string id, name, text; bool live = false; std::vector<TreeNode> nodes; };
+    const std::vector<TreeBranch>& heroTree() const { return m_tree; }
+    bool learned(const std::string& nodeId) const;
+    // Why `nodeId` cannot be learned now ("" = it can).
+    std::string learnBlocker(const std::string& nodeId) const;
+    std::optional<std::string> learn(const std::string& nodeId);
+    // Tactics: how many stacks the commander may order to act first (0–3).
+    int tacticsRank() const;
 
     // ── Special characters (see Specials.cpp) ────────────────────────────────
     struct Ability { int level; std::string name, text; };
@@ -306,7 +320,7 @@ private:
     std::vector<Stack> guardsOf(const HexCoord& c) const;
     void report(const std::string& speaker, const std::string& text);
     std::string adviser() const;   // who reports news: Ushari once she rides with you
-    void grantXp(int xp);
+    static std::vector<TreeBranch> loadHeroTree(const std::string& path);
     void payUpkeep();
     float movesBonus() const;
     int   sightBonus() const;
@@ -336,6 +350,8 @@ private:
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::vector<Special>             m_specials;
     HeroProgress                     m_heroProgress;
+    std::vector<TreeBranch>          m_tree;
+    std::vector<std::string>         m_learned;   // tree node ids, in the order learned
     struct StartArgs { std::string map, data, encounters, triggers; uint32_t seed = 0; };
     std::optional<StartArgs>         m_startArgs;   // set when started from files
     std::vector<Rival>               m_rivals;

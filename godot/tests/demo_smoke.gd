@@ -141,6 +141,16 @@ func _story() -> void:
     check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
     scene.dialogue.skip_all()
     check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari rides with the hero")
+    # Three wolf fights are worth a level: spend the point in the commander's tree.
+    check(int(scene.state.hero_progress.points) >= 1, "Clearing the vale earns a tree point")
+    check(scene.open_tree(), "The commander's tree opens (K)")
+    var tree: Control = scene.screens.top()
+    check(tree._columns.get_child_count() == 4, "Four branches are shown")
+    check(not tree.learn("banner"), "Command is not in the demo yet")
+    check(tree.learn("first_orders"), "First Orders can be learned")
+    check(int(scene.state.tactics_rank) == 1, "Tactics rank 1 after First Orders")
+    tree.find_child("Done", true, false).pressed.emit()
+    await process_frame
     for day in 6:                                        # home to Varenhold, to leave her in charge
         if scene.hero.cell == HOME: break
         scene.travel_to(HOME)

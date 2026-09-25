@@ -88,6 +88,9 @@ SUITE("Level 1 — the druid speaks before his pack fights, then walks off; Usha
     if (!s.specials().empty()) CHECK(s.specials()[0].id == "ushari");
     CHECK(hasQuest(s, "wolves", true));
     CHECK(hasQuest(s, "main", false));
+    CHECK_EQ(s.heroProgress().level, 2);                 // the first area is worth a level
+    CHECK_EQ(s.heroProgress().points, 1);
+    CHECK_EQ(s.specials()[0].xp, 0);                     // she arrives after the reward
     CHECK(!hasQuest(s, "bridge", false));                // the politics wait for the morning
     s.endDay();
     CHECK(spoke(s.scenario().drainLines(), "Ushari"));

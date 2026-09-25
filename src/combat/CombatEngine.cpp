@@ -732,8 +732,24 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     CombatUnit& actor = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                       : m_enemy.stacks[slot.stackIndex];
     const HexCoord from = actor.pos;
-    // Who may react is judged before the mover arrives (it may end up adjacent).
     auto& shooters = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+    // Guardians strike first, as the stack turns its back to step away.
+    for (int i : opportunityStrikers(to, path)) {
+        CombatUnit& g = shooters[i];
+        g.hasReacted = true;
+        CombatEvent blow;
+        blow.type           = CombatEvent::Type::UnitAttacked;
+        blow.isPlayer       = !slot.isPlayer;
+        blow.stackIndex     = i;
+        blow.targetIsPlayer = slot.isPlayer;
+        blow.targetIndex    = slot.stackIndex;
+        blow.isOpportunity  = true;
+        m_events.push_back(blow);
+        int damage = calcDamage(g, actor, m_rng);
+        if (meleePenalty(g)) damage /= 2;
+        if (hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), true)) return false;   // cut down mid-step
+    }
+    // Who may react is judged before the mover arrives (it may end up adjacent).
     std::vector<int> ready;
     for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
         const CombatUnit& s = shooters[i];
@@ -773,11 +789,35 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     return !actor.isDead();
 }
 
+std::vector<int> CombatEngine::opportunityStrikers(HexCoord to, const std::vector<HexCoord>& route) const {
+    std::vector<int> out;
+    if (isOver()) return out;
+    const CombatUnit& actor = activeUnit();
+    const auto& foes = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    std::vector<HexCoord> steps{actor.pos};
+    if (route.empty()) steps.push_back(to);
+    else for (const HexCoord& h : route) if (h != steps.back()) steps.push_back(h);
+    for (int i = 0; i < static_cast<int>(foes.size()); ++i) {
+        const CombatUnit& g = foes[i];
+        if (g.isDead() || !hasOpportunityStrike(g) || g.hasReacted) continue;
+        for (size_t k = 1; k < steps.size(); ++k)
+            if (g.pos.distanceTo(steps[k - 1]) == 1 && g.pos.distanceTo(steps[k]) > 1) { out.push_back(i); break; }
+    }
+    return out;
+}
+
 std::vector<CombatEngine::ReactionPreview> CombatEngine::reactionsTo(HexCoord to) const {
     std::vector<ReactionPreview> out;
     if (isOver()) return out;
     const CombatUnit& actor = activeUnit();
     const auto& shooters = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    for (int i : opportunityStrikers(to)) {
+        ReactionPreview r;
+        r.shooter     = i;
+        r.opportunity = true;
+        r.damage      = meleeRange(shooters[i], actor);
+        out.push_back(r);
+    }
     for (int i = 0; i < static_cast<int>(shooters.size()); ++i) {
         const CombatUnit& s = shooters[i];
         if (s.isDead() || !hasReadiedShot(s) || !canShoot(s) || s.hasReacted) continue;
@@ -892,6 +932,32 @@ std::vector<CombatEvent> CombatEngine::drainEvents() {
 }
 
 // ── Turn advancement ──────────────────────────────────────────────────────────
+
+bool CombatEngine::setOpeningOrder(const std::vector<int>& playerStacks, int limit) {
+    if (isOver() || battleStarted() || static_cast<int>(playerStacks.size()) > limit) return false;
+    std::vector<TurnSlot> first;
+    for (int i : playerStacks) {
+        if (i < 0 || i >= static_cast<int>(m_player.stacks.size()) || m_player.stacks[i].isDead()) return false;
+        for (const auto& f : first) if (f.stackIndex == i) return false;
+        first.push_back({true, i});
+    }
+    std::vector<TurnSlot> rest;
+    for (const auto& slot : m_queue) {
+        bool chosen = false;
+        for (const auto& f : first) chosen = chosen || (slot.isPlayer && slot.stackIndex == f.stackIndex);
+        if (!chosen) rest.push_back(slot);
+    }
+    const TurnSlot before = m_queue[m_turn];
+    m_queue = first;
+    m_queue.insert(m_queue.end(), rest.begin(), rest.end());
+    const TurnSlot& now = m_queue[0];
+    if (now.isPlayer != before.isPlayer || now.stackIndex != before.stackIndex) {
+        // The opening turn's experience goes to whoever actually opens.
+        CombatUnit& opener = now.isPlayer ? m_player.stacks[now.stackIndex] : m_enemy.stacks[now.stackIndex];
+        awardScXp(opener, m_queue[0], opener.perTurnXp);
+    }
+    return true;
+}
 
 void CombatEngine::advance() {
     if (isOver()) return;

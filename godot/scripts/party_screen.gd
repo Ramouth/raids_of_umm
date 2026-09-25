@@ -6,7 +6,7 @@ extends Control
 
 signal finished(result: Dictionary)
 
-const PORTRAITS := {"ushari": "units/ushari.png", "kharim": "portraits/kharim.png"}
+const PORTRAITS := {"ushari": "units/ushari.png", "kharim": "portraits/kharim.png", "maerwen": "portraits/maerwen.png"}
 
 var host: Node   # desert.gd: provides state, station()
 var _list: VBoxContainer

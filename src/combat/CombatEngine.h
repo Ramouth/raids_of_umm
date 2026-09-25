@@ -149,10 +149,20 @@ public:
     // ends a move closer to it — before a walk-and-strike lands.  It must have
     // ammo and not already be engaged by someone else; line of sight applies.
     static constexpr double kReactionFactor = 1.0;
-    struct ReactionPreview { int shooter = -1; DamageRange damage; bool blocked = false; };
+    struct ReactionPreview { int shooter = -1; DamageRange damage; bool blocked = false; bool opportunity = false; };
     // Shots the active stack would draw by walking from its hex to `to`.
     std::vector<ReactionPreview> reactionsTo(HexCoord to) const;
     static bool hasReadiedShot(const CombatUnit& u) { return u.readiedShot || u.type->hasAbility("readied_shot"); }
+
+    // ── Opportunity strike ───────────────────────────────────────────────────
+    // A guardian ("opportunity_strike" ability) strikes, once per round, an
+    // enemy stack that steps out of its reach: starts a step next to it and
+    // ends that step not next to it. The blow lands before the step (a stack
+    // it kills never gets away) and draws no retaliation.
+    static bool hasOpportunityStrike(const CombatUnit& u) { return u.type->hasAbility("opportunity_strike"); }
+    // Guardians the active stack would provoke by walking `route` (hexes after
+    // its own, ending on the destination; empty = straight to `to`).
+    std::vector<int> opportunityStrikers(HexCoord to, const std::vector<HexCoord>& route = {}) const;
 
     // ── Engaged shooters (HoMM3) ─────────────────────────────────────────────
     // A shooter with a living enemy next to it cannot shoot: it must deal
@@ -229,6 +239,14 @@ public:
 
     // Advance to the next actor; rebuilds the queue when a round ends.
     void advance();
+
+    // ── Tactics: opening orders ──────────────────────────────────────────────
+    // Before anyone has acted in round 1, the player may name up to `limit`
+    // of their stacks (player army indices, in order) to act first, ahead of
+    // every enemy. Returns false (nothing changes) once the battle is under
+    // way, or for a bad list (unknown/dead/duplicate index, too many).
+    bool setOpeningOrder(const std::vector<int>& playerStacks, int limit);
+    bool battleStarted() const { return m_round > 1 || m_turn > 0; }
 
     // True if target has friendly attackers on two opposite hex sides.
     // Pinned units take 150% damage and cannot retaliate.

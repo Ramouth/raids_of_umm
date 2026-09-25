@@ -64,6 +64,7 @@ protected:
         ClassDB::bind_method(D_METHOD("save_game", "path", "extra_json"), &UmmAdventure::save_game);
         ClassDB::bind_method(D_METHOD("load_game", "path"), &UmmAdventure::load_game);
         ClassDB::bind_method(D_METHOD("add_item", "id"), &UmmAdventure::add_item);
+        ClassDB::bind_method(D_METHOD("learn", "id"), &UmmAdventure::learn);
         ClassDB::bind_method(D_METHOD("join_special", "id"), &UmmAdventure::join_special);
         ClassDB::bind_method(D_METHOD("claim_chest", "gold"), &UmmAdventure::claim_chest);
         ClassDB::bind_method(D_METHOD("resolve_encounter", "victory"), &UmmAdventure::resolve_encounter);
@@ -96,6 +97,7 @@ public:
         return guarded([&] { return bridge_.transfer(q, r, id.utf8().get_data(), count, to_garrison); });
     }
     String add_item(const String& id) { return guarded([&] { return bridge_.add_item(id.utf8().get_data()); }); }
+    String learn(const String& id) { return guarded([&] { return bridge_.learn(id.utf8().get_data()); }); }
     String join_special(const String& id) { return guarded([&] { return bridge_.join_special(id.utf8().get_data()); }); }
     String claim_chest(bool gold) { return guarded([&] { return bridge_.claim_chest(gold); }); }
     String resolve_encounter(bool victory) { return guarded([&] { return bridge_.resolve_encounter(victory); }); }

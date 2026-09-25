@@ -176,6 +176,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 for (const auto& line : t.value("say", Json::array()))
                     m_lines.push_back({line.at(0).get<std::string>(), line.at(1).get<std::string>()});
         }
+        if (a.contains("xp")) s.grantXp(a["xp"].get<int>());   // a story reward
         if (a.contains("vanish")) m_vanished.insert(a["vanish"].get<std::string>());
         if (a.contains("offer"))
             for (const auto& def : m_offerDefs)

@@ -67,6 +67,7 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
         auto player = make_army(army, true);
         auto enemy = make_army(encounter.at("guards"), false);
         engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy));
+        opening_ = std::clamp(encounter.value("tactics", 0), 0, 3);   // commander's Tactics rank
         // Tests and replays may fix the dice and the AI's choices.
         if (encounter.contains("seed")) engine_->setSeed(encounter.at("seed").get<uint32_t>());
         return response();
@@ -91,6 +92,7 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
     if (engine_->hasPendingChoice()) return failure("Resolve the pending character choice first.");
+    if (opening_ > 0 && action != "retreat") return failure("Give your opening orders first (or skip them).");
     const HexCoord cell{q, r};
     if (action == "retreat") {
         engine_->doRetreat();
@@ -126,11 +128,27 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (!engine_) return failure("No battle has started.");
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
-    if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
     std::vector<HexCoord> path;
     try {
         for (const auto& cell : route) path.push_back({cell.at(0).get<int>(), cell.at(1).get<int>()});
     } catch (const std::exception&) { return failure("A route is a list of [q, r] hexes."); }
+    if (action == "opening") {
+        if (opening_ == 0) return failure("There are no opening orders to give.");
+        std::vector<int> order;
+        const auto& own = engine_->playerArmy().stacks;
+        for (const HexCoord& cell : path) {
+            int index = -1;
+            for (int i = 0; i < static_cast<int>(own.size()); ++i)
+                if (!own[i].isDead() && own[i].pos == cell) index = i;
+            if (index < 0) return failure("Opening orders name your own stacks.");
+            order.push_back(index);
+        }
+        if (!engine_->setOpeningOrder(order, opening_)) return failure("Those opening orders are not allowed.");
+        opening_ = 0;
+        return response();
+    }
+    if (opening_ > 0) return failure("Give your opening orders first (or skip them).");
+    if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
     if (action == "move") {
         if (!engine_->doMoveAlong(path)) return failure("That route is blocked or too long.");
     } else if (action == "strike") {
@@ -156,7 +174,7 @@ Json CombatSession::snapshot() const {
         {"units", Json::array()}, {"initiative", Json::array()}, {"reachable", Json::array()},
         {"attackable", Json::array()}, {"survivors", Json::array()}, {"rewards", Json::array()},
         {"fallen", Json::array()},
-        {"active", ""}, {"player_turn", false}};
+        {"active", ""}, {"player_turn", false}, {"opening", opening_}};
     for (bool player : {true, false}) {
         const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
         for (int index = 0; index < static_cast<int>(army.stacks.size()); ++index) {
@@ -290,7 +308,7 @@ Json CombatSession::reactions(HexCoord to) const {
     const bool player = engine_->activeUnit().isPlayer;
     for (const auto& r : engine_->reactionsTo(to))
         out.push_back({{"key", key(!player, r.shooter)}, {"damage_min", r.damage.min},
-                       {"damage_max", r.damage.max}, {"blocked", r.blocked}});
+                       {"damage_max", r.damage.max}, {"blocked", r.blocked}, {"opportunity", r.opportunity}});
     return out;
 }
 
@@ -330,7 +348,7 @@ Json CombatSession::response() {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
             {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
-            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction},
+            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction}, {"opportunity", event.isOpportunity},
             {"from", hex(event.from)}, {"to", hex(event.to)},
             {"kills", event.kills}, {"remaining", event.remaining}};
         if (event.type == CombatEvent::Type::UnitAttacked) {

@@ -105,6 +105,14 @@ Json AdventureBridge::snapshot() const {
     for (const auto& id : session_.items()) items.push_back(id);
     Json lore = Json::array();
     for (const auto& l : session_.scenario().lore()) lore.push_back({{"title", l.title}, {"text", l.text}});
+    Json tree = Json::array();           // the commander's tree, with what can be learned now
+    for (const auto& b : session_.heroTree()) {
+        Json nodes = Json::array();
+        for (const auto& n : b.nodes)
+            nodes.push_back({{"id", n.id}, {"name", n.name}, {"text", n.text},
+                             {"learned", session_.learned(n.id)}, {"blocker", session_.learnBlocker(n.id)}});
+        tree.push_back({{"id", b.id}, {"name", b.name}, {"text", b.text}, {"live", b.live}, {"nodes", nodes}});
+    }
     Json vanished = Json::array();       // story figures who have left the map
     for (const auto& obj : session_.map().objects())
         if (session_.scenario().vanished().count(obj.name)) vanished.push_back(cell(obj.pos));
@@ -192,6 +200,7 @@ Json AdventureBridge::snapshot() const {
         {"vanished", vanished},
         {"encounter_xp", encounter_xp},
         {"hero_progress", hero_progress},
+        {"tree", tree}, {"tactics_rank", session_.tacticsRank()},
         {"encounter", pending},
         {"sites", sites},
         {"chest", chest},
@@ -327,6 +336,13 @@ Json AdventureBridge::accept_offer(const std::string& id) {
 
 Json AdventureBridge::transfer(int q, int r, const std::string& unit_id, int count, bool to_garrison) {
     auto err = session_.transfer({q, r}, unit_id, count, to_garrison);
+    Json out = snapshot();
+    if (err) { out["ok"] = false; out["error"] = *err; }
+    return out;
+}
+
+Json AdventureBridge::learn(const std::string& id) {
+    auto err = session_.learn(id);
     Json out = snapshot();
     if (err) { out["ok"] = false; out["error"] = *err; }
     return out;

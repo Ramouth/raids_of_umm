@@ -99,6 +99,8 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_garrisons.clear();
     m_specials.clear();
     m_heroProgress = HeroProgress{};
+    m_learned.clear();
+    m_tree = loadHeroTree(dataDir + "/hero_tree.json");   // no file: an empty tree
     m_startArgs.reset();
     m_pendingAmbush = false;
     m_lost = false;

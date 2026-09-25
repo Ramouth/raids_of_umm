@@ -274,6 +274,9 @@
           ]
         },
         {
+          "xp": 40
+        },
+        {
           "join": "ushari"
         },
         {
@@ -1205,6 +1208,45 @@
               "Ushari",
               "He is dead, commander. The signet still fits your hand. Hallowmere will need a new lord."
             ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maerwen_joins",
+      "when": {
+        "event": "rival_beaten",
+        "name": "Hale household",
+        "after": "hale_broken"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Maerwen",
+              "Hold. I am Maerwen Hale, his sister. I held his gate while he sold the passage to the Shariw. I did not know. Or I did not want to."
+            ],
+            [
+              "Maerwen",
+              "The heron should still stand for something. Let me carry it where he would not: into the dark, with you."
+            ],
+            [
+              "Ushari",
+              "A Hale at our backs. Forgive me if I keep my shield on that side, my lady."
+            ],
+            [
+              "Maerwen",
+              "Keep it there. Anyone who turns their back on me learns why herons stand so still."
+            ]
+          ]
+        },
+        {
+          "join": "maerwen"
+        },
+        {
+          "lore": [
+            "Maerwen Hale",
+            "Corvin's sister and the shield-captain of Hallowmere. She does not chase an enemy; she waits for it to turn away. Ushari does not trust her, and says so."
           ]
         }
       ]

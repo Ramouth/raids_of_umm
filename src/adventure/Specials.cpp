@@ -5,6 +5,8 @@
 // no XP). Upkeep rises with level; unpaid SCs sulk, then leave.
 #include "AdventureSession.h"
 #include <algorithm>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -12,6 +14,7 @@ struct SpecialDef { const char* id; const char* name; const char* title; };
 constexpr SpecialDef kSpecials[] = {
     {"ushari", "Ushari", "Veteran commander"},
     {"kharim", "Kharim", "Scholar of Pha'raxh"},
+    {"maerwen", "Maerwen Hale", "Shield-captain of the heron"},
 };
 
 } // namespace
@@ -27,6 +30,10 @@ std::vector<AdventureSession::Ability> AdventureSession::abilitiesOf(const std::
         {1, "Old Maps",      "+1 sight radius; he knows where to look."},
         {3, "Surveyor",      "+1 movement per day along forgotten paths."},
         {5, "Deep Reading",  "+2 sight radius."},
+    };
+    if (id == "maerwen") return {
+        {1, "Heron's Patience", "In battle, strikes any enemy that steps out of her reach (once per round)."},
+        {3, "Lowland Roads",    "+1 movement per day: she knows every Hale road."},
     };
     return {};
 }
@@ -92,6 +99,7 @@ float AdventureSession::movesBonus() const {
     if (hasAbility("Drillmaster")) bonus += 1;
     if (hasAbility("Legend of the Sands")) bonus += 2;
     if (hasAbility("Surveyor")) bonus += 1;
+    if (hasAbility("Lowland Roads")) bonus += 1;
     if (m_stablesWeek != 0 && m_stablesWeek == week()) bonus += STABLES_BONUS;
     return bonus;
 }
@@ -117,7 +125,7 @@ void AdventureSession::grantXp(int xp) {
         ++m_heroProgress.level;
         ++m_heroProgress.points;
         report("Commander", "You reach level " + std::to_string(m_heroProgress.level)
-               + ". One point to spend in the spell tree.");
+               + ". One point to spend in the commander's tree (K).");
     }
     for (auto& sc : m_specials) {
         if (sc.stationed) continue;
@@ -179,4 +187,51 @@ std::optional<std::string> AdventureSession::station(const std::string& id, bool
     }
     recomputeVisibility();
     return std::nullopt;
+}
+
+// ── Commander tree ───────────────────────────────────────────────────────────
+
+std::vector<AdventureSession::TreeBranch> AdventureSession::loadHeroTree(const std::string& path) {
+    std::vector<TreeBranch> tree;
+    std::ifstream f(path);
+    if (!f.is_open()) return tree;
+    const auto root = nlohmann::json::parse(f, nullptr, false);
+    if (root.is_discarded()) return tree;
+    for (const auto& b : root.value("branches", nlohmann::json::array())) {
+        TreeBranch branch{b.value("id", ""), b.value("name", ""), b.value("text", ""), b.value("live", false), {}};
+        for (const auto& n : b.value("nodes", nlohmann::json::array()))
+            branch.nodes.push_back({n.value("id", ""), n.value("name", ""), n.value("text", "")});
+        tree.push_back(std::move(branch));
+    }
+    return tree;
+}
+
+bool AdventureSession::learned(const std::string& nodeId) const {
+    return std::find(m_learned.begin(), m_learned.end(), nodeId) != m_learned.end();
+}
+
+std::string AdventureSession::learnBlocker(const std::string& nodeId) const {
+    for (const auto& branch : m_tree)
+        for (size_t i = 0; i < branch.nodes.size(); ++i) {
+            if (branch.nodes[i].id != nodeId) continue;
+            if (learned(nodeId))                            return "Already learned.";
+            if (!branch.live)                               return "Not in the demo yet.";
+            if (i > 0 && !learned(branch.nodes[i - 1].id))  return "Learn " + branch.nodes[i - 1].name + " first.";
+            if (m_heroProgress.points <= 0)                 return "No points to spend: gain a level.";
+            return "";
+        }
+    return "No such skill.";
+}
+
+std::optional<std::string> AdventureSession::learn(const std::string& nodeId) {
+    if (auto why = learnBlocker(nodeId); !why.empty()) return why;
+    m_learned.push_back(nodeId);
+    --m_heroProgress.points;
+    return std::nullopt;
+}
+
+int AdventureSession::tacticsRank() const {
+    int rank = 0;
+    for (const char* id : {"first_orders", "vanguard", "battle_plan"}) rank += learned(id) ? 1 : 0;
+    return rank;
 }

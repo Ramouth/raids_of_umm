@@ -1,0 +1,44 @@
+{
+  "_comment": "The commander's tree. One point per level after the first; a branch is learned top to bottom. Only 'live' branches can be learned; the others show what is coming.",
+  "branches": [
+    {
+      "id": "tactics", "name": "Tactics", "live": true,
+      "text": "Battlefield control: who moves first, and where.",
+      "nodes": [
+        {"id": "first_orders", "name": "First Orders", "text": "Before each battle, choose one of your stacks to act first in round 1, ahead of every enemy."},
+        {"id": "vanguard",     "name": "Vanguard",     "text": "Choose two stacks to open the battle, in the order you set."},
+        {"id": "battle_plan",  "name": "Battle Plan",  "text": "Choose three stacks to open the battle, in the order you set."}
+      ]
+    },
+    {
+      "id": "command", "name": "Command", "live": false,
+      "text": "Auras: the commander's presence holds the line.",
+      "nodes": [
+        {"id": "banner",       "name": "Banner",       "text": "One stack gets a radius-1 aura of +2 defence."},
+        {"id": "wider_banner", "name": "Wider Banner", "text": "+1 aura radius, companion auras included."},
+        {"id": "rally",        "name": "Rally",        "text": "+3 attack inside your auras."},
+        {"id": "oathbound",    "name": "Oathbound",    "text": "Once per battle, a stack or companion cannot be wiped out this round."}
+      ]
+    },
+    {
+      "id": "sand", "name": "Sand", "live": false,
+      "text": "Battle spells that move the battlefield. Once per battle each.",
+      "nodes": [
+        {"id": "displace",   "name": "Displace",   "text": "Push or pull a stack two hexes."},
+        {"id": "quicksand",  "name": "Quicksand",  "text": "Hexes that slow whoever walks in."},
+        {"id": "stone_wall", "name": "Stone Wall", "text": "Raise a wall of hexes nobody can cross."},
+        {"id": "ward",       "name": "Ward",       "text": "A stack ignores the next blow."}
+      ]
+    },
+    {
+      "id": "veined", "name": "The Veined", "live": false,
+      "text": "What the obelisks teach. Opens after two obelisks.",
+      "nodes": [
+        {"id": "vein_sight",   "name": "Vein Sight",   "text": "See through the fog along the veins."},
+        {"id": "grave_harvest","name": "Grave Harvest","text": "Raise the lowest dead of your enemies after battle."},
+        {"id": "listen_below", "name": "Listen Below", "text": "Hear what is under the map."},
+        {"id": "the_door",     "name": "The Door",     "text": "..."}
+      ]
+    }
+  ]
+}

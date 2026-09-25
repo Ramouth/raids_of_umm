@@ -42,6 +42,8 @@ var _stand: Dictionary = {}
 var waypoints: Array = []
 ## Pointer over the Defend button: the status line explains the stance.
 var _defend_hover := false
+var begin_button: Button
+var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -89,6 +91,8 @@ func _ready() -> void:
     defend.mouse_exited.connect(func():
         _defend_hover = false
         _update_status())
+    begin_button = _button("Begin the battle · Enter", Vector2(830, 440), give_orders)
+    begin_button.hide()
     retreat = _button("Retreat…", Vector2(830, 494), func(): confirm_retreat.popup_centered())
     auto_button = CheckButton.new()
     auto_button.text = "Auto-battle (AI commands your stacks)"
@@ -278,6 +282,9 @@ func _log_damage(event: Dictionary, strike: Dictionary) -> void:
     else:
         var verb := "shoots" if strike.get("ranged", false) else "attacks"
         if strike.get("reaction", false): verb = "fires at the approaching"
+        if strike.get("opportunity", false):
+            _log("%s strikes %s as it steps out of reach: %s." % [_unit_label(strike.unit), _unit_label(victim), outcome], TEXT, strike.unit)
+            return
         var pinned := " PINNED (+50%, no retaliation)" if strike.flanked else ""
         if strike.get("blocked", false): pinned += " through the ranks (blocked shot: half damage)"
         _log("%s %s %s%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), pinned, outcome], TEXT, strike.unit)
@@ -312,10 +319,17 @@ func _refresh() -> void:
         var player_turn: bool = state.get("player_turn", false)
         var whose := "YOUR TURN" if player_turn and not auto_battle else ("AUTO-BATTLE" if player_turn else "ENEMY TURN")
         if busy: whose = "resolving…"
-        turn_label.text = "ROUND %d   ·   %s   ·   %s" % [state.get("round", 1), _unit_label(state.get("active", "")), whose]
-        turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
+        if _opening() > 0 and not auto_battle:
+            turn_label.text = "ROUND 1   ·   OPENING ORDERS"
+            turn_label.add_theme_color_override("font_color", GOLD)
+        else:
+            turn_label.text = "ROUND %d   ·   %s   ·   %s" % [state.get("round", 1), _unit_label(state.get("active", "")), whose]
+            turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
     _build_initiative()
     defend.disabled = busy or auto_battle or not state.get("player_turn", false) or not ongoing
+    begin_button.visible = _opening() > 0 and ongoing
+    defend.visible = not begin_button.visible
+    begin_button.disabled = busy or auto_battle
     retreat.disabled = busy or not ongoing
     auto_button.disabled = not ongoing
     _update_inspection()
@@ -402,7 +416,8 @@ func _update_inspection() -> void:
 func _inspect(unit: Dictionary) -> void:
     var colour := FRIEND if unit.player else FOE
     var lines: Array[String] = []
-    var tag := "ACTING NOW" if unit.key == state.get("active", "") else ("kept on screen · right-click empty ground to release" if unit.key == _pinned_key else "")
+    var acting := "FIRST TO ACT, unless your orders say otherwise" if _opening() > 0 else "ACTING NOW"
+    var tag := acting if unit.key == state.get("active", "") else ("kept on screen · right-click empty ground to release" if unit.key == _pinned_key else "")
     var companion: bool = unit.get("companion", false)
     if companion:
         lines.append("[font_size=21][b][color=#%s]%s[/color][/b][/font_size]" % [GOLD.to_html(false), unit.name])
@@ -627,6 +642,11 @@ func _update_status() -> void:
     var active: Dictionary = units.get(state.get("active", ""), {})
     if not ongoing:
         text = "The battle is over."
+    elif _opening() > 0 and not auto_battle:
+        var chosen: Array[String] = []
+        for key in _orders: chosen.append(_unit_name(key))
+        text = "[b]TACTICS[/b]: click up to %d stack%s to act first · %s · Enter" % [
+            _opening(), "" if _opening() == 1 else "s", (" → ".join(chosen)) if not chosen.is_empty() else "none: usual order"]
     elif not my_turn:
         if auto_battle: text = "Auto-battle: the AI commands your stacks. Untick Auto-battle to take over."
         elif busy: text = "Resolving…"
@@ -764,11 +784,19 @@ func _reaction_text(shots: Array) -> String:
     var parts: Array[String] = []
     var low := 0
     var high := 0
+    var blows: Array[String] = []   # guardians striking a stack that steps out of reach
     for shot in shots:
+        if shot.get("opportunity", false):
+            blows.append("%s strikes as you step away: %s" % [_unit_label(shot.key), _range_text(int(shot.damage_min), int(shot.damage_max))])
+            continue
         parts.append(_unit_label(shot.key) + (" (blocked ½)" if shot.blocked else ""))
         low += int(shot.damage_min)
         high += int(shot.damage_max)
-    return " · [color=#%s]⚠ %s fire%s as you close in: %s damage first[/color]" % [FOE.to_html(false), ", ".join(parts), "" if parts.size() > 1 else "s", _range_text(low, high)]
+    var text := ""
+    if not blows.is_empty(): text += " · [color=#%s]⚠ %s[/color]" % [FOE.to_html(false), " · ".join(blows)]
+    if not parts.is_empty():
+        text += " · [color=#%s]⚠ %s fire%s as you close in: %s damage first[/color]" % [FOE.to_html(false), ", ".join(parts), "" if parts.size() > 1 else "s", _range_text(low, high)]
+    return text
 
 func _defend_explanation(unit: Dictionary) -> String:
     var defence := int(unit.get("defense", 0))
@@ -790,8 +818,43 @@ static func _hex_distance(a: Array, b: Array) -> int:
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
+## Tactics rank still to use: how many of your stacks you may order to act first.
+func _opening() -> int:
+    return int(state.get("opening", 0))
+
+## Click your own stacks to put them in (or take them out of) the opening orders.
+func _toggle_order(coordinates: Array) -> void:
+    var unit := _unit_at(coordinates)
+    if unit.is_empty() or not unit.player: return
+    if unit.key in _orders: _orders.erase(unit.key)
+    elif _orders.size() < _opening(): _orders.append(unit.key)
+    else:
+        _log("Your Tactics allow %d opening order%s. Click a numbered stack to take it back." % [_opening(), "" if _opening() == 1 else "s"], FOE)
+        return
+    board.order_marks = {}
+    for i in _orders.size(): board.order_marks[_orders[i]] = i + 1
+    board.queue_redraw()
+    _update_status()
+
+## Sends the opening orders (none chosen = initiative as usual) and starts round 1.
+func give_orders() -> bool:
+    if _opening() == 0: return false
+    var route: Array = []
+    for key in _orders: route.append(units[key].cell)
+    var names: Array[String] = []
+    for key in _orders: names.append(_unit_label(key))
+    if issue_route("opening", route):
+        if not names.is_empty(): _log("Opening orders: %s act%s first." % [", then ".join(names), "s" if names.size() == 1 else ""], GOLD)
+        _orders.clear()
+        board.order_marks = {}
+        return true
+    return false
+
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
+    if _opening() > 0:
+        if not busy and not auto_battle: _toggle_order(coordinates)
+        return
     if busy or auto_battle or not state.get("player_turn", false): return
     if board.modified_click or Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_CTRL):
         _toggle_waypoint(coordinates)
@@ -824,7 +887,11 @@ func _defend() -> void:
     if not defend.disabled: issue("defend")
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_D:
+    if event is InputEventKey and event.pressed and not event.echo and _opening() > 0 \
+            and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+        give_orders()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_D:
         _defend()
         get_viewport().set_input_as_handled()
     elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and not waypoints.is_empty():
@@ -835,6 +902,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _schedule_ai() -> void:
     if _ai_scheduled or busy or state.is_empty() or state.result != "ongoing": return
+    if _opening() > 0:              # nobody moves before the opening orders
+        if auto_battle:
+            _orders.clear()
+            give_orders()           # the AI gives none: initiative as usual
+        return
     if state.player_turn and not auto_battle: return
     _ai_scheduled = true
     await get_tree().create_timer(0.35 * animation_speed).timeout
