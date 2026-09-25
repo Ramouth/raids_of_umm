@@ -94,6 +94,17 @@ func _root_scene() -> void:
     var game: Node = load("res://scenes/game.tscn").instantiate()
     root.add_child(game)
     await process_frame
+    var intro: Control = null
+    for node in game.find_children("*", "Control", true, false):
+        if node.has_method("skip") and node.has_signal("finished"): intro = node
+    check(intro != null and game.adventure == null, "A new game opens on the intro")
+    if intro != null:
+        await process_frame
+        check(intro._slide == 0 and intro._lines.get_child_count() == 1, "The first slide and its first line show")
+        intro.advance()
+        check(intro._line == 1, "Click / Space shows the next line")
+        intro.skip()                                   # Esc
+        await process_frame
     check(game.adventure != null and game.screens.base == game.adventure, "Game root hosts the adventure as the base screen")
     check(game.adventure.screens == game.screens, "Adventure pushes onto the root screen stack")
     game.queue_free()
