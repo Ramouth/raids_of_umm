@@ -19,7 +19,7 @@ const SLIDES := [
     {"image": "intro/04_throne.jpg", "lines": [
         "He left no heir. No regent.",
         "The mightiest throne in the world stands empty, and the sand is already climbing its steps."]},
-    {"image": "intro/05_hunt.jpg", "lines": [
+    {"image": "intro/05_hunt.jpg", "pace": 0.7, "lines": [
         "So the hunt begins.",
         "Who will take the throne? Who will reach the capital first? Who will carry off its relics?"]},
     {"image": "intro/06_passage.jpg", "lines": [
@@ -97,6 +97,8 @@ func _picture() -> TextureRect:
     rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    # Paintings, not pixel art: smooth filtering, or the slow zoom shimmers.
+    rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
     rect.modulate.a = 0.0
     add_child(rect)
     return rect
@@ -151,7 +153,8 @@ func _show_line(text: String, first := false) -> void:
     label.modulate.a = 0.0
     _lines.add_child(label)
     create_tween().tween_property(label, "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
-    _timer.start(3.5 + text.length() / 18.0 + (FADE if first else 0.0))
+    var pace: float = SLIDES[_slide].get("pace", 1.0)   # < 1: a slide that moves on sooner
+    _timer.start((3.5 + text.length() / 18.0) * pace + (FADE if first else 0.0))
 
 func _title() -> void:
     for child in _lines.get_children(): child.queue_free()
