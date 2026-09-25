@@ -55,6 +55,11 @@ var state: Dictionary = {}
 var fog: Node2D
 var _pending_steps: Array = []
 var _destination := NO_CELL
+## HoMM3 routes: the first click plans (the route stays drawn), a second click
+## on the same hex sets off; Esc or a right-click cancels. Kept across days
+## until the hero gets there.
+var _planned := NO_CELL
+var _right_press := Vector2.ZERO
 var _calendar_label: Label
 var _treasury_label: Label
 var _moves_label: Label
@@ -795,6 +800,9 @@ func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseButton:
         if event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
             _dragging = event.pressed and _over_map(event.position)
+        if event.button_index == MOUSE_BUTTON_RIGHT:   # a right-click (not a drag) cancels the plan
+            if event.pressed: _right_press = event.position
+            elif event.position.distance_to(_right_press) < 6.0 and _planned != NO_CELL: cancel_route()
         if not event.pressed or not _over_map(event.position):
             return
         if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -803,7 +811,7 @@ func _unhandled_input(event: InputEvent) -> void:
             _zoom(-1)
         elif event.button_index == MOUSE_BUTTON_LEFT:
             var world_point: Vector2 = get_canvas_transform().affine_inverse() * event.position
-            travel_to(UmmMapData.world_to_cell(world_point))
+            click_cell(UmmMapData.world_to_cell(world_point))
     elif event is InputEventMouseMotion and _dragging:
         camera.position -= event.relative / camera.zoom
         _clamp_camera()
@@ -813,6 +821,7 @@ func _unhandled_input(event: InputEvent) -> void:
                 sidebar.get_node("Grid").button_pressed = not overlay.show_grid
             KEY_SPACE, KEY_ENTER:
                 if dialogue.is_speaking(): dialogue.advance()
+                elif event.keycode == KEY_ENTER and _planned != NO_CELL: travel_to(_planned)
                 elif event.keycode == KEY_SPACE: center_hero()
             KEY_Q:
                 toggle_quest_log()
@@ -836,7 +845,8 @@ func _unhandled_input(event: InputEvent) -> void:
                 open_garrison()
             KEY_ESCAPE:
                 if not hero.moving:
-                    _inspect(NO_CELL)
+                    if _planned != NO_CELL: cancel_route()
+                    else: _inspect(NO_CELL)
 
 func _inspect(cell: Vector2i) -> void:
     _hover = cell
@@ -889,7 +899,38 @@ func _inspect(cell: Vector2i) -> void:
                 sidebar.get_node("Route").text = "%d hexes · %.1f movement\nNo movement left today — end the day (E)." % [_preview.size(), plan.cost]
     overlay.origin = hero.cell
     overlay.path = _preview.duplicate()
+    if _planned != NO_CELL and cell != _planned:   # the planned route stays drawn while you look around
+        var kept: Dictionary = JSON.parse_string(adventure.preview(_planned.x, _planned.y))
+        overlay.path.clear()
+        for c in kept.path: overlay.path.append(Vector2i(c[0], c[1]))
+        overlay.reachable = int(kept.reachable)
+        if not _preview.is_empty(): sidebar.get_node("Route").text += "
+(Click to plan this route instead.)"
+    elif _planned != NO_CELL and cell == _planned and not _preview.is_empty():
+        sidebar.get_node("Route").text = sidebar.get_node("Route").text.split("\n")[0] + "\nClick again (or Enter) to set off · Esc cancels."
     overlay.queue_redraw()
+
+## A left click on the map: plan a route there, or set off if it is the planned one.
+func click_cell(cell: Vector2i) -> bool:
+    if cell == _planned: return travel_to(cell)
+    return plan_route(cell)
+
+## Draws a route to `cell` and keeps it until the hero gets there or it is cancelled.
+func plan_route(cell: Vector2i) -> bool:
+    if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup): return false
+    _inspect(cell)
+    if _preview.is_empty(): return false
+    _planned = cell
+    _inspect(cell)
+    var goal := str(data.objects.get(cell, {}).get("name", "there"))
+    notice.text = "Route planned to %s. Click it again (or Enter) to set off; Esc or right-click cancels." % goal
+    return true
+
+func cancel_route() -> void:
+    if _planned == NO_CELL: return
+    _planned = NO_CELL
+    notice.text = "Route cancelled."
+    _inspect(_hover)
 
 func travel_to(cell: Vector2i) -> bool:
     if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup):
@@ -952,6 +993,8 @@ func _journey_finished() -> void:
     var captured := notice.text.ends_with("banner.") or _found_on_journey
     _found_on_journey = false
     _apply_state(state)
+    if hero.cell == _planned or state.get("encounter") != null:
+        _planned = NO_CELL           # arrived, or the road was barred: the plan is done
     if _check_lost(): return
     if not _held_lines.is_empty():
         dialogue.say(_held_lines)

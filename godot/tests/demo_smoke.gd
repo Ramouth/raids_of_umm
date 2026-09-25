@@ -80,6 +80,7 @@ func _run() -> void:
     await _story()
     await _town_recruiting()
     await _hero_and_companions()
+    await _route_planning()
     await _ridge_pass()
     await _passage_wins()
     await _defeat_ends()
@@ -258,6 +259,27 @@ func _town_recruiting() -> void:
     garrison.find_child("Done", true, false).pressed.emit()
     await process_frame
     check(scene.screens.depth() == 0 and scene.get_node("HUD").visible, "Leaving the town returns to the map")
+    scene.queue_free()
+    await process_frame
+
+## HoMM3 routes: a first click only plans; a second click sets off; Esc cancels.
+func _route_planning() -> void:
+    var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
+    scene.dialogue.skip_all()
+    var start: Vector2i = scene.hero.cell
+    var goal := Vector2i(-7, 2)
+    check(scene.click_cell(goal), "A first click plans a route")
+    await process_frame
+    check(scene.hero.cell == start and not scene.hero.moving, "Planning does not move the hero")
+    check(not scene.overlay.path.is_empty() and scene.overlay.path[-1] == goal, "The planned route is drawn")
+    scene._inspect(Vector2i(-10, 4))                          # looking elsewhere...
+    check(scene.overlay.path[-1] == goal, "...keeps the planned route on the map")
+    scene.cancel_route()
+    check(scene._planned == scene.NO_CELL, "Esc / right-click cancels the plan")
+    check(scene.click_cell(goal) and scene.click_cell(goal), "Clicking the planned hex again sets off")
+    await _walk(scene)
+    check(scene.hero.cell != start, "The hero travelled")
+    check(scene.hero.cell != goal or scene._planned == scene.NO_CELL, "Arriving clears the plan")
     scene.queue_free()
     await process_frame
 

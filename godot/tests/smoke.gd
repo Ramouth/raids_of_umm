@@ -58,7 +58,10 @@ func _run() -> void:
     click.position = scene.get_canvas_transform() * UmmMapData.cell_to_world(target)
     root.push_input(click, true)
     await process_frame
-    check(scene.hero.moving, "Mouse click starts hero movement")
+    check(not scene.hero.moving and scene._planned == target, "A first click plans the route (HoMM3)")
+    root.push_input(click.duplicate(), true)
+    await process_frame
+    check(scene.hero.moving, "A second click on the planned hex starts hero movement")
     check(not scene.travel_to(Vector2i.ZERO), "A second order cannot interrupt an active step")
     var deadline := Time.get_ticks_msec() + 6000
     while scene.hero.moving and Time.get_ticks_msec() < deadline:
