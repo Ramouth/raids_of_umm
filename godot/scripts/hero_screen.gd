@@ -44,7 +44,7 @@ func _ready() -> void:
     _doll.size = Vector2(600, 460)
     add_child(_doll)
     var figure := TextureRect.new()
-    figure.texture = load("res://content/textures/units/armoured_warrior.png")
+    figure.texture = load("res://content/textures/units/british_lord.png")
     figure.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     figure.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     figure.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

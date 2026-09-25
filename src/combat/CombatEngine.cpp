@@ -227,8 +227,9 @@ bool CombatEngine::doAttackAlong(const std::vector<HexCoord>& route, int targetI
         return true;
     }
     if (!isLegalRoute(route) || !canAttackFrom(route.back(), targetIndex)) return false;
+    m_strikeOrigin = activeUnit().pos;
     if (arrive(route.back(), route)) resolveAttack(targetIndex);
-    else advance();                        // shot down on the way in
+    else { m_strikeOrigin.reset(); advance(); }   // shot down on the way in
     return true;
 }
 
@@ -260,7 +261,9 @@ void CombatEngine::doAttack(int targetIndex) {
 
 bool CombatEngine::doAttackFrom(HexCoord from, int targetIndex) {
     if (!canAttackFrom(from, targetIndex)) return false;
+    m_strikeOrigin = activeUnit().pos;
     if (from != activeUnit().pos && !arrive(from, {})) {
+        m_strikeOrigin.reset();
         advance();                         // shot down on the way in
         return true;
     }
@@ -315,6 +318,8 @@ void CombatEngine::resolveAttack(int targetIndex) {
 
     int damage = calcDamage(attacker, target, m_rng);
     if (pinned) damage = damage * 3 / 2;
+    if (attacker.type->hasAbility("lone_wolf") && fightsAlone(friendlyStacks, slot.stackIndex, attacker.pos))
+        damage = loneWolfDamage(damage);
     if (!isRanged && meleePenalty(attacker)) damage = std::max(1, damage / 2);   // shooter hand to hand
     if (blocked) damage = std::max(1, damage / 2);
 
@@ -330,8 +335,10 @@ void CombatEngine::resolveAttack(int targetIndex) {
               << " [" << atName << " | effDef " << rawDef << "→" << reducedDef << "]"
               << " (" << target.count << " survivors)\n";
 
-    if (hitStack(!slot.isPlayer, targetIndex, damage, !isRanged))
+    if (hitStack(!slot.isPlayer, targetIndex, damage, !isRanged)) {
         awardScXp(attacker, slot, attacker.killXp);   // kill XP if the attacker is an SC
+        gainRenown(attacker);
+    }
 
     // ── Melee retaliation ────────────────────────────────────────────────────
     if (!isRanged && !target.isDead() && !target.hasRetaliated
@@ -351,14 +358,45 @@ void CombatEngine::resolveAttack(int targetIndex) {
         int retDamage = calcDamage(target, attacker, m_rng);
         if (meleePenalty(target)) retDamage = std::max(1, retDamage / 2);        // a shooter strikes back weakly
         target.hasRetaliated = true;
-        hitStack(slot.isPlayer, slot.stackIndex, retDamage, true);
+        if (hitStack(slot.isPlayer, slot.stackIndex, retDamage, true)) gainRenown(target);
 
         std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
                   << " (" << attacker.type->name << ": " << attacker.count << " left)\n";
     }
 
+    // Hit and run: back to where the walk began.
+    if (m_strikeOrigin && !attacker.isDead() && attacker.type->hasAbility("strike_and_return")
+        && *m_strikeOrigin != attacker.pos) {
+        bool free = true;
+        for (const auto* army : {&m_player, &m_enemy})
+            for (const auto& s : army->stacks) free = free && (s.isDead() || s.pos != *m_strikeOrigin);
+        if (free) {
+            CombatEvent back;
+            back.type       = CombatEvent::Type::UnitMoved;
+            back.isPlayer   = slot.isPlayer;
+            back.stackIndex = slot.stackIndex;
+            back.from       = attacker.pos;
+            back.to         = *m_strikeOrigin;
+            m_events.push_back(back);
+            attacker.pos = *m_strikeOrigin;
+            refreshAuras();
+        }
+    }
+    m_strikeOrigin.reset();
     advance();
+}
+
+void CombatEngine::gainRenown(CombatUnit& victor) {
+    if (victor.isDead()) return;
+    if (victor.type->hasAbility("great_renown")) victor.renown += 2 * kRenownGain;
+    else if (victor.type->hasAbility("renown"))  victor.renown += kRenownGain;
+}
+
+bool CombatEngine::fightsAlone(const std::vector<CombatUnit>& friends, int self, HexCoord at) {
+    for (int j = 0; j < static_cast<int>(friends.size()); ++j)
+        if (j != self && !friends[j].isDead() && friends[j].pos.distanceTo(at) == 1) return false;
+    return true;
 }
 
 // static
@@ -496,6 +534,8 @@ AttackPreview CombatEngine::previewAttackUnchecked(int targetIndex, HexCoord fro
                && actor.pos.distanceTo(target.pos) > 1;
     p.pinned = !p.ranged && isFlanked(target, friends);
     p.damage = p.ranged ? damageRange(actor, target, p.pinned) : meleeRange(actor, target, p.pinned);
+    if (actor.type->hasAbility("lone_wolf") && fightsAlone(friends, self, from))
+        p.damage = {loneWolfDamage(p.damage.min), loneWolfDamage(p.damage.max), p.damage.avg * 1.25};
     p.blocked = p.ranged && !hasLineOfSight(from, target.pos);
     if (p.blocked)
         p.damage = {std::max(1, p.damage.min / 2), std::max(1, p.damage.max / 2), std::max(1.0, p.damage.avg / 2)};

@@ -40,9 +40,9 @@
   "buildings": [
     {
       "id": "village_hall",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "Village Hall",
-      "description": "The reeve's hall. 500 gold a day.",
+      "description": "The lord's hall and its mead-benches. 500 gold a day.",
       "cost": {},
       "requires": [],
       "income": 500,
@@ -50,7 +50,7 @@
     },
     {
       "id": "town_hall",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "Town Hall",
       "description": "Tolls and market dues. 1000 gold a day.",
       "cost": {
@@ -63,7 +63,7 @@
     },
     {
       "id": "city_hall",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "City Hall",
       "description": "The seat of the march. 2000 gold a day.",
       "cost": {
@@ -79,7 +79,7 @@
     },
     {
       "id": "fort",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "Fort",
       "description": "A timber palisade. Needed for the heavier dwellings.",
       "cost": {},
@@ -88,9 +88,9 @@
     },
     {
       "id": "citadel",
-      "faction": "ivory_compact",
-      "name": "Citadel",
-      "description": "Stone walls and a keep. Recruits grow 50% faster; knights will come.",
+      "faction": "cruths",
+      "name": "Hillfort",
+      "description": "Earth ramparts and a stone gate. Recruits grow 50% faster; the nobles will come.",
       "cost": {
         "Gold": 2500,
         "Stone": 5
@@ -102,9 +102,9 @@
     },
     {
       "id": "castle",
-      "faction": "ivory_compact",
-      "name": "Castle",
-      "description": "The march's stronghold. Recruits grow twice as fast.",
+      "faction": "cruths",
+      "name": "High Seat",
+      "description": "The seat of a British king. Recruits grow twice as fast.",
       "cost": {
         "Gold": 5000,
         "Wood": 10,
@@ -117,7 +117,7 @@
     },
     {
       "id": "marketplace",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "Marketplace",
       "description": "Trade resources: sell at half value, buy at one and a half.",
       "cost": {
@@ -129,29 +129,29 @@
     },
     {
       "id": "muster_field",
-      "faction": "ivory_compact",
-      "name": "Muster Field",
-      "description": "Levy Spearmen gather here.",
+      "faction": "cruths",
+      "name": "Painting Stones",
+      "description": "Where the Cruths paint their first stripe. Woad Runners gather here.",
       "cost": {},
       "requires": [],
-      "unlocks": "levy_spearman",
+      "unlocks": "woad_runner",
       "starting": true
     },
     {
       "id": "archery_butts",
-      "faction": "ivory_compact",
-      "name": "Archery Butts",
-      "description": "Desert Archers train here.",
+      "faction": "cruths",
+      "name": "Sling Range",
+      "description": "Shepherds practise on the hillside. Cruth Slingers gather here.",
       "cost": {},
       "requires": [],
-      "unlocks": "desert_archer",
+      "unlocks": "cruth_slinger",
       "starting": true
     },
     {
       "id": "armoury",
-      "faction": "ivory_compact",
-      "name": "Armoury",
-      "description": "Arms and trains Armoured Warriors.",
+      "faction": "cruths",
+      "name": "Blade Circle",
+      "description": "A ring of standing stones where the Painted Blades duel for their stripes.",
       "cost": {
         "Gold": 1000,
         "Stone": 5
@@ -159,13 +159,13 @@
       "requires": [
         "fort"
       ],
-      "unlocks": "armoured_warrior"
+      "unlocks": "painted_blade"
     },
     {
       "id": "horse_lines",
-      "faction": "ivory_compact",
+      "faction": "cruths",
       "name": "Horse Lines",
-      "description": "Stables and paddocks for Rider Archers.",
+      "description": "Paddocks for the Gododdin Riders' mounts.",
       "cost": {
         "Gold": 2000,
         "Wood": 5,
@@ -174,13 +174,13 @@
       "requires": [
         "armoury"
       ],
-      "unlocks": "rider_archer"
+      "unlocks": "gododdin_rider"
     },
     {
       "id": "knights_hall",
-      "faction": "ivory_compact",
-      "name": "Knights' Hall",
-      "description": "Where the Compact's Rider Knights are sworn.",
+      "faction": "cruths",
+      "name": "Mead Hall",
+      "description": "Where the lord's household drinks his mead, and swears the Teulu's oath.",
       "cost": {
         "Gold": 4000,
         "Stone": 5,
@@ -190,13 +190,13 @@
         "horse_lines",
         "citadel"
       ],
-      "unlocks": "rider_knight"
+      "unlocks": "teulu"
     },
     {
       "id": "drill_yard",
-      "faction": "ivory_compact",
-      "name": "Drill Yard",
-      "description": "Veterans drill the levies. While you hold this town, your troops fight with +1 attack.",
+      "faction": "cruths",
+      "name": "Boasting Ring",
+      "description": "Warriors boast of deeds to come. While you hold this town, your troops fight with +1 attack.",
       "cost": {
         "Gold": 1500,
         "Stone": 5
@@ -208,9 +208,9 @@
     },
     {
       "id": "marksmens_tower",
-      "faction": "ivory_compact",
-      "name": "Marksmen's Tower",
-      "description": "Archers drill the readied shot: while you hold this town, your shooters fire once a round at any enemy that moves closer, before it strikes.",
+      "faction": "cruths",
+      "name": "Slingers' Cairn",
+      "description": "Slingers keep watch from the cairn: while you hold this town, your shooters fire once a round at any enemy that moves closer, before it strikes.",
       "cost": {
         "Gold": 2000,
         "Wood": 5

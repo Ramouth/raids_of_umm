@@ -18,7 +18,7 @@ func _run() -> void:
     var view: Control = CombatView.new()
     root.add_child(view)
     await process_frame
-    view.begin([{"id": "levy_spearman", "count": 20}, {"id": "desert_archer", "count": 10}, {"id": "armoured_warrior", "count": 4},
+    view.begin([{"id": "woad_runner", "count": 20}, {"id": "cruth_slinger", "count": 10}, {"id": "painted_blade", "count": 4}, {"id": "gododdin_rider", "count": 3},
                 {"id": "maerwen", "count": 1, "level": 2, "companion": true}],
                {"guards": [{"id": "grey_wolf", "count": 16}, {"id": "brigand", "count": 8}], "reward": "", "tactics": 2}, "Hermit's Wolves")
     while view.busy: await process_frame

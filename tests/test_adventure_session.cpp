@@ -244,10 +244,10 @@ SUITE("AdventureSession — player towns start with a week of their roster") {
     const TownState* home = s.town({-6, 0});
     CHECK(home != nullptr);
     if (home) {
-        CHECK(home->recruitPool.count("levy_spearman") == 1);
+        CHECK(home->recruitPool.count("woad_runner") == 1);
         CHECK(home->recruitPool.count("skeleton_warrior") == 0);     // neutral creature
         CHECK(home->recruitPool.count("shariw_scout") == 0);         // other roster
-        CHECK_EQ(home->recruitPool.at("levy_spearman"), s.resources().unit("levy_spearman")->weeklyGrowth);
+        CHECK_EQ(home->recruitPool.at("woad_runner"), s.resources().unit("woad_runner")->weeklyGrowth);
     }
     const TownState* far = s.town({6, 0});
     CHECK(far != nullptr && far->recruitPool.empty());                // neutral town recruits nothing
@@ -256,36 +256,36 @@ SUITE("AdventureSession — player towns start with a week of their roster") {
 SUITE("AdventureSession — recruiting spends gold and fills the army") {
     auto s = started();
     int gold = s.treasury()[Resource::Gold];
-    CHECK(!s.recruit({-6, 0}, "levy_spearman", 10));
-    CHECK_EQ(s.treasury()[Resource::Gold], gold - 10 * s.resources().unit("levy_spearman")->cost[Resource::Gold]);
+    CHECK(!s.recruit({-6, 0}, "woad_runner", 10));
+    CHECK_EQ(s.treasury()[Resource::Gold], gold - 10 * s.resources().unit("woad_runner")->cost[Resource::Gold]);
     auto army = s.army();
     CHECK_EQ((int)army.size(), 1);
-    if (!army.empty()) CHECK(army[0].id == "levy_spearman" && army[0].count == 10);
-    CHECK(s.recruit({-6, 0}, "levy_spearman", 999).has_value());      // pool limit
-    CHECK(s.recruit({-6, 0}, "rider_knight", 2).has_value());         // cannot afford obsidian
+    if (!army.empty()) CHECK(army[0].id == "woad_runner" && army[0].count == 10);
+    CHECK(s.recruit({-6, 0}, "woad_runner", 999).has_value());      // pool limit
+    CHECK(s.recruit({-6, 0}, "teulu", 2).has_value());         // cannot afford obsidian
 }
 
 SUITE("AdventureSession — must stand in an owned town to recruit") {
     auto s = started();
     s.travel({-5, 0});
-    CHECK(s.recruit({-6, 0}, "levy_spearman", 1).has_value());
-    CHECK(s.recruit({6, 0}, "levy_spearman", 1).has_value());
+    CHECK(s.recruit({-6, 0}, "woad_runner", 1).has_value());
+    CHECK(s.recruit({6, 0}, "woad_runner", 1).has_value());
 }
 
 SUITE("AdventureSession — weekly growth refills pools; capture swaps roster") {
     auto s = started();
-    int start = s.town({-6, 0})->recruitPool.at("levy_spearman");
+    int start = s.town({-6, 0})->recruitPool.at("woad_runner");
     for (int i = 0; i < 6; ++i) s.endDay();                            // day 7
-    CHECK_EQ(s.town({-6, 0})->recruitPool.at("levy_spearman"), start * 2);
+    CHECK_EQ(s.town({-6, 0})->recruitPool.at("woad_runner"), start * 2);
     CHECK(s.town({6, 0})->recruitPool.empty());
     for (int day = 0; day < 3 && s.owner({6, 0}) != 1; ++day) { s.travel({6, 0}); s.endDay(); }
     CHECK_EQ(s.owner({6, 0}), 1);
-    CHECK(s.town({6, 0})->recruitPool.count("levy_spearman") == 1);
+    CHECK(s.town({6, 0})->recruitPool.count("woad_runner") == 1);
 }
 
 SUITE("AdventureSession — setArmy keeps known stacks") {
     auto s = started();
-    s.setArmy({{"levy_spearman", 5}, {"not_a_unit", 3}, {"desert_archer", 0}});
+    s.setArmy({{"woad_runner", 5}, {"not_a_unit", 3}, {"desert_archer", 0}});
     auto army = s.army();
     CHECK_EQ((int)army.size(), 1);
 }

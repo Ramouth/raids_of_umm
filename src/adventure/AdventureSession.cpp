@@ -706,7 +706,7 @@ std::optional<std::string> AdventureSession::transfer(const HexCoord& site, cons
 
 std::string AdventureSession::rosterFor(int owner) {
     switch (owner) {
-        case Faction::Player: return "ivory_compact";
+        case Faction::Player: return "cruths";
         case Faction::AI:     return "shariw";
         default:              return "";
     }

@@ -33,17 +33,17 @@ SUITE("Town buildings — a town starts with its hall, fort and first two dwelli
     CHECK(t != nullptr);
     for (const char* id : {"village_hall", "fort", "muster_field", "archery_butts"}) CHECK(t->buildings.count(id));
     CHECK(!t->buildings.count("armoury"));
-    CHECK(s.canRecruitHere(HOME, "levy_spearman"));
-    CHECK(!s.canRecruitHere(HOME, "armoured_warrior"));
-    CHECK(t->recruitPool.count("levy_spearman") && t->recruitPool.at("levy_spearman") > 0);
-    CHECK(!t->recruitPool.count("armoured_warrior") || t->recruitPool.at("armoured_warrior") == 0);
+    CHECK(s.canRecruitHere(HOME, "woad_runner"));
+    CHECK(!s.canRecruitHere(HOME, "painted_blade"));
+    CHECK(t->recruitPool.count("woad_runner") && t->recruitPool.at("woad_runner") > 0);
+    CHECK(!t->recruitPool.count("painted_blade") || t->recruitPool.at("painted_blade") == 0);
 }
 
 SUITE("Town buildings — a missing dwelling blocks recruiting and says which") {
     auto s = townSession();
     rich(s);
-    auto err = s.recruit(HOME, "armoured_warrior", 1);
-    CHECK(err.has_value() && err->find("Armoury") != std::string::npos);
+    auto err = s.recruit(HOME, "painted_blade", 1);
+    CHECK(err.has_value() && err->find("Blade Circle") != std::string::npos);
 }
 
 SUITE("Town buildings — one per day; prerequisites; cost is paid") {
@@ -53,9 +53,9 @@ SUITE("Town buildings — one per day; prerequisites; cost is paid") {
     const int gold = s.treasury()[Resource::Gold];
     CHECK(!s.build(HOME, "armoury"));
     CHECK_EQ(s.treasury()[Resource::Gold], gold - 1000);
-    CHECK(s.canRecruitHere(HOME, "armoured_warrior"));
-    CHECK(s.town(HOME)->recruitPool.at("armoured_warrior") > 0);         // first week's recruits at once
-    CHECK(!s.recruit(HOME, "armoured_warrior", 1));
+    CHECK(s.canRecruitHere(HOME, "painted_blade"));
+    CHECK(s.town(HOME)->recruitPool.at("painted_blade") > 0);         // first week's recruits at once
+    CHECK(!s.recruit(HOME, "painted_blade", 1));
     auto again = s.build(HOME, "marketplace");
     CHECK(again.has_value() && again->find("today") != std::string::npos);
     s.endDay();
@@ -86,11 +86,11 @@ SUITE("Town buildings — a citadel makes recruits grow 50% faster") {
     rich(s);
     CHECK(!s.build(HOME, "citadel"));
     CHECK_NEAR(s.growthBonus(HOME), 0.5, 1e-9);
-    const int base = s.resources().unit("levy_spearman")->weeklyGrowth;
-    const int before = s.town(HOME)->recruitPool.at("levy_spearman");
+    const int base = s.resources().unit("woad_runner")->weeklyGrowth;
+    const int before = s.town(HOME)->recruitPool.at("woad_runner");
     while (s.dayOfWeek() != 7) s.endDay();
     s.endDay();                                                         // the week turns
-    const int grown = s.town(HOME)->recruitPool.at("levy_spearman") - before;
+    const int grown = s.town(HOME)->recruitPool.at("woad_runner") - before;
     CHECK(grown >= base * 3 / 2 - 1 && grown <= base * 3 / 2 + 1);
 }
 
@@ -147,8 +147,8 @@ SUITE("Town buildings — each town is itself: own starting set, own daily build
     const HexCoord varen{-6, 0}, hale{6, 0};
     CHECK(!s.town(varen)->buildings.count("town_hall"));
     CHECK(s.town(hale)->buildings.count("town_hall") && s.town(hale)->buildings.count("armoury"));   // the Hale seat
-    CHECK(s.canRecruitHere(hale, "armoured_warrior"));
-    CHECK(!s.canRecruitHere(varen, "armoured_warrior"));
+    CHECK(s.canRecruitHere(hale, "painted_blade"));
+    CHECK(!s.canRecruitHere(varen, "painted_blade"));
     CHECK(!s.build(varen, "armoury"));
     CHECK(s.buildBlocker(varen, "marketplace").find("Tomorrow") == 0);
     CHECK(s.buildBlocker(hale, "citadel").empty());            // Hallowmere's build is still free today

@@ -1064,15 +1064,15 @@
             "band": "Hale household",
             "army": [
               {
-                "id": "levy_spearman",
+                "id": "woad_runner",
                 "count": 24
               },
               {
-                "id": "desert_archer",
+                "id": "cruth_slinger",
                 "count": 10
               },
               {
-                "id": "armoured_warrior",
+                "id": "painted_blade",
                 "count": 4
               }
             ]
@@ -1142,15 +1142,15 @@
             "band": "Hale household",
             "army": [
               {
-                "id": "levy_spearman",
+                "id": "woad_runner",
                 "count": 24
               },
               {
-                "id": "desert_archer",
+                "id": "cruth_slinger",
                 "count": 10
               },
               {
-                "id": "armoured_warrior",
+                "id": "painted_blade",
                 "count": 4
               }
             ]

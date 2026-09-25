@@ -3,6 +3,7 @@
 #include "CombatEvent.h"
 #include "CombatMap.h"
 #include <cstdint>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -164,6 +165,17 @@ public:
     // its own, ending on the destination; empty = straight to `to`).
     std::vector<int> opportunityStrikers(HexCoord to, const std::vector<HexCoord>& route = {}) const;
 
+    // ── The Cruths: glory fought alone ───────────────────────────────────────
+    // lone_wolf: +25% damage when no living friendly stack stands next to the
+    //   attacker's hex (they fight as individuals, not as a line).
+    // renown / great_renown: destroying an enemy stack paints a new stripe,
+    //   +2 / +4 attack for the rest of the battle.
+    // strike_and_return: a stack that walked in to strike goes back to where
+    //   it started, if that hex is still free (hit and run).
+    static constexpr int kRenownGain = 2;
+    static bool fightsAlone(const std::vector<CombatUnit>& friends, int self, HexCoord at);
+    static int  loneWolfDamage(int damage) { return damage + damage / 4; }
+
     // ── Engaged shooters (HoMM3) ─────────────────────────────────────────────
     // A shooter with a living enemy next to it cannot shoot: it must deal
     // with that enemy in melee first (and fires no reaction shots).
@@ -321,6 +333,9 @@ private:
     // bodyguard) and emit the Damaged/Died events.  Returns true if it died.
     bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee);
 
+    // A stack that destroyed an enemy stack gains its renown (if it has any).
+    void gainRenown(CombatUnit& victor);
+
     // Move the active stack (event + position + auras), then let enemy
     // shooters react.  Returns false if the stack died on the way in.
     bool arrive(HexCoord to, const std::vector<HexCoord>& path);
@@ -339,6 +354,7 @@ private:
     int                   m_turn  = 0;
     int                   m_round = 1;
     CombatResult          m_result = CombatResult::Ongoing;
+    std::optional<HexCoord> m_strikeOrigin;   // where a walk-and-strike began (strike_and_return)
     std::mt19937          m_rng;
     std::mt19937          m_aiRng;
 

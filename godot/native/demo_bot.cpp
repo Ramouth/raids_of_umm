@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
         AdventureSession s;
         if (auto e = s.start(root + "/data/maps/old_passage.json", root + "/data", root + "/data/maps/old_passage.encounters.json",
                              seed, root + "/data/maps/old_passage.triggers.json")) { std::cerr << *e << "\n"; return 1; }
-        s.setArmy({{"levy_spearman", 24}, {"desert_archer", 10}, {"armoured_warrior", 3}});
+        s.setArmy({{"woad_runner", 24}, {"cruth_slinger", 10}, {"painted_blade", 3}});
         recruitAll(s);
         bool visitedCamp = false;
         std::vector<std::string> plan = {"Hill Wolves", "Den Wolves", "Hermit's Wolves",   // level 1: Ushari's road

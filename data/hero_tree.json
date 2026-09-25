@@ -1,5 +1,5 @@
 {
-  "_comment": "The Ivory Compact commander's paths. At level 2 the player chooses one path for good; each later level grants that path's skill for the level. Effects: tactics (stacks ordered first), attack/defense (every troop stack), readied_shot (archers fire at stacks moving closer), moves (per day), sight, gold (a day), growth (weekly recruits, +fraction). A skill without an effect is not in the demo yet. The Veined is the wildcard: offered by the story, never chosen at level 2.",
+  "_comment": "The player's commander paths (a British noble leading the Cruths). At level 2 the player chooses one path for good; each later level grants that path's skill for the level. Effects: tactics (stacks ordered first), attack/defense (every troop stack), readied_shot (archers fire at stacks moving closer), moves (per day), sight, gold (a day), growth (weekly recruits, +fraction). A skill without an effect is not in the demo yet. The Veined is the wildcard: offered by the story, never chosen at level 2.",
   "paths": [
     {
       "id": "marshal", "name": "Marshal",
@@ -13,7 +13,7 @@
         {"level": 7,  "id": "hold_the_line","name": "Hold the Line","text": "Defending stacks also strike anyone who steps away from them."},
         {"level": 8,  "id": "wider_banner", "name": "Wider Banner", "text": "The banner reaches two hexes, and companions' auras grow too."},
         {"level": 9,  "id": "oathbound",    "name": "Oathbound",    "text": "Once per battle, a stack cannot be wiped out this round."},
-        {"level": 10, "id": "marshal_legend","name": "Marshal of the Compact", "text": "Your name alone steadies a wavering line."}
+        {"level": 10, "id": "marshal_legend","name": "Marshal of the North", "text": "Your name alone steadies a wavering line."}
       ]
     },
     {
@@ -43,7 +43,7 @@
         {"level": 7,  "id": "remounts",     "name": "Remounts",     "text": "Stables refresh your horses for the whole week, everywhere."},
         {"level": 8,  "id": "spymaster",    "name": "Spymaster",    "text": "See rival war-bands through the fog."},
         {"level": 9,  "id": "war_chest",    "name": "War Chest",    "text": "Companions' upkeep halved."},
-        {"level": 10, "id": "qm_legend",    "name": "Quartermaster-General", "text": "The Compact's roads run wherever you ride."}
+        {"level": 10, "id": "qm_legend",    "name": "Quartermaster-General", "text": "Your roads run wherever you ride."}
       ]
     }
   ],

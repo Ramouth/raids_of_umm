@@ -28,7 +28,7 @@ struct UnitType {
     std::string name;        // Display name, e.g. "Mummy"
     std::string description;
     int         tier = 1;   // 1–7 (HoMM3-style)
-    std::string faction;    // roster owner: "ivory_compact", "shariw", "" = neutral creature
+    std::string faction;    // roster owner: "cruths" (the player), "shariw", "symmachy", "" = neutral
 
     // ── Combat stats ─────────────────────────────────────────────────────────
     int attack       = 1;   // Offensive power

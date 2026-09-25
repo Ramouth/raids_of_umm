@@ -14,7 +14,7 @@ var _hover := NO_CELL
 var _preview: Array[Vector2i] = []
 var _zoom_index := 1
 var _zoom_levels := [0.5, 0.75, 1.0, 1.5, 2.0]
-const STARTING_ARMY := [{"id": "levy_spearman", "count": 24}, {"id": "desert_archer", "count": 10}, {"id": "armoured_warrior", "count": 3}]
+const STARTING_ARMY := [{"id": "woad_runner", "count": 24}, {"id": "cruth_slinger", "count": 10}, {"id": "painted_blade", "count": 3}]
 const EndScreen = preload("res://scripts/end_screen.gd")
 ## Fixed passage seed for tests; -1 picks a random old mine per expedition.
 var passage_seed := -1
@@ -104,7 +104,7 @@ func _ready() -> void:
     sidebar.get_node("Grid").toggled.connect(_toggle_grid)
     sidebar.get_node("Center").pressed.connect(center_hero)
     sidebar.get_node("Overview").pressed.connect(fit_map)
-    sidebar.get_node("Portrait").texture = load("res://content/textures/units/armoured_warrior.png")
+    sidebar.get_node("Portrait").texture = load("res://content/textures/units/british_lord.png")
     encounter = JSON.parse_string(FileAccess.get_file_as_string("res://content_source/dungeon_encounter.json"))
     var units: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/units.json"))
     if units is Dictionary:
@@ -316,9 +316,9 @@ func _announce_levels(reply: Dictionary) -> void:
     reply.erase("level_ups")          # the same reply is applied again later
     for up in ups:
         var skill := str(up.get("skill", ""))
-        var spec := {"title": "LEVEL %d" % int(up.level), "picture": "units/armoured_warrior.png"}
+        var spec := {"title": "LEVEL %d" % int(up.level), "picture": "units/british_lord.png"}
         if skill.is_empty() and state.get("tree", {}).get("needs_path", false):
-            spec.flavour = "Your commander has earned a name among the Compact. Choose a path: Marshal, Siegemaster or Quartermaster. It is chosen for good."
+            spec.flavour = "Your commander has earned a name among the Cruths. Choose a path: Marshal, Siegemaster or Quartermaster. It is chosen for good."
             spec.buttons = ["Choose a path"]
             show_popup(spec, func(_choice: int): open_tree.call_deferred())
         elif not skill.is_empty():

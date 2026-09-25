@@ -20,8 +20,8 @@ def say(*lines):
 def lore(title, text):
     return {"lore": [title, text]}
 
-HALE_HOUSEHOLD = [{"id": "levy_spearman", "count": 24}, {"id": "desert_archer", "count": 10},
-                  {"id": "armoured_warrior", "count": 4}]
+HALE_HOUSEHOLD = [{"id": "woad_runner", "count": 24}, {"id": "cruth_slinger", "count": 10},
+                  {"id": "painted_blade", "count": 4}]
 
 VALE_WOLVES = ["Hill Wolves", "Den Wolves", "Hermit's Wolves"]
 

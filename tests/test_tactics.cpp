@@ -121,6 +121,73 @@ SUITE("Opportunity — a stack the blow kills never gets away; staying close is 
     }
 }
 
+// ── The Cruths: lone wolf, renown, strike and return ─────────────────────────
+
+SUITE("Cruths — a lone wolf hits 25% harder with no friend beside it; the forecast agrees") {
+    const UnitType* wolf  = type("PaintedOne", 9, 8, 100, 3, {"lone_wolf"});
+    const UnitType* pal   = type("Pal", 1, 1, 100);
+    const UnitType* dummy = type("Dummy", 1, 1, 1000);
+    for (bool alone : {true, false}) {
+        CombatArmy p; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(wolf, 1, true));
+        p.stacks.push_back(CombatUnit::make(pal, 1, true));
+        CombatArmy e; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(dummy, 1, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        const HexCoord at = CombatMap::toHex(4, 2);
+        eng.teleportUnit(true, 0, at);
+        eng.teleportUnit(false, 0, at.neighbor(0));
+        eng.teleportUnit(true, 1, alone ? CombatMap::toHex(0, 0) : at.neighbor(3));
+        CHECK_EQ(eng.previewAttack(0).damage.min, alone ? 10 : 8);
+        eng.doAttack(0);
+        CHECK_EQ(eng.enemyArmy().stacks[0].totalHp(), 1000 - (alone ? 10 : 8));
+    }
+}
+
+SUITE("Cruths — breaking a stack paints renown: +2 attack (great renown +4) for the battle") {
+    const UnitType* blade  = type("Blade", 9, 50, 100, 3, {"renown"});
+    const UnitType* chosen = type("Chosen", 9, 50, 100, 3, {"great_renown"});
+    const UnitType* victim = type("Victim", 1, 1, 10);
+    for (const UnitType* t : {blade, chosen}) {
+        CombatArmy p; p.isPlayer = true;
+        p.stacks.push_back(CombatUnit::make(t, 1, true));
+        CombatArmy e; e.isPlayer = false;
+        e.stacks.push_back(CombatUnit::make(victim, 1, false));
+        e.stacks.push_back(CombatUnit::make(victim, 1, false));
+        CombatEngine eng(std::move(p), std::move(e));
+        const HexCoord at = CombatMap::toHex(4, 2);
+        eng.teleportUnit(true, 0, at);
+        eng.teleportUnit(false, 0, at.neighbor(0));
+        eng.teleportUnit(false, 1, CombatMap::toHex(10, 0));
+        const int before = eng.playerArmy().stacks[0].effectiveAttack();
+        eng.doAttack(0);
+        CHECK(eng.enemyArmy().stacks[0].isDead());
+        CHECK_EQ(eng.playerArmy().stacks[0].effectiveAttack(), before + (t == chosen ? 4 : 2));
+    }
+}
+
+SUITE("Cruths — strike and return: walk in, strike, go back to where it started") {
+    const UnitType* raider = type("Raider3", 9, 5, 100, 5, {"strike_and_return"});
+    const UnitType* dummy  = type("Dummy3", 1, 1, 1000);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(raider, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(dummy, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord start = CombatMap::toHex(2, 2);
+    const HexCoord foe   = CombatMap::toHex(5, 2);
+    eng.teleportUnit(true, 0, start);
+    eng.teleportUnit(false, 0, foe);
+    CHECK(eng.canAttack(0));
+    eng.doAttack(0);                                           // walk up, strike...
+    CHECK(eng.enemyArmy().stacks[0].totalHp() < 1000);
+    CHECK(eng.playerArmy().stacks[0].pos == start);           // ...and back
+    bool back = false;
+    for (const auto& ev : eng.drainEvents())
+        back = back || (ev.type == CombatEvent::Type::UnitMoved && ev.to == start);
+    CHECK(back);
+}
+
 // ── The commander's path ──────────────────────────────────────────────────────
 
 SUITE("Path — chosen once at level 2; each level then grants the path's skill") {

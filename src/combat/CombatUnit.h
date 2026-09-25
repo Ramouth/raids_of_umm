@@ -63,8 +63,11 @@ struct CombatUnit {
     // Recomputed by CombatEngine::refreshAuras() whenever anyone moves or dies.
     int auraBonus    = 0;
 
+    // Renown (the Cruths' paint): attack earned this battle by destroying enemy stacks.
+    int renown       = 0;
+
     // Effective stats (base + item bonuses) — convenience used by CombatEngine.
-    int effectiveAttack()  const { return type->attack  + attackBonus;  }
+    int effectiveAttack()  const { return type->attack  + attackBonus + renown; }
     int effectiveDefense() const { return type->defense + defenseBonus + auraBonus; }
     int maxHp()            const { return type->hitPoints + hpBonus; }
     int effectiveSpeed()   const { return type->speed   + speedBonus;   }

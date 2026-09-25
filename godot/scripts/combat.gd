@@ -312,7 +312,7 @@ func _companion_warnings() -> String:
     return "[color=#%s]⚠ %s.[/color]" % [Board.DANGER_COLOR.to_html(false), "; ".join(lines)]
 
 func _refresh() -> void:
-    board.locked = busy or auto_battle
+    board.locked = busy or auto_battle or _opening() > 0   # no move range while orders are given
     board.queue_redraw()
     var ongoing: bool = state.get("result", "") == "ongoing"
     if ongoing:
