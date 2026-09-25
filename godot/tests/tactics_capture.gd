@@ -14,7 +14,7 @@ func _shot(name: String) -> void:
 
 func _run() -> void:
     DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
-    root.size = Vector2i(1280, 800)
+    root.size = Vector2i(1920, 1080)
     var view: Control = CombatView.new()
     root.add_child(view)
     await process_frame

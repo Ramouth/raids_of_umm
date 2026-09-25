@@ -13,7 +13,7 @@ func _shot(name: String) -> void:
 
 func _run() -> void:
     DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
-    root.size = Vector2i(1600, 900)
+    root.size = Vector2i(1920, 1080)
     var scene: Node2D = load("res://scenes/desert.tscn").instantiate()
     scene.passage_seed = 1
     root.add_child(scene)
