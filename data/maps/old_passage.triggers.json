@@ -1,5 +1,11 @@
 {
+  "start_companions": [],
   "quests": [
+    {
+      "id": "wolves",
+      "title": "Wolves in the Vale",
+      "text": "A guest of the Compact is on the road to Varenhold, but no escort will cross the vale while the wolves hunt it. Clear the Hill Wolves, the Den Wolves and the Hermit's Wolves."
+    },
     {
       "id": "main",
       "title": "The Old Passage",
@@ -90,12 +96,142 @@
         {
           "say": [
             [
-              "Ushari",
-              "Varenhold is yours while your brother is away, commander. The levies are ready; the grain is not."
+              "Steward",
+              "Varenhold is yours while Lord Aldren is away, commander. He rode east three days ago, and took the good horses."
+            ],
+            [
+              "Steward",
+              "A rider came in at dawn. The Compact is sending someone to Varenhold. Someone important; the rider would not say who."
+            ],
+            [
+              "Steward",
+              "But the wolves came down from the hills this winter. Three packs between us and the Coldwater, and no escort will cross the vale while they hunt it."
+            ],
+            [
+              "Steward",
+              "Clear the wolves, commander, and our guest can ride in."
+            ]
+          ]
+        },
+        {
+          "quest": "wolves"
+        },
+        {
+          "lore": [
+            "The Families",
+            "The northern marches are held by old families sworn to the Ivory Compact: House Varen at Varenhold in the west, House Hale at Hallowmere by the mere. They share blood, borders, and a long habit of smiling at each other."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "druid_seen",
+      "when": {
+        "event": "see",
+        "name": "Hooded Stranger"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "Commander. Up by the hermit's hollow. There is a man standing in the middle of that wolf pack."
+            ],
+            [
+              "Scout",
+              "Hooded. Leaning on a stick. The wolves lie around his feet like dogs at a hearth."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "druid_speaks",
+      "when": {
+        "event": "engage",
+        "name": "Hermit's Wolves"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Hooded Druid",
+              "That is far enough, son of Varen. These wolves were old in these hills before your walls were stone."
+            ],
+            [
+              "Hooded Druid",
+              "I know what your brother went east to find. Hear me: a door swings both ways."
+            ],
+            [
+              "Hooded Druid",
+              "My forefathers did not grow the roots across the old passage to keep your kind out. They grew them thick, and deep, to keep something in."
+            ],
+            [
+              "Hooded Druid",
+              "Your family's blood was always hot. Your grandfather's. Your brother's, hottest of all."
+            ],
+            [
+              "Hooded Druid",
+              "I wish talking were enough. With Varens it never is. Teeth, then."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "druid_gone",
+      "when": {
+        "event": "encounter_won",
+        "name": "Hermit's Wolves"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "The hooded man is gone, commander. No tracks in the frost. Nothing, where he stood."
+            ],
+            [
+              "Scout",
+              "Only roots. Fresh ones, pushed up through ground that has been frozen since the autumn."
+            ]
+          ]
+        },
+        {
+          "vanish": "Hooded Stranger"
+        },
+        {
+          "lore": [
+            "The Hooded Man",
+            "A druid stood with the wolves above the hermit's hollow and warned you off the old passage. His forefathers, he said, grew roots across it: not to keep the families out, but to keep something in."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_arrives",
+      "when": {
+        "event": "cleared",
+        "names": [
+          "Hill Wolves",
+          "Den Wolves",
+          "Hermit's Wolves"
+        ]
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Steward",
+              "Riders on the west road, commander! Compact colours. The vale is quiet enough for them now."
             ],
             [
               "Ushari",
-              "Aldren rode east three days ago with Kharim's letter. The old passage, he said. A road under the Greyfangs that runs all the way south to Umm'Natur."
+              "Ushari, of the Ivory Compact. So you are the Varen who cleared the road for me. Good. I dislike waiting."
+            ],
+            [
+              "Ushari",
+              "The Compact did not send me for the view. Aldren rode east with Kharim's letter. The old passage, he said: a road under the Greyfangs that runs all the way south to Umm'Natur."
             ],
             [
               "Ushari",
@@ -108,15 +244,37 @@
           ]
         },
         {
+          "join": "ushari"
+        },
+        {
+          "quest_done": "wolves"
+        },
+        {
           "quest": "main"
         },
         {
           "quest": "aldren"
-        },
+        }
+      ]
+    },
+    {
+      "id": "ushari_druid",
+      "when": {
+        "event": "cleared",
+        "names": [
+          "Hill Wolves",
+          "Den Wolves",
+          "Hermit's Wolves"
+        ],
+        "after": "druid_speaks"
+      },
+      "do": [
         {
-          "lore": [
-            "The Families",
-            "The northern marches are held by old families sworn to the Ivory Compact: House Varen at Varenhold in the west, House Hale at Hallowmere by the mere. They share blood, borders, and a long habit of smiling at each other."
+          "say": [
+            [
+              "Ushari",
+              "A hooded man who talks to wolves and warns you away from a door. The north is full of old men with warnings, commander. The trouble is, most of them are right about something."
+            ]
           ]
         }
       ]
@@ -124,7 +282,9 @@
     {
       "id": "corvin_gift",
       "when": {
-        "event": "start"
+        "event": "day",
+        "day": 2,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -172,11 +332,11 @@
         {
           "say": [
             [
-              "Ushari",
-              "There. Crossbows on the far bank and wolves in the reeds. They are not stopping travellers; they are counting them."
+              "Scout",
+              "The Coldwater bridge. Crossbows on the far bank and wolves in the reeds. They are not stopping travellers; they are counting them."
             ],
             [
-              "Ushari",
+              "Scout",
               "Clear the bridge and we have a straight road to Hallowmere."
             ]
           ]
@@ -187,7 +347,8 @@
       "id": "bridge_won",
       "when": {
         "event": "encounter_won",
-        "name": "Bridge Wardens"
+        "name": "Bridge Wardens",
+        "wait": "corvin_gift"
       },
       "do": [
         {
@@ -252,7 +413,8 @@
       "id": "shariw_warning",
       "when": {
         "event": "day",
-        "day": 3
+        "day": 3,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -273,7 +435,8 @@
       "id": "aldren_horse",
       "when": {
         "event": "day",
-        "day": 5
+        "day": 5,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -300,7 +463,8 @@
       "id": "aldren_found",
       "when": {
         "event": "day",
-        "day": 7
+        "day": 7,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -363,7 +527,8 @@
       "id": "shariw_fear",
       "when": {
         "event": "day",
-        "day": 10
+        "day": 10,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -394,7 +559,8 @@
       "id": "week_two",
       "when": {
         "event": "day",
-        "day": 9
+        "day": 9,
+        "after": "ushari_arrives"
       },
       "do": [
         {
@@ -440,7 +606,27 @@
             [
               "Inscription",
               "WE WERE ASKED TO SLEEP. WE ARE SLEEPING. DO NOT COUNT THE STEPS."
-            ],
+            ]
+          ]
+        },
+        {
+          "lore": [
+            "The Obelisks",
+            "Black stones stand across the marches. They were not raised by the families; the oldest songs already call them old. Violet veins run through them like blood through a wrist, and every vein points east, under the Greyfangs."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tarn_obelisk_ushari",
+      "when": {
+        "event": "visit",
+        "name": "Tarn Obelisk",
+        "wait": "ushari_arrives"
+      },
+      "do": [
+        {
+          "say": [
             [
               "Ushari",
               "It is not carved. Look at the edges. It grew, like ice on a window."
@@ -449,12 +635,6 @@
               "Ushari",
               "And the veins in it... they run downward. Toward the mountains."
             ]
-          ]
-        },
-        {
-          "lore": [
-            "The Obelisks",
-            "Black stones stand across the marches. They were not raised by the families; the oldest songs already call them old. Violet veins run through them like blood through a wrist, and every vein points east, under the Greyfangs."
           ]
         }
       ]
@@ -471,10 +651,6 @@
             [
               "Inscription",
               "THE KINGS BROUGHT SALT AND GRAIN AND THEIR SECOND SONS. WE BROUGHT THE DARK THAT KEEPS."
-            ],
-            [
-              "Ushari",
-              "The quarrymen say the stone is warm in winter. They cut around it. Nobody has ever cut into it."
             ]
           ]
         },
@@ -482,6 +658,24 @@
           "lore": [
             "The Ones Beneath",
             "The barrow-kings of the north did not only bury their dead. They traded with something under the mountains: grain and salt and people sent down, and in return 'the dark that keeps'. What was kept, and for whom, the stones do not say."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quarry_obelisk_ushari",
+      "when": {
+        "event": "visit",
+        "name": "Quarry Obelisk",
+        "wait": "ushari_arrives"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "The quarrymen say the stone is warm in winter. They cut around it. Nobody has ever cut into it."
+            ]
           ]
         }
       ]
@@ -498,7 +692,27 @@
             [
               "Inscription",
               "THE KING WENT INTO THE WATER SO THAT HE WOULD NOT HAVE TO GO DOWN."
-            ],
+            ]
+          ]
+        },
+        {
+          "lore": [
+            "The Drowned King",
+            "The last barrow-king walked into Hallow Mere wearing his crown rather than answer a summons from below. His barrow stands south of the mere. The dead there are said to keep the crown, and the crown to keep a map."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "drowned_obelisk_ushari",
+      "when": {
+        "event": "visit",
+        "name": "Drowned Obelisk",
+        "wait": "ushari_arrives"
+      },
+      "do": [
+        {
+          "say": [
             [
               "Ushari",
               "Half of it is under the bog. The half we can see is dry. Completely dry."
@@ -507,12 +721,6 @@
               "Ushari",
               "Commander... I think the Drowned King was not escaping an enemy. I think he was escaping the bargain."
             ]
-          ]
-        },
-        {
-          "lore": [
-            "The Drowned King",
-            "The last barrow-king walked into Hallow Mere wearing his crown rather than answer a summons from below. His barrow stands south of the mere. The dead there are said to keep the crown, and the crown to keep a map."
           ]
         }
       ]
@@ -529,14 +737,6 @@
             [
               "Inscription",
               "SOUTH OF THE MOUNTAIN THE SAND IS A LID. UNDER THE LID, WE ARE STILL AWAKE."
-            ],
-            [
-              "Ushari",
-              "South of the mountain is the desert. Pha'raxh. The empire that fell... or that went down, if this stone is honest."
-            ],
-            [
-              "Ushari",
-              "These veins are not decoration, commander. They are a road. And roads lead somewhere that is expecting you."
             ]
           ]
         },
@@ -549,10 +749,33 @@
       ]
     },
     {
+      "id": "greyfang_obelisk_ushari",
+      "when": {
+        "event": "visit",
+        "name": "Greyfang Obelisk",
+        "wait": "ushari_arrives"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "South of the mountain is the desert. Pha'raxh. The empire that fell... or that went down, if this stone is honest."
+            ],
+            [
+              "Ushari",
+              "These veins are not decoration, commander. They are a road. And roads lead somewhere that is expecting you."
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "id": "warm_stone",
       "when": {
         "event": "item",
-        "item": "warm_stone"
+        "item": "warm_stone",
+        "wait": "ushari_arrives"
       },
       "do": [
         {
@@ -594,7 +817,8 @@
       "id": "barrow_seen",
       "when": {
         "event": "see",
-        "name": "Barrow of the Drowned King"
+        "name": "Barrow of the Drowned King",
+        "wait": "ushari_arrives"
       },
       "do": [
         {
@@ -611,7 +835,8 @@
       "id": "crown_found",
       "when": {
         "event": "item",
-        "item": "drowned_crown"
+        "item": "drowned_crown",
+        "wait": "ushari_arrives"
       },
       "do": [
         {
@@ -632,7 +857,8 @@
       "id": "first_mine",
       "when": {
         "event": "see_type",
-        "type": "old_mine"
+        "type": "old_mine",
+        "wait": "ushari_arrives"
       },
       "do": [
         {
@@ -767,7 +993,7 @@
       "id": "kharim_joins",
       "when": {
         "event": "quests_done",
-        "count": 4
+        "count": 5
       },
       "do": [
         {
@@ -923,10 +1149,6 @@
             [
               "Corvin",
               "...Tell the Compact the north was never theirs."
-            ],
-            [
-              "Ushari",
-              "He is dead, commander. The signet still fits your hand. Hallowmere will need a new lord."
             ]
           ]
         },
@@ -936,10 +1158,29 @@
       ]
     },
     {
+      "id": "hale_broken_ushari",
+      "when": {
+        "event": "rival_beaten",
+        "name": "Hale household",
+        "wait": "ushari_arrives"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "He is dead, commander. The signet still fits your hand. Hallowmere will need a new lord."
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "id": "recap",
       "when": {
         "event": "enter_q",
-        "q_min": 5
+        "q_min": 5,
+        "after": "ushari_arrives"
       },
       "do": [
         {

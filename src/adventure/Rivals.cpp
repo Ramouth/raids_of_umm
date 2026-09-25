@@ -39,6 +39,11 @@ void AdventureSession::report(const std::string& speaker, const std::string& tex
     m_scenario.say(speaker, text);
 }
 
+std::string AdventureSession::adviser() const {
+    for (const auto& sc : m_specials) if (sc.id == "ushari") return "Ushari";
+    return "Scout";
+}
+
 const AdventureSession::Rival* AdventureSession::rivalAt(const HexCoord& c) const {
     for (const auto& r : m_rivals)
         if (r.alive && r.pos == c) return &r;
@@ -264,7 +269,7 @@ void AdventureSession::rivalTurn(Rival& r) {
                 if (find->second == MineFind::Passage) {
                     m_lost = true;
                     m_lostReason = "The Shariw reached the passage beneath the " + name + " first, and sealed it.";
-                    report("Ushari", "Smoke over the " + name + "... they have collapsed the passage. It is over.");
+                    report(adviser(), "Smoke over the " + name + "... they have collapsed the passage. It is over.");
                 } else {
                     report("Scout", "Shariw riders have searched the " + name + ". They found nothing there.");
                 }

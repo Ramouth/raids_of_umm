@@ -105,6 +105,9 @@ Json AdventureBridge::snapshot() const {
     for (const auto& id : session_.items()) items.push_back(id);
     Json lore = Json::array();
     for (const auto& l : session_.scenario().lore()) lore.push_back({{"title", l.title}, {"text", l.text}});
+    Json vanished = Json::array();       // story figures who have left the map
+    for (const auto& obj : session_.map().objects())
+        if (session_.scenario().vanished().count(obj.name)) vanished.push_back(cell(obj.pos));
     Json garrisons = Json::array();
     for (const auto& [coord, ctrl] : session_.control()) {
         const auto* held = session_.garrison(coord);
@@ -186,6 +189,7 @@ Json AdventureBridge::snapshot() const {
         {"visible", cells(session_.visible())},
         {"explored", cells(session_.explored())},
         {"guarded", guarded},
+        {"vanished", vanished},
         {"encounter_xp", encounter_xp},
         {"hero_progress", hero_progress},
         {"encounter", pending},
@@ -358,6 +362,11 @@ Json AdventureBridge::load(const std::string& path) {
 
 Json AdventureBridge::add_item(const std::string& id) {
     session_.addItem(id);
+    return with_lines(snapshot());
+}
+
+Json AdventureBridge::join_special(const std::string& id) {
+    session_.joinSpecial(id);
     return with_lines(snapshot());
 }
 

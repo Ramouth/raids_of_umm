@@ -31,6 +31,7 @@ public:
     Json save(const std::string& path, const Json& extra);
     Json load(const std::string& path);   // snapshot + "extra"
     Json add_item(const std::string& id);
+    Json join_special(const std::string& id);   // a companion joins (tests, story tools)
     Json claim_chest(bool gold);          // snapshot + "found"
 
 private:

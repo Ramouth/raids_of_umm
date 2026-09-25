@@ -150,6 +150,7 @@ OBJECTS = [
     ("pickup",         "Charcoal Burners",          1,  8, 0, "campfire"),
     ("pickup",         "Hermit's Chest",           -6, -9, 0, "chest"),
     ("guard",          "Hermit's Wolves",          -7,-10, 0, ""),
+    ("quest_giver",    "Hooded Stranger",          -7, -8.5, 0, "druid"),   # level 1: the druid with the last pack
     ("pickup",         "Pilgrims' Alms",            9, -2, 0, "gold"),
     ("artifact",       "Oath Cairn",              -13, -3, 0, "oathstone_amulet"),
     ("guard",          "Tarn Brigands",           -12, -2, 0, ""),

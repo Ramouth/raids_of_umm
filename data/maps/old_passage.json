@@ -5512,6 +5512,13 @@
       "name": "Hermit's Wolves"
     },
     {
+      "q": -7,
+      "r": -5,
+      "type": "quest_giver",
+      "name": "Hooded Stranger",
+      "kind": "druid"
+    },
+    {
       "q": 9,
       "r": -6,
       "type": "pickup",

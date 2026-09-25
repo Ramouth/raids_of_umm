@@ -2,7 +2,7 @@
 // demo_bot — plays "The Old Passage" (stage 1, the northern marches) through AdventureSession with a simple
 // greedy strategy, to check the demo is winnable and how long it takes.
 // Usage: demo_bot <repo_root> [seeds] [verbose]
-// Strategy: recruit on growth days, take mines and towns in order, fight any
+// Strategy: clear the vale's wolves (level 1), recruit on growth days, take mines and towns in order, fight any
 // guard it is clearly stronger than, visit Kharim, search old mines (ruled-
 // out ones last). Battles are auto-resolved with the real CombatEngine.
 #include "adventure/AdventureSession.h"
@@ -57,7 +57,8 @@ int main(int argc, char** argv) {
         s.setArmy({{"levy_spearman", 24}, {"desert_archer", 10}, {"armoured_warrior", 3}});
         recruitAll(s);
         bool visitedCamp = false;
-        std::vector<std::string> plan = {"Varen Gold Mine", "Log Pile", "Pinewood Sawmill", "Hunters' Camp",
+        std::vector<std::string> plan = {"Hill Wolves", "Den Wolves", "Hermit's Wolves",   // level 1: Ushari's road
+            "Varen Gold Mine", "Log Pile", "Pinewood Sawmill", "Hunters' Camp",
             "Varen Windmill", "Standing Stone of Varen", "Tarn Obelisk", "Bridge Wardens", "Hallowmere", "Toll Coins",
             "Tithe Silver", "Weeping Stone", "Hallow Quarry", "Quarry Obelisk", "Mere Sawmill", "Mere Watermill",
             "Drowned Obelisk", "Blackglass Seam", "Old Mine of Dunmere", "Old Mine of Carrow", "Greyfang Pass",

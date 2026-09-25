@@ -301,6 +301,7 @@ private:
     float rivalStepCost(const HexCoord& c) const;
     std::vector<Stack> guardsOf(const HexCoord& c) const;
     void report(const std::string& speaker, const std::string& text);
+    std::string adviser() const;   // who reports news: Ushari once she rides with you
     void grantXp(int xp);
     void payUpkeep();
     float movesBonus() const;

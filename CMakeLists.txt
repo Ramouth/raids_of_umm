@@ -112,6 +112,7 @@ add_executable(raids_tests
     tests/test_worldbuilder.cpp
     tests/test_adventure_session.cpp
     tests/test_adventure_sites.cpp
+    tests/test_level_one.cpp
     tests/test_town_buildings.cpp
     tests/test_hero_equipment.cpp
     src/adventure/AdventureSession.cpp

@@ -284,6 +284,7 @@ func _apply_state(next: Dictionary) -> void:
     var guarded: Dictionary = {}
     for c in state.get("guarded", []): guarded[Vector2i(c[0], c[1])] = true
     map_view.set_cleared_guards(guarded)
+    map_view.remove_objects(state.get("vanished", []))
     map_view.mark_sites(state.get("sites", []))
     _show_xp_gain()
     _sync_inventory()
@@ -856,7 +857,7 @@ func travel_to(cell: Vector2i) -> bool:
         if reply.encounter != null:
             state = reply
             _say(reply)
-            _begin_encounter(reply.encounter)
+            _engage()
             return true
         notice.text = "Not enough movement left today. End the day (E) to rest."
         return false
@@ -909,7 +910,7 @@ func _journey_finished() -> void:
         dialogue.say(_held_lines)
         _held_lines = []
     if state.get("encounter") != null:
-        _begin_encounter(state.encounter)
+        _engage()
         return
     if state.get("chest") != null:
         _offer_chest(state.chest)
@@ -1069,6 +1070,15 @@ func _encounter_entry(landmark: Dictionary) -> Dictionary:
     return table.get("defaults", {}).get(key, {})
 
 var _encounter_type := ""
+
+## Starts the pending fight, once whoever is speaking has had their say
+## (a battle screen would hide the transmission).
+func _engage() -> void:
+    if dialogue != null and dialogue.is_speaking():
+        notice.text = "Click the message to hear them out; the fight follows."
+        await dialogue.drained
+        if state.get("encounter") == null or is_instance_valid(battle): return   # walked away meanwhile
+    _begin_encounter(state.encounter)
 
 func _begin_encounter(encounter: Dictionary) -> void:
     _encounter_type = str(encounter.type)

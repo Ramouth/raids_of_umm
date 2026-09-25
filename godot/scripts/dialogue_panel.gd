@@ -9,7 +9,8 @@ const PORTRAITS := {
     "Ushari": "portraits/ushari.png", "Kharim": "portraits/kharim.png",
     "Scout": "units/rider_archer.png", "Messenger": "units/levy_spearman.png",
     "Aldren": "portraits/aldren.png", "Corvin": "portraits/corvin.png",
-    "Inscription": "objects/obelisk.png",
+    "Inscription": "objects/obelisk.png", "Hooded Druid": "portraits/druid.png",
+    "Steward": "units/levy_spearman.png",
 }
 
 var _queue: Array[Dictionary] = []

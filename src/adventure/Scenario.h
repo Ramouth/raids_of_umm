@@ -15,11 +15,15 @@ class AdventureSession;
  * Loaded from data/maps/<map>.triggers.json:
  *
  *   { "quests":   [ { "id", "title", "text", "main": bool } ],
- *     "triggers": [ { "id", "when": {...}, "do": [ {...}, ... ] } ] }
+ *     "triggers": [ { "id", "when": {...}, "do": [ {...}, ... ] } ],
+ *     "start_companions": [id, ...] }   — who rides with the hero on day 1
+ *                                          (absent = the default, Ushari)
  *
  * when.event:  "start" | "day" (day) | "see" (cell) | "see_type" (type)
  *              | "enter_q" (q_min) | "visit" (name) | "capture" (name)
  *              | "encounter_won" (name) | "mines_held" (count) | "item" (item)
+ *              | "cleared" (names: [...]) — every named guard camp has been beaten
+ *              | "engage" (name) — the hero is about to fight that guard camp
  * do actions:  "say": [[speaker, text], ...]   — dialogue lines for the UI
  *              "quest": id / "quest_done": id / "quest_text": [id, text]
  *              "reveal": [q, r, radius]         — lift fog
@@ -32,11 +36,14 @@ class AdventureSession;
  *              "lore": [title, text]            — a codex entry (the journal's Lore page)
  *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
  *                                               — that site turns rival; a war-band rides out
+ *              "vanish": name                   — that map object leaves the map (a figure walks off)
  * (event "quests_done" (count) fires as optional quests complete;
  *  event "rival_beaten" (name) fires when the hero breaks a war-band)
  *
  * when.after: id — only after that trigger has fired (story order).
  * when.unless: id — never, once that trigger has fired (a beat overtaken by events).
+ * when.wait: id — if that trigger has not fired yet, hold this one and run it
+ *                 right after it does (e.g. a companion's line before she has joined).
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
  * made through AdventureSession::acceptOffer().
  */
@@ -59,6 +66,10 @@ public:
 
     std::optional<std::string> load(const std::string& path);
     bool loaded() const { return m_loaded; }
+    // Companions with the hero at the start; nullopt = the file does not say.
+    const std::optional<std::vector<std::string>>& startCompanions() const { return m_startCompanions; }
+    // Map objects a "vanish" action has taken off the map.
+    const std::unordered_set<std::string>& vanished() const { return m_vanished; }
 
     // Event hooks — AdventureSession calls these; matching triggers fire.
     void fire(AdventureSession& s, const std::string& event, const Json& detail = Json::object());
@@ -79,6 +90,7 @@ public:
 private:
     bool matches(const Json& when, const std::string& event, const Json& detail) const;
     Quest* quest(const std::string& id);
+    void fireTrigger(AdventureSession& s, const Json& trigger);
 
     bool                            m_loaded = false;
     Json                            m_triggers = Json::array();
@@ -89,4 +101,8 @@ private:
     std::vector<Offer>              m_offerDefs;
     std::vector<Line>               m_lines;
     std::vector<Lore>               m_lore;
+    std::optional<std::vector<std::string>> m_startCompanions;
+    std::unordered_set<std::string> m_won;          // guard camps beaten, by name
+    std::unordered_set<std::string> m_vanished;     // map objects gone from the map
+    std::vector<std::string>        m_waiting;      // triggers held by when.wait
 };

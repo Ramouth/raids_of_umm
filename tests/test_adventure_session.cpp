@@ -558,7 +558,8 @@ SUITE("Save — the demo map round-trips mid-game") {
     CHECK_EQ((int)b.explored().size(), (int)a.explored().size());
     CHECK(b.passageMine() == a.passageMine());
     CHECK_EQ((int)b.army().size(), (int)a.army().size());
-    CHECK_EQ(b.specials()[0].xp, a.specials()[0].xp);
+    CHECK_EQ((int)b.specials().size(), (int)a.specials().size());   // Ushari joins later in the demo
+    if (!a.specials().empty()) CHECK_EQ(b.specials()[0].xp, a.specials()[0].xp);
     CHECK_EQ((int)b.scenario().quests().size(), (int)a.scenario().quests().size());
     CHECK_EQ((int)b.rivals().size(), (int)a.rivals().size());
     if (!a.rivals().empty()) CHECK(b.rivals()[0].pos == a.rivals()[0].pos);

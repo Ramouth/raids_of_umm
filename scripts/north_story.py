@@ -2,7 +2,12 @@
 """north_story.py — writes data/maps/old_passage.triggers.json (stage 1 story).
 
 Kept as a script so the beats read top to bottom like the story doc.
-Speakers with portraits: Ushari, Kharim, Aldren, Corvin, Inscription.
+Speakers with portraits: Ushari, Kharim, Aldren, Corvin, Inscription, Hooded Druid.
+
+Level 1 opens without Ushari: the Steward sends you after the vale's wolves,
+a hooded druid (Hul'rik; the player does not learn his name yet) stands with
+the last pack, and Ushari rides in once every pack is dead. Any beat she
+speaks in waits for her arrival (see trig()).
 """
 import json
 from pathlib import Path
@@ -18,7 +23,12 @@ def lore(title, text):
 HALE_HOUSEHOLD = [{"id": "levy_spearman", "count": 24}, {"id": "desert_archer", "count": 10},
                   {"id": "armoured_warrior", "count": 4}]
 
+VALE_WOLVES = ["Hill Wolves", "Den Wolves", "Hermit's Wolves"]
+
 quests = [
+    {"id": "wolves", "title": "Wolves in the Vale",
+     "text": "A guest of the Compact is on the road to Varenhold, but no escort will cross the vale while the "
+             "wolves hunt it. Clear the Hill Wolves, the Den Wolves and the Hermit's Wolves."},
     {"id": "main", "title": "The Old Passage", "main": True,
      "text": "Somewhere under the Greyfang mountains runs the old passage: a road older than the families, "
              "leading south to the lost desert of Umm'Natur. Aldren rode ahead to find it. Follow him."},
@@ -49,32 +59,84 @@ offers = [
 
 T = []
 def trig(id, when, *do):
+    # Ushari joins in level 1; a beat she speaks in before then waits for her.
+    speaks = any(line[0] == "Ushari" for a in do for line in a.get("say", []))
+    if speaks and id != "ushari_arrives" and not ({"after", "wait"} & when.keys()):
+        if when["event"] in ("day", "enter_q"):     # these come round again: just gate them
+            when = {**when, "after": "ushari_arrives"}
+        else:                                       # one-off: what others say plays now, hers waits
+            lines = [l for a in do for l in a.get("say", [])]
+            cut = next(i for i, l in enumerate(lines) if l[0] == "Ushari")
+            rest = [a for a in do if "say" not in a]
+            if cut:
+                T.append({"id": id, "when": when, "do": [{"say": lines[:cut]}] + rest})
+                T.append({"id": id + "_ushari", "when": {**when, "wait": "ushari_arrives"},
+                          "do": [{"say": lines[cut:]}]})
+                return
+            when = {**when, "wait": "ushari_arrives"}
     T.append({"id": id, "when": when, "do": list(do)})
 
-# ── Act 1 — the families ────────────────────────────────────────────────────
+# ── Level 1 — wolves in the vale ────────────────────────────────────────────
 trig("intro", {"event": "start"},
-     say(("Ushari", "Varenhold is yours while your brother is away, commander. The levies are ready; the grain is not."),
-         ("Ushari", "Aldren rode east three days ago with Kharim's letter. The old passage, he said. A road under the Greyfangs "
-                    "that runs all the way south to Umm'Natur."),
-         ("Ushari", "Whoever holds that road reaches the desert crown first. Every house in the marches has heard the rumour."),
-         ("Ushari", "Your cousin Corvin holds Hallowmere across the Coldwater. House Hale has promised us help. Let us see what a promise weighs.")),
-     {"quest": "main"}, {"quest": "aldren"},
+     say(("Steward", "Varenhold is yours while Lord Aldren is away, commander. He rode east three days ago, and took the good horses."),
+         ("Steward", "A rider came in at dawn. The Compact is sending someone to Varenhold. Someone important; the rider would not say who."),
+         ("Steward", "But the wolves came down from the hills this winter. Three packs between us and the Coldwater, "
+                     "and no escort will cross the vale while they hunt it."),
+         ("Steward", "Clear the wolves, commander, and our guest can ride in.")),
+     {"quest": "wolves"},
      lore("The Families",
           "The northern marches are held by old families sworn to the Ivory Compact: House Varen at Varenhold in the west, "
           "House Hale at Hallowmere by the mere. They share blood, borders, and a long habit of smiling at each other."))
 
-trig("corvin_gift", {"event": "start"},
+trig("druid_seen", {"event": "see", "name": "Hooded Stranger"},
+     say(("Scout", "Commander. Up by the hermit's hollow. There is a man standing in the middle of that wolf pack."),
+         ("Scout", "Hooded. Leaning on a stick. The wolves lie around his feet like dogs at a hearth.")))
+
+# The druid is Hul'rik; the player only meets a hooded stranger for now.
+trig("druid_speaks", {"event": "engage", "name": "Hermit's Wolves"},
+     say(("Hooded Druid", "That is far enough, son of Varen. These wolves were old in these hills before your walls were stone."),
+         ("Hooded Druid", "I know what your brother went east to find. Hear me: a door swings both ways."),
+         ("Hooded Druid", "My forefathers did not grow the roots across the old passage to keep your kind out. "
+                          "They grew them thick, and deep, to keep something in."),
+         ("Hooded Druid", "Your family's blood was always hot. Your grandfather's. Your brother's, hottest of all."),
+         ("Hooded Druid", "I wish talking were enough. With Varens it never is. Teeth, then.")))
+
+trig("druid_gone", {"event": "encounter_won", "name": "Hermit's Wolves"},
+     say(("Scout", "The hooded man is gone, commander. No tracks in the frost. Nothing, where he stood."),
+         ("Scout", "Only roots. Fresh ones, pushed up through ground that has been frozen since the autumn.")),
+     {"vanish": "Hooded Stranger"},
+     lore("The Hooded Man",
+          "A druid stood with the wolves above the hermit's hollow and warned you off the old passage. "
+          "His forefathers, he said, grew roots across it: not to keep the families out, but to keep something in."))
+
+trig("ushari_arrives", {"event": "cleared", "names": VALE_WOLVES},
+     say(("Steward", "Riders on the west road, commander! Compact colours. The vale is quiet enough for them now."),
+         ("Ushari", "Ushari, of the Ivory Compact. So you are the Varen who cleared the road for me. Good. I dislike waiting."),
+         ("Ushari", "The Compact did not send me for the view. Aldren rode east with Kharim's letter. The old passage, he said: "
+                    "a road under the Greyfangs that runs all the way south to Umm'Natur."),
+         ("Ushari", "Whoever holds that road reaches the desert crown first. Every house in the marches has heard the rumour."),
+         ("Ushari", "Your cousin Corvin holds Hallowmere across the Coldwater. House Hale has promised us help. Let us see what a promise weighs.")),
+     {"join": "ushari"}, {"quest_done": "wolves"}, {"quest": "main"}, {"quest": "aldren"})
+
+trig("ushari_druid", {"event": "cleared", "names": VALE_WOLVES, "after": "druid_speaks"},
+     say(("Ushari", "A hooded man who talks to wolves and warns you away from a door. "
+                    "The north is full of old men with warnings, commander. The trouble is, most of them are right about something.")))
+
+# Corvin's letter comes the morning after, so Ushari's arrival has the stage.
+trig("corvin_gift", {"event": "day", "day": 2, "after": "ushari_arrives"},
      say(("Corvin", "Cousin! Word reached me that Aldren left you the keys. Good. You were always the steadier of the two."),
          ("Corvin", "I am sending twelve spears and a wagon of timber. Consider it an apology for the state of the bridge."),
          ("Corvin", "Brigands and wolves hold the Coldwater crossing. Clear it and Hallowmere is yours to recruit from, as if it flew your banner.")),
      {"troops": [{"id": "levy_spearman", "count": 12}]}, {"give": {"Wood": 5, "Gold": 500}},
      {"quest": "bridge"})
 
+# ── Act 1 — the families ────────────────────────────────────────────────────
 trig("bridge_seen", {"event": "see", "name": "Bridge Wardens"},
-     say(("Ushari", "There. Crossbows on the far bank and wolves in the reeds. They are not stopping travellers; they are counting them."),
-         ("Ushari", "Clear the bridge and we have a straight road to Hallowmere.")))
+     say(("Scout", "The Coldwater bridge. Crossbows on the far bank and wolves in the reeds. They are not stopping travellers; they are counting them."),
+         ("Scout", "Clear the bridge and we have a straight road to Hallowmere.")))
 
-trig("bridge_won", {"event": "encounter_won", "name": "Bridge Wardens"},
+# Waits for Corvin's request, so a bridge cleared early still closes his quest.
+trig("bridge_won", {"event": "encounter_won", "name": "Bridge Wardens", "wait": "corvin_gift"},
      say(("Ushari", "The brigands carried Hale coin. Fresh-struck. Someone paid them to sit on that bridge."),
          ("Ushari", "Probably nothing. Brigands rob everyone, including cousins.")),
      {"quest_done": "bridge"})
@@ -202,7 +264,7 @@ trig("hold_three", {"event": "mines_held", "count": 3, "after": "kharim"},
      say(("Kharim", "Three mines under Varen banners! You can hold these marches after all. A promise is a promise.")),
      {"quest": "hold"}, {"quest_done": "hold"}, {"clue": True})
 
-trig("kharim_joins", {"event": "quests_done", "count": 4},
+trig("kharim_joins", {"event": "quests_done", "count": 5},   # the vale's wolves + four of Kharim's era
      say(("Kharim", "My debts are paid and my maps are thinner. You have earned more than a clue, commander."),
          ("Kharim", "I am coming with you. Someone must read the walls when we go down.")),
      {"join": "kharim"})
@@ -234,5 +296,5 @@ trig("recap", {"event": "enter_q", "q_min": 5},
 trig("war_camp", {"event": "see", "name": "Shariw War Camp"},
      say(("Scout", "The Shariw war camp. Sand-coloured tents on frozen ground. They brought their scorpions and their fires and their patience.")))
 
-OUT.write_text(json.dumps({"quests": quests, "offers": offers, "triggers": T}, indent=2, ensure_ascii=False))
+OUT.write_text(json.dumps({"start_companions": [], "quests": quests, "offers": offers, "triggers": T}, indent=2, ensure_ascii=False))
 print(f"Wrote {OUT.name}: {len(quests)} quests, {len(offers)} offers, {len(T)} triggers")

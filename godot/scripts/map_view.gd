@@ -29,6 +29,7 @@ const KIND_TEXTURES := {
     "chest": "objects/treasure_chest.png", "campfire": "objects/campfire.png",
     "windmill": "objects/windmill.png", "watermill": "objects/watermill.png",
     "listening_shard": "objects/veined_relic.png", "warm_stone": "objects/veined_relic.png",
+    "druid": "objects/druid.png",
 }
 const WATER_TERRAIN := ["oasis", "lake", "river"]
 const TREE_SPRITES := ["terrain/forest/pine_cluster.png", "terrain/forest/oak_cluster.png"]
@@ -195,6 +196,15 @@ func set_cleared_guards(guarded: Dictionary) -> void:
     for cell: Vector2i in anchors:
         if data.objects[cell].type == "guard":
             anchors[cell].visible = guarded.has(cell)
+
+## Story figures who walked off (a "vanish" beat) leave the map for good.
+func remove_objects(cells: Array) -> void:
+    for c in cells:
+        var cell := Vector2i(c[0], c[1])
+        if anchors.has(cell):
+            anchors[cell].queue_free()
+            anchors.erase(cell)
+        data.objects.erase(cell)
 
 ## Old mines Kharim has ruled out get a "dead end" tag and fade.
 func mark_ruled_out(ruled: Dictionary) -> void:

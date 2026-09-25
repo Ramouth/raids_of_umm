@@ -192,4 +192,4 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.95, 0.82, 0.53, 1)
 theme_override_colors/font_outline_color = Color(0.1, 0.07, 0.04, 1)
 theme_override_constants/outline_size = 5
-text = "Follow the road east to the Coldwater, where House Hale waits across the bridge."
+text = "Clear the wolves from the vale so the Compact's guest can reach Varenhold."

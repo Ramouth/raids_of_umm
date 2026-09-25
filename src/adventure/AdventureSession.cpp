@@ -158,7 +158,9 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     if (!triggersPath.empty())
         if (auto err = m_scenario.load(triggersPath)) return err;
 
-    joinSpecial("ushari");                 // the expedition's commander
+    // The expedition's commander rides from day 1 unless the story brings her in later.
+    for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{"ushari"}))
+        joinSpecial(id);
     m_movesMax = DEFAULT_MOVES + movesBonus();
     m_moves    = m_movesMax;
     recomputeVisibility();
@@ -289,6 +291,9 @@ std::vector<AdventureSession::Step> AdventureSession::travel(const HexCoord& to)
             break;
         }
     }
+    if (m_pending)                    // a fight is about to start: last words first
+        if (const MapObjectDef* obj = m_map.objectAt(*m_pending))
+            m_scenario.fire(*this, "engage", {{"name", obj->name}});
     return steps;
 }
 
@@ -472,7 +477,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
             grantXp(encounterXp(cell));
             it->alive = false;
             m_scenario.fire(*this, "rival_beaten", {{"name", it->name}});
-            report("Ushari", "The " + it->name + " is broken. The land is quieter tonight.");
+            report(adviser(), "The " + it->name + " is broken. The land is quieter tonight.");
             if (!ambush) {
                 m_moves    = std::max(0.0f, m_moves - stepCost(cell));
                 m_hero.pos = cell;
@@ -491,8 +496,10 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory) {
     std::string item = m_encounters[cell].item;
     m_encounters.erase(cell);
     if (!item.empty()) addItem(item);
-    if (const MapObjectDef* obj = m_map.objectAt(cell))
+    if (const MapObjectDef* obj = m_map.objectAt(cell)) {
         m_scenario.fire(*this, "encounter_won", {{"name", obj->name}});
+        m_scenario.fire(*this, "cleared");
+    }
     if (!zone) {   // attacked in the camp's zone: the hero holds its ground
         m_moves    = std::max(0.0f, m_moves - stepCost(cell));
         m_hero.pos = cell;

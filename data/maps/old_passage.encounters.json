@@ -82,11 +82,11 @@
       "guards": [
         {
           "id": "grey_wolf",
-          "count": 14
+          "count": 20
         }
       ],
       "reward": {
-        "Gold": 250
+        "Gold": 400
       }
     },
     "Bridge Wardens": {

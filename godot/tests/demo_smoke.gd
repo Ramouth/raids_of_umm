@@ -5,6 +5,7 @@ extends SceneTree
 
 const WEEK2_ARMY := [{"id": "levy_spearman", "count": 50}, {"id": "desert_archer", "count": 26},
     {"id": "armoured_warrior", "count": 10}, {"id": "rider_archer", "count": 4}]
+const HOME := Vector2i(-11, 6)          # Varenhold
 const RIDGE_GUARD := Vector2i(-4, 2)  # the Bridge Wardens on the Coldwater
 
 var failures := 0
@@ -25,6 +26,43 @@ func _walk(scene: Node) -> void:
     while scene.hero.moving or (is_instance_valid(scene.popup) and scene.popup != scene._chest_panel):
         if is_instance_valid(scene.popup) and scene.popup != scene._chest_panel: scene.popup.choose(0)
         await process_frame
+    # A fight waits for the speaker to finish; click through like a player.
+    await process_frame
+    if scene.state.get("encounter") != null and scene.dialogue.is_speaking():
+        _heard.append_array(scene.dialogue._queue.map(func(l): return str(l.speaker)))
+        _heard.append(scene.dialogue._speaker.text)
+        scene.dialogue.skip_all()
+        await process_frame
+
+func _toward(scene: Node2D, target: Vector2i) -> Vector2i:
+    var best: Vector2i = scene.hero.cell
+    var best_d := 1 << 30
+    for c: Vector2i in scene.data.tiles:
+        if not scene.fog.is_explored(c) or not scene.data.is_passable(c) or scene._guarded(c): continue
+        var dq := c.x - target.x
+        var dr := c.y - target.y
+        var d: int = max(abs(dq), abs(dr), abs(dq + dr))
+        if d < best_d: best_d = d; best = c
+    return best
+
+var _heard: Array = []   # speakers clicked through before fights (upper-cased current + queued)
+
+## Marches on a guard camp (scouting through the fog on the way), ending days
+## as needed, and auto-wins every fight.
+func _clear_camp(scene: Node2D, cell: Vector2i) -> void:
+    for day in 10:
+        if not scene._guarded(cell): return
+        if not scene.travel_to(cell):             # still in the fog: walk to its edge
+            scene.travel_to(_toward(scene, cell))
+        await _walk(scene)
+        while is_instance_valid(scene.battle):
+            await _auto_battle(scene)
+            await _walk(scene)
+            if scene._guarded(cell): scene.travel_to(cell); await _walk(scene)
+        if scene._guarded(cell):
+            scene.dialogue.skip_all()
+            scene.end_day()
+            await _turn_done(scene)
 
 func _capture(label: String) -> void:
     if DisplayServer.get_name() == "headless": return
@@ -82,16 +120,36 @@ func _auto_battle(scene: Node2D) -> String:
 func _story() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
     check(scene.dialogue.is_speaking(), "The intro transmission plays at the start")
-    check(scene.dialogue._speaker.text == "USHARI", "Ushari opens the story")
-    check(scene.state.quests.any(func(q): return q.main), "The main quest is given")
-    check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
+    check(scene.dialogue._speaker.text == "STEWARD", "The steward opens level 1")
+    check(scene.state.quests.any(func(q): return q.id == "wolves"), "Level 1: clear the vale's wolves")
+    check(not scene.state.quests.any(func(q): return q.main), "The main quest waits for Ushari")
+    check(scene.state.specials.is_empty(), "No companion at the start")
     check(scene.state.lore.size() >= 1, "The first lore entry is in the codex")
     scene.toggle_quest_log()
     check(scene.quest_log.visible, "Q opens the quest log")
     scene.toggle_quest_log()
     scene.dialogue.skip_all()
     check(not scene.dialogue.is_speaking(), "Dialogue can be dismissed")
+    var druid := Vector2i(-7, -5)
+    check(scene.map_view.anchors.has(druid), "The hooded druid stands by the Hermit's Wolves")
+    for camp in [Vector2i(-8, -3), Vector2i(-10, -2), Vector2i(-7, -6)]:   # Hill, Den, Hermit's
+        await _clear_camp(scene, camp)
+        check(not scene._guarded(camp), "Wolf pack at %s is cleared" % camp)
+    check("HOODED DRUID" in _heard or "Hooded Druid" in _heard, "The druid speaks before his pack fights")
+    check(not scene.map_view.anchors.has(druid), "The druid walks off once his wolves fall")
+    check(scene.state.quests.any(func(q): return q.main), "The main quest is given")
+    check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
+    scene.dialogue.skip_all()
     check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari rides with the hero")
+    for day in 6:                                        # home to Varenhold, to leave her in charge
+        if scene.hero.cell == HOME: break
+        scene.travel_to(HOME)
+        await _walk(scene)
+        if scene.hero.cell != HOME:
+            scene.dialogue.skip_all()
+            scene.end_day()
+            await _turn_done(scene)
+    check(scene.hero.cell == HOME, "The hero rides home to Varenhold")
     check(scene.open_party(), "The companions screen opens")
     var party: Control = scene.screens.top()
     party._station("ushari", true)
@@ -120,6 +178,7 @@ func _story() -> void:
 func _hero_and_companions() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", [{"id": "levy_spearman", "count": 24}])
     for id in ["greyfang_helm", "barrow_blade", "drowned_crown"]: scene._apply_state(JSON.parse_string(scene.adventure.add_item(id)))
+    scene._apply_state(JSON.parse_string(scene.adventure.join_special("ushari")))   # she joins in level 1
     check(scene.open_hero(), "The hero screen opens")
     var sheet: Control = scene.screens.top()
     check(sheet._pack.get_child_count() == 3, "Three items wait in the backpack")
