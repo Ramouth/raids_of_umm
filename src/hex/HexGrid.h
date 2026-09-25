@@ -99,7 +99,8 @@ public:
         const HexCoord& start,
         const HexCoord& goal,
         PassFunc passFunc,
-        std::function<float(const HexCoord&, const HexCoord&)> costFunc = nullptr
+        std::function<float(const HexCoord&, const HexCoord&)> costFunc = nullptr,
+        float minStepCost = 1.0f   // cheapest step costFunc can return: keeps the estimate optimistic
     ) const {
         if (!has(start) || !has(goal)) return {};
         if (start == goal) return {start};
@@ -111,7 +112,7 @@ public:
         std::unordered_map<HexCoord, float>    gScore;
 
         gScore[start] = 0.0f;
-        open.push_back({heuristic(start, goal), start});
+        open.push_back({heuristic(start, goal) * minStepCost, start});
 
         while (!open.empty()) {
             // Pop lowest f
@@ -139,7 +140,7 @@ public:
                 if (it == gScore.end() || tentative < it->second) {
                     gScore[nb] = tentative;
                     cameFrom[nb] = current;
-                    float fScore = tentative + heuristic(nb, goal);
+                    float fScore = tentative + heuristic(nb, goal) * minStepCost;
                     open.push_back({fScore, nb});
                 }
             }

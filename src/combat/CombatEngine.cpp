@@ -46,6 +46,31 @@ std::vector<HexCoord> CombatEngine::reachableTiles() const {
     return reachableFor(activeUnit());
 }
 
+std::vector<HexCoord> CombatEngine::walkTo(const CombatUnit& unit, HexCoord to) const {
+    std::unordered_set<HexCoord> occupied;
+    for (const auto* army : {&m_player, &m_enemy})
+        for (const auto& s : army->stacks)
+            if (!s.isDead() && &s != &unit) occupied.insert(s.pos);
+    std::queue<HexCoord> frontier;
+    std::unordered_map<HexCoord, HexCoord> previous{{unit.pos, unit.pos}};
+    frontier.push(unit.pos);
+    while (!frontier.empty() && !previous.count(to)) {
+        const HexCoord at = frontier.front();
+        frontier.pop();
+        for (int dir = 0; dir < 6; ++dir) {
+            const HexCoord nb = at.neighbor(dir);
+            if (!CombatMap::inBounds(nb) || occupied.count(nb) || previous.count(nb)) continue;
+            previous[nb] = at;
+            frontier.push(nb);
+        }
+    }
+    std::vector<HexCoord> path;
+    if (!previous.count(to)) return path;
+    for (HexCoord c = to; c != unit.pos; c = previous.at(c)) path.push_back(c);
+    std::reverse(path.begin(), path.end());
+    return path;
+}
+
 std::vector<HexCoord> CombatEngine::reachableFor(const CombatUnit& unit) const {
 
     // Build a set of all occupied hexes (any living stack, friend or foe).
@@ -378,6 +403,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
             back.stackIndex = slot.stackIndex;
             back.from       = attacker.pos;
             back.to         = *m_strikeOrigin;
+            back.path       = walkTo(attacker, *m_strikeOrigin);
             m_events.push_back(back);
             attacker.pos = *m_strikeOrigin;
             refreshAuras();
@@ -802,7 +828,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     ev.stackIndex = slot.stackIndex;
     ev.from       = from;
     ev.to         = to;
-    ev.path       = path;
+    ev.path       = path.empty() ? walkTo(actor, to) : path;   // routed around the stacks as they stand now
     m_events.push_back(ev);
     actor.pos = to;
     refreshAuras();

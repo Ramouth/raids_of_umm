@@ -4,6 +4,8 @@
 #include "adventure/AdventureSession.h"
 #include "combat/CombatEngine.h"
 #include <deque>
+#include <queue>
+#include <unordered_map>
 
 namespace {
 
@@ -186,6 +188,73 @@ SUITE("Cruths — strike and return: walk in, strike, go back to where it starte
     for (const auto& ev : eng.drainEvents())
         back = back || (ev.type == CombatEvent::Type::UnitMoved && ev.to == start);
     CHECK(back);
+}
+
+// ── Routing around obstacles ──────────────────────────────────────────────────
+
+SUITE("Routing — a walk is routed when it happens: never through a stack that dies later") {
+    const UnitType* killer = type("Killer", 9, 500, 100, 5);
+    const UnitType* victim = type("Victim4", 1, 1, 10);
+    const UnitType* wall   = type("Wall4", 1, 1, 1000);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(killer, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(victim, 1, false));
+    e.stacks.push_back(CombatUnit::make(wall, 1, false));
+    CombatEngine eng(std::move(p), std::move(e));
+    const HexCoord start = CombatMap::toHex(2, 2);
+    eng.teleportUnit(true, 0, start);
+    eng.teleportUnit(false, 0, CombatMap::toHex(3, 2));       // right in the way...
+    eng.teleportUnit(false, 1, CombatMap::toHex(10, 0));
+    const HexCoord from = CombatMap::toHex(4, 2);              // ...strike it from the far side
+    CHECK(eng.doAttackFrom(from, 0));
+    CHECK(eng.enemyArmy().stacks[0].isDead());
+    for (const auto& ev : eng.drainEvents()) {
+        if (ev.type != CombatEvent::Type::UnitMoved) continue;
+        CHECK(!ev.path.empty());
+        CHECK(ev.path.back() == from);
+        for (const auto& h : ev.path) CHECK(h != CombatMap::toHex(3, 2));   // walked round, not through
+    }
+}
+
+SUITE("Routing — map routes are the cheapest there are (roads at 0.5 included)") {
+    WorldMap map;
+    CHECK(!map.loadJson("data/maps/old_passage.json"));
+    std::vector<HexCoord> cells;
+    for (const auto& [c, t] : map) if (t.passable) cells.push_back(c);
+    auto cost = [&](const std::vector<HexCoord>& p) {
+        float total = 0;
+        for (size_t i = 1; i < p.size(); ++i) total += map.tileAt(p[i])->moveCost;
+        return total;
+    };
+    int worse = 0, checked = 0;
+    for (size_t i = 0; i < cells.size(); i += 13)
+        for (size_t j = 5; j < cells.size(); j += 17) {
+            auto route = map.findPathWeighted(cells[i], cells[j], nullptr);
+            if (route.size() < 2) continue;
+            // Reference: plain Dijkstra over the same tiles.
+            std::unordered_map<HexCoord, float> best{{cells[i], 0.0f}};
+            using Entry = std::pair<float, HexCoord>;
+            auto later = [](const Entry& a, const Entry& b) { return a.first > b.first; };
+            std::priority_queue<Entry, std::vector<Entry>, decltype(later)> open(later);
+            open.push({0.0f, cells[i]});
+            while (!open.empty()) {
+                auto [g, at] = open.top();
+                open.pop();
+                if (g > best[at]) continue;
+                for (int d = 0; d < 6; ++d) {
+                    HexCoord n = at.neighbor(d);
+                    const MapTile* t = map.tileAt(n);
+                    if (!t || !t->passable) continue;
+                    float ng = g + t->moveCost;
+                    if (!best.count(n) || ng < best[n] - 1e-4f) { best[n] = ng; open.push({ng, n}); }
+                }
+            }
+            ++checked;
+            if (cost(route) > best[cells[j]] + 1e-3f) ++worse;
+        }
+    CHECK(checked > 500);
+    CHECK_EQ(worse, 0);
 }
 
 // ── The commander's path ──────────────────────────────────────────────────────

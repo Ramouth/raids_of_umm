@@ -343,6 +343,10 @@ private:
     // Recompute every stack's auraBonus from current positions.
     void refreshAuras();
 
+    // Shortest walk for `unit` to `to` around every living stack as they stand
+    // now (hexes after its own, ending on `to`; empty if there is none).
+    std::vector<HexCoord> walkTo(const CombatUnit& unit, HexCoord to) const;
+
     // Hexes `unit` can walk to (same rules as reachableTiles), ignoring `self`.
     std::vector<HexCoord> reachableFor(const CombatUnit& unit) const;
 

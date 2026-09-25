@@ -336,11 +336,17 @@ std::vector<HexCoord> WorldMap::findPath(const HexCoord& from,
 std::vector<HexCoord> WorldMap::findPathWeighted(const HexCoord& from,
                                                   const HexCoord& to,
                                                   const std::function<bool(const HexCoord&)>& blocked) const {
+    // A* needs an estimate that never overshoots: a road step (0.5) is the
+    // cheapest there is, so distance is scaled by the cheapest tile on the map.
+    float cheapest = 1.0f;
+    for (const auto& [c, t] : m_grid)
+        if (t.passable && t.moveCost > 0.0f) cheapest = std::min(cheapest, t.moveCost);
     return m_grid.findPath(
         from, to,
         [&](const HexCoord& c, const MapTile& t) { return t.passable && !(blocked && blocked(c)); },
         [this](const HexCoord& /*from*/, const HexCoord& to) {
             const MapTile* t = m_grid.get(to);
             return t ? t->moveCost : 1.0f;
-        });
+        },
+        cheapest);
 }
