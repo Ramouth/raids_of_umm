@@ -20,7 +20,7 @@ class AdventureSession;
  *     "start_companions": [id, ...] }   — who rides with the hero on day 1
  *                                          (absent = the default, Ushari)
  *
- * when.event:  "start" | "day" (day) | "see" (cell) | "see_type" (type)
+ * when.event:  "start" | "night" (End Day) | "day" (day) | "see" (cell) | "see_type" (type)
  *              | "enter_q" (q_min) | "visit" (name) | "capture" (name)
  *              | "encounter_won" (name) | "mines_held" (count) | "item" (item)
  *              | "cleared" (names: [...]) — every named guard camp has been beaten
@@ -34,6 +34,7 @@ class AdventureSession;
  *              "choice": {id, title, text, options: [{id, label, detail, then}]}
  *              "ending": {id, heading, body, frames, return_to?} — complete the chapter
  *              "leave": id — companion departs, retaining progression for a reunion
+ *              "morale": {id, value} — chapter-persistent companion attack modifier (-2 to 2)
  *              "join": id                       — a special character joins the hero
  *              "troops": [{"id","count"}]      — soldiers join the hero's army
  *              "item": id                       — an item is handed to the hero
@@ -80,6 +81,7 @@ public:
     bool essential(const std::string& id) const { return m_essential.count(id) > 0; }
     bool passageEndsScenario() const { return m_passageEndsScenario; }
     const Json& choice() const { return m_choice; }
+    int morale(const std::string& id) const { return m_morale.count(id) ? m_morale.at(id) : 0; }
     const Json& outcome() const { return m_outcome; }
     bool awaitingChoice() const { return !m_choice.empty(); }
     std::optional<std::string> choose(AdventureSession& s, const std::string& id);
@@ -112,6 +114,7 @@ private:
     bool                            m_loaded = false;
     bool                            m_passageEndsScenario = true;
     std::unordered_set<std::string> m_essential;
+    std::unordered_map<std::string, int> m_morale; // persistent companion combat attack modifier
     Json                            m_choice = Json::object();
     Json                            m_outcome = Json::object();
     Json                            m_triggers = Json::array();

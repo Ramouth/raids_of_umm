@@ -1,0 +1,8 @@
+{
+  "id": "desert",
+  "name": "Sands of Umm'Natur",
+  "description": "Warm sandstone, ochre dunes and weathered desert landmarks.",
+  "palette": {"ground": "c89943", "shore": "ead39a", "road_edge": "ac7935", "road": "e0b762", "label": "fff0c0", "label_shadow": "352018", "panel": "211c14", "frame": "665032", "button": "392b1c", "text": "e8d8b3"},
+  "objects": {}, "scenery": {}, "landmark_widths": {},
+  "review_map": "res://content/maps/default.json"
+}

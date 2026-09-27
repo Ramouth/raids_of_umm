@@ -56,7 +56,7 @@ struct AttackPreview {
  * CombatEngine — pure combat logic.
  *
  * Owns two armies and a CombatMap.  Drives turn order via an initiative
- * queue sorted by UnitType::speed.  Places units on spawn hexes at startup.
+ * queue sorted by speed plus the battle initiative roll.  Places units on spawn hexes at startup.
  * Provides reachable- and attackable-hex queries for highlighting.
  *
  * Action methods are stubs for this pass; damage resolution and ability
@@ -66,10 +66,13 @@ struct AttackPreview {
  */
 class CombatEngine {
 public:
-    CombatEngine(CombatArmy player, CombatArmy enemy);
+    // Production battles use a d6; zero keeps fixed initiative for simulations.
+    CombatEngine(CombatArmy player, CombatArmy enemy, int initiativeDie = 0,
+                 std::optional<uint32_t> seed = std::nullopt);
 
     // Reseed damage rolls and the AI's tie-break RNG.  Same seed + same
-    // commands ⇒ identical battle (tests, replays, balance sims).
+    // commands ⇒ identical damage/AI. Pass the constructor seed to reproduce
+    // initiative too (it has already rolled by the time this method is called).
     // Without a call both streams are seeded from std::random_device.
     void setSeed(uint32_t seed);
 
@@ -125,6 +128,9 @@ public:
     // True if the active unit could attack the enemy stack at targetIndex this
     // turn (shot with ammo, adjacent strike, or walk-then-strike).
     bool canAttack(int targetIndex) const;
+    bool canCurse(int targetIndex) const;
+    bool doCurse(int targetIndex);
+    static constexpr int CURSE_RANGE = 4;
 
     // Preview of the active unit attacking enemy stack targetIndex from
     // bestAttackHex() (see AttackPreview).
@@ -138,12 +144,12 @@ public:
     // Damage bounds for `attacker` striking `defender` with the current stats
     // (defending bonus, item bonuses, bypass).  `pinned` applies the ×1.5.
     static DamageRange damageRange(const CombatUnit& attacker, const CombatUnit& defender,
-                                   bool pinned = false);
+                                   bool pinned = false, bool melee = false);
 
     // HoMM3: shooters deal half damage hand to hand (their strikes and their
     // retaliation), unless their type has "no_melee_penalty".
     static bool meleePenalty(const CombatUnit& u) {
-        return u.type->isRanged() && !u.type->hasAbility("no_melee_penalty");
+        return u.type->isRanged() && !u.type->hasAbility("no_melee_penalty") && !u.type->hasAbility("witch_knife");
     }
     // damageRange() for a melee blow: halved for a shooter.
     static DamageRange meleeRange(const CombatUnit& attacker, const CombatUnit& defender, bool pinned = false);
@@ -317,7 +323,7 @@ private:
     // Assign each stack its spawn position on the CombatMap.
     void placeArmies();
 
-    // Build m_queue sorted by speed desc; player wins speed ties.
+    // Build m_queue sorted by initiative score; player wins score ties.
     void buildQueue();
 
     // Check if either side is fully dead and update m_result accordingly.
@@ -328,11 +334,11 @@ private:
     void resolveAttack(int targetIndex);
 
     // ATK/DEF multiplier shared by calcDamage and damageRange.
-    static double damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender);
+    static double damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender, bool melee = false);
 
     // HoMM3-style damage roll: sum rand(min,max) over each creature in attacker.
     static int calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
-                          std::mt19937& rng);
+                          std::mt19937& rng, bool melee = false);
 
     // Cascade damage through the stack, decrementing count as creatures die.
     static void applyDamage(CombatUnit& target, int damage);

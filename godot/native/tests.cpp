@@ -11,6 +11,39 @@ int main(int argc, char** argv) {
         const Json guards = {{"guards", {{{"id", "skeleton_warrior"}, {"count", 12}},
             {{"id", "sand_scorpion"}, {"count", 4}}}}, {"reward", "scarab_amulet"}};
         const Json army = {{{"id", "desert_archer"}, {"count", 10}}, {{"id", "mummy"}, {"count", 3}}};
+        // The Godot bridge must pass the seed before rolling initial initiative.
+        bool runnerFirst = false, wolfFirst = false;
+        for (unsigned seed = 0; seed < 32; ++seed) {
+            CombatSession rolled, replay;
+            Json troops = {{{"id", "woad_runner"}, {"count", 10}}};
+            Json foes = {{"guards", {{{"id", "grey_wolf"}, {"count", 10}}}}, {"seed", seed}};
+            auto a = rolled.start(argv[1], troops, foes);
+            auto b = replay.start(argv[1], troops, foes);
+            check(a.at("ok") && b.at("ok"), "Seeded initiative battles start");
+            check(a["state"] == b["state"], "The same seed reproduces initial rolls and queue");
+            const auto& state = a["state"];
+            runnerFirst |= state["active"] == "p0";
+            wolfFirst |= state["active"] == "e0";
+            for (const auto& unit : state["units"]) {
+                const int roll = unit["initiative_roll"];
+                check(roll >= 1 && roll <= 6, "Every stack rolls d6");
+                check(unit["initiative_score"].get<int>() == unit["speed"].get<int>() + roll,
+                      "Displayed initiative equals speed plus roll");
+            }
+            check(state["next_round"][0] == state["active"], "Round preview uses the same battle rolls");
+        }
+        check(runnerFirst && wolfFirst, "Wolves do not always start ahead of runners");
+        CombatSession steady, shaken;
+        Json withCompanion = army;
+        withCompanion.push_back({{"id", "ushari"}, {"level", 3}, {"companion", true}});
+        auto normal = steady.start(argv[1], withCompanion, guards);
+        withCompanion.back()["morale"] = -2;
+        auto troubled = shaken.start(argv[1], withCompanion, guards);
+        check(normal.at("ok") && troubled.at("ok"), "Companion morale battles start");
+        check(normal["state"]["units"][2]["attack"].get<int>() - 2 ==
+              troubled["state"]["units"][2]["attack"].get<int>(), "Shaken Ushari actually loses two attack");
+        check(normal["state"]["units"][0]["attack"] == troubled["state"]["units"][0]["attack"],
+              "Ushari's morale does not penalize troops");
         CombatSession session;
         auto reply = session.start(argv[1], army, guards);
         check(reply.at("ok"), "Registry and original armies load");

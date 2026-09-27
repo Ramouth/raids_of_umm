@@ -588,3 +588,60 @@ SUITE("Scenario — 'after' gates a trigger until another has fired") {
     CHECK_EQ((int)lines.size(), 1);
     if (!lines.empty()) CHECK(lines[0].text == "late");
 }
+
+SUITE("Ushari — levels require sustained XP, independently of the commander") {
+    AdventureSession s;
+    CHECK(!s.start("data/maps/default.json", "data"));
+    s.grantXp(299);
+    CHECK_EQ(s.specials()[0].level, 1);
+    CHECK_EQ(s.heroProgress().level, 3);
+    s.grantXp(1);
+    CHECK_EQ(s.specials()[0].level, 2);
+    s.grantXp(449);
+    CHECK_EQ(s.specials()[0].level, 2);
+    s.grantXp(1);
+    CHECK_EQ(s.specials()[0].level, 3);
+    CHECK_EQ(AdventureSession::companionXpForLevel("kharim", 3), 250);
+    CHECK_EQ(AdventureSession::companionXpForLevel("maerwen", 3), 250);
+    AdventureSession restored;
+    const auto error = restored.loadState(s.saveState());
+    CHECK(!error);
+    if (error) return;
+    CHECK_EQ(restored.specials()[0].xp, 750);
+    CHECK_EQ(restored.specials()[0].level, 3);
+    restored.grantXp(599);
+    CHECK_EQ(restored.specials()[0].level, 3);
+    restored.grantXp(1);
+    CHECK_EQ(restored.specials()[0].level, 4);
+}
+
+SUITE("Companions — wounded or unpaid companions sit out XP as well as battles") {
+    auto wounded = started();
+    wounded.companionsFell({"ushari"}, false);
+    wounded.grantXp(300);
+    CHECK_EQ(wounded.specials()[0].xp, 0);
+    CHECK_EQ(wounded.specials()[0].level, 1);
+    CHECK_EQ(wounded.heroProgress().xp, 300);
+    for (int i = 0; i < AdventureSession::WOUND_DAYS; ++i) wounded.endDay();
+    wounded.grantXp(300);
+    CHECK_EQ(wounded.specials()[0].level, 2);
+    AdventureSession unpaid;
+    CHECK(!unpaid.start("data/maps/default.json", "data"));
+    auto save = unpaid.saveState();
+    save["specials"][0]["unpaid"] = AdventureSession::SULK_DAYS;
+    CHECK(!unpaid.loadState(save));
+    unpaid.grantXp(300);
+    CHECK_EQ(unpaid.specials()[0].xp, 0);
+}
+
+SUITE("Ushari — old saves keep levels already earned under the faster curve") {
+    AdventureSession s;
+    CHECK(!s.start("data/maps/default.json", "data"));
+    auto save = s.saveState();
+    save["specials"][0]["level"] = 3;
+    save["specials"][0]["xp"] = 250;
+    CHECK(!s.loadState(save));
+    s.grantXp(100);
+    CHECK_EQ(s.specials()[0].level, 3);
+    CHECK_EQ(s.specials()[0].xp, 350);
+}

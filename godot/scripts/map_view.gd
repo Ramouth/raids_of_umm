@@ -2,6 +2,11 @@
 extends Node2D
 ## Native Godot scene nodes compose the map in both the editor and the game.
 
+const ArtTheme = preload("res://scripts/map_art_theme.gd")
+const MEADOW_SHADER = preload("res://shaders/north_meadow.gdshader")
+var art_theme = ArtTheme.new()
+var mountain_groups: Array = []
+
 const PATCH_SHADER = preload("res://shaders/terrain_patch.gdshader")
 const WATER_SHADER = preload("res://shaders/water.gdshader")
 const OBJECT_TEXTURES := {
@@ -14,14 +19,6 @@ const OBJECT_TEXTURES := {
     "stables": "objects/stables.png", "learning_stone": "objects/learning_stone.png",
     "obelisk": "objects/obelisk.png",
 }
-## Northern art for the same object types, used on grass-ground maps.
-const NORTH_TEXTURES := {
-    "town": "objects/town_north.png", "sawmill": "objects/sawmill_north.png",
-    "gold_mine": "objects/gold_mine_north.png", "guard": "objects/guard_north.png",
-    "dungeon": "objects/dungeon_north.png", "artifact": "objects/cairn.png",
-    "old_mine": "objects/old_mine_north.png", "quest_giver": "objects/quest_giver_north.png",
-}
-const NORTH_MOUNTAINS := ["terrain/mountain/mountain_north.png", "terrain/mountain/mountain_north2.png"]
 ## Sprite by object kind (pickups, mills, dwellings, relic artifacts).
 const KIND_TEXTURES := {
     "wood": "objects/wood_pile.png", "stone": "objects/stone_pile.png", "gold": "objects/gold_pile.png",
@@ -42,9 +39,6 @@ const FEATURE_TEXTURES := {
     "grass": "terrain/grass/grass.png", "highland": "terrain/highland/highland.png",
     "wall": "terrain/wall/wall.png", "swamp": "terrain/highland/highland1.png",
 }
-## On grass-ground maps these replace the desert-era hex art.
-const NORTH_FEATURES := {"highland": "terrain/highland/highland2.png"}
-
 @export_file("*.json") var map_path := "res://content/maps/old_passage.json"
 @export_group("Art direction")
 @export var sand_color := Color("c89943")
@@ -64,6 +58,7 @@ func rebuild() -> void:
     for child in get_children():
         child.free()
     anchors.clear()
+    mountain_groups.clear()
     if not data.read(map_path):
         push_error(data.error)
         return
@@ -75,10 +70,16 @@ func rebuild() -> void:
     for point in outline:
         world_bounds = world_bounds.expand(point)
     var north := data.ground == "grass"
+    art_theme.load_for(data.ground)
     var ground := Polygon2D.new()
     ground.name = "GrassFoundation" if north else "SandFoundation"
     ground.polygon = outline
-    ground.color = grass_color if north else sand_color
+    ground.color = art_theme.colour("ground")
+    if north:
+        var meadow := ShaderMaterial.new()
+        meadow.shader = MEADOW_SHADER
+        meadow.set_shader_parameter("meadow", art_theme.colour("ground"))
+        ground.material = meadow
     add_child(ground)
     var grain := Polygon2D.new()
     grain.name = "GrassGrain" if north else "SandGrain"
@@ -93,6 +94,7 @@ func rebuild() -> void:
     grain.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
     grain.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     grain.color = Color(1, 1, 1, grass_detail_opacity if north else sand_detail_opacity)
+    grain.visible = not north
     add_child(grain)
     var terrain := Node2D.new()
     terrain.name = "TerrainFeatures"
@@ -101,14 +103,11 @@ func rebuild() -> void:
         var tile: Dictionary = data.tiles[cell]
         if tile.terrain in WATER_TERRAIN or tile.terrain == data.ground:
             continue
-        if north and tile.terrain == "forest":
-            continue  # trees are scenery: they Y-sort with the hero (see _build_trees)
+        if north and tile.terrain in ["forest", "mountain", "highland", "swamp"]:
+            continue  # Northern relief is composed as scenery, without polygon-shaped tile bases.
         if not FEATURE_TEXTURES.has(tile.terrain):
             continue
-        var art: String = NORTH_FEATURES.get(tile.terrain, FEATURE_TEXTURES[tile.terrain]) if north else FEATURE_TEXTURES[tile.terrain]
-        if north and tile.terrain == "mountain":
-            var peak: String = NORTH_MOUNTAINS[posmod(cell.x * 7 + cell.y * 13, NORTH_MOUNTAINS.size())]
-            if ResourceLoader.exists("res://content/textures/" + peak): art = peak
+        var art: String = FEATURE_TEXTURES[tile.terrain]
         var feature := _sprite(art)
         feature.name = "%s_%d_%d" % [tile.terrain, cell.x, cell.y]
         feature.position = UmmMapData.cell_to_world(cell)
@@ -143,7 +142,69 @@ func rebuild() -> void:
     for cell: Vector2i in data.objects:
         _build_object(scenery, cell, data.objects[cell])
     if north:
+        _build_mountains(scenery)
         _build_trees(scenery)
+        _build_undergrowth(scenery)
+
+## One painted ridge spans a connected group of up to three blocked cells.
+## Geometry stays authoritative: no passable cells or map objects enter a group.
+func _build_mountains(scenery: Node2D) -> void:
+    var cells: Array = data.tiles.keys()
+    cells.sort_custom(func(a: Vector2i, b: Vector2i): return a.y < b.y if a.x == b.x else a.x < b.x)
+    var used := {}
+    for start: Vector2i in cells:
+        if used.has(start) or data.tiles[start].terrain != "mountain" or data.is_passable(start) or data.objects.has(start): continue
+        var group: Array[Vector2i] = [start]
+        used[start] = true
+        for direction: Vector2i in [Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, 1)]:
+            for step in range(1, int(art_theme.config.ridge_cells)):
+                var next := start + direction * step
+                if used.has(next) or not data.tiles.has(next) or data.tiles[next].terrain != "mountain" or data.is_passable(next) or data.objects.has(next): break
+                group.append(next)
+                used[next] = true
+            if group.size() > 1: break
+        mountain_groups.append(group)
+        var ridge := _sprite(str(art_theme.config.scenery.ridge))
+        ridge.name = "Ridge_%d_%d" % [start.x, start.y]
+        var first := UmmMapData.cell_to_world(group[0])
+        var last := UmmMapData.cell_to_world(group[-1])
+        var width := 132.0 + absf(last.x - first.x)
+        _fit_sprite(ridge, width)
+        ridge.flip_h = posmod(start.x * 7 + start.y * 13, 2) == 0
+        ridge.position = (first + last) / 2.0 + Vector2(0, 24)
+        ridge.offset.y = -ridge.texture.get_height() * 0.37
+        # A wide ridge cannot cover the vertical span of an axial group.
+        # Give each blocked cell its own visible foothill before adding the crest.
+        for cell: Vector2i in group:
+            var foothill := _sprite(str(art_theme.config.scenery.ridge))
+            foothill.name = "MountainFootprint_%d_%d" % [cell.x, cell.y]
+            _fit_sprite(foothill, 112.0)
+            foothill.position = UmmMapData.cell_to_world(cell) + Vector2(0, 22)
+            foothill.offset.y = -foothill.texture.get_height() * 0.37
+            foothill.flip_h = posmod(cell.x + cell.y, 2) == 0
+            scenery.add_child(foothill)
+        scenery.add_child(ridge)
+
+func _fit_sprite(sprite: Sprite2D, width: float) -> void:
+    sprite.scale = Vector2.ONE * width / float(sprite.texture.get_width())
+    sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+## Scatter plants across cell boundaries, avoiding roads and interaction anchors.
+func _build_undergrowth(scenery: Node2D) -> void:
+    for cell: Vector2i in data.tiles:
+        var tile: Dictionary = data.tiles[cell]
+        if data.objects.has(cell) or tile.get("road", false) or tile.terrain not in ["grass", "highland", "forest", "swamp"]: continue
+        var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
+        if tile.terrain == "grass" and h % 5 != 0: continue
+        var tuft := _sprite(str(art_theme.config.scenery.scrub))
+        tuft.name = "Scrub_%d_%d" % [cell.x, cell.y]
+        _fit_sprite(tuft, float(art_theme.config.scrub_width) + h % 29)
+        tuft.position = UmmMapData.cell_to_world(cell) + Vector2(h % 41 - 20, (h >> 2) % 29 - 14)
+        tuft.offset.y = -tuft.texture.get_height() * 0.25
+        tuft.flip_h = h % 2 == 0
+        if tile.terrain == "swamp": tuft.modulate = Color("829573")
+        elif tile.terrain == "highland": tuft.modulate = Color("b5b9a2")
+        scenery.add_child(tuft)
 
 ## Forest hexes become clumps of pines and oaks, Y-sorted with the hero and
 ## buildings so the expedition walks behind trunks, HoMM3-style.
@@ -153,17 +214,19 @@ func _build_trees(scenery: Node2D) -> void:
             continue
         var center := UmmMapData.cell_to_world(cell)
         var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
-        var offsets := [Vector2(-18, -8), Vector2(16, -4), Vector2(-2, 14)]
+        var offsets := [Vector2(-24, -11), Vector2(21, -6), Vector2(-4, 19)]
+        if h % 3 == 0: offsets.resize(2)
         for i in range(offsets.size()):
-            var pick: String = TREE_SPRITES[(h >> i) & 1]
-            if h % 5 == 0: pick = TREE_SPRITES[0]  # some stands are all pine
+            var tree_art: Array = art_theme.config.scenery.trees
+            var pick: String = tree_art[(h >> i) & 1]
+            if h % 5 == 0: pick = tree_art[0]  # some stands are all pine
             var tree := _sprite(pick)
             tree.name = "Tree_%d_%d_%d" % [cell.x, cell.y, i]
-            var jitter := Vector2(((h >> (i * 3)) % 7) - 3, ((h >> (i * 2)) % 5) - 2)
+            var jitter := Vector2(((h >> (i * 3)) % 23) - 11, ((h >> (i * 2)) % 19) - 9)
             # The sprite is drawn up from its feet so Y-sorting uses the trunk base.
             tree.offset = Vector2(0, -52)
             tree.position = center + offsets[i] + jitter + Vector2(0, 26)
-            tree.scale = Vector2.ONE * (0.42 + ((h >> i) % 4) * 0.03)
+            tree.scale = Vector2.ONE * (0.38 + ((h >> i) % 6) * 0.035)
             scenery.add_child(tree)
 
 ## Collected pickups vanish; weekly sites already used this week fade.
@@ -185,7 +248,8 @@ func object_texture(object: Dictionary) -> String:
     if type == "town" and int(object.get("factionId", 0)) == 2 and data.ground == "grass":
         candidates.append("objects/town_shariw_north.png")
     if KIND_TEXTURES.has(kind): candidates.append(KIND_TEXTURES[kind])
-    if data.ground == "grass" and NORTH_TEXTURES.has(type): candidates.append(NORTH_TEXTURES[type])
+    var themed: Dictionary = art_theme.config.get("objects", {})
+    if themed.has(type): candidates.append(str(themed[type]))
     if OBJECT_TEXTURES.has(type): candidates.append(OBJECT_TEXTURES[type])
     for path in candidates:
         if ResourceLoader.exists("res://content/textures/" + path): return path
@@ -215,9 +279,19 @@ func mark_ruled_out(ruled: Dictionary) -> void:
         label.text = str(data.objects[cell].name) + ("  ·  dead end" if dead else "")
         anchors[cell].modulate = Color(1, 1, 1, 0.55) if dead else Color.WHITE
 
+var _theme_textures: Dictionary = {}
+
 func _sprite(relative_path: String) -> Sprite2D:
     var sprite := Sprite2D.new()
-    sprite.texture = load("res://content/textures/" + relative_path)
+    if relative_path.begins_with("themes/"):
+        if not _theme_textures.has(relative_path):
+            var source: Texture2D = load("res://content/textures/" + relative_path)
+            var bitmap := source.get_image()
+            if not bitmap.has_mipmaps(): bitmap.generate_mipmaps()
+            _theme_textures[relative_path] = ImageTexture.create_from_image(bitmap)
+        sprite.texture = _theme_textures[relative_path]
+    else:
+        sprite.texture = load("res://content/textures/" + relative_path)
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     return sprite
 
@@ -244,14 +318,14 @@ func _build_roads() -> void:
             var line := Line2D.new()
             line.points = PackedVector2Array([from, to])
             line.width = 13.0
-            line.default_color = Color("6e5231") if north else Color("ac7935")
+            line.default_color = art_theme.colour("road_edge")
             line.begin_cap_mode = Line2D.LINE_CAP_ROUND
             line.end_cap_mode = Line2D.LINE_CAP_ROUND
             roads.add_child(line)
             var center := Line2D.new()
             center.points = line.points
             center.width = 8.0
-            center.default_color = Color("a3845a") if north else Color("e0b762")
+            center.default_color = art_theme.colour("road")
             roads.add_child(center)
 
 func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
@@ -271,6 +345,10 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
             if object.get("name", "") == "Varenhold":
                 sprite.scale = Vector2.ONE * 1.28
                 sprite.position.y = -62
+        var widths: Dictionary = art_theme.config.get("landmark_widths", {})
+        if widths.has(str(object.type)):
+            _fit_sprite(sprite, float(widths[str(object.type)]))
+            sprite.position.y = -sprite.texture.get_height() * sprite.scale.y * 0.34
         anchor.add_child(sprite)
     else:
         # Missing art remains an explicit map marker, never a different building.
@@ -297,8 +375,8 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
     label.size = Vector2(190, 24)
     label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     label.add_theme_font_size_override("font_size", 13)
-    label.add_theme_color_override("font_color", Color("fff0c0"))
-    label.add_theme_color_override("font_outline_color", Color("352018"))
+    label.add_theme_color_override("font_color", art_theme.colour("label"))
+    label.add_theme_color_override("font_outline_color", art_theme.colour("label_shadow"))
     label.add_theme_constant_override("outline_size", 5)
     anchor.add_child(label)
 
@@ -342,7 +420,7 @@ func _build_water(parent: Node2D) -> void:
             bank.points = shore
             bank.closed = true
             bank.width = 6.0
-            bank.default_color = Color("7d6a43") if data.ground == "grass" else Color("ead39a")
+            bank.default_color = art_theme.colour("shore")
             bank.joint_mode = Line2D.LINE_JOINT_ROUND
             parent.add_child(bank)
     _build_bridges(parent)

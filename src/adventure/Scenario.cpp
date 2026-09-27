@@ -27,6 +27,7 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         m_choice = Json::object();
         m_outcome = Json::object();
         m_lore.clear();
+        m_morale.clear();
         m_essential.clear();
         for (const auto& id : root.value("essential_companions", Json::array()))
             m_essential.insert(id.get<std::string>());
@@ -140,6 +141,8 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 fire(s, "quests_done", {{"count", optional}});
             }
         if (a.contains("join")) s.joinSpecial(a["join"].get<std::string>());
+        if (a.contains("morale"))
+            m_morale[a["morale"].at("id").get<std::string>()] = std::clamp(a["morale"].at("value").get<int>(), -2, 2);
         if (a.contains("leave")) s.leaveSpecial(a["leave"].get<std::string>());
         if (a.contains("choice") && m_outcome.empty()) m_choice = a["choice"];
         if (a.contains("ending")) {
@@ -227,10 +230,11 @@ Scenario::Json Scenario::saveState() const {
             {"won", Json(std::vector<std::string>(m_won.begin(), m_won.end()))},
             {"vanished", Json(std::vector<std::string>(m_vanished.begin(), m_vanished.end()))},
             {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)},
-            {"choice", m_choice}, {"outcome", m_outcome}};
+            {"choice", m_choice}, {"outcome", m_outcome}, {"morale", m_morale}};
 }
 
 void Scenario::loadState(const Json& state) {
+    m_morale = state.value("morale", std::unordered_map<std::string, int>{});
     m_choice = state.value("choice", Json::object());
     m_outcome = state.value("outcome", Json::object());
     m_fired.clear();

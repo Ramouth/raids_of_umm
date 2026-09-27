@@ -13,6 +13,11 @@ var _buttons: VBoxContainer
 var _elapsed := 0.0
 var _closed := false
 var _fade: Tween
+var _conversation_index := -1
+var _speaker: Label
+var _portrait: TextureRect
+var _commander: Label
+var _next_line: Button
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -41,10 +46,40 @@ func _ready() -> void:
     if not choice.is_empty():
         _heading.text = str(choice.title).to_upper()
         _words.text = str(choice.text)
+        if choice.get("presentation", "") == "conversation":
+            _scene = "conversation"
+            var portraits := HBoxContainer.new()
+            portraits.alignment = BoxContainer.ALIGNMENT_CENTER
+            portraits.add_theme_constant_override("separation", 260)
+            column.add_child(portraits)
+            column.move_child(portraits, 1)
+            for path in ["portraits/ushari.png"]:
+                var portrait := TextureRect.new()
+                portrait.custom_minimum_size = Vector2(180, 180)
+                portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+                portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+                portrait.texture = load("res://content/textures/" + path)
+                portraits.add_child(portrait)
+                if _portrait == null: _portrait = portrait
+            _commander = _label("COMMANDER\nHOUSE VAREN", 20, Color("a9ccb7"))
+            _commander.custom_minimum_size = Vector2(180, 180)
+            _commander.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+            portraits.add_child(_commander)
+            _speaker = _label("", 18, Color("a9ccb7"))
+            column.add_child(_speaker)
+            column.move_child(_speaker, _words.get_index())
+            _next_line = Button.new()
+            _next_line.text = "Continue"
+            _next_line.custom_minimum_size.y = 44
+            _next_line.pressed.connect(_advance_conversation)
+            _buttons.add_child(_next_line)
         for option in choice.options:
             var button := Button.new()
-            button.text = str(option.label) + "\n" + str(option.get("detail", ""))
+            button.text = str(option.label)
+            if not str(option.get("detail", "")).is_empty(): button.text += "\n" + str(option.detail)
             button.custom_minimum_size.y = 60
+            button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            button.visible = _next_line == null
             button.pressed.connect(select.bind(str(option.id)))
             _buttons.add_child(button)
     else:
@@ -56,7 +91,25 @@ func _ready() -> void:
         button.pressed.connect(advance)
         _buttons.add_child(button)
         advance()
+    if _next_line != null: _advance_conversation()
     (_buttons.get_child(0) as Button).grab_focus()
+
+func _advance_conversation() -> void:
+    _conversation_index += 1
+    var lines: Array = choice.get("lines", [])
+    if _conversation_index < lines.size():
+        var line: Array = lines[_conversation_index]
+        _speaker.text = str(line[0]).to_upper()
+        _words.text = str(line[1])
+        _portrait.modulate = Color.WHITE if line[0] == "Ushari" else Color(0.45, 0.55, 0.5)
+        _commander.modulate.a = 1.0 if line[0] == "Commander" else 0.45
+        return
+    _speaker.text = "YOUR RESPONSE"
+    _words.text = str(choice.text)
+    _next_line.hide()
+    for button in _buttons.get_children():
+        if button != _next_line: button.show()
+    (_buttons.get_child(1) as Button).grab_focus()
 
 func _label(text: String, font_size: int, colour: Color) -> Label:
     var label := Label.new()
@@ -69,6 +122,7 @@ func _label(text: String, font_size: int, colour: Color) -> Label:
 
 func select(id: String) -> void:
     if _closed or choice.is_empty(): return
+    if _next_line != null and _next_line.visible: return
     if not choice.options.any(func(option): return str(option.id) == id): return
     _closed = true
     finished.emit({"choice": id})
@@ -126,6 +180,11 @@ func _draw() -> void:
         if _scene != "home":
             var arrive := minf(_elapsed / 2.0, 1.0)
             _horse(Vector2(540 + arrive * 90, 360), _scene == "blood")
+    elif _scene == "conversation":
+        draw_rect(Rect2(100, 65, 1080, 210), Color("101f22"))
+        for y in range(66, 275, 4):
+            draw_line(Vector2(100, y), Vector2(1180, y), Color(0.5, 0.8, 0.65, 0.035))
+        draw_line(Vector2(100, 277), Vector2(1180, 277), Color("618578"), 2)
     else:
         draw_colored_polygon(PackedVector2Array([Vector2(0, 430), Vector2(0, 170), Vector2(400, 65), Vector2(530, 150), Vector2(450, 430)]), ink)
         draw_colored_polygon(PackedVector2Array([Vector2(830, 430), Vector2(750, 150), Vector2(890, 60), Vector2(1280, 165), Vector2(1280, 430)]), ink)

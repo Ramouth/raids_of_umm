@@ -191,7 +191,7 @@ Gold + Wood
 
 ### Special Characters
 
-- **Ushari** — Warrior archetype. Aura buffs adjacent physical units.
+- **Ushari** — Witch from the last witch tribe in the realm. Fragile caster with a protective aura, ranged magic, and a weak physical knife attack when cornered.
   Former commander who has fought in three campaigns before this one.
 - **Kharim** — Strategist archetype. Increases rider speed and flanking
   radius. Has studied the maps of Pha'raxh obsessively. Suspects the

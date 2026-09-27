@@ -125,7 +125,7 @@ bool strikesFirst(const Ctx& c, int i) {
 // Can foe e strike a stack standing on h before that stack acts again?
 // Move-and-attack: any melee foe within its move range + 1 (ignoring blockers).
 bool canReach(const CombatUnit& e, HexCoord h) {
-    return e.pos.distanceTo(h) - 1 <= e.type->moveRange;
+    return e.pos.distanceTo(h) - 1 <= e.effectiveMove();
 }
 
 // Net expected loss of ending our turn on h: strikes from melee foes that act
@@ -204,7 +204,7 @@ double futureAttackValue(const Ctx& c, int i, HexCoord h, bool shot) {
 // Best discounted attack the actor sets up by ending its turn on h.
 double positionValue(const Ctx& c, HexCoord h) {
     const int idx = cellIndex(h);
-    const int range = std::max(1, c.actor.type->moveRange);
+    const int range = std::max(1, c.actor.effectiveMove());
     double best = 0, second = 0;
     for (int i = 0; i < (int)c.foes.size(); ++i) {
         const CombatUnit& e = c.foes[i];
@@ -215,7 +215,7 @@ double positionValue(const Ctx& c, HexCoord h) {
             // into a melee strike — so stepping away from it (kiting) gains
             // nothing, and the scorer never plays keep-away.
             const bool chaser = !(e.type->isRanged() && e.shotsLeft > 0) && strikesFirst(c, i)
-                                && e.pos.distanceTo(h) - 1 <= e.type->moveRange;
+                                && e.pos.distanceTo(h) - 1 <= e.effectiveMove();
             const bool shot = e.pos.distanceTo(h) > 1 && !chaser;
             v = futureAttackValue(c, i, h, shot) * kNextTurn;
         } else {
@@ -421,6 +421,13 @@ CombatAI::Candidate CombatAI::chooseAction(CombatEngine& engine) {
 
 void CombatAI::takeTurn(CombatEngine& engine) {
     if (engine.isOver()) return;
+    // A witch binds a nearby unbound melee threat before trading damage.
+    const auto& foes = engine.activeUnit().isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
+    for (int i = 0; i < static_cast<int>(foes.size()); ++i)
+        if (engine.canCurse(i) && foes[i].boundTurns == 0 && !foes[i].type->isRanged()) {
+            engine.doCurse(i);
+            return;
+        }
     const Candidate choice = chooseAction(engine);
     switch (choice.kind) {
     case Candidate::Kind::Attack:

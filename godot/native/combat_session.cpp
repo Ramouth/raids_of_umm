@@ -36,6 +36,7 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
             if (!type || !type->isCompanion() || level < 1 || level > 30 || ++companions > 3)
                 throw std::runtime_error("Unknown companion or too many companions: " + id);
             army.stacks.push_back(CombatUnit::companion(type, level, player));
+            army.stacks.back().attackBonus += std::clamp(entry.value("morale", 0), -2, 2);
             continue;
         }
         const int count = entry.at("count").get<int>();
@@ -66,14 +67,14 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
             return failure("Unknown encounter reward: " + reward_);
         auto player = make_army(army, true);
         auto enemy = make_army(encounter.at("guards"), false);
-        engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy));
+        const std::optional<uint32_t> seed = encounter.contains("seed")
+            ? std::optional<uint32_t>(encounter.at("seed").get<uint32_t>()) : std::nullopt;
+        engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy), 6, seed);
         const Json works = encounter.value("fieldworks", Json::object());
         barricades_ = std::clamp(works.value("barricade", 0), 0, 3);
         stakes_ = std::clamp(works.value("stakes", 0), 0, 3 - barricades_);
         deploying_ = barricades_ + stakes_ > 0;
         opening_ = std::clamp(encounter.value("tactics", 0), 0, 3);   // commander's Tactics rank
-        // Tests and replays may fix the dice and the AI's choices.
-        if (encounter.contains("seed")) engine_->setSeed(encounter.at("seed").get<uint32_t>());
         return response();
     } catch (const std::exception& error) {
         engine_.reset();
@@ -121,6 +122,12 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
         if (action == "move") {
             if (!engine_->canMoveTo(cell)) return failure("That hex is not reachable.");
             engine_->doMove(cell);
+        } else if (action == "curse") {
+            int target = -1;
+            const auto& foes = engine_->enemyArmy().stacks;
+            for (int i = 0; i < static_cast<int>(foes.size()); ++i)
+                if (!foes[i].isDead() && foes[i].pos == cell) target = i;
+            if (!engine_->doCurse(target)) return failure("Binding Thread needs an enemy within four hexes and no adjacent enemies.");
         } else if (action == "attack") {
             const auto targets = legal_targets();
             if (std::find(targets.begin(), targets.end(), cell) == targets.end())
@@ -219,9 +226,10 @@ Json CombatSession::snapshot() const {
                 {"attack", unit.effectiveAttack()}, {"defense", unit.effectiveDefense()},
                 {"min_damage", unit.type->minDamage + unit.damageBonus},
                 {"max_damage", unit.type->maxDamage + unit.damageBonus},
-                {"move", unit.type->moveRange}, {"abilities", unit.type->abilities},
+                {"bound_turns", unit.boundTurns}, {"move", unit.effectiveMove()}, {"abilities", unit.type->abilities},
                 {"retaliated", unit.hasRetaliated},
-                {"speed", unit.effectiveSpeed()}, {"defending", unit.isDefending}});
+                {"speed", unit.effectiveSpeed()}, {"initiative_roll", unit.initiativeRoll},
+                {"initiative_score", unit.initiativeScore()}, {"defending", unit.isDefending}});
             if (player && unit.isSpecialCharacter) {
                 if (unit.isDead()) state["fallen"].push_back(unit.scId);
                 else {
@@ -246,6 +254,19 @@ Json CombatSession::snapshot() const {
             Json shots = reactions(cell);
             if (!shots.empty()) state["reaction_fire"].push_back({{"cell", hex(cell)}, {"shots", shots}});
         }
+        state["curse_targets"] = Json::array();
+        state["curse_range"] = Json::array();
+        const auto& actor = engine_->activeUnit();
+        if (actor.type->hasAbility("binding_thread") && !engine_->isEngaged(actor)) {
+            for (int col = 0; col < CombatMap::GRID_W; ++col)
+                for (int row = 0; row < CombatMap::GRID_H; ++row) {
+                    const auto cell = CombatMap::toHex(col, row);
+                    if (actor.pos.distanceTo(cell) <= CombatEngine::CURSE_RANGE) state["curse_range"].push_back(hex(cell));
+                }
+            const auto& foes = turn.isPlayer ? engine_->enemyArmy().stacks : engine_->playerArmy().stacks;
+            for (int i = 0; i < static_cast<int>(foes.size()); ++i)
+                if (engine_->canCurse(i)) state["curse_targets"].push_back(hex(foes[i].pos));
+        }
         for (auto cell : legal_targets()) state["attackable"].push_back(hex(cell));
         int index = 0;
         for (const auto& slot : engine_->turnOrder()) {
@@ -265,13 +286,13 @@ Json CombatSession::snapshot() const {
 }
 
 Json CombatSession::next_round() const {
-    // Same rule as CombatEngine::buildQueue: faster first, the expedition wins ties.
+    // Same battle rolls as round one; Marshal overrides expire after that round.
     struct Slot { bool player; int index; int speed; };
     std::vector<Slot> order;
     for (bool player : {true, false}) {
         const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
         for (int i = 0; i < static_cast<int>(army.stacks.size()); ++i)
-            if (!army.stacks[i].isDead()) order.push_back({player, i, army.stacks[i].effectiveSpeed()});
+            if (!army.stacks[i].isDead()) order.push_back({player, i, army.stacks[i].initiativeScore()});
     }
     std::stable_sort(order.begin(), order.end(), [](const Slot& a, const Slot& b) {
         if (a.speed != b.speed) return a.speed > b.speed;
@@ -366,7 +387,7 @@ Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int i
 }
 
 Json CombatSession::response() {
-    static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "choice"};
+    static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "curse", "choice"};
     Json events = Json::array();
     for (const auto& event : engine_->drainEvents()) {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
@@ -374,7 +395,7 @@ Json CombatSession::response() {
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
             {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction}, {"opportunity", event.isOpportunity},
             {"from", hex(event.from)}, {"to", hex(event.to)},
-            {"kills", event.kills}, {"remaining", event.remaining}};
+            {"roll", event.curseRoll}, {"kills", event.kills}, {"remaining", event.remaining}};
         if (event.type == CombatEvent::Type::UnitAttacked) {
             // Attacks never move anyone, so the current positions tell shots from strikes.
             const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];

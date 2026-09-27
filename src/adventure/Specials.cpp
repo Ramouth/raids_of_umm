@@ -45,6 +45,12 @@ int AdventureSession::xpForLevel(int level) {
     return level <= 10 ? table[std::max(level, 1)] : 7200 + (level - 10) * 2500;
 }
 
+int AdventureSession::companionXpForLevel(const std::string& id, int level) {
+    // Ushari starts powerful; her levels should span several encounters.
+    // Keep earned XP and existing saved levels, but slow future advancement.
+    return xpForLevel(level) * (id == "ushari" ? 3 : 1);
+}
+
 int AdventureSession::upkeepFor(int level) {
     if (level >= 8) return 600;
     if (level >= 5) return 300;
@@ -150,9 +156,9 @@ void AdventureSession::grantXp(int xp) {
         m_levelUps.push_back(up);
     }
     for (auto& sc : m_specials) {
-        if (sc.stationed) continue;
+        if (sc.stationed || isWounded(sc) || sc.unpaidDays >= SULK_DAYS) continue;
         sc.xp += xp;
-        while (sc.xp >= xpForLevel(sc.level + 1)) {
+        while (sc.xp >= companionXpForLevel(sc.id, sc.level + 1)) {
             ++sc.level;
             std::string line = sc.name + " reaches level " + std::to_string(sc.level) + ".";
             for (const auto& a : abilitiesOf(sc.id))

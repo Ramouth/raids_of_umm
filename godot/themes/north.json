@@ -1,0 +1,21 @@
+{
+  "id": "north",
+  "name": "Northern Marches",
+  "description": "Slate, limestone, moss and meadow. Upper-left light, oblique painted sprites, irregular edges.",
+  "palette": {"ground": "526d42", "shore": "566b49", "road_edge": "64543d", "road": "a08e68", "label": "eee9cb", "label_shadow": "18251c", "panel": "17231d", "frame": "65735a", "button": "304336", "text": "e3e8d3"},
+  "objects": {
+    "town": "objects/town_north.png", "sawmill": "objects/sawmill_north.png",
+    "gold_mine": "objects/gold_mine_north.png", "guard": "objects/guard_north.png",
+    "dungeon": "objects/dungeon_north.png", "artifact": "objects/cairn.png",
+    "old_mine": "objects/old_mine_north.png", "quest_giver": "objects/quest_giver_north.png",
+    "quarry": "themes/north/quarry.png"
+  },
+  "scenery": {
+    "ridge": "themes/north/ridge.png", "scrub": "themes/north/scrub.png",
+    "trees": ["terrain/forest/pine_cluster.png", "terrain/forest/oak_cluster.png"]
+  },
+  "landmark_widths": {"quarry": 132},
+  "ridge_cells": 3,
+  "scrub_width": 58,
+  "review_map": "res://content/maps/old_passage.json"
+}

@@ -249,6 +249,7 @@ public:
     const std::vector<Special>& specials() const { return m_specials; }
     static std::vector<Ability> abilitiesOf(const std::string& id);
     static int xpForLevel(int level);      // total xp needed to reach 'level'
+    static int companionXpForLevel(const std::string& id, int level);
     static int upkeepFor(int level);       // gold per day
     bool hasAbility(const std::string& abilityName) const;  // active on an SC travelling with the hero
     void joinSpecial(const std::string& id);

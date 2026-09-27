@@ -42,6 +42,10 @@ night scene. On the home route she enters alone; her progression is retained for
 a later reunion. The chapter outcome is saved to `user://chapter_one.json`.
 Later chapters and the reunion are not yet playable.
 
+Ending a day briefly dims the map and announces the day; week boundaries have a longer week card. The hooded figure stands beside the Hermit’s Wolves, warns you before their battle, and disappears after their defeat. After all three wolf packs fall, the next **End Day** brings nightfall and Ushari arrives in a player-paced night conversation with a portrait and speaker nameplates. Her question about Aldren has supportive, uncertain, and dismissive responses. Her last witch tribe background emerges through the conversation. Choices and journal entries describe her reaction without exposing numerical consequences; the relationship state survives saves.
+
+Run `res://tests/story_effects_smoke.gd` for calendar and conversation presentation checks.
+
 Story source: `scripts/north_story.py`; regenerate with `python3 scripts/north_story.py`.
 Map source: `scripts/gen_north_map.py`; hand-tuned playable map: `data/maps/old_passage.json`.
 The vale now has a quarry, northern routes have stone and obsidian supplies, and

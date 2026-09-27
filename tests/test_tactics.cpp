@@ -410,3 +410,104 @@ SUITE("Fieldworks — cannot seal off the battlefield") {
     CHECK(!eng.placeFieldwork(CombatMap::toHex(3, 4), true));
     CHECK_EQ((int)eng.fieldworks().size(), 4);
 }
+
+SUITE("Initiative — speed plus d6 varies the starter, is reproducible, and Marshal overrides it") {
+    const UnitType* runner = type("Initiative runner", 7, 1, 100);
+    const UnitType* wolf = type("Initiative wolf", 9, 1, 100);
+    CombatArmy p; p.isPlayer = true;
+    p.stacks.push_back(CombatUnit::make(runner, 1, true));
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(wolf, 1, false));
+    bool playerStarted = false, enemyStarted = false;
+    for (uint32_t seed = 0; seed < 64; ++seed) {
+        CombatEngine a(p, e, 6, seed), replay(p, e, 6, seed);
+        const auto& player = a.playerArmy().stacks[0];
+        const auto& enemy = a.enemyArmy().stacks[0];
+        CHECK(player.initiativeRoll >= 1 && player.initiativeRoll <= 6);
+        CHECK(enemy.initiativeRoll >= 1 && enemy.initiativeRoll <= 6);
+        CHECK_EQ(player.initiativeRoll, replay.playerArmy().stacks[0].initiativeRoll);
+        CHECK_EQ(enemy.initiativeRoll, replay.enemyArmy().stacks[0].initiativeRoll);
+        const bool first = a.currentTurn().isPlayer;
+        CHECK_EQ(first, player.initiativeScore() >= enemy.initiativeScore());
+        playerStarted |= first;
+        enemyStarted |= !first;
+        CHECK(a.setOpeningOrder({0}, 1));
+        CHECK(a.currentTurn().isPlayer);
+        a.doDefend();
+        a.doDefend();
+        CHECK_EQ(a.roundNumber(), 2);
+        CHECK_EQ(a.currentTurn().isPlayer, first);  // same battle rolls, override expired
+        CHECK_EQ(player.initiativeRoll, replay.playerArmy().stacks[0].initiativeRoll);
+    }
+    CHECK(playerStarted);
+    CHECK(enemyStarted);
+}
+
+SUITE("Ushari — reduced ranged magic, physical knife, and low durability") {
+    AdventureSession session;
+    CHECK(!session.start(plainMap(), "data"));
+    const auto* ushariType = session.resources().unit("ushari");
+    const auto* targetType = session.resources().unit("armoured_warrior");
+    const auto* guardType = session.resources().unit("maerwen");
+    CHECK(ushariType && targetType && guardType);
+    if (!ushariType || !targetType || !guardType) return;
+    auto ushari = CombatUnit::companion(ushariType, 1, true);
+    auto veteran = CombatUnit::companion(ushariType, 5, true);
+    auto target = CombatUnit::make(targetType, 20, false);
+    const auto shot = CombatEngine::damageRange(ushari, target);
+    CHECK(ushariType->attackType == AttackType::Magical);
+    CHECK(ushariType->isRanged());
+    CHECK(shot.min >= 25 && shot.max < 70);
+    CHECK(ushari.maxHp() <= 50 && ushari.effectiveDefense() <= 3);
+    CHECK(veteran.maxHp() < guardType->hitPoints);
+    CHECK_EQ(veteran.effectiveDefense(), ushari.effectiveDefense());
+    CHECK(CombatEngine::damageRange(veteran, target).avg > shot.avg * 1.5);
+    const auto knife = CombatEngine::meleeRange(ushari, target);
+    target.defenseBonus = 100;
+    CHECK(CombatEngine::meleeRange(ushari, target).max < knife.max); // knife respects armour
+    CHECK_EQ(CombatEngine::damageRange(ushari, target).min, shot.min); // magic ignores armour
+    CHECK(CombatEngine::meleeRange(ushari, target).max <= shot.max / 2);
+
+    CombatArmy p; p.isPlayer = true; p.stacks.push_back(ushari);
+    CombatArmy e; e.isPlayer = false; e.stacks.push_back(target);
+    CombatEngine combat(p, e);
+    CHECK(combat.currentTurn().isPlayer);
+    CHECK(combat.canShoot(combat.activeUnit()));
+    const int hp = combat.enemyArmy().stacks[0].totalHp();
+    combat.doAttack(0);
+    CHECK(combat.enemyArmy().stacks[0].totalHp() <= hp - shot.min);
+    CHECK_EQ(combat.playerArmy().stacks[0].shotsLeft, ushariType->shots - 1);
+    CHECK_EQ(combat.playerArmy().stacks[0].totalHp(), ushari.maxHp()); // no ranged retaliation
+    const auto at = combat.playerArmy().stacks[0].pos;
+    combat.teleportUnit(false, 0, at.neighbor(0));
+    CHECK(!combat.canShoot(combat.playerArmy().stacks[0]));
+    CHECK(CombatEngine::damageRange(combat.enemyArmy().stacks[0], combat.playerArmy().stacks[0]).min >= ushari.maxHp());
+}
+
+SUITE("Binding Thread — four-hex range and engaged casting lock") {
+    AdventureSession session;
+    CHECK(!session.start(plainMap(), "data"));
+    auto witch = CombatUnit::companion(session.resources().unit("ushari"), 1, true);
+    CombatArmy p; p.isPlayer = true; p.stacks.push_back(witch);
+    CombatArmy e; e.isPlayer = false;
+    e.stacks.push_back(CombatUnit::make(type("Dummy", 1, 1, 1000), 1, false));
+    CombatEngine eng(p, e, 6, 42);
+    eng.teleportUnit(true, 0, {2, 0});
+    eng.teleportUnit(false, 0, {6, 0});
+    CHECK(eng.canCurse(0));
+    eng.teleportUnit(false, 0, {7, 0});
+    CHECK(!eng.canCurse(0));
+    const auto turn = eng.turnIndex();
+    CHECK(!eng.doCurse(0));
+    CHECK_EQ(eng.turnIndex(), turn);
+    eng.teleportUnit(false, 0, {3, 0});
+    CHECK(!eng.canCurse(0));
+    CHECK(!eng.canShoot(eng.activeUnit()));
+    CHECK(eng.canAttack(0));
+    const auto expected = eng.previewAttack(0).damage;
+    const int hp = eng.enemyArmy().stacks[0].totalHp();
+    CHECK(eng.doAttackFrom({2, 0}, 0));
+    const int dealt = hp - eng.enemyArmy().stacks[0].totalHp();
+    CHECK(dealt >= expected.min && dealt <= expected.max);
+    CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, witch.shotsLeft);
+}

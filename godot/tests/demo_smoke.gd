@@ -123,6 +123,18 @@ func _scene(map_path: String, army: Array) -> Node2D:
 func _auto_battle(scene: Node2D) -> String:
     var battle: Control = scene.battle
     battle.animation_speed = 0.02
+    while battle.busy: await process_frame
+    if battle._deploying():
+        battle.give_orders()
+        while battle.busy: await process_frame
+    if battle._opening() > 0:
+        # The player must explicitly use or skip Marshal before auto-battle.
+        for unit in battle.state.units:
+            if unit.player and int(unit.count) > 0:
+                battle._toggle_order(unit.cell)
+                break
+        check(battle.give_orders(), "Marshal chooses a starter before auto-battle")
+        while battle.busy: await process_frame
     battle.auto_button.button_pressed = true
     while battle.busy or battle.state.result == "ongoing": await process_frame
     var result: String = battle.state.result
@@ -144,16 +156,15 @@ func _story() -> void:
     scene.dialogue.skip_all()
     check(not scene.dialogue.is_speaking(), "Dialogue can be dismissed")
     var druid := Vector2i(-7, -5)
-    check(not scene.map_view.anchors.has(druid), "The opening has no druid subplot")
+    check(scene.map_view.anchors.has(druid), "The hooded figure stands beside the Hermit's Wolves")
     for camp in [Vector2i(-8, -3), Vector2i(-10, -2), Vector2i(-7, -6)]:   # Hill, Den, Hermit's
         await _clear_camp(scene, camp)
         check(not scene._guarded(camp), "Wolf pack at %s is cleared" % camp)
-    check(not "HOODED DRUID" in _heard and not "Hooded Druid" in _heard, "Wolves need no exposition")
+    check("HOODED DRUID" in _heard or "Hooded Druid" in _heard, "The hooded figure warns the player before battle")
     check(not scene.map_view.anchors.has(druid), "The druid walks off once his wolves fall")
-    check(scene.state.quests.any(func(q): return q.main), "The main quest is given")
-    check(scene.state.quests.any(func(q): return q.id == "aldren"), "The brother's quest is given")
+    check(scene.state.specials.is_empty(), "Ushari does not arrive at the final wolf kill")
+    check(scene.state.story_choice.is_empty(), "No arrival conversation before nightfall")
     scene.dialogue.skip_all()
-    check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari rides with the hero")
     # Clearing the vale is worth level 2: the pop-up asks for a path.
     check(int(scene.state.hero_progress.level) == 2, "Clearing the vale reaches level 2")
     check(scene.state.tree.needs_path, "Level 2 asks for a path")
@@ -170,6 +181,24 @@ func _story() -> void:
     check(not scene.state.tree.needs_path, "The path is chosen for good")
     tree.find_child("Done", true, false).pressed.emit()
     await process_frame
+    scene.dialogue.skip_all()
+    await process_frame
+    scene.end_day()
+    var night_card: Node = scene.get_node("HUD/DayTransition")
+    check(night_card.get_child(0).text.begins_with("NIGHT FALLS"), "Arrival announces night instead of dawn")
+    await _turn_done(scene)
+    scene.dialogue.skip_all()
+    scene._present_story()
+    check(scene.state.specials.size() == 1 and scene.state.specials[0].id == "ushari", "Ushari joins at nightfall")
+    check(scene.state.quests.any(func(q): return q.id == "aldren"), "Her arrival begins the brother's quest")
+    check(is_instance_valid(scene._story_screen), "Ushari's night conversation opens")
+    if is_instance_valid(scene._story_screen):
+        var conversation: Control = scene._story_screen
+        check(conversation.choice.id == "ushari_at_night", "Arrival asks about Aldren")
+        for line in conversation.choice.lines: conversation._advance_conversation()
+        conversation.select("stand_by_aldren")
+        await process_frame
+        scene.dialogue.skip_all()
     for day in 6:                                        # home to Varenhold, to leave her in charge
         if scene.hero.cell == HOME: break
         scene.travel_to(HOME)

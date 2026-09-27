@@ -5,15 +5,20 @@ const NO_CELL := Vector2i(9999, 9999)
 @onready var overlay: Node2D = $RouteOverlay
 @onready var hero: Node2D = $Hero
 @onready var camera: Camera2D = $Camera
-@onready var sidebar: VBoxContainer = $HUD/Layout/Sidebar/Content
+@onready var sidebar: VBoxContainer = $HUD/Layout/Sidebar/Scroll/Content
 @onready var notice: Label = $HUD/Layout/Notice
 
 var data: UmmMapData
 var _dragging := false
 var _hover := NO_CELL
 var _preview: Array[Vector2i] = []
-var _zoom_index := 1
-var _zoom_levels := [0.5, 0.75, 1.0, 1.5, 2.0]
+const ZOOM_MIN := 0.10
+const ZOOM_MAX := 2.5
+var _zoom_target := 0.75
+var _zoom_tween: Tween
+var _zoom_readout: Label
+var _map_tools: PanelContainer
+var _grid_button: CheckButton
 const STARTING_ARMY := [{"id": "woad_runner", "count": 24}, {"id": "cruth_slinger", "count": 10}, {"id": "painted_blade", "count": 3}]
 const ChapterScene = preload("res://scripts/chapter_scene.gd")
 var _story_screen: Control
@@ -97,11 +102,13 @@ func _ready() -> void:
         return
     overlay.data = data
     overlay.reparent(map_view)
+    overlay.z_index = 10  # legible above scenery, below unexplored fog
     map_view.move_child(overlay, map_view.get_node("Scenery").get_index())
     # Reparent into the native Y-sorted scenery layer: feet decide occlusion.
     hero.reparent(map_view.get_node("Scenery"))
     fog = FogOverlay.new()
     fog.name = "Fog"
+    fog.z_index = 20
     fog.data = data
     map_view.add_child(fog)
     if not _start_adventure():
@@ -122,6 +129,7 @@ func _ready() -> void:
     var items: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/items.json"))
     if items is Dictionary:
         for item in items.items: item_defs[item.id] = item
+    map_view.art_theme.apply_ui($HUD/Layout)
     _build_expedition_controls()
     _build_turn_hud()
     $HUD/Layout/Header/Text/Title.text = data.title
@@ -130,6 +138,7 @@ func _ready() -> void:
     _say(state)
     get_viewport().size_changed.connect(_resize_hud)
     _resize_hud()
+    _build_map_tools()
     _entered_cell(hero.cell)
     fit_map()
 
@@ -757,23 +766,55 @@ func end_day() -> void:
     if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return
     var next: Dictionary = JSON.parse_string(adventure.end_day())
     if not next.get("ok", false): return
+    turn_busy = true
     _apply_state(next)
+    await _day_transition()
     _say(next)
     var message := "Day %d of week %d dawns. Your expedition is rested." % [state.day_of_week, state.week]
+    if state.get("story_choice", {}).get("id", "") == "ushari_at_night":
+        message = "Night falls. Ushari arrives from the west road."
     if not str(next.get("event", "")).is_empty():
         message += " " + str(next.event)
     notice.text = message
     _inspect(_hover)
-    if _check_lost(): return
+    if _check_lost():
+        turn_busy = false
+        return
     var moves: Array = next.get("rival_moves", [])
     if not moves.is_empty():
         turn_busy = true
         _update_turn_hud()
         await _animate_rivals(moves)
-        turn_busy = false
-        _update_turn_hud()
+    turn_busy = false
+    _update_turn_hud()
     if state.get("encounter") != null and not is_instance_valid(battle):
         _engage()
+
+func _day_transition() -> void:
+    var overlay := ColorRect.new()
+    overlay.name = "DayTransition"
+    overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overlay.color = Color(0.02, 0.03, 0.06, 0.65)
+    overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+    $HUD.add_child(overlay)
+    var words := Label.new()
+    words.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    var new_week := int(state.day_of_week) == 1
+    words.text = "WEEK %d\nA new week begins" % int(state.week) if new_week else "DAY %d  ·  WEEK %d\nA new day dawns" % [int(state.day_of_week), int(state.week)]
+    if state.get("story_choice", {}).get("id", "") == "ushari_at_night":
+        words.text = "NIGHT FALLS\nA rider on the west road"
+    words.add_theme_font_size_override("font_size", 32 if new_week else 26)
+    words.add_theme_color_override("font_color", Color("edcf91"))
+    overlay.add_child(words)
+    overlay.modulate.a = 0.0
+    var fade := create_tween()
+    fade.tween_property(overlay, "modulate:a", 1.0, 0.15)
+    fade.tween_interval(0.6 if new_week else 0.3)
+    fade.tween_property(overlay, "modulate:a", 0.0, 0.25)
+    await fade.finished
+    overlay.queue_free()
 
 func _resize_hud() -> void:
     var width := get_viewport_rect().size.x
@@ -783,10 +824,12 @@ func _resize_hud() -> void:
 
 func _process(delta: float) -> void:
     _present_story()
+    if is_instance_valid(_zoom_readout): _zoom_readout.text = "%d%%" % roundi(camera.zoom.x * 100.0)
     var direction := Vector2(
         float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
         float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
     if not direction.is_zero_approx():
+        _stop_zoom()
         camera.position += direction.normalized() * 500.0 * delta / camera.zoom.x
         _clamp_camera()
     if _dragging and not (Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE)):
@@ -798,6 +841,7 @@ func _process(delta: float) -> void:
 
 func _over_map(point: Vector2) -> bool:
     var size := get_viewport_rect().size
+    if is_instance_valid(_map_tools) and _map_tools.get_global_rect().has_point(point): return false
     return point.x >= 0 and point.x < size.x - 310 and point.y > 155 and point.y < size.y - 55
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -818,6 +862,7 @@ func _unhandled_input(event: InputEvent) -> void:
             var world_point: Vector2 = get_canvas_transform().affine_inverse() * event.position
             click_cell(UmmMapData.world_to_cell(world_point))
     elif event is InputEventMouseMotion and _dragging:
+        _stop_zoom()
         camera.position -= event.relative / camera.zoom
         _clamp_camera()
     elif event is InputEventKey and event.pressed and not event.echo:
@@ -840,6 +885,10 @@ func _unhandled_input(event: InputEvent) -> void:
                 save_game()
             KEY_F9:
                 load_game()
+            KEY_EQUAL, KEY_PLUS, KEY_KP_ADD:
+                _zoom(1, _map_focus())
+            KEY_MINUS, KEY_KP_SUBTRACT:
+                _zoom(-1, _map_focus())
             KEY_HOME:
                 fit_map()
             KEY_E:
@@ -1312,31 +1361,96 @@ func _restart() -> void:
     center_hero()
     notice.text = "A new expedition sets out. Previous loot and dungeon progress have been reset."
 
+func _build_map_tools() -> void:
+    _map_tools = PanelContainer.new()
+    _map_tools.name = "MapTools"
+    _map_tools.position = Vector2(30, 164)
+    var style := StyleBoxFlat.new()
+    style.bg_color = map_view.art_theme.colour("panel")
+    style.border_color = map_view.art_theme.colour("frame")
+    style.set_border_width_all(1)
+    style.set_content_margin_all(5)
+    _map_tools.add_theme_stylebox_override("panel", style)
+    $HUD/Layout.add_child(_map_tools)
+    var row := HBoxContainer.new()
+    row.add_theme_constant_override("separation", 6)
+    _map_tools.add_child(row)
+    for label in ["−", "100%", "+", "Fit map", "Find hero"]:
+        if label == "100%":
+            _zoom_readout = Label.new()
+            _zoom_readout.custom_minimum_size.x = 52
+            _zoom_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            row.add_child(_zoom_readout)
+            continue
+        var button := Button.new()
+        button.text = label
+        button.custom_minimum_size = Vector2(38, 32)
+        button.add_theme_font_size_override("font_size", 13)
+        if label == "−": button.pressed.connect(func(): _zoom(-1, _map_focus()))
+        elif label == "+": button.pressed.connect(func(): _zoom(1, _map_focus()))
+        elif label == "Fit map": button.pressed.connect(fit_map)
+        else: button.pressed.connect(center_hero)
+        button.tooltip_text = "Wheel or + / −: zoom · Home: fit map · Space: find hero"
+        row.add_child(button)
+    _grid_button = CheckButton.new()
+    _grid_button.text = "Hex grid"
+    _grid_button.custom_minimum_size.x = 110
+    _grid_button.add_theme_font_size_override("font_size", 13)
+    _grid_button.tooltip_text = "Show movement hexes · G"
+    _grid_button.toggled.connect(_toggle_grid)
+    row.add_child(_grid_button)
+
 func _toggle_grid(enabled: bool) -> void:
     overlay.show_grid = enabled
-    overlay.queue_redraw()
+    sidebar.get_node("Grid").set_pressed_no_signal(enabled)
+    if is_instance_valid(_grid_button): _grid_button.set_pressed_no_signal(enabled)
 
-func _zoom(direction: int) -> void:
-    var before := get_global_mouse_position()
-    _zoom_index = clampi(_zoom_index + direction, 0, _zoom_levels.size() - 1)
-    camera.zoom = Vector2.ONE * _zoom_levels[_zoom_index]
+func _map_focus() -> Vector2:
+    var viewport := get_viewport_rect().size
+    return Vector2((viewport.x - 310.0) * 0.5, (viewport.y + 100.0) * 0.5)
+
+func _stop_zoom() -> void:
+    if _zoom_tween and _zoom_tween.is_valid(): _zoom_tween.kill()
+    _zoom_target = camera.zoom.x
+
+func _zoom(direction: int, at := Vector2(-1, -1)) -> void:
+    if at.x < 0:
+        at = get_viewport().get_mouse_position()
+        if not _over_map(at): at = _map_focus()
+    _set_zoom(_zoom_target * pow(1.2, direction), at)
+
+func _set_zoom(value: float, at: Vector2, smooth := true) -> void:
+    _stop_zoom()
+    _zoom_target = clampf(value, ZOOM_MIN, ZOOM_MAX)
+    var world_anchor := get_canvas_transform().affine_inverse() * at
+    var old_zoom := camera.zoom
+    var old_position := camera.position
+    camera.zoom = Vector2.ONE * _zoom_target
     camera.force_update_scroll()
-    camera.position += before - get_global_mouse_position()
-    _clamp_camera()
+    camera.position += world_anchor - get_canvas_transform().affine_inverse() * at
+    var destination := camera.position
+    if smooth:
+        camera.zoom = old_zoom
+        camera.position = old_position
+        _zoom_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+        _zoom_tween.tween_property(camera, "zoom", Vector2.ONE * _zoom_target, 0.16)
+        _zoom_tween.tween_property(camera, "position", destination, 0.16)
+    camera.force_update_scroll()
 
 func center_hero() -> void:
-    camera.position = hero.position + Vector2(155.0 / camera.zoom.x, -30.0 / camera.zoom.x)
+    _stop_zoom()
+    var offset := (_map_focus() - get_viewport_rect().size * 0.5) / camera.zoom
+    camera.position = hero.position - offset
     camera.force_update_scroll()
 
 func fit_map() -> void:
+    _stop_zoom()
     var viewport := get_viewport_rect().size
-    var available := viewport - Vector2(370, 210)
-    var fit := minf(available.x / map_view.world_bounds.size.x, available.y / map_view.world_bounds.size.y)
-    fit = clampf(fit, 0.3, 1.0)
-    _zoom_levels[0] = minf(fit, 0.5)
-    _zoom_index = 0
+    var available := viewport - Vector2(380, 250)
+    var fit := clampf(minf(available.x / map_view.world_bounds.size.x, available.y / map_view.world_bounds.size.y), ZOOM_MIN, 1.0)
+    _zoom_target = fit
     camera.zoom = Vector2.ONE * fit
-    camera.position = map_view.world_bounds.get_center() + Vector2(155.0 / fit, -50.0 / fit)
+    camera.position = map_view.world_bounds.get_center() - (_map_focus() - viewport * 0.5) / fit
     camera.force_update_scroll()
 
 func _clamp_camera() -> void:

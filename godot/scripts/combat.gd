@@ -18,6 +18,7 @@ var _ai_scheduled := false
 var board: Control
 var heading: Label
 var turn_label: Label
+var order_caption: Label
 var initiative: HBoxContainer
 var status: RichTextLabel
 ## Red line at the top of the board: which companions the enemy can reach.
@@ -25,6 +26,8 @@ var warning: RichTextLabel
 var inspection: RichTextLabel
 var log_view: RichTextLabel
 var defend: Button
+var curse_button: Button
+var _curse_mode := false
 var retreat: Button
 var auto_button: CheckButton
 var return_button: Button
@@ -43,6 +46,12 @@ var waypoints: Array = []
 ## Pointer over the Defend button: the status line explains the stance.
 var _defend_hover := false
 var begin_button: Button
+var skip_orders_button: Button
+var _orders_scroll: ScrollContainer
+var _marshal_panel: Control
+var _marshal_selection: Label
+var _marshal_help: Label
+var _orders_list: VBoxContainer
 var _fieldwork_box: VBoxContainer
 var _fieldwork_kind := "barricade"
 var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
@@ -64,8 +73,8 @@ func _ready() -> void:
     heading.text = "THE SEALED TOMB"
     turn_label = _label(Vector2(600, 18), Vector2(640, 30), 18)
     turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-    var order_caption := _label(Vector2(40, 54), Vector2(200, 20), 12)
-    order_caption.text = "TURN ORDER  (left acts first)"
+    order_caption = _label(Vector2(40, 54), Vector2(1200, 20), 12)
+    order_caption.text = "TURN ORDER · Speed + d6, highest total first · Your army wins ties · Same-side ties keep army order"
     order_caption.add_theme_color_override("font_color", DIM)
     initiative = HBoxContainer.new()
     initiative.position = Vector2(40, 74)
@@ -86,6 +95,8 @@ func _ready() -> void:
     warning.scroll_active = false
     inspection = _rich(Vector2(826, 170), Vector2(415, 262), 16)
     inspection.scroll_active = false
+    curse_button = _button("Binding Thread · C", Vector2(830, 392), _toggle_curse)
+    curse_button.hide()
     defend = _button("Defend · D   (+25% defence until its next turn)", Vector2(830, 440), _defend)
     defend.mouse_entered.connect(func():
         _defend_hover = true
@@ -107,6 +118,19 @@ func _ready() -> void:
             _refresh())
         _fieldwork_box.add_child(button)
     _fieldwork_box.hide()
+    _orders_scroll = ScrollContainer.new()
+    _orders_scroll.position = Vector2(830, 286)
+    _orders_scroll.size = Vector2(400, 100)
+    _orders_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    add_child(_orders_scroll)
+    _orders_list = VBoxContainer.new()
+    _orders_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _orders_list.add_theme_constant_override("separation", 4)
+    _orders_scroll.add_child(_orders_list)
+    _orders_scroll.hide()
+    skip_orders_button = _button("Skip skill · Use the dice order", Vector2(830, 392), _skip_orders)
+    skip_orders_button.size.y = 36
+    skip_orders_button.hide()
     begin_button = _button("Begin the battle · Enter", Vector2(830, 440), give_orders)
     begin_button.hide()
     retreat = _button("Retreat…", Vector2(830, 494), func(): confirm_retreat.popup_centered())
@@ -130,6 +154,29 @@ func _ready() -> void:
     confirm_retreat.confirmed.connect(func(): issue("retreat"))
     confirm_retreat.canceled.connect(_schedule_ai)
     add_child(confirm_retreat)
+    _marshal_panel = Control.new()
+    _marshal_panel.name = "MarshalOpening"
+    _marshal_panel.size = size
+    _marshal_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    add_child(_marshal_panel)
+    var shade := ColorRect.new()
+    shade.size = size
+    shade.color = Color(0.04, 0.04, 0.03, 0.96)
+    _marshal_panel.add_child(shade)
+    var title := _label(Vector2(240, 72), Vector2(800, 54), 32)
+    title.text = "MARSHAL · CHOOSE YOUR STARTER"
+    title.reparent(_marshal_panel)
+    _marshal_help = _label(Vector2(240, 140), Vector2(800, 90), 20)
+    _marshal_help.reparent(_marshal_panel)
+    _orders_scroll.reparent(_marshal_panel)
+    _orders_scroll.position = Vector2(240, 248)
+    _orders_scroll.size = Vector2(800, 340)
+    _marshal_selection = _label(Vector2(240, 604), Vector2(800, 62), 18)
+    _marshal_selection.reparent(_marshal_panel)
+    skip_orders_button.reparent(_marshal_panel)
+    skip_orders_button.position = Vector2(240, 684)
+    skip_orders_button.size = Vector2(380, 48)
+    _marshal_panel.hide()
     get_viewport().size_changed.connect(_resize)
     _resize()
 
@@ -203,7 +250,8 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
-    _log("Battle begins. Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand, at half damage. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
+    _log("Each stack rolls d6 once per battle. Speed + roll sets initiative; your army wins total ties. Same-side ties keep army order. Marshal opening orders apply only in round one.", GOLD)
+    _log("Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand, at half damage. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
     _consume(reply)
     return true
 
@@ -234,7 +282,7 @@ func _decode_reply(raw: String) -> Dictionary:
     if reply.get("ok", false):
         # Godot's JSON parser makes every number a float. Array equality is
         # type-sensitive, so normalize hex coordinates at this boundary.
-        var cells: Array = reply.state.reachable + reply.state.attackable
+        var cells: Array = reply.state.reachable + reply.state.attackable + reply.state.get("curse_targets", []) + reply.state.get("curse_range", [])
         for entry in reply.state.get("reaction_fire", []): cells.append(entry.cell)
         for unit in reply.state.units: cells.append(unit.cell)
         for work in reply.state.get("fieldworks", []): cells.append(work.cell)
@@ -256,11 +304,14 @@ func _set_state(next: Dictionary) -> void:
 
 func _consume(reply: Dictionary) -> void:
     busy = true
+    _curse_mode = false
+    board.curse_mode = false
     board.set_hover("", "")
     _refresh()
     var strike := {}   # the attack event whose damage comes next
     for event in reply.events:
         match event.type:
+            "curse": _log("%s casts Binding Thread on %s: d6 = %d — %s." % [_unit_name(event.unit), _unit_name(event.target), int(event.roll), "Bound" if int(event.roll) >= 3 else "Resisted"], GOLD, event.target)
             "attack": strike = event
             "damage": _log_damage(event, strike)
             "move": _log("%s moves." % _unit_label(event.unit), DIM, event.unit)
@@ -339,16 +390,39 @@ func _refresh() -> void:
         if _deploying():
             turn_label.text = "BEFORE BATTLE   ·   PLACE YOUR FIELDWORKS"
             turn_label.add_theme_color_override("font_color", GOLD)
-        elif _opening() > 0 and not auto_battle:
-            turn_label.text = "ROUND 1   ·   OPENING ORDERS"
+        elif _opening() > 0:
+            turn_label.text = "BEFORE BATTLE   ·   MARSHAL: CHOOSE WHO ACTS FIRST"
             turn_label.add_theme_color_override("font_color", GOLD)
         else:
             turn_label.text = "ROUND %d   ·   %s   ·   %s" % [state.get("round", 1), _unit_label(state.get("active", "")), whose]
             turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
+    var caster: Dictionary = units.get(state.get("active", ""), {})
+    curse_button.visible = ongoing and "binding_thread" in caster.get("abilities", []) and _opening() == 0 and not _deploying()
+    curse_button.disabled = busy or auto_battle or not state.get("player_turn", false) or caster.get("engaged", false) or state.get("curse_targets", []).is_empty()
+    curse_button.text = "Cancel Binding Thread · Esc" if _curse_mode else "Binding Thread · C"
+    curse_button.tooltip_text = "Range: 4 hexes. Roll d6, succeeds on 3+. Replaces your attack. Adjacent enemies prevent casting."
+    inspection.size.y = 212 if curse_button.visible else 262
+    inspection.scroll_active = true
+    if curse_button.disabled: _curse_mode = false
+    board.curse_mode = _curse_mode
     _build_initiative()
     defend.disabled = busy or auto_battle or not state.get("player_turn", false) or not ongoing
     begin_button.visible = (_opening() > 0 or _deploying()) and ongoing
-    begin_button.text = "Finish placement · Enter" if _deploying() else "Begin the battle · Enter"
+    var choosing := _opening() > 0 and not _deploying() and ongoing
+    _marshal_panel.visible = choosing
+    var button_parent: Node = _marshal_panel if choosing else self
+    if begin_button.get_parent() != button_parent: begin_button.reparent(button_parent)
+    begin_button.position = Vector2(660, 684) if choosing else Vector2(830, 440)
+    begin_button.size = Vector2(380, 48) if choosing else Vector2(400, 46)
+    begin_button.text = "Finish placement · Enter" if _deploying() else ("Pick your starter above" if _orders.is_empty() else "Begin with %s · Enter" % _unit_name(_orders[0]))
+    _marshal_help.text = "1. Click a troop below to choose who acts first.\n2. Press Begin to enter the battlefield and move on green hexes.\nYour Marshal skill beats every enemy's initiative roll. Choose up to %d." % _opening()
+    var chosen_names: Array[String] = []
+    for key in _orders: chosen_names.append(_unit_name(key))
+    _marshal_selection.text = "No starter selected. Click a troop above." if chosen_names.is_empty() else "YOUR OPENING ORDER: " + " → ".join(chosen_names) + "\nClick a selected troop again to remove it. Round 2 uses the dice order."
+    _orders_scroll.visible = _opening() > 0 and not _deploying() and ongoing
+    skip_orders_button.visible = _orders_scroll.visible
+    skip_orders_button.disabled = busy
+    _refresh_order_choices()
     _fieldwork_box.visible = _deploying() and ongoing
     if int(state.get("fieldwork_stock", {}).get(_fieldwork_kind, 0)) == 0:
         _fieldwork_kind = "stakes" if int(state.get("fieldwork_stock", {}).get("stakes", 0)) > 0 else "barricade"
@@ -362,9 +436,10 @@ func _refresh() -> void:
         button.disabled = busy or stock == 0
         button.tooltip_text = "Blocks movement and all arrows." if kind == "barricade" else "Blocks movement; arrows pass over it."
     defend.visible = not begin_button.visible
-    begin_button.disabled = busy or auto_battle
+    begin_button.disabled = busy or (_opening() > 0 and not _deploying() and _orders.is_empty())
     retreat.disabled = busy or not ongoing
-    auto_button.disabled = not ongoing
+    auto_button.disabled = not ongoing or _opening() > 0
+    auto_button.tooltip_text = "Choose or explicitly skip Marshal orders before enabling auto-battle." if _opening() > 0 else "The AI takes control of your stacks."
     _update_inspection()
     _update_status()
 
@@ -376,10 +451,14 @@ func _build_initiative() -> void:
         child.queue_free()
     if state.get("result", "") != "ongoing": return
     var slots := 0
+    var order: Array = []
+    if _opening() > 0: order.append_array(_orders)
     for slot in state.get("initiative", []):
-        if slot.acted or not units.has(slot.key): continue
-        initiative.add_child(_portrait(slot.key, slot.key == state.active))
+        if not slot.acted and units.has(slot.key) and slot.key not in order: order.append(slot.key)
+    for key in order:
+        initiative.add_child(_portrait(key, slots == 0, false, slots + 1))
         slots += 1
+    order_caption.text = ("ROUND 1 PREVIEW · Marshal choices first, then speed + d6" if _opening() > 0 else "TURN ORDER · Speed + d6, highest total first") + " · Your army wins ties · Same-side ties keep army order"
     var next: Array = state.get("next_round", [])
     if not next.is_empty() and slots < 16:
         var divider := Label.new()
@@ -390,16 +469,19 @@ func _build_initiative() -> void:
         divider.add_theme_font_size_override("font_size", 12)
         divider.add_theme_color_override("font_color", DIM)
         initiative.add_child(divider)
+        var next_place := 0
         for key in next:
             if slots >= 16: break
-            initiative.add_child(_portrait(key, false, true))
+            next_place += 1
+            initiative.add_child(_portrait(key, false, true, next_place))
             slots += 1
 
-func _portrait(key: String, active: bool, upcoming := false) -> Control:
+func _portrait(key: String, active: bool, upcoming := false, place := 1) -> Control:
     var unit: Dictionary = units[key]
     var frame := Panel.new()
+    frame.name = ("Next_" if upcoming else "Turn_") + key
     frame.custom_minimum_size = Vector2(62, 70)
-    frame.tooltip_text = "%s ×%d · %s · speed %d" % [unit.name, unit.count, "yours" if unit.player else "enemy", unit.speed]
+    frame.tooltip_text = "%s ×%d · %s · Speed %d + d6 %d = initiative %d" % [unit.name, unit.count, "yours" if unit.player else "enemy", unit.speed, int(unit.get("initiative_roll", 0)), int(unit.get("initiative_score", unit.speed))]
     var style := StyleBoxFlat.new()
     style.bg_color = Color("26372c") if unit.player else Color("3f2320")
     style.border_color = GOLD if active else (FRIEND if unit.player else FOE)
@@ -417,7 +499,7 @@ func _portrait(key: String, active: bool, upcoming := false) -> Control:
     picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
     frame.add_child(picture)
     var count := Label.new()
-    count.text = ("♥%d" % int(unit.hp)) if unit.get("companion", false) else "×%d" % unit.count
+    count.text = "%d+%d=%d" % [int(unit.speed), int(unit.get("initiative_roll", 0)), int(unit.get("initiative_score", unit.speed))]
     count.position = Vector2(0, 48)
     count.size = Vector2(62, 20)
     count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -425,6 +507,22 @@ func _portrait(key: String, active: bool, upcoming := false) -> Control:
     count.add_theme_color_override("font_color", FRIEND if unit.player else FOE)
     count.mouse_filter = Control.MOUSE_FILTER_IGNORE
     frame.add_child(count)
+    var number := Label.new()
+    number.text = str(place)
+    number.position = Vector2(3, 0)
+    number.add_theme_font_size_override("font_size", 14)
+    number.add_theme_color_override("font_color", GOLD)
+    number.add_theme_color_override("font_outline_color", Color.BLACK)
+    number.add_theme_constant_override("outline_size", 5)
+    number.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    frame.add_child(number)
+    if _opening() > 0 and unit.player and not upcoming:
+        frame.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+        frame.tooltip_text += " · Click to choose or remove a Marshal opening order"
+        frame.gui_input.connect(func(event: InputEvent):
+            if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+                _toggle_order(unit.cell)
+                frame.accept_event())
     frame.mouse_entered.connect(func():
         board.highlight_key = key
         _hover_key = key
@@ -440,6 +538,13 @@ func _portrait(key: String, active: bool, upcoming := false) -> Control:
 # ── Stack inspection ──────────────────────────────────────────────────────────
 
 func _update_inspection() -> void:
+    if _opening() > 0 and not _deploying():
+        inspection.text = "[color=#f7d580][b]MARSHAL · OPENING ORDERS[/b][/color]\nChoose up to %d friendly stacks below, on the board, or in the turn bar. They act first in your chosen order.\nThis selects who acts; move on green hexes after starting. Round 2 uses the dice order." % _opening()
+        for font in ["normal_font_size", "bold_font_size"]: inspection.add_theme_font_size_override(font, 14)
+        inspection.size.y = 110
+        return
+    for font in ["normal_font_size", "bold_font_size"]: inspection.add_theme_font_size_override(font, 16)
+    inspection.size.y = 262
     if _deploying():
         inspection.text = "[color=#f7d580][b]FIELD ENGINEERING[/b][/color]\n\nChoose a fieldwork, then click a highlighted hex. Right-click a placed piece to recover it.\n\nBarricades block everyone's arrows. Stakes block movement only. Equipment is reused next battle."
         return
@@ -465,12 +570,15 @@ func _inspect(unit: Dictionary) -> void:
         lines.append("Health  %d / %d on the top creature  ·  %d total" % [unit.get("hp_left", unit.unit_hp), unit.unit_hp, unit.hp])
     lines.append("Attack %d  ·  Defence %d  ·  Damage %d–%d each" % [unit.attack, unit.defense, unit.get("min_damage", 0), unit.get("max_damage", 0)])
     lines.append("Speed %d  ·  Moves %d hexes" % [unit.speed, unit.get("move", 0)])
-    if unit.ranged and unit.get("engaged", false):
+    if "witch_knife" in unit.get("abilities", []):
+        lines.append("Knife: 4–7 physical damage (+1 per level); adjacent targets only.")
+        lines.append("Engaged: cannot cast; use the knife or move away." if unit.get("engaged", false) else "Binding Thread: range 4 · d6 succeeds on 3+ · uses the turn.")
+    elif unit.ranged and unit.get("engaged", false):
         lines.append("[color=#%s]ENGAGED: an enemy is next to it — it cannot shoot, only fight hand to hand (half damage)[/color]" % FOE.to_html(false))
     elif unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting  ·  half damage hand to hand" % [unit.shots, unit.get("shots_max", unit.shots)])
     if unit.get("readied_shot", false) and int(unit.get("shots", 0)) > 0:
         lines.append("[color=#%s]Readied shot: fires once a round at an enemy moving closer[/color]" % GOLD.to_html(false))
-    else: lines.append("Melee  ·  attacks adjacent stacks only")
+    elif not unit.ranged: lines.append("Melee  ·  attacks adjacent stacks only")
     if int(unit.get("aura_radius", 0)) > 0:
         lines.append("[color=#%s]Aura: stacks within %d hex get +%d defence while %s stands[/color]" % [GOLD.to_html(false), int(unit.aura_radius), int(unit.aura_defense), unit.name])
     if int(unit.get("aura_bonus", 0)) > 0:
@@ -479,6 +587,7 @@ func _inspect(unit: Dictionary) -> void:
         var guard: String = unit.get("bodyguard", "")
         lines.append("Bodyguard: %s" % (_unit_label(guard) + " takes half of each melee blow" if not guard.is_empty() else "none — keep a stack beside %s" % unit.name))
     var notes: Array[String] = []
+    if int(unit.get("bound_turns", 0)) > 0: notes.append("BOUND: %d turns remaining" % int(unit.bound_turns))
     if unit.defending: notes.append("DEFENDING: +25% defence until its next turn")
     notes.append("retaliation used this round" if unit.get("retaliated", false) else "will retaliate once this round")
     var acted := false
@@ -682,7 +791,7 @@ func _update_status() -> void:
     elif _deploying():
         text = "[b]FIELDWORKS[/b]: click highlighted hex to place · right-click to recover · Enter to finish"
         kind = "move" if not _hover_cell.is_empty() and int(_hover_cell[0]) >= 2 and int(_hover_cell[0]) <= 4 else "blocked"
-    elif _opening() > 0 and not auto_battle:
+    elif _opening() > 0:
         var chosen: Array[String] = []
         for key in _orders: chosen.append(_unit_name(key))
         text = "[b]TACTICS[/b]: click up to %d stack%s to act first · %s · Enter" % [
@@ -692,6 +801,10 @@ func _update_status() -> void:
         elif busy: text = "Resolving…"
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
+    elif _curse_mode:
+        text = "[b]BINDING THREAD[/b] · choose an enemy within 4 hexes · d6: 3+ · Esc cancels"
+        kind = "attack" if _hover_cell in state.get("curse_targets", []) else "blocked"
+        label = "Binding Thread · 3+ on d6" if kind == "attack" else ""
     elif _hover_cell.is_empty():
         var how := "shoot" if active.get("ranged", false) and int(active.get("shots", 0)) > 0 and not active.get("engaged", false) else "strike"
         text = "%s: click enemy = %s · green hex = move · [b]Ctrl+click green = waypoint[/b] · D = defend" % [_unit_name(state.active), how]
@@ -786,6 +899,14 @@ func _update_status() -> void:
     if my_turn and kind == "attack" and not _stand.is_empty() and _stand.get("ranged", false):
         board.shot_line = [active.cell, _hover_cell]
         board.shot_blocked = _stand.get("blocked", false)
+    if _curse_mode:
+        board.pin_spots = []
+        board.pin_stand = []
+        board.pin_ally = []
+        board.reaction_lines = []
+        board.shot_line = []
+        board.walk_path = []
+        board.stand_cell = []
     board.set_hover(kind if my_turn else "", label if my_turn else "")
 
 ## Standing hexes (of those legal for this hover) that would pin the target.
@@ -865,8 +986,40 @@ func _deploying() -> bool:
 func _opening() -> int:
     return int(state.get("opening", 0))
 
+func _refresh_order_choices() -> void:
+    for child in _orders_list.get_children():
+        _orders_list.remove_child(child)
+        child.queue_free()
+    if not _orders_scroll.visible: return
+    for unit in state.get("units", []):
+        if not unit.player or int(unit.count) <= 0: continue
+        var button := Button.new()
+        button.name = unit.key
+        var selected := _orders.find(unit.key)
+        button.text = ("%d. SELECTED · " % (selected + 1) if selected >= 0 else "Choose starter · ") + "%s ×%d    |    Speed %d + roll %d = %d" % [unit.name, int(unit.count), int(unit.speed), int(unit.get("initiative_roll", 0)), int(unit.get("initiative_score", unit.speed))]
+        button.icon = Board.unit_texture(unit.id)
+        button.expand_icon = true
+        button.add_theme_constant_override("icon_max_width", 42)
+        button.add_theme_font_size_override("font_size", 18)
+        button.tooltip_text = "Click again to remove this order." if selected >= 0 else "Choose this stack to act before the enemy in round one."
+        button.toggle_mode = true
+        button.button_pressed = selected >= 0
+        button.disabled = busy or (selected < 0 and _orders.size() >= _opening())
+        button.custom_minimum_size.y = 48
+        button.pressed.connect(_toggle_order.bind(unit.cell))
+        _orders_list.add_child(button)
+
+func _skip_orders() -> bool:
+    if busy or _opening() == 0 or _deploying(): return false
+    if not issue_route("opening", []): return false
+    _orders.clear()
+    board.order_marks = {}
+    _log("Marshal orders skipped. Highest speed + d6 total acts first.", DIM)
+    return true
+
 ## Click your own stacks to put them in (or take them out of) the opening orders.
 func _toggle_order(coordinates: Array) -> void:
+    if busy or _opening() == 0 or _deploying(): return
     var unit := _unit_at(coordinates)
     if unit.is_empty() or not unit.player: return
     if unit.key in _orders: _orders.erase(unit.key)
@@ -877,12 +1030,12 @@ func _toggle_order(coordinates: Array) -> void:
     board.order_marks = {}
     for i in _orders.size(): board.order_marks[_orders[i]] = i + 1
     board.queue_redraw()
-    _update_status()
+    _refresh()
 
-## Sends the opening orders (none chosen = initiative as usual) and starts round 1.
+## Commits the selected opening orders and starts round 1. Skipping is a separate action.
 func give_orders() -> bool:
     if _deploying(): return issue("deploy_done")
-    if _opening() == 0: return false
+    if _opening() == 0 or _orders.is_empty(): return false
     var route: Array = []
     for key in _orders: route.append(units[key].cell)
     var names: Array[String] = []
@@ -900,9 +1053,13 @@ func _cell_clicked(cell: Vector2i) -> void:
         if not busy and not auto_battle: issue("place_" + _fieldwork_kind, cell)
         return
     if _opening() > 0:
-        if not busy and not auto_battle: _toggle_order(coordinates)
+        if not busy: _toggle_order(coordinates)
         return
     if busy or auto_battle or not state.get("player_turn", false): return
+    if _curse_mode:
+        if coordinates in state.get("curse_targets", []): issue("curse", cell)
+        else: _log("Choose an enemy within four hexes.", DIM)
+        return
     if board.modified_click or Input.is_key_pressed(KEY_SHIFT) or Input.is_key_pressed(KEY_CTRL):
         _toggle_waypoint(coordinates)
         return
@@ -933,6 +1090,13 @@ func _cell_right_clicked(cell: Vector2i) -> void:
         _update_status()
     _update_inspection()
 
+func _toggle_curse() -> void:
+    if curse_button.disabled or not curse_button.visible: return
+    _curse_mode = not _curse_mode
+    _clear_route()
+    _stand = {}
+    _refresh()
+
 func _defend() -> void:
     if not defend.disabled: issue("defend")
 
@@ -940,6 +1104,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo and (_opening() > 0 or _deploying()) \
             and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
         give_orders()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+        _toggle_curse()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and _curse_mode:
+        _curse_mode = false
+        _refresh()
         get_viewport().set_input_as_handled()
     elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_D:
         _defend()
@@ -955,11 +1126,7 @@ func _schedule_ai() -> void:
     if _deploying():
         if auto_battle: issue("deploy_done")
         return
-    if _opening() > 0:              # nobody moves before the opening orders
-        if auto_battle:
-            _orders.clear()
-            give_orders()           # the AI gives none: initiative as usual
-        return
+    if _opening() > 0: return      # only an explicit use/skip decision starts the battle
     if state.player_turn and not auto_battle: return
     _ai_scheduled = true
     await get_tree().create_timer(0.35 * animation_speed).timeout

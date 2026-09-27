@@ -77,6 +77,7 @@ struct CombatEvent {
         BattleEnded,
         ScXpGained,      // isPlayer, stackIndex, xpAmount
         ScLevelUp,       // isPlayer, stackIndex, newLevel
+        CurseCast,      // target, curseRoll; succeeds on 3+
         ScChoicePending, // isPlayer, stackIndex, choiceLevel, branchOptions
     };
 
@@ -96,6 +97,7 @@ struct CombatEvent {
     bool         isOpportunity   = false;  // a guardian striking a stack that stepped out of its reach
 
     // Damage amount (UnitDamaged only)
+    int          curseRoll      = 0;
     int          damage         = 0;
     int          kills          = 0;   // creatures that died from this damage (UnitDamaged)
     int          remaining      = 0;   // creatures left in the stack afterwards (UnitDamaged)

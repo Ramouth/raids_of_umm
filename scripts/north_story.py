@@ -49,15 +49,59 @@ trig("intro", {"event": "start"},
      {"quest": "wolves"},
      lore("The Families", "Your family, House Varen, holds Varenhold. Your cousin Corvin Hale holds Hallowmere across the Coldwater."))
 
-trig("ushari_arrives", {"event": "cleared", "names": ["Hill Wolves", "Den Wolves", "Hermit's Wolves"]},
-     say(("Steward", "Ushari, my lord. She asked for Lord Aldren's rooms."),
-         ("Ushari", "He left? We were meant to ride together."),
-         ("Steward", "East, to his cousin's. Your father wants you to fetch him home."),
-         ("Ushari", "Then I am coming with you.")),
-     {"xp": 40}, {"join": "ushari"}, {"quest_done": "wolves"}, {"quest": "aldren"},
-     lore("Ushari", "Aldren's lover arrived expecting to travel with him. Her family keeps the old rites; in the northern halls, people call them witches."))
+trig("druid_seen", {"event": "see", "name": "Hooded Stranger"},
+     say(("Scout", "Commander. Up by the hermit's hollow. There is a man standing in the middle of that wolf pack."),
+         ("Scout", "Hooded. Leaning on a stick. The wolves lie around his feet like dogs at a hearth.")))
 
-trig("ushari_road", {"event": "day", "after": "ushari_arrives", "unless": "hallowmere"},
+# The druid is Hul'rik; the player only meets a hooded stranger for now.
+trig("druid_speaks", {"event": "engage", "name": "Hermit's Wolves"},
+     say(("Hooded Druid", "That is far enough, son of Varen. These wolves were old in these hills before your walls were stone."),
+         ("Hooded Druid", "I know what your brother went east to find. Hear me: a door swings both ways."),
+         ("Hooded Druid", "My forefathers did not grow the roots across the old passage to keep your kind out. "
+                          "They grew them thick, and deep, to keep something in."),
+         ("Hooded Druid", "Your family's blood was always hot. Your grandfather's. Your brother's, hottest of all."),
+         ("Hooded Druid", "I wish talking were enough. With Varens it never is. Teeth, then.")))
+
+trig("druid_gone", {"event": "encounter_won", "name": "Hermit's Wolves"},
+     say(("Scout", "The hooded man is gone, commander. No tracks in the frost. Nothing, where he stood."),
+         ("Scout", "Only roots. Fresh ones, pushed up through ground that has been frozen since the autumn.")),
+     {"vanish": "Hooded Stranger"},
+     lore("The Hooded Man",
+          "A druid stood with the wolves above the hermit's hollow and warned you off the old passage. "
+          "His forefathers, he said, grew roots across it: not to keep the families out, but to keep something in."))
+
+trig("vale_cleared", {"event": "cleared", "names": ["Hill Wolves", "Den Wolves", "Hermit's Wolves"]},
+     {"xp": 40}, {"quest_done": "wolves"},
+     say(("Steward", "The west road is clear. Ushari can reach us after nightfall. End the day when you are ready.")))
+
+trig("ushari_arrives", {"event": "night", "after": "vale_cleared"},
+     {"join": "ushari"}, {"quest": "aldren"},
+     lore("Ushari", "Ushari comes from the last witch tribe in the realm. Where others shut their doors to her people, Aldren welcomed her. She arrived expecting to find him at Varenhold."),
+     {"choice": {"id": "ushari_at_night", "title": "Varenhold · After the wolves · That night",
+                 "presentation": "conversation",
+                 "lines": [
+                     ["Ushari", "Your brother, Aldren... do you think he will be back?"],
+                     ["Commander", "You were expecting him here?"],
+                     ["Ushari", "He asked me to wait. Your steward wouldn't let me through the gate until I gave his name."],
+                     ["Commander", "Why?"],
+                     ["Ushari", "I'm from the last witch tribe in the realm. Some people still shut their doors when they hear that. Aldren opened his."],
+                     ["Ushari", "So tell me. Do you think he'll come back?"],
+                 ],
+                 "text": "Your brother Aldren... do you think he will be back?",
+                 "options": [
+                     {"id": "stand_by_aldren", "label": "I hope so. If he doesn't, we'll go looking together.",
+                      "then": [say(("Ushari", "Together, then. Hold still. This thread is for the road.")),
+                               lore("A promise by the fire", "You promised Ushari you would search for Aldren together. She tied a protective thread around your wrist.")]},
+                     {"id": "uncertain_aldren", "label": "I don't know. He hasn't told me anything either.",
+                      "then": [say(("Ushari", "Then neither of us should be waiting here alone. I'll ride with you.")),
+                               lore("Waiting for Aldren", "You admitted that you did not know when Aldren would return. Ushari decided to join your search.")]},
+                     {"id": "dismiss_aldren", "label": "If he wanted you with him, he would have taken you.",
+                      "then": [{"morale": {"id": "ushari", "value": -2}},
+                               say(("Ushari", "Then I'll ask him myself.")),
+                               lore("Words that wound", "Ushari put away the thread she had been tying for you. She will ride with you, but has grown distant since your conversation.")]},
+                 ]}})
+
+trig("ushari_road", {"event": "day", "after": "ushari_arrives", "delay": 1, "unless": "hallowmere"},
      say(("Ushari", "He promised me he would wait. Did he promise you that too?")),
      {"quest": "bridge"})
 

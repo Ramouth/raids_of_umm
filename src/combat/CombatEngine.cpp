@@ -6,12 +6,22 @@
 #include <unordered_set>
 #include <climits>
 
-CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy)
+CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy, int initiativeDie,
+                           std::optional<uint32_t> seed)
     : m_player(std::move(player))
     , m_enemy(std::move(enemy))
     , m_rng(std::random_device{}())
     , m_aiRng(std::random_device{}())
 {
+    if (seed) setSeed(*seed);
+    // Initiative has its own random stream so rolls never shift damage or AI dice.
+    std::mt19937 initiativeRng(seed ? (*seed ^ 0x85EBCA6Bu) : std::random_device{}());
+    if (initiativeDie > 0) {
+        std::uniform_int_distribution<int> roll(1, initiativeDie);
+        for (auto* army : {&m_player, &m_enemy})
+            for (auto& unit : army->stacks)
+                if (!unit.isDead()) unit.initiativeRoll = roll(initiativeRng);
+    }
     placeArmies();
     refreshAuras();
     buildQueue();
@@ -147,7 +157,7 @@ std::vector<HexCoord> CombatEngine::reachableFor(const CombatUnit& unit) const {
         auto [hex, steps] = frontier.front();
         frontier.pop();
 
-        if (steps >= unit.type->moveRange) continue;
+        if (steps >= unit.effectiveMove()) continue;
 
         for (int dir = 0; dir < 6; ++dir) {
             HexCoord nb = hex.neighbor(dir);
@@ -274,7 +284,7 @@ void CombatEngine::doMove(HexCoord dest) {
 bool CombatEngine::isLegalRoute(const std::vector<HexCoord>& route) const {
     if (isOver() || route.empty()) return false;
     const CombatUnit& actor = activeUnit();
-    if (static_cast<int>(route.size()) > actor.type->moveRange) return false;
+    if (static_cast<int>(route.size()) > actor.effectiveMove()) return false;
     std::unordered_set<HexCoord> occupied;
     for (const auto& work : m_fieldworks) occupied.insert(work.cell);
     for (const auto* army : {&m_player, &m_enemy})
@@ -393,7 +403,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
         m_events.push_back(ev);
     }
 
-    int damage = calcDamage(attacker, target, m_rng);
+    int damage = calcDamage(attacker, target, m_rng, !isRanged);
     if (pinned) damage = damage * 3 / 2;
     if (attacker.type->hasAbility("lone_wolf") && fightsAlone(friendlyStacks, slot.stackIndex, attacker.pos))
         damage = loneWolfDamage(damage);
@@ -402,9 +412,12 @@ void CombatEngine::resolveAttack(int targetIndex) {
 
     // Build attack-type annotation for the log.
     static const char* kAttackTypeNames[] = { "physical", "piercing", "magical" };
-    const char* atName = kAttackTypeNames[static_cast<int>(attacker.type->attackType)];
+    const bool knife = !isRanged && attacker.type->hasAbility("witch_knife");
+    const char* atName = knife ? "physical knife" : kAttackTypeNames[static_cast<int>(attacker.type->attackType)];
     int rawDef    = target.effectiveDefense();
-    int reducedDef = static_cast<int>(rawDef * (1.0f - attacker.type->defBypassRatio));
+    int reducedDef = knife ? rawDef : static_cast<int>(rawDef * (1.0f - attacker.type->defBypassRatio));
+
+    const bool targetKilled = hitStack(!slot.isPlayer, targetIndex, damage, !isRanged);
 
     std::cout << "[CombatEngine] " << attacker.type->name
               << " attacks " << target.type->name
@@ -412,7 +425,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
               << " [" << atName << " | effDef " << rawDef << "→" << reducedDef << "]"
               << " (" << target.count << " survivors)\n";
 
-    if (hitStack(!slot.isPlayer, targetIndex, damage, !isRanged)) {
+    if (targetKilled) {
         awardScXp(attacker, slot, attacker.killXp);   // kill XP if the attacker is an SC
         gainRenown(attacker);
     }
@@ -432,7 +445,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
             m_events.push_back(ev);
         }
 
-        int retDamage = calcDamage(target, attacker, m_rng);
+        int retDamage = calcDamage(target, attacker, m_rng, true);
         if (meleePenalty(target)) retDamage = std::max(1, retDamage / 2);        // a shooter strikes back weakly
         target.hasRetaliated = true;
         if (hitStack(slot.isPlayer, slot.stackIndex, retDamage, true)) gainRenown(target);
@@ -499,7 +512,7 @@ bool CombatEngine::isFlanked(const CombatUnit& target,
 }
 
 // static
-double CombatEngine::damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender) {
+double CombatEngine::damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender, bool melee) {
     // Effective attack and defense incorporate item bonuses.
     int effAtk = attacker.effectiveAttack();
     int effDef = defender.effectiveDefense();
@@ -509,7 +522,7 @@ double CombatEngine::damageMultiplier(const CombatUnit& attacker, const CombatUn
     // Attack-type armor bypass: Physical=0%, Piercing=50% (default), Magical=100%.
     // defBypassRatio is data-driven per unit so it can be tuned in units.json.
     int effDefReduced = effDef;
-    if (attacker.type->defBypassRatio > 0.0f)
+    if (attacker.type->defBypassRatio > 0.0f && !(melee && attacker.type->hasAbility("witch_knife")))
         effDefReduced = static_cast<int>(effDef * (1.0f - attacker.type->defBypassRatio));
 
     int diff = effAtk - effDefReduced;
@@ -520,39 +533,43 @@ double CombatEngine::damageMultiplier(const CombatUnit& attacker, const CombatUn
 
 // static
 int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defender,
-                              std::mt19937& rng) {
+                              std::mt19937& rng, bool melee) {
     // Base damage roll: each creature in the stack rolls [minDmg, maxDmg],
     // then adds a flat per-creature bonus from equipped items.
-    std::uniform_int_distribution<int> dist(attacker.type->minDamage, attacker.type->maxDamage);
+    const bool knife = melee && attacker.type->hasAbility("witch_knife");
+    std::uniform_int_distribution<int> dist(knife ? 4 : attacker.type->minDamage, knife ? 7 : attacker.type->maxDamage);
     int baseDmg = 0;
     for (int i = 0; i < attacker.count; ++i)
-        baseDmg += dist(rng) + attacker.damageBonus;
+        baseDmg += dist(rng) + (knife ? std::max(0, attacker.scLevel - 1) : attacker.damageBonus);
 
-    return std::max(1, static_cast<int>(baseDmg * damageMultiplier(attacker, defender)));
+    return std::max(1, static_cast<int>(baseDmg * damageMultiplier(attacker, defender, melee)));
 }
 
 // static
 DamageRange CombatEngine::damageRange(const CombatUnit& attacker, const CombatUnit& defender,
-                                      bool pinned) {
+                                      bool pinned, bool melee) {
     DamageRange out;
     if (attacker.isDead()) return out;
-    const double mult = damageMultiplier(attacker, defender);
+    const double mult = damageMultiplier(attacker, defender, melee);
+    const bool knife = melee && attacker.type->hasAbility("witch_knife");
+    const int minimum = knife ? 4 : attacker.type->minDamage;
+    const int maximum = knife ? 7 : attacker.type->maxDamage;
+    const int bonus = knife ? std::max(0, attacker.scLevel - 1) : attacker.damageBonus;
     const int n = attacker.count;
     auto finish = [&](double base) {
         int dmg = std::max(1, static_cast<int>(base * mult));
         return pinned ? dmg * 3 / 2 : dmg;
     };
-    out.min = finish(double(n) * (attacker.type->minDamage + attacker.damageBonus));
-    out.max = finish(double(n) * (attacker.type->maxDamage + attacker.damageBonus));
-    const double avgBase = double(n) * (0.5 * (attacker.type->minDamage + attacker.type->maxDamage)
-                                        + attacker.damageBonus);
+    out.min = finish(double(n) * (minimum + bonus));
+    out.max = finish(double(n) * (maximum + bonus));
+    const double avgBase = double(n) * (0.5 * (minimum + maximum) + bonus);
     out.avg = std::max(1.0, avgBase * mult) * (pinned ? 1.5 : 1.0);
     return out;
 }
 
 // static
 DamageRange CombatEngine::meleeRange(const CombatUnit& attacker, const CombatUnit& defender, bool pinned) {
-    DamageRange d = damageRange(attacker, defender, pinned);
+    DamageRange d = damageRange(attacker, defender, pinned, true);
     if (!meleePenalty(attacker)) return d;
     return {std::max(1, d.min / 2), std::max(1, d.max / 2), std::max(1.0, d.avg / 2)};
 }
@@ -562,6 +579,33 @@ int CombatEngine::killsFor(const CombatUnit& target, int damage) {
     CombatUnit copy = target;
     applyDamage(copy, damage);
     return target.count - copy.count;
+}
+
+bool CombatEngine::canCurse(int targetIndex) const {
+    if (isOver() || hasPendingChoice()) return false;
+    const auto& actor = activeUnit();
+    const auto& foes = actor.isPlayer ? m_enemy.stacks : m_player.stacks;
+    if (!actor.type->hasAbility("binding_thread") || actor.isDead() || isEngaged(actor)
+        || targetIndex < 0 || targetIndex >= static_cast<int>(foes.size())) return false;
+    const auto& target = foes[targetIndex];
+    return !target.isDead() && actor.pos.distanceTo(target.pos) <= CURSE_RANGE;
+}
+
+bool CombatEngine::doCurse(int targetIndex) {
+    if (!canCurse(targetIndex)) return false;
+    const auto slot = currentTurn();
+    auto& target = (slot.isPlayer ? m_enemy : m_player).stacks[targetIndex];
+    CombatEvent event;
+    event.type = CombatEvent::Type::CurseCast;
+    event.isPlayer = slot.isPlayer;
+    event.stackIndex = slot.stackIndex;
+    event.targetIsPlayer = !slot.isPlayer;
+    event.targetIndex = targetIndex;
+    event.curseRoll = std::uniform_int_distribution<int>(1, 6)(m_rng);
+    if (event.curseRoll >= 3) target.boundTurns = 2;
+    m_events.push_back(event);
+    advance();
+    return true;
 }
 
 bool CombatEngine::canAttack(int targetIndex) const {
@@ -863,7 +907,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
         blow.targetIndex    = slot.stackIndex;
         blow.isOpportunity  = true;
         m_events.push_back(blow);
-        int damage = calcDamage(g, actor, m_rng);
+        int damage = calcDamage(g, actor, m_rng, true);
         if (meleePenalty(g)) damage /= 2;
         if (hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), true)) return false;   // cut down mid-step
     }
@@ -1084,6 +1128,9 @@ void CombatEngine::advance() {
     checkWinCondition();
     if (isOver()) return;
 
+    const auto completed = currentTurn();
+    auto& actor = (completed.isPlayer ? m_player : m_enemy).stacks[completed.stackIndex];
+    if (actor.boundTurns > 0) --actor.boundTurns;
     ++m_turn;
 
     // Skip any stacks that died mid-round (retaliation, splash, etc.)
@@ -1167,15 +1214,15 @@ void CombatEngine::buildQueue() {
         if (!m_enemy.stacks[i].isDead())
             m_queue.push_back({ false, i });
 
-    // Higher effective speed acts first (base speed + item bonuses); player wins ties.
+    // Higher speed + battle roll acts first; player wins ties, then army order.
     std::stable_sort(m_queue.begin(), m_queue.end(),
         [&](const TurnSlot& a, const TurnSlot& b) {
             const CombatUnit& ua = a.isPlayer ? m_player.stacks[a.stackIndex]
                                               : m_enemy.stacks[a.stackIndex];
             const CombatUnit& ub = b.isPlayer ? m_player.stacks[b.stackIndex]
                                               : m_enemy.stacks[b.stackIndex];
-            int sa = ua.effectiveSpeed();
-            int sb = ub.effectiveSpeed();
+            int sa = ua.initiativeScore();
+            int sb = ub.initiativeScore();
             if (sa != sb) return sa > sb;
             return a.isPlayer && !b.isPlayer;
         });

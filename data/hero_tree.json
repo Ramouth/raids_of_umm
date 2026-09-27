@@ -10,7 +10,7 @@
           "level": 2,
           "id": "first_orders",
           "name": "First Orders",
-          "text": "Before each battle, order one of your stacks to act first, ahead of every enemy.",
+          "text": "At battle start, click a troop in the Marshal starter screen, then press Begin. It acts before every enemy, regardless of the initiative roll.",
           "effect": {
             "tactics": 1
           }

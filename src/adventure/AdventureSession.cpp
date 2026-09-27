@@ -663,6 +663,7 @@ std::string AdventureSession::endDay() {
     // TurnManager ticks weekly growth on day 7, 14, 21 …
     if (event.empty() && dayOfWeek() == 7)
         event = "Recruits gather in the towns for the coming week.";
+    m_scenario.fire(*this, "night", {{"day", day()}});
     m_scenario.fire(*this, "day", {{"day", day()}});
     return event;
 }

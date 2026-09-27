@@ -138,8 +138,8 @@ Json AdventureBridge::snapshot() const {
             abilities.push_back({{"level", a.level}, {"name", a.name}, {"text", a.text},
                                  {"unlocked", sc.level >= a.level}});
         specials.push_back({{"id", sc.id}, {"name", sc.name}, {"title", sc.title},
-                            {"level", sc.level}, {"xp", sc.xp},
-                            {"next", AdventureSession::xpForLevel(sc.level + 1)},
+                            {"level", sc.level}, {"xp", sc.xp}, {"morale", session_.scenario().morale(sc.id)},
+                            {"next", AdventureSession::companionXpForLevel(sc.id, sc.level + 1)},
                             {"stationed", sc.stationed ? cell(*sc.stationed) : Json(nullptr)},
                             {"unpaid", sc.unpaidDays}, {"upkeep", AdventureSession::upkeepFor(sc.level)},
                             {"wounded_until", sc.woundedUntil}, {"wounded", session_.isWounded(sc)},
@@ -147,7 +147,8 @@ Json AdventureBridge::snapshot() const {
     }
     Json battle_companions = Json::array();
     for (const auto& c : session_.battleCompanions())
-        battle_companions.push_back({{"id", c.id}, {"count", 1}, {"level", c.level}, {"companion", true}});
+        battle_companions.push_back({{"id", c.id}, {"count", 1}, {"level", c.level}, {"companion", true},
+                                   {"morale", session_.scenario().morale(c.id)}});
     Json rivals = Json::array();
     for (const auto& r : session_.rivals()) {
         if (!r.alive || !session_.isVisible(r.pos)) continue;   // hidden in fog

@@ -2,6 +2,7 @@
 #include "world/UnitType.h"
 #include "world/SCDef.h"
 #include "hex/HexCoord.h"
+#include <algorithm>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -62,15 +63,22 @@ struct CombatUnit {
     // Defence granted by a friendly aura where the stack stands right now.
     // Recomputed by CombatEngine::refreshAuras() whenever anyone moves or dies.
     int auraBonus    = 0;
+    int boundTurns   = 0; // remaining turns of this target, decremented after acting
 
     // Renown (the Cruths' paint): attack earned this battle by destroying enemy stacks.
     int renown       = 0;
+
+    // Rolled once at battle start; speed + d6 determines the normal turn order.
+    int initiativeRoll = 0;
+    int initiativeScore() const { return effectiveSpeed() + initiativeRoll; }
 
     // Effective stats (base + item bonuses) — convenience used by CombatEngine.
     int effectiveAttack()  const { return type->attack  + attackBonus + renown; }
     int effectiveDefense() const { return type->defense + defenseBonus + auraBonus; }
     int maxHp()            const { return type->hitPoints + hpBonus; }
-    int effectiveSpeed()   const { return type->speed   + speedBonus;   }
+    int effectiveSpeed()   const { return type->speed   + speedBonus - (boundTurns > 0 ? 2 : 0);   }
+
+    int effectiveMove() const { return boundTurns > 0 && type->moveRange > 0 ? std::max(1, type->moveRange - 2) : type->moveRange; }
 
     bool isDead()  const { return count <= 0; }
 

@@ -17,6 +17,7 @@ const PIN_COLOR := Color("ffb347")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
+var curse_mode := false
 ## True when the last left click held Shift or Ctrl (set route waypoints).
 var modified_click := false
 ## Hover feedback set by the combat screen: the hex under the pointer, what a
@@ -154,6 +155,10 @@ func _draw() -> void:
                 var reach: Array = route_reach if not waypoints.is_empty() else state.get("reachable", [])
                 if cell in reach: fill = Color("405347")
                 if cell in state.get("attackable", []): fill = Color("854637")
+                if curse_mode:
+                    fill = Color("38413c")
+                    if cell in state.get("curse_range", []): fill = Color("45425e")
+                    if cell in state.get("curse_targets", []): fill = Color("9464a0")
             draw_colored_polygon(points, fill)
             points.append(points[0])
             draw_polyline(points, Color("667267"), 1.0, true)
@@ -187,7 +192,7 @@ func _draw() -> void:
     for unit in state.get("units", []):
         if unit.count <= 0: continue
         var ring := ""
-        if unit.key == state.get("active", ""): ring = "active"
+        if unit.key == state.get("active", "") and int(state.get("opening", 0)) == 0 and not state.get("deploying", false): ring = "active"
         elif unit.key == highlight_key: ring = "highlight"
         if ring.is_empty(): continue
         var points := hex_points(cell_point(unit.cell))
@@ -475,6 +480,18 @@ func animate(event: Dictionary, speed: float) -> void:
                     var tween := create_tween()
                     tween.tween_property(actor, "position", cell_point(cell), 0.12 * speed)
                     await tween.finished
+        "curse":
+            if actor and target:
+                var thread := Line2D.new()
+                thread.width = 2.5
+                thread.default_color = Color("c299dd")
+                thread.points = PackedVector2Array([actor.position + Vector2(0, -24), target.position + Vector2(0, -24)])
+                add_child(thread)
+                var fade := create_tween()
+                fade.tween_property(thread, "modulate:a", 0.0, duration * 2)
+                float_text(target, "BOUND" if int(event.roll) >= 3 else "RESISTED", Color("d9b4ed"), duration * 3)
+                await fade.finished
+                thread.queue_free()
         "attack":
             if actor and target:
                 if event.flanked: float_text(target, "PINNED", Color("f7d580"), duration * 2)

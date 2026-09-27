@@ -1,0 +1,20 @@
+{
+  "mode": "built-in image_gen",
+  "assets": [
+    {
+      "name": "quarry",
+      "prompt": "Use case: stylized-concept. Asset type: production game map sprite, transparent PNG. Create ONE northern limestone quarry for a lush temperate medieval fantasy strategy adventure map, high oblique/isometric view matching classic hand-painted pixel-art strategy map sprites. Cool grey layered rock face cut into a mossy grassy hillside, small weathered timber derrick, stone blocks, tiny cart, ferns and low scrub at the feet. Muted meadow/olive greens, slate grey and weathered brown; soft light from upper left. Compact silhouette readable at 110 pixels wide. Entire sprite including edges visible with generous transparent padding. NO desert sand, yellow sandstone, enclosing walls, octagonal/hexagonal base, floating island, tile border, text, letters, interface, characters, watermark. Natural irregular grassy edges taper into genuine transparent alpha; not a colored background. Square canvas.",
+      "source": "/home/hal9002/.codex/generated_images/01a0dfe4-73c8-7cf1-8968-6a625c64138c/exec-3d650162-f63b-4e3d-8fcc-e1561d42ceb8.png"
+    },
+    {
+      "name": "ridge",
+      "prompt": "Use case: stylized-concept. Asset type: production game map sprite, transparent PNG. Create ONE coherent wide mountain ridge for a northern medieval fantasy strategy map, composed of 3 connected unequal craggy slate peaks with shared rocky foothills rather than separate triangles. High oblique/isometric view, classic hand-painted pixel-art strategy game scenery. Grey slate stratified rocks, dark moss in crevices, green scrub and a few tiny firs at the base, only small residual snow patches on tallest crest. Long low natural silhouette, wider than tall, an interconnected range suitable for spanning 2 or 3 map cells. Muted slate grey and olive/fern greens matching a lush northern limestone quarry; soft light from upper left. Whole ridge visible with transparent padding all around. NO hexagon, octagon, tile pedestal, floating island, faceted low-poly geometry, geometric base, text, buildings, frame or watermark. Genuine transparent alpha outside irregular foothill silhouette. Landscape canvas.",
+      "source": "/home/hal9002/.codex/generated_images/01a0dfe4-73c8-7cf1-8968-6a625c64138c/exec-867f9704-9357-434e-9f68-0b77528a6fc7.png"
+    },
+    {
+      "name": "scrub",
+      "prompt": "Use case: stylized-concept. Asset type: production game map sprite, transparent PNG. Create ONE small loose patch of lush northern undergrowth: irregular low bramble shrubs mixed with ferns, tufts of long meadow grass, a couple of small mossy grey stones and very few pale wildflowers. High oblique/isometric view matching classic hand-painted pixel-art medieval strategy map sprites, detailed yet readable at 65 pixels wide. Muted olive, fern and sage green, cool grey stones, upper left light. Broad sparse organic shape, low height, no trees. Individual outer leaves and grass tufts taper naturally to genuine transparent alpha with generous empty padding. NO hexagon, octagon, square ground tile, pedestal, floating island, enclosing border, background, text or watermark. Square canvas.",
+      "source": "/home/hal9002/.codex/generated_images/01a0dfe4-73c8-7cf1-8968-6a625c64138c/exec-bc826b12-b7f0-4587-b0de-1d89c2f8e5f8.png"
+    }
+  ]
+}

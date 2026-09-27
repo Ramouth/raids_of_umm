@@ -80,6 +80,7 @@ func _card(sc: Dictionary) -> Control:
     if sc.get("wounded", false): status = "WOUNDED until day %d — sits out battles, abilities rest" % int(sc.wounded_until)
     if int(sc.unpaid) >= 3: status = "UNPAID %d days — abilities withheld, leaves at 7" % int(sc.unpaid)
     elif int(sc.unpaid) > 0: status += "  ·  unpaid %d day(s)" % int(sc.unpaid)
+    if int(sc.get("morale", 0)) < 0: status += "  ·  Distant since your conversation"
     column.add_child(_label("%s  ·  %s" % [sc.name, sc.title], 18, Color("f0c870")))
     column.add_child(_label("Level %d   ·   XP %d / %d   ·   Upkeep %d gold a day   ·   %s" % [sc.level, sc.xp, sc.next, sc.upkeep, status], 13, Color("c8b08a")))
     var bar := ProgressBar.new()
@@ -89,7 +90,11 @@ func _card(sc: Dictionary) -> Control:
     bar.custom_minimum_size = Vector2(700, 8)
     column.add_child(bar)
     var battle := _battle_line(sc)
-    if not battle.is_empty(): column.add_child(_label(battle, 14, Color("9fd4b4")))
+    if not battle.is_empty():
+        var combat_stats := _label(battle, 14, Color("9fd4b4"))
+        combat_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        combat_stats.custom_minimum_size = Vector2(700, 0)
+        column.add_child(combat_stats)
     for ability in sc.abilities:
         var mark := "✓" if ability.unlocked else "Lv %d" % int(ability.level)
         var line := _label("%s  %s — %s" % [mark, ability.name, ability.text], 14, Color("e8d8b8") if ability.unlocked else Color("7c7060"))
@@ -110,7 +115,7 @@ func _card(sc: Dictionary) -> Control:
         actions.add_child(recall)
     return row
 
-## "In battle: 85 health · attack 11 · defence 11 · 20–28 damage · speed 7 · aura +3 defence (1 hex)"
+## Live combat stats, including companion growth and attack type.
 func _battle_line(sc: Dictionary) -> String:
     var unit: Dictionary = host.unit_defs.get(str(sc.id), {})
     if unit.is_empty(): return ""
@@ -121,6 +126,7 @@ func _battle_line(sc: Dictionary) -> String:
         int(unit.hitPoints) + int(grow.get("hitPoints", 0)) * n, int(unit.attack) + int(grow.get("attack", 0)) * n,
         int(unit.defense) + int(grow.get("defense", 0)) * n, int(unit.minDamage) + dmg, int(unit.maxDamage) + dmg, int(unit.speed)]
     if int(unit.get("shots", 0)) > 0: line += " · ranged (%d shots)" % int(unit.shots)
+    if str(unit.get("attackType", "physical")) == "magical": line += " · magic ignores armour"
     var aura: Dictionary = unit.get("aura", {})
     if int(aura.get("defense", 0)) > 0: line += " · aura +%d defence (%d hex)" % [int(aura.defense), int(aura.radius)]
     return line

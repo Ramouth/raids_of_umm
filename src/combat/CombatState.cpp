@@ -13,7 +13,7 @@ CombatState::CombatState(CombatArmy player, CombatArmy enemy,
                          std::shared_ptr<CombatOutcome>  outcome,
                          std::vector<std::string>        lootTable,
                          std::optional<SpecialCharacter> dungeonSC)
-    : m_engine(std::move(player), std::move(enemy))
+    : m_engine(std::move(player), std::move(enemy), 6)
     , m_outcome(std::move(outcome))
     , m_lootTable(std::move(lootTable))
     , m_dungeonSC(std::move(dungeonSC))

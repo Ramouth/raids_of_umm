@@ -100,70 +100,75 @@ offset_bottom = -20.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="Content" type="VBoxContainer" parent="HUD/Layout/Sidebar"]
+[node name="Scroll" type="ScrollContainer" parent="HUD/Layout/Sidebar"]
 layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Content" type="VBoxContainer" parent="HUD/Layout/Sidebar/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 16
 
-[node name="Eyebrow" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="Eyebrow" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.68, 0.52, 0.29, 1)
 theme_override_font_sizes/font_size = 11
 text = "YOUR EXPEDITION"
 
-[node name="HeroTitle" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="HeroTitle" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 theme_override_fonts/font = SubResource("HeadingFont")
 theme_override_font_sizes/font_size = 23
 text = "The Pathfinder"
 
-[node name="Portrait" type="TextureRect" parent="HUD/Layout/Sidebar/Content"]
+[node name="Portrait" type="TextureRect" parent="HUD/Layout/Sidebar/Scroll/Content"]
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
 texture_filter = 1
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Location" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="Location" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 text = "Khemret"
 autowrap_mode = 2
 
-[node name="Separator" type="HSeparator" parent="HUD/Layout/Sidebar/Content"]
+[node name="Separator" type="HSeparator" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 
-[node name="TerrainTitle" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="TerrainTitle" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.68, 0.52, 0.29, 1)
 theme_override_font_sizes/font_size = 11
 text = "CHART A COURSE"
 
-[node name="Inspection" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="Inspection" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 custom_minimum_size = Vector2(0, 86)
 layout_mode = 2
 text = "Hover over the desert to inspect terrain and landmarks."
 autowrap_mode = 2
 
-[node name="Route" type="Label" parent="HUD/Layout/Sidebar/Content"]
+[node name="Route" type="Label" parent="HUD/Layout/Sidebar/Scroll/Content"]
 custom_minimum_size = Vector2(0, 55)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.94, 0.76, 0.4, 1)
 text = "Click a reachable hex to travel."
 autowrap_mode = 2
 
-[node name="Spacer" type="Control" parent="HUD/Layout/Sidebar/Content"]
+[node name="Spacer" type="Control" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="Grid" type="CheckButton" parent="HUD/Layout/Sidebar/Content"]
+[node name="Grid" type="CheckButton" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 text = "Show hex grid     G"
 
-[node name="Center" type="Button" parent="HUD/Layout/Sidebar/Content"]
+[node name="Center" type="Button" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 text = "Find hero     Space"
 
-[node name="Overview" type="Button" parent="HUD/Layout/Sidebar/Content"]
+[node name="Overview" type="Button" parent="HUD/Layout/Sidebar/Scroll/Content"]
 layout_mode = 2
 text = "Map overview     Home"
 

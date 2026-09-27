@@ -46,8 +46,8 @@ func _run() -> void:
             dungeon = cell
             break
     scene.fog.reveal([[dungeon.x, dungeon.y]])  # scouted: the test targets it directly
-    # Fixture army the casualty/retaliation checks below were tuned against.
-    scene.army = [{"id": "desert_archer", "count": 10}, {"id": "mummy", "count": 3}]
+    # Enough health to test retreat after casualties even when enemies win initiative.
+    scene.army = [{"id": "desert_archer", "count": 10}, {"id": "mummy", "count": 10}]
     # Guards strong enough to reach our line through the archers' reaction volleys.
     var tuned_guards: Array = scene.encounter.guards.duplicate(true)
     scene.encounter.guards = [{"id": "skeleton_warrior", "count": 24}, {"id": "sand_scorpion", "count": 8}]
@@ -113,15 +113,15 @@ func _run() -> void:
     # Let the guards close and retaliate, then verify casualties survive return.
     # Guards close in along lines that dodge our archers' reaction volleys, so
     # this can take a few rounds, but they must arrive (no stalling).
-    var remaining := 13
+    var remaining := 20
     for turn in range(6):
         if battle.state.result != "ongoing": break
         check(battle.issue("defend"), "Player can hold position while guards advance")
         await _idle(battle)
         remaining = 0
         for stack in battle.state.survivors: remaining += int(stack.count)
-        if remaining < 13 and turn >= 1: break
-    check(remaining < 13, "Enemy melee inflicts real expedition casualties")
+        if remaining < 20 and turn >= 1: break
+    check(remaining < 20, "Enemy melee inflicts real expedition casualties")
     check(battle.history.any(func(line: String): return "retaliation" in line), "Retaliation events are presented")
     check(battle.history.any(func(line: String): return "Round 2" in line), "Round changes are logged")
     if capture: await _capture("combat_log")
@@ -303,27 +303,28 @@ func _run() -> void:
 
     # Line of sight: a shot through a stack is shown, forecast and dealt at half.
     scene.cleared_dungeons.clear()
-    # Our melee holds; their skeletons advance in front of their brigands.
-    scene.army = [{"id": "desert_archer", "count": 4}, {"id": "armoured_warrior", "count": 30}, {"id": "levy_spearman", "count": 60}]
-    scene.encounter.guards = [{"id": "skeleton_warrior", "count": 60}, {"id": "brigand", "count": 30}, {"id": "grey_wolf", "count": 20}]
-    scene.encounter.seed = int(OS.get_environment("LOS_SEED")) if OS.has_environment("LOS_SEED") else 3
+    # Place our own blocker on the shot line instead of relying on AI movement.
+    scene.army = [{"id": "desert_archer", "count": 20}, {"id": "rider_knight", "count": 5}]
+    scene.encounter.guards = [{"id": "ancient_treant", "count": 20}]
+    scene.encounter.seed = 3
+    scene.state.tactics_rank = 2
     scene.state.battle_companions = []
     check(scene.enter_dungeon(), "Line-of-sight fixture starts")
     battle = scene.battle
     battle.animation_speed = 0.02
+    while battle.busy: await process_frame
+    battle._toggle_order(battle.units["p1"].cell)
+    battle._toggle_order(battle.units["p0"].cell)
+    check(battle.give_orders(), "Marshal sends the blocker before the archer")
+    await _idle(battle)
+    check(battle.issue("move", Vector2i(2, 1)), "A friendly stack walks onto the line of fire")
     await _idle(battle)
     var blocked_preview := {}
     var clear_preview := {}
-    for turn in range(24):
-        if battle.state.result != "ongoing": break
-        var shooter_now: Dictionary = battle.units.get(battle.state.active, {})
-        if shooter_now.get("ranged", false) and int(shooter_now.get("shots", 0)) > 0:
-            for preview in battle.state.previews:
-                if preview.ranged and preview.get("blocked", false): blocked_preview = preview
-                elif preview.ranged: clear_preview = preview
-            if not blocked_preview.is_empty(): break
-        battle.issue("ai" if shooter_now.get("ranged", false) else "defend")
-        await _idle(battle)
+    for preview in battle.state.previews:
+        if preview.ranged and preview.get("blocked", false): blocked_preview = preview
+        elif preview.ranged: clear_preview = preview
+    scene.state.tactics_rank = 0
     check(not blocked_preview.is_empty(), "A shot through a stack comes up during the fight")
     if not blocked_preview.is_empty():
         var target_key: String = blocked_preview.key
@@ -413,7 +414,7 @@ func _run() -> void:
     for unit in battle.state.units:
         if unit.get("companion", false): ushari = unit
     check(not ushari.is_empty() and ushari.name == "Ushari", "Ushari rides into battle")
-    check(int(ushari.get("unit_hp", 0)) == 85, "Her health grows with her level (75 + 10)")
+    check(int(ushari.get("unit_hp", 0)) == 54, "Her health grows slowly with her level (50 + 4)")
     check(ushari.get("cell", []) == [0, 2], "She starts at the centre of the back line")
     check(not str(ushari.get("bodyguard", "")).is_empty(), "A troop stack beside her is her bodyguard")
     var shielded := false
