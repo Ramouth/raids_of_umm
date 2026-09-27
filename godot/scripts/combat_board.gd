@@ -489,7 +489,7 @@ func animate(event: Dictionary, speed: float) -> void:
                 add_child(thread)
                 var fade := create_tween()
                 fade.tween_property(thread, "modulate:a", 0.0, duration * 2)
-                float_text(target, "BOUND" if int(event.roll) >= 3 else "RESISTED", Color("d9b4ed"), duration * 3)
+                float_text(target, ("BOUND" if event.get("slows", false) else "WEAKENED") if int(event.roll) >= 3 else "RESISTED", Color("d9b4ed"), duration * 3)
                 await fade.finished
                 thread.queue_free()
         "attack":

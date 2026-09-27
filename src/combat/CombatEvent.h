@@ -98,6 +98,7 @@ struct CombatEvent {
 
     // Damage amount (UnitDamaged only)
     int          curseRoll      = 0;
+    bool         curseSlows     = false;
     int          damage         = 0;
     int          kills          = 0;   // creatures that died from this damage (UnitDamaged)
     int          remaining      = 0;   // creatures left in the stack afterwards (UnitDamaged)

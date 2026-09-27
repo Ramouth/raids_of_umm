@@ -131,6 +131,7 @@ public:
     bool canCurse(int targetIndex) const;
     bool doCurse(int targetIndex);
     static constexpr int CURSE_RANGE = 4;
+    static constexpr int CURSE_SLOW_LEVEL = 3;
 
     // Preview of the active unit attacking enemy stack targetIndex from
     // bestAttackHex() (see AttackPreview).

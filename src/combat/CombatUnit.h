@@ -63,7 +63,8 @@ struct CombatUnit {
     // Defence granted by a friendly aura where the stack stands right now.
     // Recomputed by CombatEngine::refreshAuras() whenever anyone moves or dies.
     int auraBonus    = 0;
-    int boundTurns   = 0; // remaining turns of this target, decremented after acting
+    int curseTurns   = 0; // remaining turns; decremented after this target acts
+    bool curseSlows = false; // Binding Thread gains this at Ushari level 3
 
     // Renown (the Cruths' paint): attack earned this battle by destroying enemy stacks.
     int renown       = 0;
@@ -76,9 +77,9 @@ struct CombatUnit {
     int effectiveAttack()  const { return type->attack  + attackBonus + renown; }
     int effectiveDefense() const { return type->defense + defenseBonus + auraBonus; }
     int maxHp()            const { return type->hitPoints + hpBonus; }
-    int effectiveSpeed()   const { return type->speed   + speedBonus - (boundTurns > 0 ? 2 : 0);   }
+    int effectiveSpeed()   const { return type->speed   + speedBonus - (curseTurns > 0 && curseSlows ? 2 : 0);   }
 
-    int effectiveMove() const { return boundTurns > 0 && type->moveRange > 0 ? std::max(1, type->moveRange - 2) : type->moveRange; }
+    int effectiveMove() const { return curseTurns > 0 && curseSlows && type->moveRange > 0 ? std::max(1, type->moveRange - 2) : type->moveRange; }
 
     bool isDead()  const { return count <= 0; }
 

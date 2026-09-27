@@ -128,7 +128,7 @@ SUITE("Opportunity — a stack the blow kills never gets away; staying close is 
 SUITE("Cruths — a lone wolf hits 25% harder with no friend beside it; the forecast agrees") {
     const UnitType* wolf  = type("PaintedOne", 9, 8, 100, 3, {"lone_wolf"});
     const UnitType* pal   = type("Pal", 1, 1, 100);
-    const UnitType* dummy = type("Dummy", 1, 1, 1000);
+    const UnitType* dummy = type("Dummy", 1, 20, 1000);
     for (bool alone : {true, false}) {
         CombatArmy p; p.isPlayer = true;
         p.stacks.push_back(CombatUnit::make(wolf, 1, true));
@@ -490,11 +490,19 @@ SUITE("Binding Thread — four-hex range and engaged casting lock") {
     auto witch = CombatUnit::companion(session.resources().unit("ushari"), 1, true);
     CombatArmy p; p.isPlayer = true; p.stacks.push_back(witch);
     CombatArmy e; e.isPlayer = false;
-    e.stacks.push_back(CombatUnit::make(type("Dummy", 1, 1, 1000), 1, false));
+    e.stacks.push_back(CombatUnit::make(type("Dummy", 1, 20, 1000), 1, false));
     CombatEngine eng(p, e, 6, 42);
     eng.teleportUnit(true, 0, {2, 0});
     eng.teleportUnit(false, 0, {6, 0});
     CHECK(eng.canCurse(0));
+    CHECK_EQ(CombatEngine::CURSE_SLOW_LEVEL, 3);
+    auto weakened = eng.enemyArmy().stacks[0];
+    weakened.curseTurns = 2;
+    CHECK(CombatEngine::damageRange(weakened, witch).avg < CombatEngine::damageRange(eng.enemyArmy().stacks[0], witch).avg);
+    CHECK_EQ(weakened.effectiveSpeed(), weakened.type->speed);
+    weakened.curseSlows = true;
+    CHECK(weakened.effectiveSpeed() < weakened.type->speed);
+    CHECK(weakened.effectiveMove() < weakened.type->moveRange);
     eng.teleportUnit(false, 0, {7, 0});
     CHECK(!eng.canCurse(0));
     const auto turn = eng.turnIndex();
@@ -510,4 +518,20 @@ SUITE("Binding Thread — four-hex range and engaged casting lock") {
     const int dealt = hp - eng.enemyArmy().stacks[0].totalHp();
     CHECK(dealt >= expected.min && dealt <= expected.max);
     CHECK_EQ(eng.playerArmy().stacks[0].shotsLeft, witch.shotsLeft);
+
+    bool sawLevelOneSuccess = false;
+    for (unsigned seed = 1; seed < 80 && !sawLevelOneSuccess; ++seed) {
+        CombatEngine cast(p, e, 6, seed);
+        cast.teleportUnit(true, 0, {2, 0});
+        cast.teleportUnit(false, 0, {6, 0});
+        if (!cast.currentTurn().isPlayer || !cast.doCurse(0)) continue;
+        for (const auto& event : cast.drainEvents()) {
+            if (event.type != CombatEvent::Type::CurseCast || event.curseRoll < 3) continue;
+            sawLevelOneSuccess = true;
+            CHECK_EQ(cast.enemyArmy().stacks[0].curseTurns, 2);
+            CHECK(!cast.enemyArmy().stacks[0].curseSlows);
+            CHECK_EQ(cast.enemyArmy().stacks[0].effectiveSpeed(), cast.enemyArmy().stacks[0].type->speed);
+        }
+    }
+    CHECK(sawLevelOneSuccess); // A novice curse weakens strikes before it can slow.
 }

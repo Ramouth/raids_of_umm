@@ -226,7 +226,7 @@ Json CombatSession::snapshot() const {
                 {"attack", unit.effectiveAttack()}, {"defense", unit.effectiveDefense()},
                 {"min_damage", unit.type->minDamage + unit.damageBonus},
                 {"max_damage", unit.type->maxDamage + unit.damageBonus},
-                {"bound_turns", unit.boundTurns}, {"move", unit.effectiveMove()}, {"abilities", unit.type->abilities},
+                {"weakened_turns", unit.curseTurns}, {"bound_turns", unit.curseSlows ? unit.curseTurns : 0}, {"curse_slows", unit.curseSlows}, {"move", unit.effectiveMove()}, {"abilities", unit.type->abilities},
                 {"retaliated", unit.hasRetaliated},
                 {"speed", unit.effectiveSpeed()}, {"initiative_roll", unit.initiativeRoll},
                 {"initiative_score", unit.initiativeScore()}, {"defending", unit.isDefending}});
@@ -395,7 +395,7 @@ Json CombatSession::response() {
             {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
             {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction}, {"opportunity", event.isOpportunity},
             {"from", hex(event.from)}, {"to", hex(event.to)},
-            {"roll", event.curseRoll}, {"kills", event.kills}, {"remaining", event.remaining}};
+            {"roll", event.curseRoll}, {"slows", event.curseSlows}, {"kills", event.kills}, {"remaining", event.remaining}};
         if (event.type == CombatEvent::Type::UnitAttacked) {
             // Attacks never move anyone, so the current positions tell shots from strikes.
             const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];

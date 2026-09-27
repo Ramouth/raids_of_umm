@@ -542,7 +542,7 @@ int CombatEngine::calcDamage(const CombatUnit& attacker, const CombatUnit& defen
     for (int i = 0; i < attacker.count; ++i)
         baseDmg += dist(rng) + (knife ? std::max(0, attacker.scLevel - 1) : attacker.damageBonus);
 
-    return std::max(1, static_cast<int>(baseDmg * damageMultiplier(attacker, defender, melee)));
+    return std::max(1, static_cast<int>(baseDmg * damageMultiplier(attacker, defender, melee) * (attacker.curseTurns > 0 ? 0.75 : 1.0)));
 }
 
 // static
@@ -552,18 +552,19 @@ DamageRange CombatEngine::damageRange(const CombatUnit& attacker, const CombatUn
     if (attacker.isDead()) return out;
     const double mult = damageMultiplier(attacker, defender, melee);
     const bool knife = melee && attacker.type->hasAbility("witch_knife");
+    const double curseFactor = attacker.curseTurns > 0 ? 0.75 : 1.0;
     const int minimum = knife ? 4 : attacker.type->minDamage;
     const int maximum = knife ? 7 : attacker.type->maxDamage;
     const int bonus = knife ? std::max(0, attacker.scLevel - 1) : attacker.damageBonus;
     const int n = attacker.count;
     auto finish = [&](double base) {
-        int dmg = std::max(1, static_cast<int>(base * mult));
+        int dmg = std::max(1, static_cast<int>(base * mult * curseFactor));
         return pinned ? dmg * 3 / 2 : dmg;
     };
     out.min = finish(double(n) * (minimum + bonus));
     out.max = finish(double(n) * (maximum + bonus));
     const double avgBase = double(n) * (0.5 * (minimum + maximum) + bonus);
-    out.avg = std::max(1.0, avgBase * mult) * (pinned ? 1.5 : 1.0);
+    out.avg = std::max(1.0, avgBase * mult * curseFactor) * (pinned ? 1.5 : 1.0);
     return out;
 }
 
@@ -594,6 +595,7 @@ bool CombatEngine::canCurse(int targetIndex) const {
 bool CombatEngine::doCurse(int targetIndex) {
     if (!canCurse(targetIndex)) return false;
     const auto slot = currentTurn();
+    auto& caster = (slot.isPlayer ? m_player : m_enemy).stacks[slot.stackIndex];
     auto& target = (slot.isPlayer ? m_enemy : m_player).stacks[targetIndex];
     CombatEvent event;
     event.type = CombatEvent::Type::CurseCast;
@@ -602,7 +604,11 @@ bool CombatEngine::doCurse(int targetIndex) {
     event.targetIsPlayer = !slot.isPlayer;
     event.targetIndex = targetIndex;
     event.curseRoll = std::uniform_int_distribution<int>(1, 6)(m_rng);
-    if (event.curseRoll >= 3) target.boundTurns = 2;
+    if (event.curseRoll >= 3) {
+        target.curseTurns = 2;
+        target.curseSlows = caster.scLevel >= CURSE_SLOW_LEVEL;
+        event.curseSlows = target.curseSlows;
+    }
     m_events.push_back(event);
     advance();
     return true;
@@ -1130,7 +1136,7 @@ void CombatEngine::advance() {
 
     const auto completed = currentTurn();
     auto& actor = (completed.isPlayer ? m_player : m_enemy).stacks[completed.stackIndex];
-    if (actor.boundTurns > 0) --actor.boundTurns;
+    if (actor.curseTurns > 0 && --actor.curseTurns == 0) actor.curseSlows = false;
     ++m_turn;
 
     // Skip any stacks that died mid-round (retaliation, splash, etc.)

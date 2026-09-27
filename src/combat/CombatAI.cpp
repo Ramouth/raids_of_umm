@@ -424,7 +424,7 @@ void CombatAI::takeTurn(CombatEngine& engine) {
     // A witch binds a nearby unbound melee threat before trading damage.
     const auto& foes = engine.activeUnit().isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
     for (int i = 0; i < static_cast<int>(foes.size()); ++i)
-        if (engine.canCurse(i) && foes[i].boundTurns == 0 && !foes[i].type->isRanged()) {
+        if (engine.canCurse(i) && foes[i].curseTurns == 0 && !foes[i].type->isRanged()) {
             engine.doCurse(i);
             return;
         }

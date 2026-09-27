@@ -785,7 +785,7 @@
     {
       "id": "ushari",
       "name": "Ushari",
-      "description": "A witch of the realm's last witch tribe. Binding Thread slows an enemy within four hexes on a d6 roll of 3 or more. Nearby enemies prevent casting; she fights with a knife instead.",
+      "description": "A witch of the realm's last witch tribe. Binding Thread weakens an enemy within four hexes on a d6 roll of 3 or more. At level 3 it also slows. Nearby enemies prevent casting; she fights with a knife instead.",
       "attack": 12,
       "defense": 3,
       "minDamage": 20,

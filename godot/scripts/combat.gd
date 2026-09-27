@@ -311,7 +311,7 @@ func _consume(reply: Dictionary) -> void:
     var strike := {}   # the attack event whose damage comes next
     for event in reply.events:
         match event.type:
-            "curse": _log("%s casts Binding Thread on %s: d6 = %d — %s." % [_unit_name(event.unit), _unit_name(event.target), int(event.roll), "Bound" if int(event.roll) >= 3 else "Resisted"], GOLD, event.target)
+            "curse": _log("%s casts Binding Thread on %s: d6 = %d — %s." % [_unit_name(event.unit), _unit_name(event.target), int(event.roll), ("Bound and slowed" if event.get("slows", false) else "Weakened") if int(event.roll) >= 3 else "Resisted"], GOLD, event.target)
             "attack": strike = event
             "damage": _log_damage(event, strike)
             "move": _log("%s moves." % _unit_label(event.unit), DIM, event.unit)
@@ -400,7 +400,7 @@ func _refresh() -> void:
     curse_button.visible = ongoing and "binding_thread" in caster.get("abilities", []) and _opening() == 0 and not _deploying()
     curse_button.disabled = busy or auto_battle or not state.get("player_turn", false) or caster.get("engaged", false) or state.get("curse_targets", []).is_empty()
     curse_button.text = "Cancel Binding Thread · Esc" if _curse_mode else "Binding Thread · C"
-    curse_button.tooltip_text = "Range: 4 hexes. Roll d6, succeeds on 3+. Replaces your attack. Adjacent enemies prevent casting."
+    curse_button.tooltip_text = "Range: 4 hexes. Roll d6, succeeds on 3+. Weakens attacks for two turns. At level 3 it also slows. Replaces your attack; adjacent enemies prevent casting."
     inspection.size.y = 212 if curse_button.visible else 262
     inspection.scroll_active = true
     if curse_button.disabled: _curse_mode = false
@@ -572,7 +572,7 @@ func _inspect(unit: Dictionary) -> void:
     lines.append("Speed %d  ·  Moves %d hexes" % [unit.speed, unit.get("move", 0)])
     if "witch_knife" in unit.get("abilities", []):
         lines.append("Knife: 4–7 physical damage (+1 per level); adjacent targets only.")
-        lines.append("Engaged: cannot cast; use the knife or move away." if unit.get("engaged", false) else "Binding Thread: range 4 · d6 succeeds on 3+ · uses the turn.")
+        lines.append("Engaged: cannot cast; use the knife or move away." if unit.get("engaged", false) else "Binding Thread: range 4 · d6 succeeds on 3+ · weakens attacks for two turns.")
     elif unit.ranged and unit.get("engaged", false):
         lines.append("[color=#%s]ENGAGED: an enemy is next to it — it cannot shoot, only fight hand to hand (half damage)[/color]" % FOE.to_html(false))
     elif unit.ranged: lines.append("Ranged  ·  %d / %d shots  ·  no retaliation when shooting  ·  half damage hand to hand" % [unit.shots, unit.get("shots_max", unit.shots)])
@@ -587,7 +587,12 @@ func _inspect(unit: Dictionary) -> void:
         var guard: String = unit.get("bodyguard", "")
         lines.append("Bodyguard: %s" % (_unit_label(guard) + " takes half of each melee blow" if not guard.is_empty() else "none — keep a stack beside %s" % unit.name))
     var notes: Array[String] = []
-    if int(unit.get("bound_turns", 0)) > 0: notes.append("BOUND: %d turns remaining" % int(unit.bound_turns))
+    if int(unit.get("weakened_turns", 0)) > 0:
+        notes.append("WEAKENED: attacks deal less damage for %d more turn(s)" % int(unit.weakened_turns))
+    if int(unit.get("bound_turns", 0)) > 0:
+        notes.append("BOUND: moves and initiative reduced for %d more turn(s)" % int(unit.bound_turns))
+    if "binding_thread" in unit.get("abilities", []) and int(unit.get("level", 1)) < 3:
+        lines.append("At level 3, Binding Thread also slows its target.")
     if unit.defending: notes.append("DEFENDING: +25% defence until its next turn")
     notes.append("retaliation used this round" if unit.get("retaliated", false) else "will retaliate once this round")
     var acted := false
