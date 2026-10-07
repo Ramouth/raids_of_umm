@@ -1,4 +1,4 @@
-// Rivals.cpp — the Shariw AI for AdventureSession.
+// Rivals.cpp — strategic opponents: legacy Shariw raiders and scenario castle lords.
 //
 // Each war-band picks one goal per turn, in priority order:
 //   1. weak (< 35% of its starting strength) → go home and recruit
@@ -112,6 +112,17 @@ void AdventureSession::spawnRival(const HexCoord& town, int band) {
     r.pos  = town;
     r.home = town;
     r.army = {{"shariw_scout", 30}, {"scorpion_rider", 12}, {"dune_stalker", 6}};
+    const auto& lord = m_scenario.rivalLord();
+    const auto* home = m_map.objectAt(town);
+    if (!lord.empty() && home && home->name == lord.value("home", "")) {
+        r.name = lord.at("name");
+        r.army.clear();
+        for (const auto& stack : lord.at("army")) r.army.push_back({stack.at("id"), stack.at("count")});
+        for (const auto& stack : lord.at("garrison")) m_garrisons[town].push_back({stack.at("id"), stack.at("count")});
+        for (const auto& obj : m_map.objects()) if (obj.name == lord.value("escort_at", ""))
+            for (const auto& stack : lord.value("escort_army", Scenario::Json::array()))
+                m_garrisons[obj.pos].push_back({stack.at("id"), stack.at("count")});
+    }
     r.startPower = power(r.army);
     m_rivals.push_back(r);
 }
@@ -129,14 +140,17 @@ std::vector<AdventureSession::Stack> AdventureSession::guardsOf(const HexCoord& 
 float AdventureSession::rivalStepCost(const HexCoord& c) const {
     const MapTile* t = m_map.tileAt(c);
     if (!t) return 1.0f;
-    if (t->terrain == Terrain::Dune && !t->road) return 1.0f;
+    if (m_scenario.rivalLord().empty() && t->terrain == Terrain::Dune && !t->road) return 1.0f;
     return t->moveCost;
 }
 
 std::vector<HexCoord> AdventureSession::rivalRoute(const Rival& r, const HexCoord& to) const {
     auto path = m_map.findPathWeighted(r.pos, to, [&](const HexCoord& c) {
+        if (const auto* band = rivalAt(c); band && band->id != r.id) return true;
         if (c == to) return false;
-        if (c == m_hero.pos || isEncounter(c)) return true;
+        if (c == m_hero.pos || m_encounters.count(c)) return true;
+        if (!m_scenario.rivalLord().empty())
+            if (auto zone = guardZoneAt(c); zone && *zone != to) return true;
         return owner(c) == Faction::Player && m_control.at(c).objType == ObjType::Town;
     });
     if (path.size() < 2) return {};
@@ -150,7 +164,7 @@ void AdventureSession::rivalRecruit(Rival& r) {
     ResourcePool& purse = m_turns.faction(Faction::AI).treasury;
     std::vector<const UnitType*> roster;
     for (const UnitType* u : m_resources->unitsByTier())
-        if (u->faction == rosterFor(Faction::AI)) roster.push_back(u);
+        if (u->faction == townRoster(r.home) && canRecruitHere(r.home, u->id)) roster.push_back(u);
     std::reverse(roster.begin(), roster.end());  // best units first
     for (const UnitType* u : roster) {
         int& pool = it->second.recruitPool[u->id];
@@ -170,18 +184,61 @@ void AdventureSession::rivalRecruit(Rival& r) {
     }
 }
 
+// Same costs, prerequisites, one-building-per-day limit and first recruit growth
+// as player towns. No off-map subsidy for a castle opponent.
+void AdventureSession::rivalBuild() {
+    static const char* plan[] = {"town_hall", "marketplace", "horse_lines", "city_hall",
+        "armoury", "citadel", "drill_yard", "knights_hall", "castle", "marksmens_tower"};
+    auto& purse = m_turns.faction(Faction::AI).treasury;
+    for (auto& [cell, town] : m_towns) {
+        const auto* obj = m_map.objectAt(cell);
+        if (!obj || obj->type != ObjType::Town || owner(cell) != Faction::AI || town.builtOnDay == day()) continue;
+        for (const char* id : plan) {
+            const auto* b = m_resources->building(id);
+            if (!b || b->faction != townRoster(cell) || town.buildings.count(id) || !purse.canAfford(b->cost)) continue;
+            if (!std::all_of(b->requires.begin(), b->requires.end(), [&](const std::string& need) { return town.buildings.count(need); })) continue;
+            purse -= b->cost;
+            town.buildings.insert(id);
+            town.builtOnDay = day();
+            town.lastBuilt = id;
+            if (const auto* u = m_resources->unit(b->unlocks))
+                town.recruitPool[u->id] += static_cast<int>(u->weeklyGrowth * (1.0 + growthBonus(cell)) + 0.5);
+            break;
+        }
+    }
+}
+
 void AdventureSession::runRivals() {
     m_rivalMoves.clear();
-    if (day() == SECOND_BAND_DAY - 1)   // rides out on the dawn of day 10
+    if (!rivalMobilized()) return;
+    const bool castleLord = !m_scenario.rivalLord().empty();
+    if (!castleLord && day() == SECOND_BAND_DAY - 1)
         for (const auto& r : std::vector<Rival>(m_rivals))
             if (owner(r.home) == Faction::AI) { spawnRival(r.home, 2); break; }
-    if (!m_rivals.empty()) {
+    if (!castleLord && !m_rivals.empty()) {
         ResourcePool& purse = m_turns.faction(Faction::AI).treasury;
         purse[Resource::Gold]     += TITHE_GOLD;
         purse[Resource::Wood]     += TITHE_WOOD;
         purse[Resource::Obsidian] += TITHE_OBSIDIAN;
     }
-    if (day() < RIVAL_START_DAY - 1) return;   // first ride on the evening of day 2 → seen day 3
+    if (castleLord) {
+        rivalBuild();
+        // A defeated field army does not make an enemy castle inert. Its steward
+        // spends the same treasury/recruit pool reinforcing the permanent garrison.
+        for (auto& [cell, town] : m_towns) {
+            if (owner(cell) != Faction::AI || !m_map.objectAt(cell) || m_map.objectAt(cell)->type != ObjType::Town) continue;
+            bool lordAlive = false;
+            for (const auto& r : m_rivals) lordAlive |= r.alive && r.home == cell;
+            if (!lordAlive) {
+                Rival steward;
+                steward.home = steward.pos = cell;
+                steward.army = m_garrisons[cell];
+                rivalRecruit(steward);
+                m_garrisons[cell] = steward.army;
+            }
+        }
+    }
+    if (day() < RIVAL_START_DAY - 1) return;
     for (auto& r : m_rivals)
         if (r.alive && !m_lost) rivalTurn(r);
 }
@@ -190,12 +247,22 @@ void AdventureSession::rivalTurn(Rival& r) {
     rivalRecruit(r);
     const double strength = power(r.army);
     const double hero     = power(army());
+    const auto& lord = m_scenario.rivalLord();
+    const bool castleLord = !lord.empty();
+    const int contact = m_scenario.firedOn(lord.value("mobilize_after", ""));
+    const bool mobilized = !castleLord || (contact >= 0 && day() >= contact + 2);
 
     // Pick the goal.
     std::optional<HexCoord> goal;
     std::vector<HexCoord> path;
     auto consider = [&](const HexCoord& target, const std::string& why) {
+        if (castleLord && !mobilized && target.q < lord.value("territory_q_min", 5)) return;
+        if (const auto* band = rivalAt(target); band && band->id != r.id) return;
+        if (m_encounters.count(target) && strength < CLEAR_MARGIN * power(guardsOf(target))) return;
         auto p = rivalRoute(r, target);
+        if (castleLord && !mobilized && std::any_of(p.begin(), p.end(), [&](const HexCoord& c) {
+                return c.q < lord.value("territory_q_min", 5);
+            })) return;
         if (p.empty()) return;
         float cost = 0;
         for (const auto& c : p) cost += rivalStepCost(c);
@@ -208,11 +275,14 @@ void AdventureSession::rivalTurn(Rival& r) {
         (strength < 0.35 * r.startPower || (growthDay && r.pos.distanceTo(r.home) <= 12))) {
         consider(r.home, "regroup");
     }
-    if (!goal && !m_pending && strength > AMBUSH_MARGIN * hero && r.pos.distanceTo(m_hero.pos) <= AMBUSH_RANGE) {
+    if (!goal && castleLord && owner(r.home) == Faction::AI && r.pos != r.home
+            && m_hero.pos.distanceTo(r.home) <= 4) consider(r.home, "defend castle");
+    if (!goal && !m_pending && strength > AMBUSH_MARGIN * hero && r.pos.distanceTo(m_hero.pos) <= (castleLord ? SIGHT_RADIUS : AMBUSH_RANGE)) {
         consider(m_hero.pos, "ambush");
     }
     // From the third week the war-chief hunts the passage before loot.
     auto searchMines = [&] {
+        if (castleLord) return; // Northern lords dispute estates, not the sealed passage.
         for (const auto& [cell, find] : m_mineFinds)
             if (strength > SEARCH_MARGIN * power(guardsOf(cell))) consider(cell, "search");
     };
@@ -220,12 +290,17 @@ void AdventureSession::rivalTurn(Rival& r) {
     if (!goal) {
         for (const auto& [cell, ctrl] : m_control) {
             if (ctrl.ownerFaction == Faction::AI || !rivalCaptures(ctrl.objType)) continue;
-            if (ctrl.objType == ObjType::Town && ctrl.ownerFaction == Faction::Player) continue;
+            if (!castleLord && ctrl.objType == ObjType::Town && ctrl.ownerFaction == Faction::Player) continue;
             if (const auto* held = garrison(cell); held && strength < CLEAR_MARGIN * power(*held)) continue;
             consider(cell, "capture");
         }
     }
     if (!goal) searchMines();
+    if (!goal && castleLord) {
+        for (const auto& [cell, pickup] : m_pickups)
+            if (pickup.item.empty() && (pickup.reward[Resource::Gold] > 0 || pickup.reward[Resource::Wood] > 0 || pickup.reward[Resource::Stone] > 0))
+                consider(cell, "supplies");
+    }
     if (!goal) {
         for (const auto& [cell, enc] : m_encounters) {
             const MapObjectDef* obj = m_map.objectAt(cell);
@@ -249,19 +324,20 @@ void AdventureSession::rivalTurn(Rival& r) {
             report("Scout", "Ambush! The " + r.name + " falls on our camp!");
             break;
         }
-        if (isEncounter(cell)) {                        // guards of an old mine
+        if (const auto* band = rivalAt(cell); band && band->id != r.id) break;
+        if (m_encounters.count(cell)) {                 // neutral guards
             auto fight = autoBattle(r.army, guardsOf(cell));
             r.army = fight.attacker;
             const MapObjectDef* site = m_map.objectAt(cell);
             std::string siteName = site ? site->name : "the guards";
             if (!fight.attackerWon) {
                 r.alive = false;
-                if (isVisible(cell)) report("Scout", "The guards of the " + siteName + " have destroyed a Shariw war-band!");
+                if (isVisible(cell)) report("Scout", "The guards of the " + siteName + " have destroyed " + r.name + "!");
                 break;
             }
             m_encounters.erase(cell);
             if (site && site->type == ObjType::Guard)
-                report("Scout", "The Shariw have cut through the " + siteName + ". The way is open for them now.");
+                report("Scout", r.name + " has cut through the " + siteName + ". The way is open for them now.");
             auto find = m_mineFinds.find(cell);
             const MapObjectDef* obj = m_map.objectAt(cell);
             std::string name = obj ? obj->name : "an old mine";
@@ -279,6 +355,13 @@ void AdventureSession::rivalTurn(Rival& r) {
         left -= cost;
         r.pos = cell;
         move.path.push_back(cell);
+        if (castleLord) {
+            auto pickup = m_pickups.find(cell);
+            if (pickup != m_pickups.end() && pickup->second.item.empty()) {
+                m_turns.faction(Faction::AI).treasury += pickup->second.reward;
+                m_pickups.erase(pickup);
+            }
+        }
         auto ctrl = m_control.find(cell);
         if (ctrl != m_control.end() && ctrl->second.ownerFaction == Faction::Player && garrison(cell)) {
             const MapObjectDef* obj = m_map.objectAt(cell);
@@ -288,22 +371,62 @@ void AdventureSession::rivalTurn(Rival& r) {
             m_garrisons[cell] = fight.defender;
             if (!fight.attackerWon) {
                 r.alive = false;
-                report("Scout", "The garrison of the " + name + " held! The Shariw war-band is destroyed.");
+                report("Scout", "The garrison of the " + name + " held! " + r.name + " is defeated.");
                 break;
             }
-            report("Scout", "The garrison of the " + name + " has fallen to the Shariw.");
+            report("Scout", "The garrison of the " + name + " has fallen to " + r.name + ".");
         }
         if (ctrl != m_control.end() && ctrl->second.ownerFaction != Faction::AI && rivalCaptures(ctrl->second.objType)) {
             bool wasOurs = ctrl->second.ownerFaction == Faction::Player;
+            const auto previousRoster = townRoster(cell);
             ctrl->second.ownerFaction = Faction::AI;
-            if (ctrl->second.objType == ObjType::Town) { m_towns[cell].recruitPool.clear(); growTown(cell); }
+            if (ctrl->second.objType == ObjType::Town) {
+                ensureBuildings(cell);
+                if (previousRoster != townRoster(cell)) { m_towns[cell].recruitPool.clear(); growTown(cell); }
+            }
+            for (auto& sc : m_specials) if (sc.stationed == cell) sc.stationed.reset();
             const MapObjectDef* obj = m_map.objectAt(cell);
             std::string name = obj ? obj->name : "a mine";
-            if (wasOurs) report("Scout", "The Shariw have taken the " + name + "! Its income is theirs now.");
-            else if (isVisible(cell)) report("Scout", "Shariw riders raise their banner over the " + name + ".");
+            if (wasOurs) report("Scout", r.name + " has taken the " + name + "! Its income is theirs now.");
+            else if (isVisible(cell)) report("Scout", r.name + " raises a banner over the " + name + ".");
         }
         if (m_lost || cell == *goal) break;
     }
     if (!move.path.empty()) m_rivalMoves.push_back(std::move(move));
     recomputeVisibility();  // lost mines stop revealing fog
+}
+
+// A pre-existing road company turns on the expedition at the agreed meeting
+// site. The reserve is saved with garrisons and consumed once, never respawned.
+bool AdventureSession::ambushFrom(const std::string& townName, const std::string& bandName) {
+    if (m_pending) return false;
+    const MapObjectDef* home = nullptr;
+    for (const auto& obj : m_map.objects()) if (obj.name == townName) home = &obj;
+    if (!home || m_hero.pos != home->pos || !garrison(home->pos)) return false;
+    std::optional<HexCoord> at;
+    for (int d = 0; d < 6; ++d) {
+        auto cell = m_hero.pos.neighbor(d);
+        const auto* tile = m_map.tileAt(cell);
+        if (tile && tile->passable && !isEncounter(cell) && !m_map.objectAt(cell)) { at = cell; break; }
+    }
+    if (!at && !isEncounter(m_hero.pos)) at = m_hero.pos;
+    if (!at) return false;
+    Rival escort;
+    escort.id = static_cast<int>(m_rivals.size()) + 1;
+    escort.name = bandName;
+    escort.home = home->pos;
+    escort.pos = *at;
+    auto& held = m_garrisons[home->pos];
+    for (auto& stack : held) {
+        int count = stack.count;
+        if (count > 0) escort.army.push_back({stack.id, count});
+        stack.count -= count;
+    }
+    held.erase(std::remove_if(held.begin(), held.end(), [](const Stack& s) { return s.count <= 0; }), held.end());
+    escort.startPower = power(escort.army);
+    m_rivals.push_back(escort);
+    m_pending = *at;
+    m_pendingAmbush = true;
+    m_pendingZone = false;
+    return true;
 }

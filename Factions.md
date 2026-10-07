@@ -193,11 +193,51 @@ Gold + Wood
 
 - **Ushari** — Witch from the last witch tribe in the realm. Fragile caster with a protective aura, ranged magic, and a weak physical knife attack when cornered.
   Former commander who has fought in three campaigns before this one.
+  Her people's rulers governed the northern land before the Compact's families
+  conquered it. The player belongs to those colonizing families. Ushari reads
+  surviving inscriptions that preserve the original settlements and institutions;
+  she seeks her people's household records for her own community, alongside the
+  search for Aldren. She has inherited a damaged history, not perfect knowledge
+  of every place her people once inhabited.
 - **Kharim** — Strategist archetype. Increases rider speed and flanking
   radius. Has studied the maps of Pha'raxh obsessively. Suspects the
   official history is wrong.
 - *(TBD)* — Merchant archetype. Economy SC; mine income bonuses,
   unit cost reduction.
+
+### Northern demo houses
+
+House Varen is the player's family; House Hale holds Hallowmere under cousin
+Corvin. **House Rook**, led by **Lord Edric Rook** at **Rookwatch**, is Hale's
+old rival over the Greyfang roads and mining estates. These are competing
+northern houses, not additional playable world factions.
+
+**Greyfen, the land of the next above-ground level, is House Rook's domain.**
+Rookwatch guards its western approach. Taking the castle gives the expedition
+a foothold but does not conquer the wider domain. Aldren's marked route leads
+through Rook-controlled country toward the old passage.
+
+Corvin supports the search for Aldren while urging the player to conquer
+Rookwatch. Edric sees the expedition as a Varen army serving Hale's claims.
+House Rook despises the surviving witch tribes and those who protect them.
+It seeks the **vacant throne of Umm'Natur**. Its captain promises to
+exterminate witches and their allies once House Rook takes that throne.
+This ambition reaches beyond its local feud with the Hales; the throne is
+vacant, not a northern office already held by Edric.
+
+If asked for passage, Rook promises an escort meeting at Greyfang Watch. There, a separate road patrol singles out Ushari, boasts that
+her people would all be dead had House Rook had its way, then attacks.
+Ushari answers that her people and their names for the land have survived. The player can instead refuse the escort and continue the search,
+or conquer the castle. After its capture Corvin offers his own steward for
+the estates, exposing his interest without enacting his later betrayal.
+Defeating the escort reveals a gap in the border patrols. Conquest instead supplies a castle base; Troll Gate provides a southern approach. Corvin's ambiguity concerns whether this search justifies annexing disputed estates and who benefits. Rook's persecution is not morally ambiguous. Neither Edric's hostility nor the conquest answers what happened to Aldren.
+
+**Later campaign reveal (author knowledge): Aldren has become a zombie.**
+The opening chapter establishes only his earlier presence and his route.
+Who changed him, the means, timing and how much of himself remains are
+undecided. Do not imply that he is Veined merely because he is undead;
+the Veined are explicitly a different civilisation, not zombies.
+See [the chapter plot](ROADMAP.md#stage-1--story).
 
 ### Relationships
 

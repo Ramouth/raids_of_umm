@@ -95,21 +95,37 @@ func _root_scene() -> void:
     var game: Node = load("res://scenes/game.tscn").instantiate()
     root.add_child(game)
     await process_frame
-    var intro: Control = null
-    for node in game.find_children("*", "Control", true, false):
-        if node.has_method("skip") and node.has_signal("finished"): intro = node
+    var intro := _find_cutscene(game)
     check(intro != null and game.adventure == null, "A new game opens on the intro")
     if intro != null:
         await process_frame
         check(intro._slide == 0 and intro._line == 0 and intro._lines.get_child_count() == 2, "The first slide shows, its lines laid out in advance")
         intro.advance()
         check(intro._line == 1, "Click / Space shows the next line")
-        intro.skip()                                   # Esc
+        intro.skip()
         await process_frame
-    check(game.adventure != null and game.screens.base == game.adventure, "Game root hosts the adventure as the base screen")
+    check(game.adventure == null and is_instance_valid(game._menu_layer), "The main menu follows the opening intro")
+    var menu_buttons: Array = game._menu_layer.find_children("*", "Button", true, false)
+    check(not menu_buttons.is_empty() and menu_buttons[0].text == "New expedition", "The main menu offers a new expedition")
+    if not menu_buttons.is_empty(): menu_buttons[0].pressed.emit()
+    await process_frame
+    intro = _find_cutscene(game)
+    check(intro != null and game.adventure == null, "Starting a new expedition opens the wolf cutscene")
+    if intro != null:
+        check(intro.slides.size() == 2 and not intro.show_title, "The wolf cutscene has two untitled story slides")
+        intro.skip()
+        await process_frame
+    check(game.adventure != null and game.screens.base == game.adventure, "The wolf cutscene starts the adventure map")
     check(game.adventure.screens == game.screens, "Adventure pushes onto the root screen stack")
+    check(game.adventure.notice.text.begins_with("Quest log updated:"), "Starting the map explicitly announces the updated wolf quest")
     game.queue_free()
     await process_frame
+
+func _find_cutscene(game: Node) -> Control:
+    for node in game.find_children("*", "Control", true, false):
+        if node.has_method("skip") and node.has_signal("finished"):
+            return node
+    return null
 
 func _scene(map_path: String, army: Array) -> Node2D:
     var scene: Node2D = load("res://scenes/desert.tscn").instantiate()
@@ -144,8 +160,6 @@ func _auto_battle(scene: Node2D) -> String:
 
 func _story() -> void:
     var scene := await _scene("res://content/maps/old_passage.json", WEEK2_ARMY)
-    check(scene.dialogue.is_speaking(), "The intro transmission plays at the start")
-    check(scene.dialogue._speaker.text == "STEWARD", "The steward opens level 1")
     check(scene.state.quests.any(func(q): return q.id == "wolves"), "Level 1: clear the vale's wolves")
     check(not scene.state.quests.any(func(q): return q.main), "The main quest waits for Ushari")
     check(scene.state.specials.is_empty(), "No companion at the start")
@@ -396,7 +410,14 @@ func _branch_endings() -> void:
         map.objects[0].name = "Varenhold"
         FileAccess.open(path, FileAccess.WRITE).store_string(JSON.stringify(map))
         var script: Dictionary = production.duplicate(true)
+        script.erase("survey_site")
+        script.erase("rival_lord")
         script.triggers = [
+            {"id": "southern_route", "when": {"event": "start"}, "do": []},
+            {"id": "aldren_camp", "when": {"event": "start"}, "do": [
+                {"lore": ["Gate rune · Esh Varen", "home"]},
+                {"lore": ["Gate rune · Tal Eren", "bridge"]},
+                {"lore": ["Gate rune · Orun", "assembly"]}]},
             {"id": "hallowmere", "when": {"event": "start"}, "do": [{"join": "ushari"}, {"quest": "aldren"}]},
             production.triggers.filter(func(t): return t.id == "passage")[0]]
         FileAccess.open(path.get_basename() + ".triggers.json", FileAccess.WRITE).store_string(JSON.stringify(script))
@@ -405,7 +426,36 @@ func _branch_endings() -> void:
         scene.travel_to(Vector2i(1, 0))
         await _walk(scene)
         check(await _auto_battle(scene) == "victory", "The search reaches the entrance")
-        check(not scene.state.won, "Finding the passage awaits a choice")
+        check(not scene.state.won, "Finding the survey awaits a choice")
+        scene.dialogue.skip_all()
+        await process_frame
+        await process_frame
+        var gate: Control = scene.screens.top()
+        check(gate != null and gate.has_method("try_lock"), "The survey puzzle precedes the ending choice")
+        if gate == null or not gate.has_method("try_lock"):
+            scene.queue_free()
+            continue
+        gate.leave_gate()
+        await process_frame
+        check(scene.screens.depth() == 0 and not scene.state.won, "Leaving the gate returns to exploration")
+        scene.end_day()
+        await _turn_done(scene)
+        check(scene.screens.depth() == 0, "The dismissed gate stays closed during exploration")
+        check(scene.save_game() and scene.load_game(), "An unresolved gate survives save/load")
+        scene.dialogue.skip_all()
+        await process_frame
+        await process_frame
+        gate = scene.screens.top()
+        check(gate != null and gate.has_method("try_lock"), "Loading at the gate restores its puzzle")
+        if gate == null or not gate.has_method("try_lock"):
+            scene.queue_free()
+            continue
+        check(not gate.try_lock(), "Wrong runes leave the gate locked")
+        gate.ask_ushari()
+        check(gate.hints == 1, "Ushari helps read the gate")
+        for wheel in range(4):
+            while gate.wheels[wheel] != wheel: gate.turn_wheel(wheel)
+        check(gate.try_lock(), "Correct runes open the gate")
         scene.dialogue.skip_all()
         await process_frame
         await process_frame
@@ -419,7 +469,9 @@ func _branch_endings() -> void:
         var film: Control = scene.screens.top()
         check(film != null and film.get("outcome") != null, "The selected night scene plays")
         check(scene.state.won and scene.state.story_outcome.night == night, "Both routes commit on the decision night")
-        check(scene.state.specials.size() == (0 if branch == "return_to_father" else 1), "Ushari leaves only on the father route")
+        check(scene.state.story_outcome.route == "greyfen_road" and not scene.state.story_outcome.passage_entered, "Both endings lead to the next surface journey")
+        check(scene.state.story_outcome.aldren_trace == "annotated_survey", "Aldren's presence is confirmed in the chapter handoff")
+        check(scene.state.specials.size() == 1, "Ushari stays with the expedition on both routes")
         if film != null:
             film.advance()
             film.advance()

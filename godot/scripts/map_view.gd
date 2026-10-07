@@ -241,11 +241,13 @@ func mark_sites(sites: Array) -> void:
             anchors[cell].modulate = Color(1, 1, 1, 0.6) if entry.used else Color.WHITE
 
 func object_texture(object: Dictionary) -> String:
+    if str(object.get("name", "")).ends_with("Rune Stone"):
+        return "objects/obelisk.png"
     var type := str(object.type)
     var kind := str(object.get("kind", ""))
     var candidates: Array[String] = []
     if type == "dwelling": candidates.append("objects/dwelling_%s.png" % kind)
-    if type == "town" and int(object.get("factionId", 0)) == 2 and data.ground == "grass":
+    if type == "town" and int(object.get("factionId", 0)) == 2 and data.ground == "grass" and kind != "cruths":
         candidates.append("objects/town_shariw_north.png")
     if KIND_TEXTURES.has(kind): candidates.append(KIND_TEXTURES[kind])
     var themed: Dictionary = art_theme.config.get("objects", {})

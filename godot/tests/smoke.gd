@@ -18,7 +18,11 @@ func check(condition: bool, message: String) -> void:
 func _run() -> void:
     var map := UmmMapData.new()
     check(map.read("res://content/maps/default.json"), "Existing C++ JSON map loads")
-    check(UmmMapData.new().read("res://content/maps/old_passage.json"), "Demo map loads")
+    var demo_map := UmmMapData.new()
+    check(demo_map.read("res://content/maps/old_passage.json"), "Demo map loads")
+    check(demo_map.objects.get(Vector2i(-9, 4), {}).get("name", "") == "Esh Varen",
+        "Esh Varen village sits beneath Varenhold on the playable map")
+    check(demo_map.is_passable(Vector2i(-9, 4)), "The village is reachable on open ground")
     check(map.tiles.size() == 169, "All 169 canonical tiles import")
     check(map.objects.size() == 11, "All 11 landmarks import")
     check(map.spawn == Vector2i(-5, 1), "Hero starts at Khemret")

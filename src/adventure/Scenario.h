@@ -39,6 +39,8 @@ class AdventureSession;
  *              "troops": [{"id","count"}]      — soldiers join the hero's army
  *              "item": id                       — an item is handed to the hero
  *              "lore": [title, text]            — a codex entry (the journal's Lore page)
+ *              "ambush_from": {"at": town, "band": name, "say": [[speaker,text]]}
+ *                                               — half its garrison attacks as an escort
  *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
  *                                               — that site turns rival; a war-band rides out
  *              "xp": n                          — experience for the commander and travelling companions
@@ -53,8 +55,12 @@ class AdventureSession;
  * when.delay: N — with "after": only N or more days after that trigger fired.
  * when.wait: id — if that trigger has not fired yet, hold this one and run it
  *                 right after it does (e.g. a companion's line before she has joined).
+ * Root rival_lord configures a castle opponent: home, name, army, garrison,
+ * mobilize_after (trigger id), territory_q_min (opening patrol boundary).
  * Root passage_ends_scenario defaults to true; false emits passage_found instead.
  * Root essential_companions keeps named companions with the search until a leave action.
+ * A choice with allow_exploration permits travel and turns while unresolved.
+ * The passage gate records its mine in at:[q,r]; it can only be solved there.
  * Pending choices and outcomes persist in saves.
  * Each trigger fires once. Offers are player choices (e.g. pay a tribute)
  * made through AdventureSession::acceptOffer().
@@ -78,12 +84,20 @@ public:
 
     std::optional<std::string> load(const std::string& path);
     bool loaded() const { return m_loaded; }
+    // Optional castle opponent. Definitions reload from the scenario; trigger dates persist.
+    const Json& rivalLord() const { return m_rivalLord; }
+    const std::string& surveySite() const { return m_surveySite; }
+    int firedOn(const std::string& id) const {
+        auto it = m_firedOn.find(id);
+        return it == m_firedOn.end() ? -1 : it->second;
+    }
     bool essential(const std::string& id) const { return m_essential.count(id) > 0; }
     bool passageEndsScenario() const { return m_passageEndsScenario; }
     const Json& choice() const { return m_choice; }
     int morale(const std::string& id) const { return m_morale.count(id) ? m_morale.at(id) : 0; }
     const Json& outcome() const { return m_outcome; }
     bool awaitingChoice() const { return !m_choice.empty(); }
+    bool blocksAdventure() const { return awaitingChoice() && !m_choice.value("allow_exploration", false); }
     std::optional<std::string> choose(AdventureSession& s, const std::string& id);
     // Companions with the hero at the start; nullopt = the file does not say.
     const std::optional<std::vector<std::string>>& startCompanions() const { return m_startCompanions; }
@@ -111,6 +125,8 @@ private:
     Quest* quest(const std::string& id);
     void fireTrigger(AdventureSession& s, const Json& trigger);
 
+    std::string                     m_surveySite;
+    Json                            m_rivalLord = Json::object();
     bool                            m_loaded = false;
     bool                            m_passageEndsScenario = true;
     std::unordered_set<std::string> m_essential;

@@ -150,7 +150,7 @@ func _ready() -> void:
     log_view.scroll_following = true
     confirm_retreat = ConfirmationDialog.new()
     confirm_retreat.title = "Retreat from battle?"
-    confirm_retreat.dialog_text = "Keep your surviving units, but leave the dungeon uncleared.\nYou receive no loot. Casualties are permanent for this expedition."
+    confirm_retreat.dialog_text = "Keep your surviving units, but leave the enemy holding the field.\nYou receive no loot. Casualties are permanent for this expedition."
     confirm_retreat.confirmed.connect(func(): issue("retreat"))
     confirm_retreat.canceled.connect(_schedule_ai)
     add_child(confirm_retreat)
@@ -1140,7 +1140,7 @@ func _schedule_ai() -> void:
     if not busy and state.result == "ongoing" and (auto_battle or not state.player_turn): issue("ai")
 
 func _show_result() -> void:
-    turn_label.text = {"victory": "VICTORY — the tomb is yours", "defeat": "DEFEAT — the expedition has fallen", "retreat": "RETREAT — the survivors escape"}.get(state.result, state.result)
+    turn_label.text = {"victory": "VICTORY — the field is yours", "defeat": "DEFEAT — the expedition has fallen", "retreat": "RETREAT — the survivors escape"}.get(state.result, state.result)
     turn_label.add_theme_color_override("font_color", GOLD)
     _log(turn_label.text, GOLD)
     var survivors: Array[String] = []

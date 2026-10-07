@@ -208,19 +208,19 @@
       "guards": [
         {
           "id": "forest_troll",
-          "count": 13
+          "count": 3
         },
         {
           "id": "highland_bear",
-          "count": 12
+          "count": 2
         },
         {
           "id": "brigand",
-          "count": 24
+          "count": 8
         },
         {
           "id": "grey_wolf",
-          "count": 32
+          "count": 10
         }
       ],
       "reward": {
@@ -232,11 +232,11 @@
       "guards": [
         {
           "id": "forest_troll",
-          "count": 28
+          "count": 5
         },
         {
           "id": "highland_bear",
-          "count": 14
+          "count": 3
         }
       ],
       "reward": {
@@ -269,11 +269,11 @@
       "guards": [
         {
           "id": "forest_troll",
-          "count": 16
+          "count": 4
         },
         {
           "id": "brigand",
-          "count": 30
+          "count": 10
         }
       ],
       "reward": {
@@ -325,15 +325,15 @@
       "guards": [
         {
           "id": "barrow_wight",
-          "count": 40
+          "count": 8
         },
         {
           "id": "forest_troll",
-          "count": 12
+          "count": 2
         },
         {
           "id": "skeleton_warrior",
-          "count": 70
+          "count": 20
         }
       ],
       "reward": {
@@ -374,6 +374,138 @@
         "Gold": 800
       },
       "item": "drowned_crown"
+    },
+    "Thornwood Wolves": {
+      "guards": [
+        {
+          "id": "grey_wolf",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "High Road Brigands": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 18
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Frostwood Wardens": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 18
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Westbarrow Dead": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 12
+        }
+      ],
+      "reward": {
+        "Gold": 350
+      }
+    },
+    "Frostmere Watch": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 8
+        },
+        {
+          "id": "skeleton_warrior",
+          "count": 16
+        }
+      ],
+      "reward": {
+        "Gold": 450
+      }
+    },
+    "North Road Reavers": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 12
+        }
+      ],
+      "reward": {
+        "Gold": 350,
+        "Wood": 1
+      }
+    },
+    "Eastcliff Trolls": {
+      "guards": [
+        {
+          "id": "forest_troll",
+          "count": 3
+        },
+        {
+          "id": "highland_bear",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
+    },
+    "Southfen Raiders": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 10
+        }
+      ],
+      "reward": {
+        "Gold": 300,
+        "Stone": 1
+      }
+    },
+    "Far Cairn Wights": {
+      "guards": [
+        {
+          "id": "barrow_wight",
+          "count": 14
+        }
+      ],
+      "reward": {
+        "Gold": 400
+      }
+    },
+    "Greyvale Bears": {
+      "guards": [
+        {
+          "id": "highland_bear",
+          "count": 8
+        }
+      ],
+      "reward": {
+        "Gold": 450
+      }
+    },
+    "Ravenwood Bandits": {
+      "guards": [
+        {
+          "id": "brigand",
+          "count": 12
+        }
+      ],
+      "reward": {
+        "Gold": 350,
+        "Wood": 1
+      }
     }
   },
   "pickups": {

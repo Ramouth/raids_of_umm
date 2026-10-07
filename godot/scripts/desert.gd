@@ -22,6 +22,8 @@ var _grid_button: CheckButton
 const STARTING_ARMY := [{"id": "woad_runner", "count": 24}, {"id": "cruth_slinger", "count": 10}, {"id": "painted_blade", "count": 3}]
 const ChapterScene = preload("res://scripts/chapter_scene.gd")
 var _story_screen: Control
+var _gate_dismissed := false
+var _gate_button: Button
 
 const EndScreen = preload("res://scripts/end_screen.gd")
 ## Fixed passage seed for tests; -1 picks a random old mine per expedition.
@@ -41,6 +43,7 @@ var _popup_queue: Array[Dictionary] = []
 const TownScreen = preload("res://scripts/town_screen.gd")
 const MapPopup = preload("res://scripts/map_popup.gd")
 const HeroScreen = preload("res://scripts/hero_screen.gd")
+const GatePuzzle = preload("res://scripts/gate_puzzle.gd")
 const DialoguePanel = preload("res://scripts/dialogue_panel.gd")
 const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
@@ -83,6 +86,7 @@ var cleared_dungeons: Dictionary = {}
 var battle: Control
 ## Injected by game.gd; when the scene runs alone (tests, F6) it makes its own.
 var screens: ScreenStack
+var game_root: Node
 var _enter_button: Button
 var _army_label: Label
 var _restart_button: Button
@@ -313,16 +317,36 @@ func _apply_state(next: Dictionary) -> void:
     if quests.size() > _quest_count and _quest_count > 0:
         notice.text = "New quest: %s  (Q to open the quest log)" % quests[-1].title
     _quest_count = quests.size()
-    if quest_log != null and quest_log.visible: quest_log.show_quests(quests)
+    if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []), _quest_progress())
     var guarded: Dictionary = {}
     for c in state.get("guarded", []): guarded[Vector2i(c[0], c[1])] = true
     map_view.set_cleared_guards(guarded)
+    for cell: Vector2i in map_view.anchors:
+        var anchor: Node2D = map_view.anchors[cell]
+        var badge := anchor.get_node_or_null("GuardCount") as Label
+        if guarded.has(cell) and badge == null:
+            badge = Label.new()
+            badge.name = "GuardCount"
+            badge.position = Vector2(-80, -100)
+            badge.size.x = 160
+            badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            badge.add_theme_font_size_override("font_size", 17)
+            badge.add_theme_color_override("font_color", Color("ffe2a0"))
+            badge.add_theme_color_override("font_outline_color", Color("191610"))
+            badge.add_theme_constant_override("outline_size", 6)
+            anchor.add_child(badge)
+        if badge != null:
+            var count := 0
+            for stack in _encounters_for(data.objects.get(cell, {})):
+                count += int(stack.count)
+            badge.text = "%d guards" % count
+            badge.visible = guarded.has(cell) and fog.is_explored(cell)
     map_view.remove_objects(state.get("vanished", []))
     map_view.mark_sites(state.get("sites", []))
     _show_xp_gain()
     _announce_levels(next)
     _sync_inventory()
-    if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []))
+    if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []), _quest_progress())
     _sync_rivals()
     _update_turn_hud()
 
@@ -507,7 +531,7 @@ func _sync_rivals() -> void:
         seen[id] = true
         var sprite: Node2D = _rival_sprites.get(id)
         if sprite == null:
-            sprite = _make_rival_sprite(str(rival.name))
+            sprite = _make_rival_sprite(str(rival.name), str(rival.get("roster", "shariw")))
             _rival_sprites[id] = sprite
         sprite.visible = true
         if not sprite.has_meta("moving"):
@@ -516,7 +540,7 @@ func _sync_rivals() -> void:
         if not seen.has(id) and not _rival_sprites[id].has_meta("moving"):
             _rival_sprites[id].visible = false
 
-func _make_rival_sprite(title: String) -> Node2D:
+func _make_rival_sprite(title: String, roster: String = "shariw") -> Node2D:
     var anchor := Node2D.new()
     anchor.name = title.validate_node_name()
     map_view.get_node("Scenery").add_child(anchor)
@@ -527,9 +551,15 @@ func _make_rival_sprite(title: String) -> Node2D:
     shadow.color = Color(0.72, 0.25, 0.17, 0.55)
     anchor.add_child(shadow)
     var sprite := Sprite2D.new()
-    sprite.texture = load("res://content/textures/units/shariw_hero.png")
+    if roster == "cruths":
+        var frame := AtlasTexture.new()
+        frame.atlas = load("res://content/textures/units/armoured_warrior_idle.png")
+        frame.region = Rect2(0, 0, 64, 64)
+        sprite.texture = frame
+    else:
+        sprite.texture = load("res://content/textures/units/shariw_hero.png")
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-    sprite.scale = Vector2(0.5, 0.5)
+    sprite.scale = Vector2.ONE if roster == "cruths" else Vector2(0.5, 0.5)
     sprite.position.y = -28
     anchor.add_child(sprite)
     var label := Label.new()
@@ -550,7 +580,7 @@ func _animate_rivals(moves: Array) -> void:
     for move in moves:
         var sprite: Node2D = _rival_sprites.get(int(move.id))
         if sprite == null:
-            sprite = _make_rival_sprite("Shariw war-band")
+            sprite = _make_rival_sprite(str(move.get("name", "Enemy army")), str(move.get("roster", "shariw")))
             _rival_sprites[int(move.id)] = sprite
         sprite.visible = true
         sprite.set_meta("moving", true)
@@ -624,6 +654,7 @@ func load_game() -> bool:
     if not reply.get("ok", false):
         notice.text = str(reply.get("error", "Could not load."))
         return false
+    _gate_dismissed = false
     var extra: Dictionary = reply.get("extra", {})
     inventory = extra.get("inventory", [])
     cleared_dungeons.clear()
@@ -645,7 +676,25 @@ func load_game() -> bool:
 
 func toggle_quest_log() -> void:
     quest_log.visible = not quest_log.visible
-    if quest_log.visible: quest_log.show_quests(state.get("quests", []), state.get("lore", []))
+    if quest_log.visible: quest_log.show_quests(state.get("quests", []), state.get("lore", []), _quest_progress())
+
+const WOLF_PACKS := ["Hill Wolves", "Den Wolves", "Hermit's Wolves", "Lowland Wolves", "Thornwood Wolves"]
+
+func _quest_progress() -> Dictionary:
+    var total := 0
+    var remaining := 0
+    var packs_remaining := 0
+    for cell: Vector2i in data.objects:
+        var landmark: Dictionary = data.objects[cell]
+        if not WOLF_PACKS.has(str(landmark.get("name", ""))): continue
+        for stack in _encounter_entry(landmark).get("guards", []):
+            total += int(stack.get("count", 0))
+        if _guarded(cell):
+            packs_remaining += 1
+            for stack in _encounters_for(landmark):
+                remaining += int(stack.get("count", 0))
+    if total == 0: return {}
+    return {"wolves": "Wolves remaining: %d / %d   ·   Packs remaining: %d / %d" % [remaining, total, packs_remaining, WOLF_PACKS.size()]}
 
 func _build_turn_hud() -> void:
     dialogue = DialoguePanel.new()
@@ -730,7 +779,7 @@ func _build_turn_hud() -> void:
     _end_day_button.pressed.connect(end_day)
     sidebar.add_child(_end_day_button)
     sidebar.move_child(_end_day_button, sidebar.get_node("Grid").get_index())
-    $HUD/Layout/Footer.text = "CLICK travel  •  E end day  •  T town  •  R garrison  •  P companions  •  Q quests  •  F5 save  •  F9 load"
+    $HUD/Layout/Footer.text = "ARROWS / WASD pan  •  CLICK travel  •  E end day  •  T town  •  R garrison  •  P companions  •  Q quests  •  F5 save  •  F9 load"
 
 func _update_turn_hud() -> void:
     if not is_instance_valid(_calendar_label): return
@@ -756,13 +805,13 @@ func _update_turn_hud() -> void:
         else:
             _xp_detail.text = "%d / %d XP  ·  %d to level %d" % [
                 int(hp.xp) - int(hp.prev), span, int(hp.next) - int(hp.xp), int(hp.level) + 1]
-    _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy or not state.get("story_choice", {}).is_empty() or state.get("won", false)
+    _end_day_button.disabled = hero.moving or is_instance_valid(battle) or turn_busy or _story_blocks_exploration() or state.get("won", false)
 
 ## True while the Shariw turn animates; blocks another End Day.
 var turn_busy := false
 
 func end_day() -> void:
-    if not state.get("story_choice", {}).is_empty() or state.get("won", false): return
+    if _story_blocks_exploration() or state.get("won", false): return
     if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return
     var next: Dictionary = JSON.parse_string(adventure.end_day())
     if not next.get("ok", false): return
@@ -826,9 +875,9 @@ func _process(delta: float) -> void:
     _present_story()
     if is_instance_valid(_zoom_readout): _zoom_readout.text = "%d%%" % roundi(camera.zoom.x * 100.0)
     var direction := Vector2(
-        float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
-        float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
-    if not direction.is_zero_approx():
+        float((Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))) - float((Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))),
+        float((Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))) - float((Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))))
+    if not direction.is_zero_approx() and not is_instance_valid(popup) and not dialogue.is_speaking() and not quest_log.visible:
         _stop_zoom()
         camera.position += direction.normalized() * 500.0 * delta / camera.zoom.x
         _clamp_camera()
@@ -900,6 +949,7 @@ func _unhandled_input(event: InputEvent) -> void:
             KEY_ESCAPE:
                 if not hero.moving:
                     if _planned != NO_CELL: cancel_route()
+                    elif is_instance_valid(game_root): game_root.open_game_menu()
                     else: _inspect(NO_CELL)
 
 func _inspect(cell: Vector2i) -> void:
@@ -1020,6 +1070,7 @@ func travel_to(cell: Vector2i) -> bool:
     return true
 
 func _entered_cell(cell: Vector2i) -> void:
+    if not _at_gate(): _gate_dismissed = false
     if not _pending_steps.is_empty():
         var step: Dictionary = _pending_steps.pop_front()
         fog.reveal(step.revealed)
@@ -1075,7 +1126,8 @@ func _journey_finished() -> void:
             "dungeon": notice.text = "%s · A cold wind rises from the sealed entrance." % object.name
             "artifact": notice.text = "%s · Only a hollow in the earth remains." % object.name
             "old_mine": notice.text = "%s · The shaft is empty and cold. Something below is breathing, slowly." % object.name
-            "quest_giver": notice.text = "%s · An abandoned camp. Check the journal for what you found." % object.name
+            "quest_giver":
+                notice.text = ("%s · An inscription survives here. Its reading is recorded in your journal." if str(object.name).ends_with("Rune Stone") else "%s · An abandoned camp. Check the journal for what you found.") % object.name
             "guard": notice.text = "%s · Their fires are cold. Nothing here yet." % object.name
             _: notice.text = "The expedition has arrived. Choose the next stretch of your journey."
     _hover = NO_CELL
@@ -1097,6 +1149,14 @@ func _build_expedition_controls() -> void:
     _enter_button.pressed.connect(enter_dungeon)
     sidebar.add_child(_enter_button)
     sidebar.move_child(_enter_button, sidebar.get_node("Spacer").get_index())
+    _gate_button = Button.new()
+    _gate_button.name = "ReadGate"
+    _gate_button.text = "Read the survey with Ushari"
+    _gate_button.pressed.connect(func():
+        _gate_dismissed = false
+        _present_story())
+    sidebar.add_child(_gate_button)
+    sidebar.move_child(_gate_button, sidebar.get_node("Spacer").get_index())
     _town_button = Button.new()
     _town_button.name = "EnterTown"
     _town_button.text = "Enter town     T"
@@ -1118,6 +1178,8 @@ func _build_expedition_controls() -> void:
 
 func _update_expedition() -> void:
     if not is_instance_valid(_army_label): return
+    _gate_button.visible = _at_gate()
+    _gate_button.disabled = hero.moving
     var summary: Array[String] = []
     for stack in army: summary.append("%d %s" % [stack.count, str(stack.id).replace("_", " ")])
     _army_label.text = ", ".join(summary) if not army.is_empty() else "Your army has fallen. Start a new expedition to fight again."
@@ -1200,6 +1262,9 @@ func screen_uncovered() -> void:
     set_process_unhandled_input(true)
 
 func _encounters_for(landmark: Dictionary) -> Array:
+    for defender in state.get("defenders", []):
+        if int(defender.cell[0]) == int(landmark.get("q", -999)) and int(defender.cell[1]) == int(landmark.get("r", -999)):
+            return defender.army
     return _encounter_entry(landmark).get("guards", [])
 
 ## The map's encounter entry for an object (mirrors the native lookup).
@@ -1239,7 +1304,7 @@ func _encounter_finished(result: Dictionary) -> void:
     result["encounter_type"] = _encounter_type
     if victory:
         inventory.append_array(result.rewards.duplicate(true))
-    var reply: Dictionary = JSON.parse_string(adventure.resolve_encounter(victory))
+    var reply: Dictionary = JSON.parse_string(adventure.resolve_encounter(victory, JSON.stringify(result.get("enemy_survivors", null))))
     var place := str(data.objects.get(Vector2i(reply.hero[0], reply.hero[1]), {}).get("name", "The guards"))
     _apply_state(reply)
     _say(reply)
@@ -1251,17 +1316,17 @@ func _encounter_finished(result: Dictionary) -> void:
         _check_defeat()
         return
     if str(result.get("encounter_type", "")) in ["rival", "ambush"]:
-        notice.text = "The Shariw war-band is scattered!"
+        notice.text = "The enemy army is defeated!"
         center_hero()
         return
     match str(reply.get("find", "none")):
         "passage":
-            notice.text = "Beneath %s, a stairway plunges into the dark: the old passage!" % place
+            notice.text = ("Beneath %s, a stairway plunges into the dark: the old passage!" if state.get("won", false) else "At %s, Aldren’s survey reveals the road ahead.") % place
             if state.get("won", false): _show_end(true)
         "loot":
             notice.text = "%s is empty of secrets, but a forgotten cache of gold and crystal lies within." % place
         "collapse":
-            notice.text = "%s ends in a wall of fallen rock. The passage is not here." % place
+            notice.text = "%s ends in fallen rock. No trace of Aldren’s survey here." % place
         _:
             notice.text = "Victory! %s is broken; the way is open." % place
     center_hero()
@@ -1272,6 +1337,16 @@ func _check_defeat() -> void:
 
 var _end_screen: Control
 
+func _story_blocks_exploration() -> bool:
+    var pending: Dictionary = state.get("story_choice", {})
+    return not pending.is_empty() and not pending.get("allow_exploration", false)
+
+func _at_gate() -> bool:
+    var pending: Dictionary = state.get("story_choice", {})
+    if pending.get("id", "") != "passage_gate": return false
+    var at: Array = pending.get("at", [])
+    return at.size() == 2 and hero.cell == Vector2i(int(at[0]), int(at[1]))
+
 func _present_story() -> void:
     if state.is_empty() or is_instance_valid(_story_screen) or is_instance_valid(_end_screen): return
     if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup): return
@@ -1279,9 +1354,12 @@ func _present_story() -> void:
     var choice: Dictionary = state.get("story_choice", {})
     var outcome: Dictionary = state.get("story_outcome", {})
     if choice.is_empty() and outcome.is_empty(): return
-    var scene := ChapterScene.new()
+    if choice.get("id", "") == "passage_gate" and (_gate_dismissed or not _at_gate()): return
+    var scene: Control = GatePuzzle.new() if choice.get("id", "") == "passage_gate" else ChapterScene.new()
     scene.theme = $HUD/Layout.theme
     _story_screen = scene
+    if scene is GatePuzzle:
+        scene.readings = state.get("lore", []).filter(func(entry): return str(entry.title).begins_with("Gate rune"))
     scene.choice = choice
     scene.outcome = outcome
     screens.push(scene, func(result: Dictionary):
@@ -1294,12 +1372,18 @@ func _present_story() -> void:
             _apply_state(reply)
             hero.place_at(_hero_cell())
             _say(reply)
+            if state.get("encounter") != null:
+                _engage.call_deferred()
+                return
             # Keep the committed branch for the next chapter, even after restarting the demo.
             var saved: Dictionary = JSON.parse_string(adventure.save_game(
                 ProjectSettings.globalize_path("user://chapter_one.json"),
                 JSON.stringify({"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])})))
             if not saved.get("ok", false): push_warning("Could not save chapter outcome: " + str(saved.get("error", "")))
             _present_story()
+        elif result.get("action", "") == "leave_gate":
+            _gate_dismissed = true
+            notice.text = "The survey waits. Find the old inscriptions, then return here to read the route with Ushari."
         else:
             _show_end(true))
 
@@ -1344,6 +1428,7 @@ func new_expedition() -> void:
     _restart()
 
 func _restart() -> void:
+    _gate_dismissed = false
     _end_screen = null
     _story_screen = null
     if dialogue != null: dialogue.skip_all()

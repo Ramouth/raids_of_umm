@@ -140,6 +140,7 @@ int AdventureSession::sightBonus() const {
 
 int AdventureSession::encounterXp(const HexCoord& c) const {
     if (const Rival* r = rivalAt(c)) return std::max(40, static_cast<int>(power(r->army) / 3));
+    if (owner(c) == Faction::AI && garrison(c)) return std::max(40, static_cast<int>(power(guardsOf(c)) / 3));
     if (!m_encounters.count(c)) return 0;
     return std::max(20, static_cast<int>(power(guardsOf(c)) / 3));
 }
@@ -270,7 +271,7 @@ std::optional<std::string> AdventureSession::choosePath(const std::string& pathI
 }
 
 std::optional<std::string> AdventureSession::buyFieldwork(const std::string& kind) {
-    if (won() || lost() || m_scenario.awaitingChoice()) return "Finish the current story first.";
+    if (won() || lost() || m_scenario.blocksAdventure()) return "Finish the current story first.";
     if (kind != "barricade" && kind != "stakes") return "Unknown fieldwork.";
     if (fieldworkCapacity() == 0 || (kind == "stakes" && fieldworkCapacity() < 2))
         return "Learn the required Siegemaster skill first.";

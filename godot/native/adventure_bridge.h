@@ -14,7 +14,7 @@ public:
     Json preview(int q, int r) const;
     Json travel(int q, int r);
     Json end_day();
-    Json resolve_encounter(bool victory);
+    Json resolve_encounter(bool victory, const Json& enemy_survivors = nullptr);
     Json set_army(const Json& stacks);
     Json build(int q, int r, const std::string& id);
     Json equip(const std::string& id);       // commander's paper doll

@@ -1,0 +1,1377 @@
+[
+  {
+    "q": -14,
+    "r": 0,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 1,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 2,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 3,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 4,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 5,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 6,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 7,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 8,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 9,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 10,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 11,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 12,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 13,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -14,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": -1,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 0,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 1,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 2,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 3,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 5,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 6,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 7,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 8,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 9,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 11,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 12,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 13,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -13,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": -2,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": -1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 0,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 5,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 6,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 7,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 8,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 11,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 12,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 13,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -12,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": -3,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": -2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": -1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 0,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 1,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 4,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 5,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -11,
+    "r": 6,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -11,
+    "r": 7,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 8,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 9,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 11,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 12,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 13,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -11,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": -4,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": -3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": -2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": -1,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 0,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 1,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -10,
+    "r": 5,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 6,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 7,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 8,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 11,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 12,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 13,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -10,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": -5,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": -4,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": -3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": -2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": -1,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 0,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -9,
+    "r": 4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 5,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 6,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 7,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 8,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 11,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 12,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 13,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -9,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -6,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -5,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": -1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 0,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 1,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 2,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -8,
+    "r": 4,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 5,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 6,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 7,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 8,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 11,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 12,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 13,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -8,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -7,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -6,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -5,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": -1,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 0,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 1,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -7,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 5,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 6,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 7,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 8,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 11,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 12,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 13,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -7,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -8,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -7,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -6,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -5,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -4,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -2,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": -1,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 0,
+    "terrain": "lake",
+    "passable": false,
+    "moveCost": 0.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 1,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 2,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 0.5,
+    "variant": 0,
+    "road": true
+  },
+  {
+    "q": -6,
+    "r": 3,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 4,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 5,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 6,
+    "terrain": "forest",
+    "passable": false,
+    "moveCost": 1.5,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 7,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 8,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 9,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 10,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 11,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 12,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 13,
+    "terrain": "grass",
+    "passable": true,
+    "moveCost": 1.0,
+    "variant": 0
+  },
+  {
+    "q": -6,
+    "r": 14,
+    "terrain": "mountain",
+    "passable": false,
+    "moveCost": 1.8,
+    "variant": 0
+  }
+]

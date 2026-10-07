@@ -23,6 +23,8 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         if (!f.is_open()) return "Cannot open triggers: " + path;
         Json root = Json::parse(f);
         m_triggers = root.value("triggers", Json::array());
+        m_rivalLord = root.value("rival_lord", Json::object());
+        m_surveySite = root.value("survey_site", "");
         m_passageEndsScenario = root.value("passage_ends_scenario", true);
         m_choice = Json::object();
         m_outcome = Json::object();
@@ -144,10 +146,26 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         if (a.contains("morale"))
             m_morale[a["morale"].at("id").get<std::string>()] = std::clamp(a["morale"].at("value").get<int>(), -2, 2);
         if (a.contains("leave")) s.leaveSpecial(a["leave"].get<std::string>());
-        if (a.contains("choice") && m_outcome.empty()) m_choice = a["choice"];
+        if (a.contains("choice") && m_outcome.empty()) {
+            m_choice = a["choice"];
+            if (m_choice.value("id", "") == "passage_gate" && s.passageMine()) {
+                auto at = *s.passageMine();
+                m_choice["at"] = {at.q, at.r};
+            }
+        }
         if (a.contains("ending")) {
             m_outcome = a["ending"];
             m_outcome["night"] = s.day();
+            if (!m_rivalLord.empty()) {
+                m_outcome["approach"] = s.departureRoute();
+                m_outcome["supply_base"] = s.departureRoute() == "castle_road" ? m_rivalLord.value("home", "") : "";
+                m_outcome["patrol_orders"] = firedOn("escort_orders") >= 0;
+                m_outcome["southern_track_scouted"] = firedOn("southern_route") >= 0 || firedOn("southern_route_visit") >= 0;
+                m_outcome["corvin_supplies_taken"] = offer("rookwatch_supplies") && offer("rookwatch_supplies")->taken;
+                bool edricAlive = false;
+                for (const auto& r : s.rivals()) if (r.name == m_rivalLord.value("name", "")) edricAlive |= r.alive;
+                m_outcome["edric_army_defeated"] = !edricAlive;
+            }
             m_choice = Json::object();
             s.completeChapter(m_outcome.value("return_to", ""));
         }
@@ -184,6 +202,15 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             }
             s.setArmy(army);
         }
+        if (a.contains("ambush_from")) {
+            const auto& b = a["ambush_from"];
+            if (s.ambushFrom(b.at("at"), b.at("band"))) {
+                for (const auto& line : b.value("say", Json::array()))
+                    m_lines.push_back({line.at(0), line.at(1)});
+            } else {
+                m_lines.push_back({"Scout", "No escort comes. We will have to make our own way."});
+            }
+        }
         if (a.contains("betray")) {
             const auto& b = a["betray"];
             std::vector<AdventureSession::Stack> army;
@@ -197,6 +224,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 for (const auto& line : t.value("say", Json::array()))
                     m_lines.push_back({line.at(0).get<std::string>(), line.at(1).get<std::string>()});
         }
+        if (a.contains("event")) fire(s, a["event"].get<std::string>());
         if (a.contains("xp")) s.grantXp(a["xp"].get<int>());   // a story reward
         if (a.contains("vanish")) m_vanished.insert(a["vanish"].get<std::string>());
         if (a.contains("offer"))
@@ -208,8 +236,19 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
 std::optional<std::string> Scenario::choose(AdventureSession& s, const std::string& id) {
     if (!awaitingChoice() || !m_outcome.empty() || s.won() || s.lost())
         return "There is no story choice to make.";
+    if (m_choice.contains("at")) {
+        const auto& at = m_choice["at"];
+        if (s.heroPos() != HexCoord(at[0].get<int>(), at[1].get<int>()))
+            return "Return to the survey to trace the route.";
+    }
     for (const auto& option : m_choice.value("options", Json::array())) {
         if (option.value("id", "") != id) continue;
+        for (const auto& title : option.value("requires_lore", Json::array())) {
+            if (std::none_of(m_lore.begin(), m_lore.end(), [&](const Lore& l) { return l.title == title; }))
+                return "Read the inscriptions at Varenhold, Coldwater bridge and the assembly court with Ushari first.";
+        }
+        if (option.value("requires_route", false) && s.departureRoute().empty())
+            return "Secure a way onward: hold Rookwatch, clear the southern Troll Gate, or recover the escort's patrol orders.";
         Json actions = option.value("then", Json::array());
         m_choice = Json::object();  // commit before executing; a second click cannot take the other path
         run(s, actions);

@@ -29,8 +29,8 @@
  *
  * Encounters (guards, old mines) block their hex until beaten. Travelling
  * into one stops the hero next to it and reports `encounter`; the caller
- * runs the battle and calls resolveEncounter(). One old mine, picked at
- * random per game, hides the passage — clearing it wins the scenario.
+ * runs the battle and calls resolveEncounter(). A scenario may name its survey mine; legacy maps choose one at random.
+ * Clearing it either wins or starts a scripted discovery.
  */
 // Bonuses every troop stack of the hero's army fights with (commander's
 // items, town buildings such as the Drill Yard).
@@ -75,7 +75,7 @@ public:
     // Loads the map + data registry and seeds ownership from map factionIds.
     // Hero starts at the first player-owned town (else first town, else first passable tile).
     // encountersPath: optional JSON of guard armies + rewards (see data/maps/*.encounters.json).
-    // seed picks which old mine hides the passage.
+    // seed picks the discovery mine unless the scenario names a survey_site.
     // triggersPath: optional Scenario script (quests, dialogue, clues).
     std::optional<std::string> start(const std::string& mapPath, const std::string& dataDir,
                                      const std::string& encountersPath = "", uint32_t seed = 0,
@@ -104,7 +104,8 @@ public:
     std::optional<HexCoord> pendingEncounter() const { return m_pending; }
     // Called after the battle. Victory clears the hex, pays the reward and moves the
     // hero onto it (spending its step cost). Returns what an old mine held.
-    MineFind resolveEncounter(bool victory);
+    struct Stack { std::string id; int count = 0; };
+    MineFind resolveEncounter(bool victory, const std::optional<std::vector<Stack>>& enemySurvivors = std::nullopt);
     bool won() const { return m_won; }
     std::optional<HexCoord> passageMine() const { return m_passage; }
 
@@ -118,7 +119,7 @@ public:
     bool siteUsed(const HexCoord& c) const;
 
     // ── Army ─────────────────────────────────────────────────────────────────
-    struct Stack { std::string id; int count = 0; };
+
     std::vector<Stack> army() const;
     // Replaces the hero's army (e.g. with combat survivors). Unknown ids are dropped.
     void setArmy(const std::vector<Stack>& stacks);
@@ -133,6 +134,7 @@ public:
     // ── Towns ────────────────────────────────────────────────────────────────
     // Faction roster a town recruits from, by owner (1 = Ivory Compact, 2 = Shariw).
     static std::string rosterFor(int owner);
+    std::string townRoster(const HexCoord& c) const;
     const TownState* town(const HexCoord& c) const;
     // Recruit into the hero's army. Hero must stand in a town the player owns.
     // Returns an error message, or nullopt on success.
@@ -180,6 +182,7 @@ public:
     // player: they leave, form a war-band beside the hero and attack at once.
     // Returns how many turned (0 = none were hired, nothing happens).
     int turncoats(const std::string& unitId, const std::string& bandName);
+    bool ambushFrom(const std::string& townName, const std::string& bandName);
     // Rules out one wrong old mine not yet searched or ruled out; returns its name.
     std::optional<std::string> giveClue();
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }
@@ -255,6 +258,8 @@ public:
     void joinSpecial(const std::string& id);
     void leaveSpecial(const std::string& id);  // retain progression for a later reunion
     void completeChapter(const std::string& returnTo = "");
+    std::string departureRoute() const;
+    bool rivalMobilized() const;
     bool isWounded(const Special& sc) const { return day() < sc.woundedUntil; }
     // Companions who ride into the hero's next battle: travelling, unwounded, paid.
     struct Companion { std::string id; int level = 1; };
@@ -340,6 +345,7 @@ private:
     std::string collect(const HexCoord& cell, bool gold);
     void rivalTurn(Rival& r);
     void rivalRecruit(Rival& r);
+    void rivalBuild();
     std::vector<HexCoord> rivalRoute(const Rival& r, const HexCoord& to) const;
     float rivalStepCost(const HexCoord& c) const;
     std::vector<Stack> guardsOf(const HexCoord& c) const;

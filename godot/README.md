@@ -36,13 +36,16 @@ and press F6 to run the scene (F5 runs the project).
 ## First chapter: the search for Aldren
 
 The northern demo begins by clearing the road for Ushari, then follows Aldren's
-trail through Corvin's country. Finding the untouched tunnel opens a permanent
-choice: return to your father, or enter with Ushari. Each route ends in a short
-night scene. On the home route she enters alone; her progression is retained for
-a later reunion. The chapter outcome is saved to `user://chapter_one.json`.
-Later chapters and the reunion are not yet playable.
+trail through Corvin's country. His note and annotated survey establish that he
+was there and reveal a definite surface route across Greyfen toward the old
+passage. The chapter ends with a choice: report to your father, or follow that
+road with Ushari. On the home route she returns with the expedition to report and provision the next march. Both branches retain her progression. Neither ending reaches or enters
+the old passage. A second above-ground level, **The Greyfen Road**, is planned
+before the underground journey. Greyfen is House Rook's domain; taking
+Rookwatch secures its western approach, not the lands beyond it. The chapter outcome is saved to `user://chapter_one.json`.
+Later chapters are not yet playable. Start a new expedition for the revised fixed survey and escort flow; old in-progress choices are not migrated.
 
-Ending a day briefly dims the map and announces the day; week boundaries have a longer week card. The hooded figure stands beside the Hermit’s Wolves, warns you before their battle, and disappears after their defeat. After all three wolf packs fall, the next **End Day** brings nightfall and Ushari arrives in a player-paced night conversation with a portrait and speaker nameplates. Her question about Aldren has supportive, uncertain, and dismissive responses. Her last witch tribe background emerges through the conversation. Choices and journal entries describe her reaction without exposing numerical consequences; the relationship state survives saves.
+Ending a day briefly dims the map and announces the day; week boundaries have a longer week card. The hooded figure stands beside the Hermit’s Wolves, warns you before their battle, and disappears after their defeat. After all five wolf packs fall, the next **End Day** brings nightfall and Ushari arrives in a player-paced night conversation with a portrait and speaker nameplates. She asks where Aldren went; the commander can point her east, answer bluntly, or welcome her. The `[name]` marker is reserved for future commander-name substitution. Choices and journal entries describe her reaction without exposing numerical consequences; the relationship state survives saves.
 
 Run `res://tests/story_effects_smoke.gd` for calendar and conversation presentation checks.
 
@@ -54,6 +57,60 @@ are unchanged.
 
 Run the native story/save regressions with `./scripts/build_godot_combat.sh --test`
 and both ending flows with `./scripts/run_godot.sh --headless --script res://tests/demo_smoke.gd`.
+
+## House Rook: the computer opponent
+
+Start a **New expedition** for this revision. Lord Edric Rook rules Rookwatch
+beyond Greyfang, with an existing castle, gold mine, sawmill, quarry and northern
+army. End Day advances his turn: he develops towns, pays for recruits from weekly
+pools, gathers supplies, captures holdings and returns home to replenish or defend.
+His economy, growth, construction and movement wait until the meeting with Corvin; two days after that warning he can march west. He receives ordinary town/mine income, with no daily subsidy or
+free second army, and does not seal the passage.
+
+Corvin offers the optional **Corvin's Old Rival** quest and campaign supplies.
+At the northern approach, **Ask House Rook for passage** leads to a deceptive
+escort meeting at **Greyfang Watch**, followed by an actual ambush battle; **We will find our own road** avoids it.
+Rookwatch can be captured and used for construction and recruitment. Defeating
+Edric's army and capturing his remaining local towns ends resistance on this map;
+House Rook's wider domain in Greyfen remains ahead, and
+the passage search and both chapter endings remain available without conquest.
+The escort is a separate finite patrol; requesting passage does not weaken the castle. Victory yields 300 gold and patrol orders opening an alternative approach. Clearing Troll Gate provides the southern track. Capturing Rookwatch adds a town supply base and 750 gold/5 wood from its stores. The ending records these differences for the planned next chapter.
+Return to Hallowmere after taking the castle for Corvin's revealing offer.
+Enemy losses persist after retreat, including combined castle defenders, and survive saves.
+
+Run `res://tests/rookwatch_smoke.gd` for the passage request, live castle
+defenders and dialogue-to-combat handoff; native regressions cover the economy,
+territorial expansion, capture and save/load.
+
+Town defenses use the existing tactical battlefield; dedicated siege walls and
+siege engines are not part of this demo. The plot is recorded in
+[the roadmap](../ROADMAP.md#stage-1--story) and [faction notes](../Factions.md).
+
+## Expanded northern exploration
+
+The Old Passage now spans 1,027 hexes with 89 sites. The original opening vale
+leads into winding woodland and mountain routes, guarded supplies and a northern
+detour. Arrow keys or WASD pan the camera. Guard badges show total creature counts;
+hover a camp to inspect its individual stacks.
+
+Three surviving inscriptions reveal the conquered land beneath the player's
+inherited map: Esh Varen beneath Varenhold, Tal Eren at the Coldwater crossing,
+and Orun at the ruined assembly court. Ushari translates them into the journal;
+inscriptions found before she arrives are remembered as rubbings. The survey is always at **Old Mine of Kaldur**, identified by the required camp visit. At the survey lodge,
+she supplies Ishara, the house of names, and explains her own purpose: recovering
+her people's household records. The player's family belongs to the colonizers.
+
+Match the survey diagram's marks to those original names to read Aldren's route. **Ask Ushari for help** recalls discovered readings. **Leave the survey**
+(or Escape) returns to exploration; movement, days and saves remain available.
+Return to the same mine and use **Read the survey with Ushari** to reopen it.
+Wrong attempts have no penalty. Decoding it gives the Greyfen itinerary and the chapter ending choice.
+All three translated inscriptions and one secured approach (castle, Troll Gate or patrol orders) are required before completing the survey and departure choice. The location, unresolved choice and translations survive saves; unfinished
+wheel positions reset. Start a new expedition for the revised map and story.
+
+Map generation: `python3 scripts/gen_north_map.py` (the authored opening terrain is
+kept in `scripts/north_vale.json`). Story generation: `python3 scripts/north_story.py`.
+Run `res://tests/expanded_demo_smoke.gd` for arrow keys, guard counts, rune stones,
+and puzzle controls, and `res://tests/demo_smoke.gd` for the full story flows.
 
 ## Home and fieldworks
 
@@ -90,7 +147,7 @@ checks. Add `-- --capture` with a display to save screenshots to `godot/artifact
 - Return to the same map with surviving stack counts; victory awards one Scarab
   Amulet and clears that dungeon for the current expedition.
 
-Controls: left click to travel; wheel to zoom; right/middle drag or WASD to pan;
+Controls: left click to travel; wheel to zoom; right/middle drag, arrows or WASD to pan;
 G toggles the grid; Space finds the hero; Home shows the entire map; Escape clears
 the preview. Orders finish before another order is accepted. Close the window to exit.
 
@@ -178,3 +235,5 @@ The project runs from source. Export presets/templates and inclusion of JSON dat
 in packaged builds are still to be configured when distribution becomes a milestone.
 
 See [the migration plan](../docs/godot-migration.md) for the gameplay integration path.
+
+See [the demo flow audit](../docs/demo_flow.md) for player context at each beat and automated route verification.

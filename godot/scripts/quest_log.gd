@@ -15,9 +15,13 @@ func _ready() -> void:
     add_theme_stylebox_override("panel", style)
     _list = VBoxContainer.new()
     _list.add_theme_constant_override("separation", 10)
-    add_child(_list)
+    var scroll := ScrollContainer.new()
+    scroll.custom_minimum_size = Vector2(460, 450)
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    add_child(scroll)
+    scroll.add_child(_list)
 
-func show_quests(quests: Array, lore: Array = []) -> void:
+func show_quests(quests: Array, lore: Array = [], progress: Dictionary = {}) -> void:
     for child in _list.get_children(): child.queue_free()
     _list.add_child(_label("QUEST LOG   ·   Q to close", 12, Color("ad854a")))
     var ordered := quests.duplicate()
@@ -29,6 +33,8 @@ func show_quests(quests: Array, lore: Array = []) -> void:
         var title := "%s   ·   %s%s" % [quest.title, kind, "   ·   DONE" if quest.done else ""]
         _list.add_child(_label(title, 16, Color("7c7060") if quest.done else Color("f0c870")))
         _list.add_child(_label(str(quest.text), 14, Color("7c7060") if quest.done else Color("e8d8b8")))
+        if progress.has(str(quest.id)):
+            _list.add_child(_label(str(progress[ str(quest.id) ]), 13, Color("b99a67") if not quest.done else Color("7c7060")))
     if not lore.is_empty():
         # What the expedition has learned: the mythos, one entry per discovery.
         _list.add_child(_label("LORE   ·   what you have learned", 12, Color("ad854a")))

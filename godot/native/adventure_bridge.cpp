@@ -1,5 +1,7 @@
 #include "adventure_bridge.h"
 #include <fstream>
+#include <cmath>
+#include <limits>
 
 namespace {
 using Json = AdventureBridge::Json;
@@ -46,10 +48,12 @@ Json AdventureBridge::snapshot() const {
     for (const auto& [coord, ctrl] : session_.control())
         owners.push_back({coord.q, coord.r, ctrl.ownerFaction});
     Json guarded = Json::array();
+    Json defenders = Json::array();
     Json encounter_xp = Json::array();   // [q, r, xp]: what beating each camp is worth
     for (const auto& obj : session_.map().objects())
         if (session_.isEncounter(obj.pos)) {
             guarded.push_back(cell(obj.pos));
+            defenders.push_back({{"cell", cell(obj.pos)}, {"army", Json::parse(session_.encounterAt(obj.pos)->guardsJson)}});
             encounter_xp.push_back({obj.pos.q, obj.pos.r, session_.encounterXp(obj.pos)});
         }
     for (const auto& r : session_.rivals())
@@ -149,19 +153,28 @@ Json AdventureBridge::snapshot() const {
     for (const auto& c : session_.battleCompanions())
         battle_companions.push_back({{"id", c.id}, {"count", 1}, {"level", c.level}, {"companion", true},
                                    {"morale", session_.scenario().morale(c.id)}});
+    auto rivalRoster = [&](const AdventureSession::Rival& r) {
+        auto roster = session_.townRoster(r.home);
+        if (roster.empty() && !r.army.empty())
+            if (const auto* unit = session_.resources().unit(r.army.front().id)) roster = unit->faction;
+        return roster;
+    };
     Json rivals = Json::array();
     for (const auto& r : session_.rivals()) {
         if (!r.alive || !session_.isVisible(r.pos)) continue;   // hidden in fog
         Json army_json = Json::array();
         for (const auto& s : r.army) army_json.push_back({{"id", s.id}, {"count", s.count}});
-        rivals.push_back({{"id", r.id}, {"name", r.name}, {"cell", cell(r.pos)}, {"army", army_json}});
+        rivals.push_back({{"id", r.id}, {"name", r.name}, {"cell", cell(r.pos)}, {"roster", rivalRoster(r)}, {"army", army_json}});
     }
     Json moves = Json::array();
     for (const auto& m : session_.lastRivalMoves()) {
         Json path = Json::array();
         for (const auto& c : m.path)
             if (session_.isVisible(c)) path.push_back(cell(c));   // only what the player saw
-        if (!path.empty()) moves.push_back({{"id", m.id}, {"path", path}});
+        if (!path.empty()) {
+            for (const auto& r : session_.rivals()) if (r.id == m.id)
+                moves.push_back({{"id", m.id}, {"name", r.name}, {"roster", rivalRoster(r)}, {"path", path}});
+        }
     }
     // Adventure sites: used = weekly site spent this week / one-time site done.
     Json sites = Json::array();
@@ -204,7 +217,7 @@ Json AdventureBridge::snapshot() const {
         {"owners", owners},
         {"visible", cells(session_.visible())},
         {"explored", cells(session_.explored())},
-        {"guarded", guarded},
+        {"guarded", guarded}, {"defenders", defenders},
         {"vanished", vanished},
         {"encounter_xp", encounter_xp},
         {"hero_progress", hero_progress},
@@ -214,7 +227,12 @@ Json AdventureBridge::snapshot() const {
         {"sites", sites},
         {"chest", chest},
         {"won", session_.won()},
-        {"story_choice", session_.scenario().choice()},
+        {"story_choice", [&] {
+            Json choice = session_.scenario().choice();
+            if (!choice.empty()) choice["route_ready"] = !session_.departureRoute().empty();
+            return choice;
+        }()},
+        {"departure_route", session_.departureRoute()},
         {"story_outcome", session_.scenario().outcome()},
         {"army", army},
         {"towns", towns},
@@ -265,9 +283,24 @@ Json AdventureBridge::travel(int q, int r) {
     return with_lines(out);
 }
 
-Json AdventureBridge::resolve_encounter(bool victory) {
+Json AdventureBridge::resolve_encounter(bool victory, const Json& enemy_survivors) {
     static const char* kFinds[] = {"none", "passage", "loot", "collapse"};
-    auto find = session_.resolveEncounter(victory);
+    std::optional<std::vector<AdventureSession::Stack>> survivors;
+    if (!enemy_survivors.is_null()) {
+        if (!enemy_survivors.is_array()) return {{"ok", false}, {"error", "Enemy survivors must be an array."}};
+        survivors.emplace();
+        for (const auto& stack : enemy_survivors) {
+            if (!stack.is_object() || !stack.contains("id") || !stack["id"].is_string()
+                    || !stack.contains("count") || !stack["count"].is_number()
+                    || !std::isfinite(stack["count"].get<double>())
+                    || stack["count"].get<double>() < 0
+                    || stack["count"].get<double>() > std::numeric_limits<int>::max()
+                    || std::floor(stack["count"].get<double>()) != stack["count"].get<double>())
+                return {{"ok", false}, {"error", "Invalid enemy survivor stack."}};
+            survivors->push_back({stack["id"], stack["count"]});
+        }
+    }
+    auto find = session_.resolveEncounter(victory, survivors);
     Json out = snapshot();
     out["find"] = kFinds[static_cast<int>(find)];
     return with_lines(out);

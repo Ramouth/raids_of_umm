@@ -47,7 +47,11 @@ Json AdventureSession::saveState() const {
     Json explored = Json::array();
     for (const auto& c : m_explored) explored.push_back(cellJson(c));
     Json encounters = Json::array();
-    for (const auto& [c, e] : m_encounters) encounters.push_back(cellJson(c));
+    Json encounterArmies = Json::array();
+    for (const auto& [c, e] : m_encounters) {
+        encounters.push_back(cellJson(c));
+        encounterArmies.push_back({{"cell", cellJson(c)}, {"army", Json::parse(e.guardsJson)}});
+    }
     Json finds = Json::array();
     for (const auto& [c, f] : m_mineFinds) finds.push_back({c.q, c.r, static_cast<int>(f)});
     Json ruled = Json::array();
@@ -89,7 +93,7 @@ Json AdventureSession::saveState() const {
         {"hero", cellJson(m_hero.pos)}, {"moves", m_moves},
         {"army", stacksJson(army())},
         {"control", control}, {"towns", towns}, {"explored", explored},
-        {"encounters", encounters}, {"finds", finds},
+        {"encounters", encounters}, {"encounter_armies", encounterArmies}, {"finds", finds},
         {"won", m_won}, {"lost", m_lost}, {"lost_reason", m_lostReason},
         {"ruled_out", ruled}, {"items", Json(std::vector<std::string>(m_items.begin(), m_items.end()))},
         {"equipped", Json(m_equipped)},
@@ -133,6 +137,9 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         for (const auto& c : save.at("encounters")) standing.insert(cellFrom(c));
         for (auto it = m_encounters.begin(); it != m_encounters.end();)
             it = standing.count(it->first) ? std::next(it) : m_encounters.erase(it);
+        for (const auto& e : save.value("encounter_armies", Json::array()))
+            if (auto it = m_encounters.find(cellFrom(e.at("cell"))); it != m_encounters.end())
+                it->second.guardsJson = e.at("army").dump();
         m_mineFinds.clear();
         for (const auto& f : save.at("finds"))
             m_mineFinds[{f.at(0).get<int>(), f.at(1).get<int>()}] = static_cast<MineFind>(f.at(2).get<int>());

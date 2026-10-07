@@ -234,7 +234,7 @@
       ]
     },
     "Hallowmere": {
-      "title": "Seat of House Hale  ·  lent to you by Corvin",
+      "title": "Seat of House Hale  \u00b7  lent to you by Corvin",
       "art": "objects/town_north.png",
       "starting": [
         "village_hall",
@@ -244,6 +244,20 @@
         "archery_butts",
         "armoury",
         "marketplace"
+      ]
+    },
+    "Rookwatch": {
+      "title": "Castle of House Rook",
+      "art": "objects/town_north.png",
+      "starting": [
+        "village_hall",
+        "town_hall",
+        "fort",
+        "citadel",
+        "castle",
+        "muster_field",
+        "archery_butts",
+        "armoury"
       ]
     }
   }

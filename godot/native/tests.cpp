@@ -1,4 +1,5 @@
 #include "combat_session.h"
+#include "adventure_bridge.h"
 #include <iostream>
 #include <stdexcept>
 using Json = CombatSession::Json;
@@ -8,6 +9,15 @@ static void check(bool condition, const char* message) {
 int main(int argc, char** argv) {
     try {
         check(argc == 2, "Pass the data directory");
+        AdventureBridge adventure;
+        const std::string data = argv[1];
+        check(adventure.start(data + "/maps/old_passage.json", data, data + "/maps/old_passage.encounters.json", 1,
+                              data + "/maps/old_passage.triggers.json").at("ok"), "Production adventure starts");
+        check(adventure.resolve_encounter(false, Json::parse(R"([{"id":"grey_wolf","count":3.0}])")).at("ok"),
+              "Godot integral JSON floats are accepted for enemy survivors");
+        for (const char* invalid : {R"([{"id":"grey_wolf","count":1.5}])", R"([{"id":"grey_wolf","count":-1}])",
+                                   R"([{"id":"grey_wolf","count":1e20}])", R"([{"id":"grey_wolf","count":"3"}])"})
+            check(!adventure.resolve_encounter(false, Json::parse(invalid)).at("ok"), "Malformed survivor counts are rejected");
         const Json guards = {{"guards", {{{"id", "skeleton_warrior"}, {"count", 12}},
             {{"id", "sand_scorpion"}, {"count", 4}}}}, {"reward", "scarab_amulet"}};
         const Json army = {{{"id", "desert_archer"}, {"count", 10}}, {{"id", "mummy"}, {"count", 3}}};
@@ -94,6 +104,7 @@ int main(int argc, char** argv) {
         check(!melee.command("attack", enemy_cell[0], enemy_cell[1]).at("ok"), "Distant melee attack rejected");
         reply = melee.command("retreat");
         check(reply["state"]["result"] == "retreat", "Retreat ends combat");
+        check(!reply["state"]["enemy_survivors"].empty(), "Retreat exports the surviving enemy army for adventure persistence");
         check(reply["state"]["survivors"][0]["count"] == 1 && reply["state"]["rewards"].empty(), "Retreat preserves survivors without loot");
 
         // Tactics: opening orders come before any other command, once.

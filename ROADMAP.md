@@ -50,21 +50,57 @@ See `economy.md` for economy decisions and implementation plan.
 | Stage | Land | Status |
 |-------|------|--------|
 | **1 — The Northern Marches** | meadows, pine and oak forest, lakes, the Coldwater river, the Greyfang mountains | ◀ the demo (`data/maps/old_passage.*`, `scripts/gen_north_map.py`, `scripts/north_story.py`) |
+| **1b — The Greyfen Road** | House Rook's domain: above-ground causeway, ruined watchtower, southern escarpment | planned follow-on level; not yet playable |
 | 2 — The Desert of Umm'Natur | sand, dunes, oases, ruins; the first desert draft | parked as `data/maps/desert_passage.*` |
 | 3 — The Scorched Black Earth | burnt plains, obsidian, ash | ⬜ |
 
-The old passage under the Greyfangs is the road from stage 1 to stage 2.
+The opening level identifies the surface route toward the old passage.
+A second above-ground level, The Greyfen Road, comes before the passage
+and the journey south to Umm'Natur.
 Map density for every stage follows HoMM3; see `docs/map_density.md`.
 
 ### Stage 1 — story
 - **Opening:** clear three wolf packs so Ushari can reach Varenhold. She expected to leave with Aldren; he has already gone east. Your father wants you to bring him home.
-- **Search:** visit Corvin at Hallowmere, then trace Aldren's camp and the old shafts. Corvin supplies a signet, timber and affordable soldiers. He remains an ally throughout this chapter.
-- **Ushari:** Aldren's lover, from a family that keeps the old rites. She accompanies the search, rather than serving as a general lore narrator. She cannot govern a town or abandon this chapter over unpaid upkeep; unpaid abilities still lapse and battle injuries still matter.
-- **At the entrance:** nobody has crossed the dust. Aldren is already dead, but neither route reveals that yet. Finding the passage opens a choice rather than an automatic victory.
-- **Return to your father:** Ushari leaves the party. At Varenhold that night, Aldren's riderless horse returns with blood beneath its saddle. Ushari enters the tunnel alone that same night.
-- **Follow Ushari:** you enter the untouched passage together that night, still unaware of the horse or Aldren's fate.
-- **Continuity:** the choice, night, knowledge and companion progression survive save/load. A committed ending also writes `user://chapter_one.json`. The later reunion and subsequent chapters remain future work.
-- **Deferred:** Kharim, the speaking druid, Maerwen, the body discovery and Corvin's betrayal. Optional stones and relics retain brief, unexplained details.
+- **Search:** visit Corvin at Hallowmere, then trace Aldren's camp and the old shafts. Corvin supplies a signet, timber and affordable soldiers. He remains an ally, but pushes an optional conquest of his family's old rival, House Rook.
+- **Computer opponent:** Lord Edric Rook holds Rookwatch beyond Greyfang. His castle, gold mine, sawmill and quarry exist from the start. After Corvin's warning he develops towns, pays for weekly recruits, gathers supplies and contests mines and towns with a roaming army. Until that meeting his income, construction, recruitment and weekly growth are paused, so tutorial exploration cannot secretly multiply his strength. He can cross west two days after the warning. The northern demo uses northern troops, not Shariw riders.
+- **Corvin's interest:** the Hales and Rooks have disputed the roads and mining estates for generations. Corvin presents taking Rookwatch as necessary to protect the search, offering 750 gold and 5 wood toward the campaign. Ushari challenges the diversion. The southern Troll Gate remains an alternative route; conquest is not required for either chapter ending.
+- **Passage request:** at the northern approach, the player can ask House Rook for passage. A messenger promises an escort; its soldiers surround the party and attack. Their captain singles out Ushari, saying House Rook would have killed all her people. He promises to purge witches and witch-lovers once the house takes the vacant throne of Umm'Natur. Ushari answers that her people still survive despite the conquest. This opens a normal battle with retreat available. Declining the offer avoids this scripted ambush, but not the strategic rivalry. The request schedules a meeting at Greyfang Watch, with a journal objective and a warning that Rook is hostile. Its separate, finite road patrol exists from the start; it does not strip troops from the castle. Defeating it yields a patrol schedule opening a third approach into Greyfen and 300 gold.
+- **House Rook's ambition:** seize the vacant throne of Umm'Natur and use that power to exterminate witches and their allies. This is a southern claim beyond the Hale–Rook land dispute, not a northern throne.
+- **Enemy perspective:** Edric accuses Corvin of using a Varen army to settle the Hale–Rook feud. The passage ambush gives the player an independent grievance, without proving Corvin's version of the land dispute or revealing Aldren's fate.
+- **Conquest:** capturing Rookwatch grants a usable town with its buildings, recruitment and income. A surviving enemy field army remains a threat; defeating the army alone leaves the castle able to recruit a garrison. On the player's next visit, Corvin celebrates and offers his steward to administer the disputed estates. This reveals how much he benefits, without transferring the player's castle or triggering his later betrayal.
+- **Ushari:** from the last witch tribe; her people's rulers governed these lands before the Compact families conquered them. She seeks the household records beyond the gate as well as Aldren. She accompanies the search, rather than serving as a general lore narrator. She cannot govern a town or abandon this chapter over unpaid upkeep; unpaid abilities still lapse and battle injuries still matter.
+- **Aldren's trail:** a note at his abandoned camp names the mine surveyors' road chart. His note names Kaldur, and his annotated copy always survives in the surface lodge at the Old Mine of Kaldur. Visiting the camp is required before interpreting the survey. His handwriting and corrected bearings establish that he was there; these are traces of his earlier journey, not proof that he is still alive.
+- **The level's discovery:** Ushari matches the survey diagram's original place names to the surviving inscriptions. This yields a definite itinerary through House Rook's domain: the Greyfen causeway, south past the split watchtower, then the southern escarpment to the old road cut. The level does not find or open the old passage. Ishara and its household records remain a destination ahead.
+- **Return to your father:** report Aldren's route. At Varenhold that night, his riderless horse returns with blood beneath its saddle. Ushari returns with the expedition; together you report and provision the next march. She does not depart alone into a house's domain whose soldiers threatened to kill her.
+- **Follow Ushari:** set out on Aldren's marked road across Greyfen together, still above ground and unaware of the horse's return. The next playable journey must cross that country before reaching the passage.
+- **Continuity:** both endings record `route: greyfen_road`, `aldren_trace: annotated_survey`, `passage_entered: false`, and `next_chapter: greyfen_road`. Both branches retain Ushari and her progression; the father's evidence and departure plan remain branch-specific. The outcome also records the secured approach, whether Rookwatch supplies the army, patrol orders, the southern track, Corvin's supplies and the fate of Edric's field army. These are handoff data; Greyfen and its consequences are not playable yet. Use a new expedition for the revised fixed survey and escort flow; retained IDs do not migrate old in-progress choices.
+- **Later reveal — author knowledge:** **Aldren has become a zombie.** Do not disclose this in the opening level's dialogue, journal, survey or ending. Who changed him, how, exactly when, his remaining awareness and any possibility of recovery are undecided. The later encounter should reframe the traces already found, not erase them.
+- **Deferred:** Kharim, Maerwen, the discovery of Aldren's condition and Corvin's betrayal. Optional stones and relics retain brief, unexplained details.
+
+The three readings are enforced by the scenario and the puzzle UI; guessing the fixed answer is insufficient. Enemy troop losses persist after retreat and through saves. Required border/camp/survey guards are sized for the demo; optional treant and other high-tier sites remain dangerous.
+
+The beat-by-beat player-context audit and verification record live in [Demo flow](docs/demo_flow.md). Map/story integration priorities are in the [map and story handoff](docs/map_story_handoff.md). At each transition ask: **Does the player know enough context and plot to understand the objective and make the next decision?**
+
+### Next level — The Greyfen Road (planned, above ground)
+
+**Greyfen is House Rook's domain.** The next level takes the expedition into
+their lands. Rookwatch guards the western approach; capturing that castle
+secures a foothold, not the whole domain. Its fall and the defeat of Edric's
+local army do not erase the house's remaining authority and forces farther in.
+The political owner is established; the commanders and encounters of the next
+level remain to be designed.
+
+The objective is to follow the known itinerary, not repeat a search among random
+shafts. Cross the Greyfen causeway, reach the split watchtower, then follow the
+southern escarpment to the old road cut, all within House Rook's domain. Traversal, hostile forces and control of
+supplies provide the obstacles. The passage entrance belongs at or after the far
+end of this level; descending underground is outside the opening demo.
+
+Continue Aldren's trail with identifiable evidence along that road. The specific
+encounters and the timing of the zombie reveal remain to be designed. If the
+player went home, provide a reason to resume the search and reunite with Ushari;
+if they followed her, begin together. Preserve the two branches' different
+knowledge of the riderless horse. This is a plot outline, not an implemented map.
 
 ### Stage 1 — HoMM3-style adventure objects (native, tested)
 Resource piles, campfires, chests (gold **or** experience), windmills/watermills (weekly),
@@ -76,23 +112,30 @@ routes go around camps when they can).
 ## Demo — "The Old Passage" (Godot) ◀ current focus
 
 A 20–30 min handcrafted scenario that shows off the core loop:
-clear the vale → search for Aldren → find the entrance → choose your route.
+clear the vale → meet Corvin → search for Aldren while contending with House Rook → identify Aldren's road across Greyfen → report home or continue together.
+Rookwatch is an optional conquest, not a prerequisite for the search.
+Edric expands east of Greyfang during the opening; two days after Corvin's warning he can march west. His AI does not seal the passage or impose a hidden chapter deadline.
 Built in the Godot slice (`godot/`); turn/economy/fog logic moves into the native
 GDExtension like CombatEngine did, so it stays covered by `raids_tests`.
 
 ### Locked decisions
 - **Engine:** Godot. SDL build stays as reference/test host.
 - **Player faction:** Ivory Compact (Gold + Wood emphasis).
-- **Complete the chapter:** find the passage hidden in one of four **Old Mines**, then choose to return to your father or follow Ushari. The entrance is selected each New Game; neither choice costs resources.
-- **Lose:** hero's army destroyed, **or a Shariw hero finds the passage first**.
-- **Rival:** one AI faction — the **Shariw** (locals who know the land; also hunting the passage).
+- **Complete the chapter:** visit Aldren's camp, collect the three inscriptions and find his annotated survey at **Kaldur**. Secure one approach—Rookwatch, Troll Gate or the escort's patrol orders—then trace the route and choose to report home or continue with Ushari. Neither choice enters the passage or costs resources.
+- **Lose:** the hero's army is destroyed. House Rook does not search or seal the passage.
+- **Rival:** **House Rook**, with Rookwatch, owned resource sites, paid town development and recruitment, and Lord Edric's field army.
 - **Mine defence:** HoMM3-style garrisons — leave troops in a mine.
 - **Mines = resources only (model A).** Units cost specialty resources, HoMM3-style;
   capturing a mine does not unlock units.
 - **SC upkeep** is a deliberate exception to economy.md Q8 ("no unit upkeep").
 
-### Map — three zones, gated by neutral guards
-Radius ~13 (~547 cells, ~3× current). Linear west → east push.
+### Earlier desert map layout (archived for stage 2)
+
+The following layout describes the parked desert draft, not the northern demo.
+The playable north has 1,027 hexes: Varen vale, the Coldwater crossings,
+Hallowmere, the Greyfang passes and the far marches around Rookwatch.
+
+Desert draft: radius ~13 (~547 cells). Linear west → east push.
 
 | Zone | Contents | Guards |
 |------|----------|--------|

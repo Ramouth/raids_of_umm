@@ -6,7 +6,7 @@ signal finished(result: Dictionary)
 var choice: Dictionary = {}
 var outcome: Dictionary = {}
 var frame := -1
-var _scene := "tunnel"
+var _scene := "road"
 var _words: Label
 var _heading: Label
 var _buttons: VBoxContainer
@@ -180,6 +180,15 @@ func _draw() -> void:
         if _scene != "home":
             var arrive := minf(_elapsed / 2.0, 1.0)
             _horse(Vector2(540 + arrive * 90, 360), _scene == "blood")
+    elif _scene in ["road", "road_alone", "road_together"]:
+        draw_circle(Vector2(990, 110), 25, Color("a6b0b7"))
+        draw_colored_polygon(PackedVector2Array([Vector2(0, 340), Vector2(160, 180), Vector2(310, 280), Vector2(450, 150), Vector2(660, 320), Vector2(950, 200), Vector2(1280, 320), Vector2(1280, 465), Vector2(0, 465)]), ink)
+        draw_colored_polygon(PackedVector2Array([Vector2(440, 465), Vector2(650, 270), Vector2(690, 270), Vector2(790, 465)]), Color("34413f"))
+        for i in 5:
+            var at := Vector2(510 + i * 33, 430 - i * 30)
+            draw_rect(Rect2(at, Vector2(10, 22)), rim)
+        if _scene != "road": _person(Vector2(610, 410), true)
+        if _scene == "road_together": _person(Vector2(700, 422), false)
     elif _scene == "conversation":
         draw_rect(Rect2(100, 65, 1080, 210), Color("101f22"))
         for y in range(66, 275, 4):

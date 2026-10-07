@@ -199,7 +199,7 @@ Json CombatSession::snapshot() const {
     Json state = {{"result", result_name(engine_->result())}, {"round", engine_->roundNumber()},
         {"units", Json::array()}, {"initiative", Json::array()}, {"reachable", Json::array()},
         {"attackable", Json::array()}, {"survivors", Json::array()}, {"rewards", Json::array()},
-        {"fallen", Json::array()},
+        {"fallen", Json::array()}, {"enemy_survivors", Json::array()},
         {"deploying", deploying_}, {"fieldwork_stock", {{"barricade", barricades_}, {"stakes", stakes_}}},
         {"fieldworks", Json::array()},
         {"active", ""}, {"player_turn", false}, {"opening", opening_}};
@@ -239,8 +239,8 @@ Json CombatSession::snapshot() const {
                         for (int foe : engine_->threatsTo(true, index)) threats.push_back(key(false, foe));
                     state["units"].back()["threats"] = threats;
                 }
-            } else if (player && !unit.isDead()) {
-                state["survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
+            } else if (!unit.isDead()) {
+                state[player ? "survivors" : "enemy_survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
             }
         }
     }

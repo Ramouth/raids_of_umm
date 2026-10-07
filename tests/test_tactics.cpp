@@ -228,8 +228,8 @@ SUITE("Routing — map routes are the cheapest there are (roads at 0.5 included)
         return total;
     };
     int worse = 0, checked = 0;
-    for (size_t i = 0; i < cells.size(); i += 13)
-        for (size_t j = 5; j < cells.size(); j += 17) {
+    for (size_t i = 0; i < cells.size(); i += 9)
+        for (size_t j = 5; j < cells.size(); j += 11) {
             auto route = map.findPathWeighted(cells[i], cells[j], nullptr);
             if (route.size() < 2) continue;
             // Reference: plain Dijkstra over the same tiles.

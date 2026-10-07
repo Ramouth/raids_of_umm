@@ -31,6 +31,8 @@ const SLIDES := [
 ]
 const TITLE := "RAIDS OF UMM'NATUR"
 const FADE := 1.4        # seconds for a slide to fade in or out
+var slides: Array = SLIDES
+var show_title := true
 var _transition: Tween
 var _line_tween: Tween
 var _title_active := false
@@ -92,7 +94,7 @@ func _ready() -> void:
     _timer.one_shot = true
     _timer.timeout.connect(advance)
     add_child(_timer)
-    for slide in SLIDES:
+    for slide in slides:
         var path := "res://content/textures/" + str(slide.image)
         if not str(slide.image).is_empty() and ResourceLoader.exists(path): _textures[slide.image] = load(path)
     advance.call_deferred()
@@ -116,23 +118,24 @@ func advance() -> void:
     if _title_active:
         skip()
         return
-    if _slide >= 0 and _line + 1 < SLIDES[_slide].lines.size():
+    if _slide >= 0 and _line + 1 < slides[_slide].lines.size():
         _line += 1
         _show_line(_line)
         return
     _slide += 1
-    if _slide >= SLIDES.size():
-        _title()
+    if _slide >= slides.size():
+        if show_title: _title()
+        else: skip()
         return
     _line = 0
-    _show_slide(str(SLIDES[_slide].image))
+    _show_slide(str(slides[_slide].image))
     _show_line(0)
 
 func _show_slide(image: String) -> void:
     if _transition != null: _transition.kill()
     _clear_lines()
     # Every line of the slide is laid out now, unseen, so nothing moves as they appear.
-    for text in SLIDES[_slide].lines: _lines.add_child(_line_label(str(text)))
+    for text in slides[_slide].lines: _lines.add_child(_line_label(str(text)))
     # The old slide becomes the back layer and fades away beneath the new one.
     var old := _front
     _front = _back
@@ -177,8 +180,8 @@ func _show_line(index: int) -> void:
     for i in index: _line_tween.tween_property(labels[i], "modulate:a", 0.45, 0.6)
     var first := index == 0
     _line_tween.tween_property(labels[index], "modulate:a", 1.0, 1.0).set_delay(FADE * 0.6 if first else 0.0)
-    var text := str(SLIDES[_slide].lines[index])
-    var pace: float = SLIDES[_slide].get("pace", 1.0)   # < 1: a slide that moves on sooner
+    var text := str(slides[_slide].lines[index])
+    var pace: float = slides[_slide].get("pace", 1.0)   # < 1: a slide that moves on sooner
     _timer.start((3.5 + text.length() / 18.0) * pace + (FADE if first else 0.0))
 
 func _title() -> void:

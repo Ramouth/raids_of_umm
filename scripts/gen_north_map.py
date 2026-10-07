@@ -21,7 +21,7 @@ import heapq
 import json
 from pathlib import Path
 
-RADIUS = 14
+RADIUS = 18
 OUT = Path(__file__).resolve().parent.parent / "data" / "maps" / "old_passage.json"
 
 # (passable, moveCost) — mirror terrainDefaultMoveCost() in src/world/MapTile.h.
@@ -79,6 +79,7 @@ def smooth(q, r, seed, scale=3):
 OBJECTS = [
     # ── Varen vale (home, west) ── learn the controls; light wolves only
     ("town",           "Varenhold",               -11,  0, 1, ""),
+    ("town",           "Esh Varen",                 -9,  0, 1, ""),  # orchard village beneath the castle
     ("gold_mine",      "Varen Gold Mine",         -12, -5, 0, ""),
     ("sawmill",        "Pinewood Sawmill",         -8,  5, 0, ""),
     ("mill",           "Varen Windmill",           -9, -3, 0, "windmill"),
@@ -125,10 +126,10 @@ OBJECTS = [
     ("guard",          "Greyfang Pass",             5, -1, 0, ""),
     ("guard",          "Troll Gate",                6,  7, 0, ""),
     # ── Far marches (east) ── the old mines under the mountains
-    ("town",           "Shariw War Camp",          11,  1, 2, ""),
+    ("town",           "Rookwatch",                11,  1, 2, "cruths"),
     ("quest_giver",    "Aldren's Camp",             8, -5, 0, ""),
     ("crystal_mine",   "Frostglass Cavern",         9,  5, 0, ""),
-    ("gold_mine",      "Greyfang Gold Mine",       12, -4, 0, ""),
+    ("gold_mine",      "Greyfang Gold Mine",       12, -4, 2, ""),
     ("old_mine",       "Old Mine of Kaldur",       10, -8, 0, ""),
     ("old_mine",       "Old Mine of Brannoc",       8,  9, 0, ""),
     ("watchtower",     "Greyfang Watch",            8, -1, 0, ""),
@@ -136,7 +137,7 @@ OBJECTS = [
     ("pickup",         "The Greyfang Campaigns",    7,  5, 0, "tome"),     # rare XP: a war journal
     ("guard",          "Treant Grove",              9,  2, 0, ""),
     ("guard",          "Troll Warband",            10, -2, 0, ""),
-    ("pickup",         "Raiders' Hoard",           11, -2, 0, "gold"),
+    ("sawmill",        "Rookwood Sawmill",         11, -2, 2, ""),
     ("pickup",         "Frost Crystals",           10,  7, 0, "crystal"),
     ("pickup",         "Frozen Chest",             13, -3, 0, "chest"),
     ("pickup",         "Abandoned Camp",            7, -8, 0, "campfire"),
@@ -150,7 +151,7 @@ OBJECTS = [
     ("pickup",         "Charcoal Burners",          1,  8, 0, "campfire"),
     ("pickup",         "Hermit's Chest",           -6, -9, 0, "chest"),
     ("guard",          "Hermit's Wolves",          -7,-10, 0, ""),
-    ("quest_giver",    "Hooded Stranger",           -7, -9, 0, "druid"),
+    ("quest_giver",    "Hooded Stranger",           -7, -8.5, 0, "druid"),
     ("pickup", "Abandoned Timber Cart", 9, -2, 0, "wood"),
     ("artifact",       "Oath Cairn",              -13, -3, 0, "oathstone_amulet"),
     ("guard",          "Tarn Brigands",           -12, -2, 0, ""),
@@ -162,6 +163,19 @@ OBJECTS = [
     ("obelisk",        "Greyfang Obelisk",         11,  3, 0, ""),
     ("artifact",       "Humming Hollow",           -4,-11, 0, "listening_shard"),
     ("artifact",       "Sinkhole",                  9, -7, 0, "warm_stone"),
+    # Northern detour: narrow trails, translated runes and guarded supplies.
+    ("quest_giver", "Varenhold Wall Rune Stone", -10, 0, 0, ""),
+    ("guard", "Thornwood Wolves", -10, -12, 0, ""),
+    ("pickup", "Thornwood Stores", -11, -11, 0, "wood"),
+    ("quest_giver", "Coldwater Bridge Rune Stone", -4, 1, 0, ""),
+    ("guard", "High Road Brigands", 0, -13, 0, ""),
+    ("pickup", "High Road Strongbox", 1, -14, 0, "chest"),
+    ("quest_giver", "Assembly Rune Stone", 3, 11, 0, ""),
+    ("guard", "Frostwood Wardens", 12, -10, 0, ""),
+    ("quarry", "Rook Quarry", 13, -10, 2, ""),
+    ("sawmill", "Thornwood Sawmill", -8, -12, 0, ""),
+    ("watchtower", "High Road Beacon", 2, -13, 0, ""),
+
 ]
 
 # Terrain patches: (centre q, Y, radius, terrain)
@@ -267,6 +281,14 @@ def build(seed):
         if tiles.get(entry) in ("mountain", "lake", "river"):
             tiles[entry] = "grass"
 
+    # Preserve the authored opening vale; cut one northern exit into the new trails.
+    vale = json.loads(Path(__file__).with_name("north_vale.json").read_text())
+    vale_cells = {(t["q"], t["r"]) for t in vale}
+    for tile in vale:
+        tiles[(tile["q"], tile["r"])] = tile["terrain"]
+    tiles[(-8, -6)] = "grass"
+    tiles[(-8, -7)] = "grass"
+
     carve_trails(tiles, bridges, [at(*w) for w in ROAD] + [(o["q"], o["r"]) for o in objects])
 
     passable = lambda cell: cell in bridges or TERRAIN[tiles[cell]][0]
@@ -287,6 +309,29 @@ def build(seed):
             tile["moveCost"] = min(cost, 0.5)
         out_tiles.append(tile)
 
+    # Remove unnecessary open ground while retaining every site and the main road.
+    # This produces winding trails and pockets instead of a broad walkable field.
+    protected = occupied | roads | bridges | vale_cells
+    protected.update(c for c in tiles if dist(c, by_name["Varenhold"]) <= 2)
+    remaining = sum(TERRAIN[t][0] for t in tiles.values())
+    for cell in sorted(tiles, key=lambda c: noise(*c, seed + 71)):
+        if remaining <= 380:
+            break
+        if cell in protected or not TERRAIN[tiles[cell]][0]:
+            continue
+        before = tiles[cell]
+        tiles[cell] = "forest" if cell[0] < 5 else "mountain"
+        try:
+            check_reachable(tiles, bridges, objects)
+        except AssertionError:
+            tiles[cell] = before
+        else:
+            remaining -= 1
+    for tile in out_tiles:
+        cell = (tile["q"], tile["r"])
+        if cell not in bridges and not TERRAIN[tiles[cell]][0]:
+            tile.update(terrain=tiles[cell], passable=False, moveCost=TERRAIN[tiles[cell]][1])
+            tile.pop("road", None)
     check_reachable(tiles, bridges, objects)
     return {"version": 1, "name": "The Old Passage", "radius": RADIUS,
             "ground": "grass", "tiles": out_tiles, "objects": objects}
