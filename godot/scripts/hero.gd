@@ -14,7 +14,7 @@ func _ready() -> void:
     for clip in ["idle", "walk"]:
         frames.add_animation(clip)
         frames.set_animation_speed(clip, 6.0 if clip == "idle" else 9.0)
-        var sheet: Texture2D = load("res://content/textures/units/armoured_warrior_%s.png" % clip)
+        var sheet: Texture2D = Art.texture("hero." + clip)
         for index in range(4):
             var frame := AtlasTexture.new()
             frame.atlas = sheet

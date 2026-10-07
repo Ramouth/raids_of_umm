@@ -35,12 +35,12 @@ func _run() -> void:
     scene.fog.visible = false
     var map: Node2D = scene.map_view
     check(map.art_theme.config.id == "north", "Grass maps use the North package")
-    for relative in [map.art_theme.config.objects.quarry, map.art_theme.config.scenery.ridge, map.art_theme.config.scenery.scrub]:
-        check(ResourceLoader.exists("res://content/textures/" + relative), "Package asset imports: " + relative)
-        var texture: Texture2D = load("res://content/textures/" + relative)
-        check(texture.get_image().detect_alpha() != Image.ALPHA_NONE, "Scenery has genuine alpha: " + relative)
+    for id in [map.art_theme.config.objects.quarry, map.art_theme.config.scenery.ridge, map.art_theme.config.scenery.scrub]:
+        check(ResourceLoader.exists(Art.path(id)), "Package asset imports: " + id)
+        var texture: Texture2D = Art.texture(id)
+        check(texture.get_image().detect_alpha() != Image.ALPHA_NONE, "Scenery has genuine alpha: " + id)
     var quarry := Vector2i(-13, 10)
-    check(map.object_texture(map.data.objects[quarry]) == "themes/north/quarry.png", "North quarry cannot fall back to desert art")
+    check(map.object_texture(map.data.objects[quarry]) == "object.quarry.north", "North quarry cannot fall back to desert art")
     check(not map.get_node("GrassGrain").visible, "Legacy patterned grass is replaced with a continuous meadow")
     var joined := 0
     var seen := {}
@@ -102,6 +102,6 @@ func _run() -> void:
     desert.map_path = "res://content/maps/default.json"
     root.add_child(desert)
     check(desert.art_theme.config.id == "desert", "Desert remains a separate package")
-    check(desert.object_texture({"type": "quarry"}) == "objects/quarry.png", "Desert retains its own quarry")
+    check(desert.object_texture({"type": "quarry"}) == "object.quarry", "Desert retains its own quarry")
     print("North package: %s" % ("PASS" if failures == 0 else "%d failures" % failures))
     quit(0 if failures == 0 else 1)

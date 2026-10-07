@@ -75,8 +75,7 @@ func _row(stack: Dictionary, in_army: bool) -> Control:
     var row := HBoxContainer.new()
     row.add_theme_constant_override("separation", 8)
     var icon := TextureRect.new()
-    var path := "res://content/textures/units/%s.png" % stack.id
-    if ResourceLoader.exists(path): icon.texture = load(path)
+    icon.texture = Art.texture("unit." + str(stack.id))
     icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     icon.custom_minimum_size = Vector2(48, 48)
     icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

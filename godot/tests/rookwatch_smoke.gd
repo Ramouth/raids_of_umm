@@ -23,7 +23,7 @@ func _run() -> void:
         if scene.data.objects[cell].name == "Rookwatch": castle = cell
         if scene.data.objects[cell].name == "Greyfang Watch": watch = cell
     check(castle != Vector2i.ZERO, "Rookwatch is in the playable map")
-    check(scene.map_view.object_texture(scene.data.objects[castle]) == "objects/town_north.png", "Rookwatch uses northern castle art")
+    check(scene.map_view.object_texture(scene.data.objects[castle]) == "object.town.north", "Rookwatch uses northern castle art")
     var count := 0
     for stack in scene._encounters_for(scene.data.objects[castle]): count += int(stack.count)
     check(count == 53, "Castle inspection includes the actual lord and garrison")

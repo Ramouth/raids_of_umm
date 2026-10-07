@@ -38,6 +38,9 @@ MVP graphics now and real art swapped in later without code changes.
   option `requires_flag`. Every resolved choice also records `choice.<id> = <option id>`
   automatically, so heavy decisions are remembered without extra authoring.
 - `ending` gains `"next": "<map id>"` (or a chapter end).
+- **A level cap per map**: `"max_level"` on each map entry. The commander cannot level past it on
+  that map, and XP past the cap is lost but counted. The session records the day the cap was
+  first reached and the XP lost to it.
 - Campaign save beside the map save; the save version is bumped.
 - Tests: state carries across two `start()` calls; a flag set in map A gates a trigger in map B;
   save/load keeps the campaign.
@@ -59,6 +62,10 @@ MVP graphics now and real art swapped in later without code changes.
 - Maps 1.0 The last hunt, 1.1 Varenhold, 1.2 The camps, 1.3 The east road, built from small
   generator specs (one script per chapter, like gen_north_map.py) to the Map design tab:
   resources, encounter density and shape tell the story.
+- **Organic outlines, no frame.** Today `gen_north_map.py` cuts every map to a hexagon (`RADIUS`,
+  line 47) and rings it with mountains ("frame the map", line 216). New maps take the land's own
+  outline (a bowl, a ribbon, corridors), with edges of varied natural barriers, and mountains only
+  where the story puts them. umm-godot draws the land beyond the edge, out of reach and faded.
 - Triggers from a new `scripts/chapter1_story.py`, with dialogue only where a decision is made.
 - `old_passage` stays in the repo as a test fixture until chapter 1 replaces it in the game.
 
@@ -69,9 +76,39 @@ MVP graphics now and real art swapped in later without code changes.
 ### E. Verification
 
 - `demo_bot` gains a campaign mode that plays chapter 1's maps in sequence.
+- **The level cap must not be trivial.** Per map, the route reports `CAP map=<id> cap=<n>
+  reached_day=<d or never> map_days=<D> xp_lost=<x> xp_earned=<y>`. The eval flags the cap as
+  trivial when a route reaches it before two-thirds of the map's days have passed, or loses
+  more than a quarter of the map's XP to it. A thorough route should reach the cap near the
+  end of the map, and a hasty one should not reach it.
 - `scripts/verify.sh` gains a `campaign` stage.
 - The blind player reads the chapter 1 transcript; target numbers come from the Rules section
   of the design doc.
+
+## The loop (after iteration 1)
+
+Once the art registry is in, each slice runs a Gleipnir-style loop: build, judge in code
+(verifier, route caps, the graph check), judge as a player (the blind player and the
+playtester), change, run again. Every run is logged in `docs/logbook/` with its numbers and the
+count of changes it led to. We expect many changes in the first runs and fewer each run after,
+and the log shows whether that happens.
+
+## Order and gates (agreed 2026-10-07)
+
+Depth before breadth: a chapter becomes good before the next one starts.
+
+| Phase | What | Gate to move on |
+|---|---|---|
+| 0 | Iteration 1: campaign layer, flags, level cap (A) and the art registry (B) | `verify.sh` passes, apart from the known old-demo failures |
+| 1 | Chapter 1 with a single hero (C, D, E), run as the loop | Changes per run falling; lost <= 3; at least half of threads opened by play; at least one late-to-early callback; cap not trivial; **the user has played it and it feels right** |
+| 2 | Captains: several heroes and promotion at level-up; rerun the chapter 1 loop | Same gate |
+| 3+ | One chapter at a time: 2 (the Under-road rules), 3 (dungeons and the relic race), 4 | Same gate, plus the user's beta test at each chapter's end |
+
+- The blind player's numbers guide the work; the user's play decides. A loop that only
+  optimises the numbers drifts toward pleasing them.
+- `demo_bot` reads its objectives from the story data, not hand-written per-map routes, before
+  chapter 1's loop starts.
+- The user plays chapter 1 at loop runs 1 and 3, and whenever the numbers stop improving.
 
 ## Order
 

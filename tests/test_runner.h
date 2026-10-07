@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <functional>
+#include <stdexcept>
 #include <vector>
 
 // ── Minimal test runner ───────────────────────────────────────────────────────
@@ -81,11 +82,18 @@ public:
         m_suites.push_back({name, fn});
     }
 
-    int run() {
+    int run(const std::string& filter = "") {
         for (auto& [name, fn] : m_suites) {
+            bool exclude = !filter.empty() && filter[0] == '!';     // "!Level 1" skips those suites
+            bool hit = name.find(exclude ? filter.substr(1) : filter) != std::string::npos;
+            if (!filter.empty() && hit == exclude) continue;
             std::cout << "\n=== " << name << " ===\n";
             g_currentSuite = name;
-            fn();
+            try { fn(); }
+            catch (const std::exception& e) {   // one broken suite must not hide the rest
+                std::cerr << "  FAIL  suite threw: " << e.what() << "  (" << name << ")\n";
+                ++g_failed;
+            }
         }
         int total = g_passed + g_failed;
         std::cout << "\n────────────────────────────────────────\n";

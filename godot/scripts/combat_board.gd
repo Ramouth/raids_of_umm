@@ -8,7 +8,6 @@ signal cell_hovered(cell: Vector2i, inside: bool)
 signal pointer_moved(point: Vector2)
 const HEX := Vector2(80, 76)
 const ORIGIN := Vector2(70, 70)
-const ART := {"dune_stalker": "enemy_scout"}  # units sharing another unit's sprite
 const PLAYER_COLOR := Color("789b88")
 const ENEMY_COLOR := Color("bc7660")
 const COMPANION_COLOR := Color("f7d580")
@@ -54,11 +53,9 @@ var _forecast: Label
 ## Drawn above the unit sprites (the pincer must not hide behind them).
 var _overlay: Node2D
 
+## Unit art by unit id (shared sprites and placeholders come from the Art registry).
 static func unit_texture(id: String) -> Texture2D:
-    var filename: String = ART.get(id, id)
-    var path := "res://content/textures/units/%s.png" % filename
-    if not ResourceLoader.exists(path): path = "res://content/textures/units/armoured_warrior.png"
-    return load(path)
+    return Art.texture("unit." + id)
 
 static func cell_point(cell: Array) -> Vector2:
     return ORIGIN + Vector2(float(cell[0]) * 60.0, (float(cell[1]) + float(cell[0]) * 0.5) * 76.0)

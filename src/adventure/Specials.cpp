@@ -148,7 +148,7 @@ int AdventureSession::encounterXp(const HexCoord& c) const {
 void AdventureSession::grantXp(int xp) {
     if (xp <= 0) return;
     m_heroProgress.xp += xp;
-    while (m_heroProgress.level < MAX_HERO_LEVEL && m_heroProgress.xp >= xpForLevel(m_heroProgress.level + 1)) {
+    while (m_heroProgress.level < m_levelCap && m_heroProgress.xp >= xpForLevel(m_heroProgress.level + 1)) {
         LevelUp up{++m_heroProgress.level, "", ""};
         for (const auto& p : m_paths)
             if (p.id == m_path)
@@ -156,6 +156,7 @@ void AdventureSession::grantXp(int xp) {
                     if (n.level == up.level) { m_learned.push_back(n.id); up.skill = n.name; up.text = n.text; }
         m_levelUps.push_back(up);
     }
+    capXp();
     for (auto& sc : m_specials) {
         if (sc.stationed || isWounded(sc) || sc.unpaidDays >= SULK_DAYS) continue;
         sc.xp += xp;
@@ -168,6 +169,16 @@ void AdventureSession::grantXp(int xp) {
         }
     }
     recomputeVisibility();
+}
+
+void AdventureSession::capXp() {
+    if (m_heroProgress.level < m_levelCap) return;
+    if (m_capReachedDay < 0) m_capReachedDay = day();
+    int ceiling = xpForLevel(std::max(m_heroProgress.level, m_levelCap));
+    if (m_heroProgress.xp > ceiling) {
+        m_xpLostToCap += m_heroProgress.xp - ceiling;
+        m_heroProgress.xp = ceiling;
+    }
 }
 
 int AdventureSession::upkeepPerDay() const {

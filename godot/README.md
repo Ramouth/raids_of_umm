@@ -178,6 +178,16 @@ That folder, `.godot/`, screenshots, and the local engine are ignored by Git. Ed
 original assets under `assets/textures/` and `data/maps/default.json`, then rerun
 the launcher. No source sprite is rewritten or recolored by the migration.
 
+## Swapping art
+
+Every image the client shows is looked up by a logical id in `godot/content_source/art.json` through `Art.texture(id)` (`scripts/art.gd`). Ids start with their category: `unit.`, `hero.`, `portrait.`, `object.`, `kind.`, `feature.`, `tree.`, `terrain.`, `screen.`, `slide.`, `icon.`. A value is a file under `assets/textures/` (staged to `res://content/textures/`), or `{"file", "fallback"?, "mipmaps"?, "frames"?, "size"?}`.
+
+- Replace a picture: overwrite the file, or point the id at a new file. No code changes.
+- New unit: drop `assets/textures/units/<unit id>.png`; `unit.<id>` needs no entry.
+- Missing art never crashes or goes blank: an unknown id or a missing file shows a generated placeholder (a figure, diamond or panel in the category colour with the id's initials) and logs one `Art: no image for '<id>'` warning. Grep the log for it to list what still needs art.
+- Dialogue portraits are `portrait.<speaker in lower case, spaces as _>`; unlisted speakers use `portrait.default`. Map objects try `object.dwelling.<kind>`, `kind.<kind>`, the biome override (`themes/<biome>.json` names ids), then `object.<type>`.
+- `res://tests/art_smoke.gd` fails if any listed file is missing.
+
 ## Check
 
 ```sh

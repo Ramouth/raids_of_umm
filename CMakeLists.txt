@@ -112,6 +112,7 @@ add_executable(raids_tests
     tests/test_worldbuilder.cpp
     tests/test_adventure_session.cpp
     tests/test_adventure_sites.cpp
+    tests/test_campaign.cpp
     tests/test_level_one.cpp
     tests/test_tactics.cpp
     tests/test_town_buildings.cpp
@@ -121,6 +122,7 @@ add_executable(raids_tests
     src/adventure/Rivals.cpp
     src/adventure/Specials.cpp
     src/adventure/SessionSave.cpp
+    src/adventure/CampaignState.cpp
     src/hex/HexGrid.cpp
     src/world/WorldMap.cpp
     src/render/Camera2D.cpp

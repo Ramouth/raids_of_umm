@@ -9,36 +9,10 @@ var mountain_groups: Array = []
 
 const PATCH_SHADER = preload("res://shaders/terrain_patch.gdshader")
 const WATER_SHADER = preload("res://shaders/water.gdshader")
-const OBJECT_TEXTURES := {
-    "town": "objects/town.png", "dungeon": "objects/dungeon.png",
-    "gold_mine": "objects/goldmine.png", "crystal_mine": "objects/crystal_mine.png",
-    "artifact": "objects/artifact.png", "sawmill": "objects/sawmill.png",
-    "quarry": "objects/quarry.png", "obsidian_vent": "objects/obsidian_vent.png",
-    "old_mine": "objects/old_mine.png", "quest_giver": "objects/quest_giver.png",
-    "guard": "objects/guard.png", "watchtower": "objects/watchtower.png",
-    "stables": "objects/stables.png", "learning_stone": "objects/learning_stone.png",
-    "obelisk": "objects/obelisk.png",
-}
-## Sprite by object kind (pickups, mills, dwellings, relic artifacts).
-const KIND_TEXTURES := {
-    "wood": "objects/wood_pile.png", "stone": "objects/stone_pile.png", "gold": "objects/gold_pile.png",
-    "crystal": "objects/crystal_pile.png", "obsidian": "objects/obsidian_pile.png",
-    "chest": "objects/treasure_chest.png", "campfire": "objects/campfire.png",
-    "windmill": "objects/windmill.png", "watermill": "objects/watermill.png",
-    "listening_shard": "objects/veined_relic.png", "warm_stone": "objects/veined_relic.png",
-    "druid": "objects/druid.png",
-}
 const WATER_TERRAIN := ["oasis", "lake", "river"]
-const TREE_SPRITES := ["terrain/forest/pine_cluster.png", "terrain/forest/oak_cluster.png"]
 var anchors: Dictionary = {}  # cell -> object anchor node
-const FEATURE_TEXTURES := {
-    "dune": "terrain/dune/dune.png", "mountain": "terrain/mountain/mountain2.png",
-    "oasis": "terrain/oasis/oasis1.png", "ruins": "terrain/ruins/ruins1.png",
-    "rock": "terrain/rock/rock1.png", "obsidian": "terrain/obsidian/obsidian0.png",
-    "river": "terrain/river/river.png", "forest": "terrain/forest/forest.png",
-    "grass": "terrain/grass/grass.png", "highland": "terrain/highland/highland.png",
-    "wall": "terrain/wall/wall.png", "swamp": "terrain/highland/highland1.png",
-}
+## Map art comes from the Art registry: object.<type>, kind.<kind>, feature.<terrain>,
+## tree.*, terrain.*_grain; biome packages (godot/themes) name ids for their overrides.
 @export_file("*.json") var map_path := "res://content/maps/old_passage.json"
 @export_group("Art direction")
 @export var sand_color := Color("c89943")
@@ -84,13 +58,8 @@ func rebuild() -> void:
     var grain := Polygon2D.new()
     grain.name = "GrassGrain" if north else "SandGrain"
     grain.polygon = outline
-    var grain_path := "res://content/textures/terrain/sand/sand_seamless.png"
-    if north:
-        grain_path = "res://content/textures/terrain/grass/grasstexture.png"
-    elif not ResourceLoader.exists(grain_path):
-        # The seamless texture is optional worktree art; tracked assets also run.
-        grain_path = "res://content/textures/terrain/sand/sand1.png"
-    grain.texture = load(grain_path)
+    # The seamless sand is optional worktree art; art.json falls back to tracked sand.
+    grain.texture = Art.texture("terrain.grass_grain" if north else "terrain.sand_grain")
     grain.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
     grain.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     grain.color = Color(1, 1, 1, grass_detail_opacity if north else sand_detail_opacity)
@@ -105,10 +74,9 @@ func rebuild() -> void:
             continue
         if north and tile.terrain in ["forest", "mountain", "highland", "swamp"]:
             continue  # Northern relief is composed as scenery, without polygon-shaped tile bases.
-        if not FEATURE_TEXTURES.has(tile.terrain):
+        if not Art.is_listed("feature." + tile.terrain):
             continue
-        var art: String = FEATURE_TEXTURES[tile.terrain]
-        var feature := _sprite(art)
+        var feature := _sprite("feature." + tile.terrain)
         feature.name = "%s_%d_%d" % [tile.terrain, cell.x, cell.y]
         feature.position = UmmMapData.cell_to_world(cell)
         var material := ShaderMaterial.new()
@@ -240,22 +208,24 @@ func mark_sites(sites: Array) -> void:
         else:
             anchors[cell].modulate = Color(1, 1, 1, 0.6) if entry.used else Color.WHITE
 
+## The art id for a map object: the most specific candidate that has an image,
+## else the most specific one (which shows as a placeholder).
 func object_texture(object: Dictionary) -> String:
     if str(object.get("name", "")).ends_with("Rune Stone"):
-        return "objects/obelisk.png"
+        return "object.obelisk"
     var type := str(object.type)
     var kind := str(object.get("kind", ""))
     var candidates: Array[String] = []
-    if type == "dwelling": candidates.append("objects/dwelling_%s.png" % kind)
+    if type == "dwelling": candidates.append("object.dwelling." + kind)
     if type == "town" and int(object.get("factionId", 0)) == 2 and data.ground == "grass" and kind != "cruths":
-        candidates.append("objects/town_shariw_north.png")
-    if KIND_TEXTURES.has(kind): candidates.append(KIND_TEXTURES[kind])
+        candidates.append("object.town.shariw_north")
+    if not kind.is_empty(): candidates.append("kind." + kind)
     var themed: Dictionary = art_theme.config.get("objects", {})
     if themed.has(type): candidates.append(str(themed[type]))
-    if OBJECT_TEXTURES.has(type): candidates.append(OBJECT_TEXTURES[type])
-    for path in candidates:
-        if ResourceLoader.exists("res://content/textures/" + path): return path
-    return ""
+    candidates.append("object." + type)
+    for id in candidates:
+        if Art.has_art(id): return id
+    return candidates[0]
 
 ## Beaten guard camps disappear from the map; `guarded` holds the ones still standing.
 func set_cleared_guards(guarded: Dictionary) -> void:
@@ -281,19 +251,9 @@ func mark_ruled_out(ruled: Dictionary) -> void:
         label.text = str(data.objects[cell].name) + ("  ·  dead end" if dead else "")
         anchors[cell].modulate = Color(1, 1, 1, 0.55) if dead else Color.WHITE
 
-var _theme_textures: Dictionary = {}
-
-func _sprite(relative_path: String) -> Sprite2D:
+func _sprite(art_id: String) -> Sprite2D:
     var sprite := Sprite2D.new()
-    if relative_path.begins_with("themes/"):
-        if not _theme_textures.has(relative_path):
-            var source: Texture2D = load("res://content/textures/" + relative_path)
-            var bitmap := source.get_image()
-            if not bitmap.has_mipmaps(): bitmap.generate_mipmaps()
-            _theme_textures[relative_path] = ImageTexture.create_from_image(bitmap)
-        sprite.texture = _theme_textures[relative_path]
-    else:
-        sprite.texture = load("res://content/textures/" + relative_path)
+    sprite.texture = Art.texture(art_id)
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     return sprite
 
@@ -336,28 +296,21 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
     anchor.position = UmmMapData.cell_to_world(cell)
     parent.add_child(anchor)
     anchors[cell] = anchor
-    var art := object_texture(object)
-    if not art.is_empty():
-        var sprite := _sprite(art)
-        sprite.position.y = -39
-        sprite.scale = Vector2(0.85, 0.85)
-        if object.type == "town":
-            sprite.scale = Vector2.ONE
-            sprite.position.y = -49
-            if object.get("name", "") == "Varenhold":
-                sprite.scale = Vector2.ONE * 1.28
-                sprite.position.y = -62
-        var widths: Dictionary = art_theme.config.get("landmark_widths", {})
-        if widths.has(str(object.type)):
-            _fit_sprite(sprite, float(widths[str(object.type)]))
-            sprite.position.y = -sprite.texture.get_height() * sprite.scale.y * 0.34
-        anchor.add_child(sprite)
-    else:
-        # Missing art remains an explicit map marker, never a different building.
-        var marker := Polygon2D.new()
-        marker.polygon = PackedVector2Array([Vector2(0, -22), Vector2(13, -9), Vector2(0, 4), Vector2(-13, -9)])
-        marker.color = Color("685040")
-        anchor.add_child(marker)
+    # Missing art shows this object's own placeholder, never a different building.
+    var sprite := _sprite(object_texture(object))
+    sprite.position.y = -39
+    sprite.scale = Vector2(0.85, 0.85)
+    if object.type == "town":
+        sprite.scale = Vector2.ONE
+        sprite.position.y = -49
+        if object.get("name", "") == "Varenhold":
+            sprite.scale = Vector2.ONE * 1.28
+            sprite.position.y = -62
+    var widths: Dictionary = art_theme.config.get("landmark_widths", {})
+    if widths.has(str(object.type)):
+        _fit_sprite(sprite, float(widths[str(object.type)]))
+        sprite.position.y = -sprite.texture.get_height() * sprite.scale.y * 0.34
+    anchor.add_child(sprite)
     if object.get("name", "") == "Varenhold":
         var pole := Line2D.new()
         pole.points = PackedVector2Array([Vector2(43, -37), Vector2(43, -105)])

@@ -1,4 +1,5 @@
 #pragma once
+#include "CampaignState.h"
 #include "Scenario.h"
 #include "core/ResourceManager.h"
 #include "core/TurnManager.h"
@@ -83,6 +84,24 @@ public:
     std::optional<std::string> start(WorldMap map, const std::string& dataDir,
                                      const std::string& encountersPath = "", uint32_t seed = 0,
                                      const std::string& triggersPath = "");
+    // A campaign map: as above, then the carried state (flags, level cap and,
+    // once carried, commander, army, items, companions, treasury) is applied
+    // after the per-map reset and before the "start" triggers fire.
+    std::optional<std::string> start(const std::string& mapPath, const std::string& dataDir,
+                                     const std::string& encountersPath, uint32_t seed,
+                                     const std::string& triggersPath, const CampaignState& carry);
+    std::optional<std::string> start(WorldMap map, const std::string& dataDir,
+                                     const std::string& encountersPath, uint32_t seed,
+                                     const std::string& triggersPath, const CampaignState& carry);
+    // What this map hands to the next: carried parts, flags, and this map's
+    // stats in lastMap. The campaign position is the Campaign's to fill.
+    CampaignState carryOut() const;
+
+    // ── Story flags (the campaign's memory; carried and saved) ───────────────
+    const Scenario::Json& flags() const { return m_flags; }
+    void setFlag(const std::string& name, const Scenario::Json& value) { m_flags[name] = value; }
+    // The map the ending names ("ending": {"next": id}); "" = next in order.
+    std::string nextMap() const { return m_scenario.nextMap(); }
 
     // ── Movement ─────────────────────────────────────────────────────────────
     // Route from the hero to 'to', excluding the hero's own cell. Empty = no route.
@@ -200,6 +219,11 @@ public:
     static constexpr int MAX_HERO_LEVEL = 10;
     struct HeroProgress { int level = 1; int xp = 0; };
     const HeroProgress& heroProgress() const { return m_heroProgress; }
+    // Each map caps the commander's level (campaign max_level, else MAX_HERO_LEVEL).
+    // At the cap, experience past xpForLevel(cap) is lost, not banked; it is counted.
+    int levelCap() const { return m_levelCap; }
+    int capReachedDay() const { return m_capReachedDay; }   // first day at the cap on this map, -1 = not yet
+    int xpLostToCap() const { return m_xpLostToCap; }
     // Experience a victory at 'c' would give (guards, old mines, war-bands); 0 = none.
     int encounterXp(const HexCoord& c) const;
     // Experience for the commander and every travelling companion (victories, story rewards).
@@ -335,6 +359,10 @@ public:
     const std::unordered_set<HexCoord>& explored() const { return m_explored; }
 
 private:
+    std::optional<std::string> startMap(WorldMap map, const std::string& dataDir, const std::string& encountersPath,
+                                        uint32_t seed, const std::string& triggersPath, const CampaignState* carry);
+    void applyCarry(const CampaignState& carry);
+    void capXp();                                // enforce the level cap on the commander's experience
     std::optional<std::string> loadEncounters(const std::string& path);
     void growTown(const HexCoord& c);
     void ensureBuildings(const HexCoord& c);   // a town the player gains starts with the faction's starting set
@@ -383,6 +411,10 @@ private:
     std::vector<Special>             m_specials;
     std::vector<Special>             m_departedSpecials;
     HeroProgress                     m_heroProgress;
+    int                              m_levelCap = MAX_HERO_LEVEL;
+    int                              m_capReachedDay = -1;
+    int                              m_xpLostToCap = 0;
+    Scenario::Json                   m_flags = Scenario::Json::object();
     std::vector<TreePath>            m_paths;
     TreePath                         m_wildcard;
     std::string                      m_path;      // chosen at level 2 ("" = not yet)

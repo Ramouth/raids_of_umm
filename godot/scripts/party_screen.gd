@@ -6,8 +6,6 @@ extends Control
 
 signal finished(result: Dictionary)
 
-const PORTRAITS := {"ushari": "units/ushari.png", "kharim": "portraits/kharim.png", "maerwen": "portraits/maerwen.png"}
-
 var host: Node   # desert.gd: provides state, station()
 var _list: VBoxContainer
 var _message: Label
@@ -66,8 +64,7 @@ func _card(sc: Dictionary) -> Control:
     var row := HBoxContainer.new()
     row.add_theme_constant_override("separation", 18)
     var portrait := TextureRect.new()
-    var path := "res://content/textures/" + str(PORTRAITS.get(sc.id, "units/armoured_warrior.png"))
-    if ResourceLoader.exists(path): portrait.texture = load(path)
+    portrait.texture = Art.texture("portrait.companion." + str(sc.id), "portrait.default")
     portrait.custom_minimum_size = Vector2(128, 128)
     portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

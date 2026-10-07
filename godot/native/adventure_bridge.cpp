@@ -61,6 +61,8 @@ Json AdventureBridge::snapshot() const {
             encounter_xp.push_back({r.pos.q, r.pos.r, session_.encounterXp(r.pos)});
     const auto& hp = session_.heroProgress();
     Json hero_progress = {{"level", hp.level}, {"xp", hp.xp}, {"max", AdventureSession::MAX_HERO_LEVEL},
+                          {"cap", session_.levelCap()}, {"cap_reached_day", session_.capReachedDay()},
+                          {"xp_lost_to_cap", session_.xpLostToCap()},
                           {"prev", AdventureSession::xpForLevel(hp.level)},
                           {"next", AdventureSession::xpForLevel(hp.level + 1)}};
     Json army = Json::array();
@@ -230,10 +232,18 @@ Json AdventureBridge::snapshot() const {
         {"story_choice", [&] {
             Json choice = session_.scenario().choice();
             if (!choice.empty()) choice["route_ready"] = !session_.departureRoute().empty();
+            if (choice.contains("options") && choice["options"].is_array())
+                for (auto& option : choice["options"])       // requires_flag not met yet
+                    option["locked"] = option.contains("requires_flag")
+                        && !Scenario::flagsMatch(session_.flags(), option["requires_flag"]);
             return choice;
         }()},
         {"departure_route", session_.departureRoute()},
         {"story_outcome", session_.scenario().outcome()},
+        {"next_map", session_.nextMap()},
+        {"flags", session_.flags()},
+        {"level_cap", session_.levelCap()}, {"cap_reached_day", session_.capReachedDay()},
+        {"xp_lost_to_cap", session_.xpLostToCap()},
         {"army", army},
         {"towns", towns},
         {"building_defs", building_defs},
@@ -456,4 +466,63 @@ Json AdventureBridge::claim_chest(bool gold) {
     Json out = snapshot();
     out["found"] = found;
     return with_lines(out);
+}
+
+// ── Campaign ──────────────────────────────────────────────────────────────────
+
+Json AdventureBridge::campaign_json() const {
+    const Campaign::Chapter* chapter = campaign_.currentChapter();
+    const Campaign::MapEntry* entry = campaign_.current();
+    return {{"finished", campaign_.finished()},
+            {"chapter", chapter ? Json{{"id", chapter->id}, {"title", chapter->title}} : Json(nullptr)},
+            {"map", entry ? campaign_.describe(*entry) : Json(nullptr)},
+            {"state", campaign_.state().toJson()}};
+}
+
+Json AdventureBridge::campaign_load(const std::string& path, const std::string& data_dir) {
+    if (auto err = campaign_.load(path, data_dir)) return {{"ok", false}, {"error", *err}};
+    Json chapters = Json::array();
+    for (const auto& c : campaign_.chapters()) {
+        Json maps = Json::array();
+        for (const auto& m : c.maps) maps.push_back(campaign_.describe(m));
+        chapters.push_back({{"id", c.id}, {"title", c.title}, {"maps", maps}});
+    }
+    return {{"ok", true}, {"campaign", campaign_json()}, {"chapters", chapters}};
+}
+
+Json AdventureBridge::campaign_current() const {
+    if (!campaign_.loaded()) return {{"ok", false}, {"error", "No campaign is loaded."}};
+    return {{"ok", true}, {"campaign", campaign_json()}};
+}
+
+Json AdventureBridge::campaign_start_map(uint32_t seed) {
+    const Campaign::MapEntry* entry = campaign_.current();
+    if (!entry) return {{"ok", false}, {"error", campaign_.loaded() ? "The campaign is over." : "No campaign is loaded."}};
+    if (auto err = session_.start(campaign_.resolve(entry->map), campaign_.dataDir(),
+                                  campaign_.resolve(entry->encounters), seed,
+                                  campaign_.resolve(entry->triggers), campaign_.startState()))
+        return {{"ok", false}, {"error", *err}};
+    Json out = with_lines(snapshot());
+    out["campaign"] = campaign_json();
+    return out;
+}
+
+Json AdventureBridge::campaign_advance(const std::string& next_map) {
+    if (!campaign_.current()) return {{"ok", false}, {"error", "There is no campaign map to leave."}};
+    if (!session_.won()) return {{"ok", false}, {"error", "The map is not finished yet."}};
+    campaign_.finishMap(session_.carryOut());
+    auto step = campaign_.advance(next_map.empty() ? session_.nextMap() : next_map);
+    if (step.error) return {{"ok", false}, {"error", *step.error}};
+    return {{"ok", true}, {"finished", step.finished}, {"new_chapter", step.newChapter},
+            {"campaign", campaign_json()}};
+}
+
+Json AdventureBridge::campaign_save(const std::string& path) const {
+    if (auto err = campaign_.saveFile(path)) return {{"ok", false}, {"error", *err}};
+    return {{"ok", true}};
+}
+
+Json AdventureBridge::campaign_load_save(const std::string& path) {
+    if (auto err = campaign_.loadFile(path)) return {{"ok", false}, {"error", *err}};
+    return {{"ok", true}, {"campaign", campaign_json()}};
 }

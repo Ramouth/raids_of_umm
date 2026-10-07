@@ -123,7 +123,7 @@ func _ready() -> void:
     sidebar.get_node("Grid").toggled.connect(_toggle_grid)
     sidebar.get_node("Center").pressed.connect(center_hero)
     sidebar.get_node("Overview").pressed.connect(fit_map)
-    sidebar.get_node("Portrait").texture = load("res://content/textures/units/british_lord.png")
+    sidebar.get_node("Portrait").texture = Art.texture("hero.portrait")
     encounter = JSON.parse_string(FileAccess.get_file_as_string("res://content_source/dungeon_encounter.json"))
     var units: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/units.json"))
     if units is Dictionary:
@@ -288,11 +288,11 @@ func open_town() -> bool:
     screen.cell = hero.cell
     var landmark: Dictionary = data.objects.get(hero.cell, {})
     if landmark.get("type", "") == "dwelling":
-        screen.view_art = "res://content/textures/" + map_view.object_texture(landmark)
+        screen.view_art = map_view.object_texture(landmark)
         screen.eyebrow_text = "DWELLING  ·  RECRUITS GATHER WEEKLY"
         screen.can_build = false
-    elif data.ground == "grass" and ResourceLoader.exists("res://content/textures/screens/town_varenhold.png"):
-        screen.view_art = "res://content/textures/screens/town_varenhold.png"
+    elif data.ground == "grass" and Art.has_art("screen.town_varenhold"):
+        screen.view_art = "screen.town_varenhold"
     screens.push(screen, func(_result: Dictionary):
         _apply_state(state)
         _update_expedition())
@@ -357,7 +357,7 @@ func _announce_levels(reply: Dictionary) -> void:
     reply.erase("level_ups")          # the same reply is applied again later
     for up in ups:
         var skill := str(up.get("skill", ""))
-        var spec := {"title": "LEVEL %d" % int(up.level), "picture": "units/british_lord.png"}
+        var spec := {"title": "LEVEL %d" % int(up.level), "picture": "hero.portrait"}
         if skill.is_empty() and state.get("tree", {}).get("needs_path", false):
             spec.flavour = "Your commander has earned a name among the Cruths. Choose a path: Marshal, Siegemaster or Quartermaster. It is chosen for good."
             spec.buttons = ["Choose a path"]
@@ -446,7 +446,7 @@ func _offer_chest(chest: Dictionary) -> void:
         func(choice: int): claim_chest(choice == 0))
     _chest_panel = popup
 
-## HoMM3 pop-up: {title, flavour, reward, picture (texture path under content/textures), buttons}.
+## HoMM3 pop-up: {title, flavour, reward, picture (an Art id; "" for none), buttons}.
 ## Queued if one is already open; `on_close` receives the chosen button's index.
 func show_popup(spec: Dictionary, on_close := Callable()) -> void:
     if is_instance_valid(popup):
@@ -458,7 +458,7 @@ func show_popup(spec: Dictionary, on_close := Callable()) -> void:
     box.flavour = str(spec.get("flavour", ""))
     box.reward = str(spec.get("reward", ""))
     var art := str(spec.get("picture", ""))
-    if not art.is_empty() and ResourceLoader.exists("res://content/textures/" + art): box.picture = load("res://content/textures/" + art)
+    if not art.is_empty(): box.picture = Art.texture(art)
     var labels: Array[String] = []
     for text in spec.get("buttons", ["OK"]): labels.append(str(text))
     box.buttons = labels
@@ -553,11 +553,11 @@ func _make_rival_sprite(title: String, roster: String = "shariw") -> Node2D:
     var sprite := Sprite2D.new()
     if roster == "cruths":
         var frame := AtlasTexture.new()
-        frame.atlas = load("res://content/textures/units/armoured_warrior_idle.png")
+        frame.atlas = Art.texture("hero.idle")
         frame.region = Rect2(0, 0, 64, 64)
         sprite.texture = frame
     else:
-        sprite.texture = load("res://content/textures/units/shariw_hero.png")
+        sprite.texture = Art.texture("hero.rival.shariw")
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     sprite.scale = Vector2.ONE if roster == "cruths" else Vector2(0.5, 0.5)
     sprite.position.y = -28
@@ -1393,7 +1393,7 @@ func _show_end(victory: bool, reason := "") -> void:
     screen.theme = $HUD/Layout.theme
     _end_screen = screen
     screen.victory = victory
-    screen.illustration = "res://content/textures/screens/%s.png" % ("victory" if victory else ("sealed" if not reason.is_empty() else ""))
+    screen.illustration = "screen.victory" if victory else ("screen.sealed" if not reason.is_empty() else "")
     if not reason.is_empty():
         screen.heading = "The Passage Is Sealed"
         screen.body = reason + " The Shariw have sealed the old passage, your search for Aldren cannot continue along this road."

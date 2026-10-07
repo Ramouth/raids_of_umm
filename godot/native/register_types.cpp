@@ -82,6 +82,13 @@ protected:
         ClassDB::bind_method(D_METHOD("preview", "q", "r"), &UmmAdventure::preview);
         ClassDB::bind_method(D_METHOD("travel", "q", "r"), &UmmAdventure::travel);
         ClassDB::bind_method(D_METHOD("end_day"), &UmmAdventure::end_day);
+        // Campaign flow (see adventure_bridge.h for what each returns).
+        ClassDB::bind_method(D_METHOD("campaign_load", "path", "data_dir"), &UmmAdventure::campaign_load, DEFVAL(""));
+        ClassDB::bind_method(D_METHOD("campaign_current"), &UmmAdventure::campaign_current);
+        ClassDB::bind_method(D_METHOD("campaign_start_map", "seed"), &UmmAdventure::campaign_start_map, DEFVAL(0));
+        ClassDB::bind_method(D_METHOD("campaign_advance", "next_map"), &UmmAdventure::campaign_advance, DEFVAL(""));
+        ClassDB::bind_method(D_METHOD("campaign_save", "path"), &UmmAdventure::campaign_save);
+        ClassDB::bind_method(D_METHOD("campaign_load_save", "path"), &UmmAdventure::campaign_load_save);
     }
 public:
     String start(const String& map, const String& dir, const String& encounters, int64_t seed, const String& triggers) {
@@ -127,6 +134,14 @@ public:
     String preview(int q, int r) { return guarded([&] { return bridge_.preview(q, r); }); }
     String travel(int q, int r) { return guarded([&] { return bridge_.travel(q, r); }); }
     String end_day() { return guarded([&] { return bridge_.end_day(); }); }
+    String campaign_load(const String& path, const String& dir) {
+        return guarded([&] { return bridge_.campaign_load(path.utf8().get_data(), dir.utf8().get_data()); });
+    }
+    String campaign_current() { return guarded([&] { return bridge_.campaign_current(); }); }
+    String campaign_start_map(int64_t seed) { return guarded([&] { return bridge_.campaign_start_map(static_cast<uint32_t>(seed)); }); }
+    String campaign_advance(const String& next) { return guarded([&] { return bridge_.campaign_advance(next.utf8().get_data()); }); }
+    String campaign_save(const String& path) { return guarded([&] { return bridge_.campaign_save(path.utf8().get_data()); }); }
+    String campaign_load_save(const String& path) { return guarded([&] { return bridge_.campaign_load_save(path.utf8().get_data()); }); }
 };
 
 void initialize_umm(ModuleInitializationLevel level) {

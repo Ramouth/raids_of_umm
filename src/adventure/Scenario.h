@@ -2,6 +2,7 @@
 #include "hex/HexCoord.h"
 #include "world/Resources.h"
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -32,7 +33,9 @@ class AdventureSession;
  *              "clue": true                     — rule out one wrong old mine
  *              "offer": id                      — a choice the UI shows at a visit
  *              "choice": {id, title, text, options: [{id, label, detail, then}]}
- *              "ending": {id, heading, body, frames, return_to?} — complete the chapter
+ *              "ending": {id, heading, body, frames, return_to?, next?} — complete the map;
+ *                                               next: the campaign map that follows ("" = next in order)
+ *              "flag": {"name": value, ...}     — remember something for later maps (any JSON value)
  *              "leave": id — companion departs, retaining progression for a reunion
  *              "morale": {id, value} — chapter-persistent companion attack modifier (-2 to 2)
  *              "join": id                       — a special character joins the hero
@@ -55,6 +58,16 @@ class AdventureSession;
  * when.delay: N — with "after": only N or more days after that trigger fired.
  * when.wait: id — if that trigger has not fired yet, hold this one and run it
  *                 right after it does (e.g. a companion's line before she has joined).
+ * when.flag: condition — only while the story flags match it; checked each time
+ *                 the event comes up, so it can fire later once the flag is set.
+ * when.unless_flag: condition — not while the flags match it.
+ *   A condition is a name (that flag is set and truthy: not null/false/0/""),
+ *   a list of names (all of them), or {"name": value, ...} (all equal).
+ * Choice options take "requires_flag": condition — refused until it holds; the
+ * snapshot marks such options "locked". Every resolved choice records the flag
+ * "choice.<choice id>" = "<option id>" before its "then" actions run.
+ * Flags live in AdventureSession: they persist in saves and carry to the next
+ * campaign map (CampaignState).
  * Root rival_lord configures a castle opponent: home, name, army, garrison,
  * mobilize_after (trigger id), territory_q_min (opening patrol boundary).
  * Root passage_ends_scenario defaults to true; false emits passage_found instead.
@@ -95,7 +108,12 @@ public:
     bool passageEndsScenario() const { return m_passageEndsScenario; }
     const Json& choice() const { return m_choice; }
     int morale(const std::string& id) const { return m_morale.count(id) ? m_morale.at(id) : 0; }
+    void setMorale(const std::string& id, int value) { m_morale[id] = std::clamp(value, -2, 2); }
     const Json& outcome() const { return m_outcome; }
+    // The campaign map the ending names; "" = none named (or no ending yet).
+    std::string nextMap() const { return m_outcome.value("next", ""); }
+    // True when the flags satisfy a when.flag / requires_flag condition (see above).
+    static bool flagsMatch(const Json& flags, const Json& condition);
     bool awaitingChoice() const { return !m_choice.empty(); }
     bool blocksAdventure() const { return awaitingChoice() && !m_choice.value("allow_exploration", false); }
     std::optional<std::string> choose(AdventureSession& s, const std::string& id);

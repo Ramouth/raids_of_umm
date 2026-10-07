@@ -1,5 +1,7 @@
 #include "combat_session.h"
 #include "adventure_bridge.h"
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 using Json = CombatSession::Json;
@@ -13,6 +15,56 @@ int main(int argc, char** argv) {
         const std::string data = argv[1];
         check(adventure.start(data + "/maps/old_passage.json", data, data + "/maps/old_passage.encounters.json", 1,
                               data + "/maps/old_passage.triggers.json").at("ok"), "Production adventure starts");
+        {   // Campaign flow: load, start a map, decide, end it, advance, carry, save the campaign.
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_campaign").string();
+            std::filesystem::create_directories(dir);
+            WorldMap fixture;
+            fixture.clear(4);
+            fixture.placeObject({{-2, 0}, ObjType::Town, "Home", 1});
+            check(!fixture.saveJson(dir + "/a.json"), "Campaign fixture map written");
+            std::ofstream(dir + "/a.triggers.json") << R"({"triggers": [
+                {"id": "oath", "when": {"event": "start"}, "do": [{"choice": {"id": "oath", "title": "Oath", "options": [
+                    {"id": "spare", "label": "Spare", "then": [{"flag": {"mercy": true}}, {"ending": {"id": "e", "next": "2.0"}}]},
+                    {"id": "burn", "label": "Burn", "requires_flag": "torch", "then": []}]}}]}]})";
+            std::ofstream(dir + "/b.triggers.json") << R"({"triggers": [
+                {"id": "remember", "when": {"event": "start", "flag": {"choice.oath": "spare"}},
+                 "do": [{"say": [["Ushari", "You spared them."]]}]}]})";
+            std::ofstream(dir + "/campaign.json") << Json{{"chapters", {
+                {{"id", "one"}, {"title", "One"}, {"maps", {
+                    {{"id", "1.0"}, {"title", "A"}, {"map", dir + "/a.json"}, {"triggers", dir + "/a.triggers.json"}, {"max_level", 2}},
+                    {{"id", "1.1"}, {"title", "skipped"}, {"map", dir + "/a.json"}}}}},
+                {{"id", "two"}, {"title", "Two"}, {"maps", {
+                    {{"id", "2.0"}, {"title", "B"}, {"map", dir + "/a.json"}, {"triggers", dir + "/b.triggers.json"}}}}}}}}.dump();
+            AdventureBridge camp;
+            check(!camp.campaign_start_map(1).at("ok"), "No campaign map before a campaign is loaded");
+            auto loaded = camp.campaign_load(dir + "/campaign.json", data);
+            check(loaded.at("ok") && loaded["campaign"]["map"]["id"] == "1.0", "Campaign loads at its first map");
+            check(loaded["chapters"].size() == 2, "Campaign lists its chapters");
+            auto map = camp.campaign_start_map(1);
+            check(map.at("ok") && map["level_cap"] == 2 && map["hero_progress"]["cap"] == 2, "Map starts with its level cap");
+            check(map["story_choice"]["options"][1]["locked"] == true, "requires_flag option is shown locked");
+            check(!camp.campaign_advance().at("ok"), "Cannot advance before the map ends");
+            check(!camp.choose_story("burn").at("ok"), "Locked option refused");
+            auto chosen = camp.choose_story("spare");
+            check(chosen["flags"]["choice.oath"] == "spare" && chosen["flags"]["mercy"] == true, "Choice and flag action recorded");
+            check(chosen["won"] == true && chosen["next_map"] == "2.0", "Ending names the next map");
+            auto step = camp.campaign_advance();
+            check(step.at("ok") && step["new_chapter"] == true && step["campaign"]["map"]["id"] == "2.0",
+                  "Advance follows the ending's next map into the next chapter");
+            check(step["campaign"]["state"]["history"].size() == 1, "Finished map's stats are recorded");
+            check(camp.campaign_save(dir + "/campaign.save.json").at("ok"), "Campaign saves");
+            AdventureBridge resumed;
+            auto back = resumed.campaign_load_save(dir + "/campaign.save.json");
+            check(back.at("ok") && back["campaign"]["map"]["id"] == "2.0", "Campaign save reloads its position");
+            auto second = resumed.campaign_start_map(1);
+            bool remembered = false;
+            for (const auto& line : second["lines"]) remembered |= line["text"] == "You spared them.";
+            check(second.at("ok") && remembered, "Flag from map 1.0 gates a trigger on map 2.0");
+            check(second["level_cap"] == 10, "No max_level: the global cap");
+            check(second["flags"]["choice.oath"] == "spare", "Flags carried into the next map");
+            auto last = resumed.campaign_current();
+            check(last["campaign"]["chapter"]["id"] == "two", "Current chapter reported");
+        }
         check(adventure.resolve_encounter(false, Json::parse(R"([{"id":"grey_wolf","count":3.0}])")).at("ok"),
               "Godot integral JSON floats are accepted for enemy survivors");
         for (const char* invalid : {R"([{"id":"grey_wolf","count":1.5}])", R"([{"id":"grey_wolf","count":-1}])",

@@ -5,14 +5,7 @@ extends PanelContainer
 
 signal drained
 
-const PORTRAITS := {
-    "Ushari": "portraits/ushari.png", "Kharim": "portraits/kharim.png",
-    "Scout": "units/rider_archer.png", "Messenger": "units/levy_spearman.png",
-    "Aldren": "portraits/aldren.png", "Corvin": "portraits/corvin.png",
-    "Inscription": "objects/obelisk.png", "Hooded Druid": "portraits/druid.png",
-    "Maerwen": "portraits/maerwen.png",
-    "Steward": "units/levy_spearman.png",
-}
+## Portraits come from the Art registry as portrait.<speaker, lower case, spaces as _>.
 
 var _queue: Array[Dictionary] = []
 var _portrait: TextureRect
@@ -79,8 +72,7 @@ func advance() -> void:
     var line: Dictionary = _queue.pop_front()
     _speaker.text = str(line.speaker).to_upper()
     _text.text = str(line.text)
-    var path: String = "res://content/textures/" + str(PORTRAITS.get(line.speaker, "units/armoured_warrior.png"))
-    _portrait.texture = load(path) if ResourceLoader.exists(path) else null
+    _portrait.texture = Art.texture("portrait." + str(line.speaker).to_lower().replace(" ", "_"), "portrait.default")
     _update_hint()
     visible = true
     _timer.start(4.0 + str(line.text).length() / 22.0)

@@ -53,12 +53,12 @@ func _ready() -> void:
             portraits.add_theme_constant_override("separation", 260)
             column.add_child(portraits)
             column.move_child(portraits, 1)
-            for path in ["portraits/ushari.png"]:
+            for art_id in ["portrait.ushari"]:
                 var portrait := TextureRect.new()
                 portrait.custom_minimum_size = Vector2(180, 180)
                 portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
                 portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                portrait.texture = load("res://content/textures/" + path)
+                portrait.texture = Art.texture(art_id)
                 portraits.add_child(portrait)
                 if _portrait == null: _portrait = portrait
             _commander = _label("COMMANDER\nHOUSE VAREN", 20, Color("a9ccb7"))

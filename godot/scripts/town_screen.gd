@@ -10,7 +10,7 @@ const CARD := Vector2(170, 360)
 
 var host: Node        # desert.gd: provides state, unit_defs, recruit()
 var cell := Vector2i.ZERO
-var view_art := "res://content/textures/screens/town_khemret.png"   # dwellings pass their map sprite
+var view_art := "screen.town_khemret"   # Art id (or data file); dwellings pass their map sprite
 var eyebrow_text := "IVORY COMPACT  ·  TOWN"
 var can_build := true   # dwellings on the map only recruit
 var tab := "recruit"
@@ -38,7 +38,7 @@ func _ready() -> void:
     _is_home = can_build and town.get("name", "") == "Varenhold"
     if _is_home: tab = "hall"
     if can_build and not str(town.get("title", "")).is_empty(): eyebrow_text = "IVORY COMPACT  ·  " + str(town.title).to_upper()
-    if can_build and not str(town.get("art", "")).is_empty(): view_art = "res://content/textures/" + str(town.art)
+    if can_build and not str(town.get("art", "")).is_empty(): view_art = str(town.art)
     _panel(Rect2(24, 18, 1232, 96))
     var title := _label(str(town.get("name", "Town")).to_upper(), 30, Color("f3dfb0"))
     title.position = Vector2(46, 26)
@@ -60,8 +60,7 @@ func _ready() -> void:
     sky.size = Vector2(276, 496)
     add_child(sky)
     var art := TextureRect.new()
-    var view := view_art
-    art.texture = load(view if ResourceLoader.exists(view) else "res://content/textures/objects/castle.png")
+    art.texture = Art.texture(view_art, "object.castle")
     art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     art.clip_contents = true
@@ -165,8 +164,7 @@ func _home_page() -> Control:
     add_child(page)
     var art := TextureRect.new()
     art.name = "VarenholdVista"
-    var path := "res://content/textures/screens/varenhold_home.png"
-    art.texture = load(path if ResourceLoader.exists(path) else view_art)
+    art.texture = Art.texture("screen.varenhold_home", view_art)
     art.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
     art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
     art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -373,8 +371,7 @@ func _card(unit: Dictionary) -> Control:
     box.add_theme_constant_override("separation", 3)
     card.add_child(box)
     var sprite := TextureRect.new()
-    var path := "res://content/textures/units/%s.png" % unit.id
-    if ResourceLoader.exists(path): sprite.texture = load(path)
+    sprite.texture = Art.texture("unit." + str(unit.id))
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
     sprite.custom_minimum_size = Vector2(0, 104)
     sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -481,8 +478,7 @@ func refresh() -> void:
         var slot := VBoxContainer.new()
         slot.custom_minimum_size = Vector2(120, 0)
         var icon := TextureRect.new()
-        var path := "res://content/textures/units/%s.png" % stack.id
-        if ResourceLoader.exists(path): icon.texture = load(path)
+        icon.texture = Art.texture("unit." + str(stack.id))
         icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
         icon.custom_minimum_size = Vector2(0, 52)
         icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

@@ -6,23 +6,23 @@ extends Control
 signal finished
 
 const SLIDES := [
-    {"image": "intro/01_word.jpg", "lines": [
+    {"image": "slide.01_word", "lines": [
         "The word is spreading.",
         "Along the salt roads, into the northern halls, from one fire to the next."]},
-    {"image": "intro/02_walls.jpg", "lines": [
+    {"image": "slide.02_walls", "lines": [
         "Umm'Natur, the walled nation, has fallen.",
         "For a thousand years its gates stood shut. Now no one keeps the walls."]},
-    {"image": "intro/03_tomb.jpg", "lines": [
+    {"image": "slide.03_tomb", "lines": [
         "Its last emperor, Sethurakh the Red, Lord of Blood and Sand, died in his own tomb.",
         "He had himself walled in alive, trusting no hand but his own, whispering the old rites to keep death out.",
         "They did not."]},
-    {"image": "intro/04_throne.jpg", "lines": [
+    {"image": "slide.04_throne", "lines": [
         "He left no heir. No regent.",
         "The mightiest throne in the world stands empty, and the sand is already climbing its steps."]},
-    {"image": "intro/05_hunt.jpg", "pace": 0.7, "lines": [
+    {"image": "slide.05_hunt", "pace": 0.7, "lines": [
         "So the hunt begins.",
         "Who will take the throne? Who will reach the capital first? Who will carry off its relics?"]},
-    {"image": "intro/06_passage.jpg", "lines": [
+    {"image": "slide.06_passage", "lines": [
         "But your people remember what the others have forgotten:",
         "an old passage under the Greyfang mountains. A way in, ahead of every king standing in line."]},
     {"image": "", "lines": [
@@ -95,8 +95,7 @@ func _ready() -> void:
     _timer.timeout.connect(advance)
     add_child(_timer)
     for slide in slides:
-        var path := "res://content/textures/" + str(slide.image)
-        if not str(slide.image).is_empty() and ResourceLoader.exists(path): _textures[slide.image] = load(path)
+        if not str(slide.image).is_empty(): _textures[slide.image] = Art.texture(str(slide.image))
     advance.call_deferred()
 
 func _picture() -> TextureRect:

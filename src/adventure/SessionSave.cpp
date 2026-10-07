@@ -3,6 +3,8 @@
 // A save names the files the session started from (map, data, encounters,
 // triggers, seed); loading replays start() and then applies what changed
 // during play. Saves are only taken between actions, never mid-battle.
+// Version 2 adds the story flags and the map's level cap and its stats;
+// version 1 saves still load (no flags, cap 10).
 #include "AdventureSession.h"
 
 using Json = Scenario::Json;
@@ -79,7 +81,9 @@ Json AdventureSession::saveState() const {
     Json visited = Json::array();
     for (const auto& c : m_visitedOnce) visited.push_back(cellJson(c));
     return {
-        {"version", 1},
+        {"version", 2},
+        {"flags", m_flags},
+        {"level_cap", {{"cap", m_levelCap}, {"reached_day", m_capReachedDay}, {"xp_lost", m_xpLostToCap}}},
         {"fieldwork_stock", m_fieldworkStock},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
         {"stables_week", m_stablesWeek},
@@ -104,11 +108,17 @@ Json AdventureSession::saveState() const {
 
 std::optional<std::string> AdventureSession::loadState(const Json& save) {
     try {
-        if (save.value("version", 0) != 1) return "Unsupported save version.";
+        int version = save.value("version", 0);
+        if (version != 1 && version != 2) return "Unsupported save version.";
         const Json& st = save.at("start");
+        // The replay sees the saved flags and cap, so flag-gated start triggers match.
+        CampaignState replay;
+        replay.flags = save.value("flags", Json::object());
+        const Json cap = save.value("level_cap", Json::object());
+        replay.levelCap = cap.value("cap", MAX_HERO_LEVEL);
         if (auto err = start(st.at("map").get<std::string>(), st.at("data").get<std::string>(),
                              st.at("encounters").get<std::string>(), st.at("seed").get<uint32_t>(),
-                             st.at("triggers").get<std::string>()))
+                             st.at("triggers").get<std::string>(), replay))
             return err;
         m_scenario.drainLines();                       // the replayed intro is not news
         m_turns.setDay(save.at("day").get<int>());
@@ -194,6 +204,9 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         m_path = save.value("path", std::string{});
         m_learned = save.value("learned", std::vector<std::string>{});
         m_levelUps.clear();
+        m_flags = save.value("flags", Json::object());
+        m_capReachedDay = cap.value("reached_day", -1);
+        m_xpLostToCap = cap.value("xp_lost", 0);
         m_scenario.loadState(save.at("scenario"));
         m_scenario.drainLines();
         m_movesMax = DEFAULT_MOVES + movesBonus();

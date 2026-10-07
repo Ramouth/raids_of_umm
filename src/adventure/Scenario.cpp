@@ -98,6 +98,9 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
         if (delay > 0 && (after.empty() || s.day() < m_firedOn[after] + delay)) continue;   // days after it
         std::string unless = trigger.value("when", Json::object()).value("unless", "");
         if (!unless.empty() && m_fired.count(unless)) { m_fired.insert(id); continue; }  // overtaken by events
+        const Json when = trigger.value("when", Json::object());
+        if (when.contains("flag") && !flagsMatch(s.flags(), when["flag"])) continue;              // not yet
+        if (when.contains("unless_flag") && flagsMatch(s.flags(), when["unless_flag"])) continue; // not now
         std::string wait = trigger.value("when", Json::object()).value("wait", "");
         if (!wait.empty() && !m_fired.count(wait)) {                // held until that beat
             m_fired.insert(id);
@@ -142,6 +145,8 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 for (const auto& other : m_quests) optional += (!other.main && other.done) ? 1 : 0;
                 fire(s, "quests_done", {{"count", optional}});
             }
+        if (a.contains("flag"))
+            for (const auto& [name, value] : a["flag"].items()) s.setFlag(name, value);
         if (a.contains("join")) s.joinSpecial(a["join"].get<std::string>());
         if (a.contains("morale"))
             m_morale[a["morale"].at("id").get<std::string>()] = std::clamp(a["morale"].at("value").get<int>(), -2, 2);
@@ -233,6 +238,24 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
     }
 }
 
+bool Scenario::flagsMatch(const Json& flags, const Json& condition) {
+    auto truthy = [&](const std::string& name) {
+        if (!flags.is_object() || !flags.contains(name)) return false;
+        const Json& v = flags[name];
+        return !(v.is_null() || v == false || v == 0 || v == "");
+    };
+    if (condition.is_string()) return truthy(condition.get<std::string>());
+    if (condition.is_array())
+        return std::all_of(condition.begin(), condition.end(),
+                           [&](const Json& n) { return n.is_string() && truthy(n.get<std::string>()); });
+    if (condition.is_object()) {
+        for (const auto& [name, value] : condition.items())
+            if (!flags.is_object() || !flags.contains(name) || flags[name] != value) return false;
+        return true;
+    }
+    return false;
+}
+
 std::optional<std::string> Scenario::choose(AdventureSession& s, const std::string& id) {
     if (!awaitingChoice() || !m_outcome.empty() || s.won() || s.lost())
         return "There is no story choice to make.";
@@ -249,7 +272,10 @@ std::optional<std::string> Scenario::choose(AdventureSession& s, const std::stri
         }
         if (option.value("requires_route", false) && s.departureRoute().empty())
             return "Secure a way onward: hold Rookwatch, clear the southern Troll Gate, or recover the escort's patrol orders.";
+        if (option.contains("requires_flag") && !flagsMatch(s.flags(), option["requires_flag"]))
+            return option.value("locked_text", std::string("That path is not open to you."));
         Json actions = option.value("then", Json::array());
+        s.setFlag("choice." + m_choice.value("id", ""), id);   // heavy decisions are remembered
         m_choice = Json::object();  // commit before executing; a second click cannot take the other path
         run(s, actions);
         return std::nullopt;

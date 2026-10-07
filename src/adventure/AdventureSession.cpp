@@ -67,7 +67,7 @@ std::optional<std::string> AdventureSession::start(const std::string& mapPath,
                                                    const std::string& triggersPath) {
     WorldMap map;
     if (auto err = map.loadJson(mapPath)) return err;
-    auto err = start(std::move(map), dataDir, encountersPath, seed, triggersPath);
+    auto err = startMap(std::move(map), dataDir, encountersPath, seed, triggersPath, nullptr);
     if (!err) m_startArgs = StartArgs{mapPath, dataDir, encountersPath, triggersPath, seed};
     return err;
 }
@@ -76,6 +76,28 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
                                                    const std::string& encountersPath,
                                                    uint32_t seed,
                                                    const std::string& triggersPath) {
+    return startMap(std::move(map), dataDir, encountersPath, seed, triggersPath, nullptr);
+}
+
+std::optional<std::string> AdventureSession::start(const std::string& mapPath, const std::string& dataDir,
+                                                   const std::string& encountersPath, uint32_t seed,
+                                                   const std::string& triggersPath, const CampaignState& carry) {
+    WorldMap map;
+    if (auto err = map.loadJson(mapPath)) return err;
+    auto err = startMap(std::move(map), dataDir, encountersPath, seed, triggersPath, &carry);
+    if (!err) m_startArgs = StartArgs{mapPath, dataDir, encountersPath, triggersPath, seed};
+    return err;
+}
+
+std::optional<std::string> AdventureSession::start(WorldMap map, const std::string& dataDir,
+                                                   const std::string& encountersPath, uint32_t seed,
+                                                   const std::string& triggersPath, const CampaignState& carry) {
+    return startMap(std::move(map), dataDir, encountersPath, seed, triggersPath, &carry);
+}
+
+std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::string& dataDir,
+                                                      const std::string& encountersPath, uint32_t seed,
+                                                      const std::string& triggersPath, const CampaignState* carry) {
     auto resources = std::make_unique<ResourceManager>();
     if (auto err = resources->load(dataDir)) return err;
 
@@ -104,6 +126,10 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     m_fieldworkStock.clear();
     m_departedSpecials.clear();
     m_heroProgress = HeroProgress{};
+    m_levelCap = MAX_HERO_LEVEL;
+    m_capReachedDay = -1;
+    m_xpLostToCap = 0;
+    m_flags = Scenario::Json::object();
     m_learned.clear();
     m_path.clear();
     m_levelUps.clear();
@@ -175,15 +201,70 @@ std::optional<std::string> AdventureSession::start(WorldMap map, const std::stri
     for (const auto& obj : m_map.objects())
         if (obj.type == ObjType::Town && obj.factionId == Faction::AI) spawnRival(obj.pos, 1);
 
-    // The expedition's commander rides from day 1 unless the story brings her in later.
-    for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{"ushari"}))
-        joinSpecial(id);
+    // The expedition's commander rides from day 1 unless the story brings her in
+    // later; on a carried campaign map the company rides in from the last map.
+    if (carry) applyCarry(*carry);
+    if (carry && carry->carried) {
+        for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{}))
+            joinSpecial(id);
+    } else {
+        for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{"ushari"}))
+            joinSpecial(id);
+    }
     m_movesMax = DEFAULT_MOVES + movesBonus();
     m_moves    = m_movesMax;
     recomputeVisibility();
     m_scenario.fire(*this, "start");
     fireSightings({m_explored.begin(), m_explored.end()});
     return std::nullopt;
+}
+
+void AdventureSession::applyCarry(const CampaignState& carry) {
+    m_flags = carry.flags.is_object() ? carry.flags : Scenario::Json::object();
+    m_levelCap = std::clamp(carry.levelCap, 1, MAX_HERO_LEVEL);
+    if (carry.carried) {
+        m_heroProgress = {carry.level, carry.xp};
+        m_path = carry.path;
+        m_learned = carry.learned;
+        std::vector<Stack> stacks;
+        for (const auto& st : carry.army) stacks.push_back({st.id, st.count});
+        setArmy(stacks);
+        m_items = {carry.items.begin(), carry.items.end()};
+        m_equipped = carry.equipped;
+        m_turns.playerFaction().treasury = carry.treasury;
+        for (const auto& c : carry.companions) {
+            m_specials.push_back({c.id, c.name, c.title, c.level, c.xp, std::nullopt, 0});
+            m_scenario.setMorale(c.id, c.morale);
+        }
+        for (const auto& c : carry.departed) {
+            m_departedSpecials.push_back({c.id, c.name, c.title, c.level, c.xp, std::nullopt, 0});
+            m_scenario.setMorale(c.id, c.morale);
+        }
+    }
+    capXp();   // a carried commander may already stand at (or past) this map's cap
+}
+
+CampaignState AdventureSession::carryOut() const {
+    CampaignState out;
+    out.carried = true;
+    out.level = m_heroProgress.level;
+    out.xp = m_heroProgress.xp;
+    out.path = m_path;
+    out.learned = m_learned;
+    for (const auto& st : army()) out.army.push_back({st.id, st.count});
+    out.items = {m_items.begin(), m_items.end()};
+    std::sort(out.items.begin(), out.items.end());
+    out.equipped = m_equipped;
+    out.treasury = treasury();
+    for (const auto& sc : m_specials)   // governors ride on with the company
+        out.companions.push_back({sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)});
+    for (const auto& sc : m_departedSpecials)
+        out.departed.push_back({sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)});
+    out.flags = m_flags;
+    out.levelCap = m_levelCap;
+    out.lastMap = {{"level_cap", m_levelCap}, {"cap_reached_day", m_capReachedDay},
+                   {"xp_lost_to_cap", m_xpLostToCap}, {"days", day()}};
+    return out;
 }
 
 // Format: { "defaults": { "guard": E, "old_mine": E }, "objects": { "<name>": E } }

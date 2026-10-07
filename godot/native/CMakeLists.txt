@@ -34,6 +34,7 @@ add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/adventure/Rivals.cpp"
     "${UMM_ROOT}/src/adventure/Specials.cpp"
     "${UMM_ROOT}/src/adventure/SessionSave.cpp"
+    "${UMM_ROOT}/src/adventure/CampaignState.cpp"
     combat_session.cpp
     adventure_bridge.cpp)
 target_include_directories(umm_combat_core PUBLIC "${UMM_ROOT}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -68,6 +69,7 @@ add_executable(adventure_regression_tests
     "${UMM_ROOT}/tests/main.cpp"
     "${UMM_ROOT}/tests/test_adventure_session.cpp"
     "${UMM_ROOT}/tests/test_adventure_sites.cpp"
+    "${UMM_ROOT}/tests/test_campaign.cpp"
     "${UMM_ROOT}/tests/test_level_one.cpp"
     "${UMM_ROOT}/tests/test_tactics.cpp"
     "${UMM_ROOT}/tests/test_town_buildings.cpp"

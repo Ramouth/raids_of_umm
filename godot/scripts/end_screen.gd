@@ -8,7 +8,7 @@ var heading := ""
 var body := ""
 var stats := ""
 var victory := false
-var illustration := ""   # res:// path shown above the text
+var illustration := ""   # Art id shown above the text; "" for none
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -17,10 +17,10 @@ func _ready() -> void:
     box.position = Vector2(190, 24)
     box.add_theme_constant_override("separation", 14)
     add_child(box)
-    if not illustration.is_empty() and ResourceLoader.exists(illustration):
+    if not illustration.is_empty():
         var art := TextureRect.new()
         art.name = "Illustration"
-        art.texture = load(illustration)
+        art.texture = Art.texture(illustration)
         art.custom_minimum_size = Vector2(900, 440)
         art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
         art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

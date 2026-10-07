@@ -34,7 +34,7 @@ func _run() -> void:
     for object in scene.data.objects.values():
         if str(object.name).ends_with("Rune Stone"):
             stones += 1
-            check(scene.map_view.object_texture(object) == "objects/obelisk.png", "Rune stones use stone artwork")
+            check(scene.map_view.object_texture(object) == "object.obelisk", "Rune stones use stone artwork")
     check(stones == 3, "Three historical inscriptions survive across the map")
     scene.queue_free()
     await process_frame
