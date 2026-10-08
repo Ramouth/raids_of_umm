@@ -27,6 +27,8 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         m_surveySite = root.value("survey_site", "");
         m_passageEndsScenario = root.value("passage_ends_scenario", true);
         m_choice = Json::object();
+        m_choiceTrigger.clear();
+        m_firing.clear();
         m_outcome = Json::object();
         m_lore.clear();
         m_morale.clear();
@@ -36,6 +38,7 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         m_startCompanions.reset();
         if (root.contains("start_companions"))
             m_startCompanions = root["start_companions"].get<std::vector<std::string>>();
+        m_startArmy = root.value("start_army", Json::array());
         m_questDefs.clear();
         for (const auto& q : root.value("quests", Json::array()))
             m_questDefs.push_back({q.value("id", ""), q.value("title", ""), q.value("text", ""),
@@ -79,8 +82,8 @@ bool Scenario::matches(const Json& when, const std::string& event, const Json& d
         || event == "rival_beaten" || event == "engage")
         return detail.value("name", "") == when.value("name", "");
     if (event == "cleared") {
-        for (const auto& name : when.value("names", Json::array()))
-            if (!m_won.count(name.get<std::string>())) return false;
+        for (const auto& name : when.value("names", Json::array()))   // beaten, or gone from the map
+            if (!m_won.count(name.get<std::string>()) && !m_vanished.count(name.get<std::string>())) return false;
         return true;
     }
     return true;  // "start"
@@ -115,7 +118,10 @@ void Scenario::fireTrigger(AdventureSession& s, const Json& trigger) {
     std::string id = trigger.value("id", "");
     m_fired.insert(id);
     m_firedOn[id] = s.day();
+    const std::string outer = m_firing;
+    m_firing = id;                              // a choice raised here remembers its trigger
     run(s, trigger.value("do", Json::array()));
+    m_firing = outer;
     // Beats that were waiting for this one play now, in the order they came up.
     std::vector<std::string> ready;
     for (auto it = m_waiting.begin(); it != m_waiting.end();) {
@@ -153,6 +159,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         if (a.contains("leave")) s.leaveSpecial(a["leave"].get<std::string>());
         if (a.contains("choice") && m_outcome.empty()) {
             m_choice = a["choice"];
+            m_choiceTrigger = m_firing;
             if (m_choice.value("id", "") == "passage_gate" && s.passageMine()) {
                 auto at = *s.passageMine();
                 m_choice["at"] = {at.q, at.r};
@@ -172,6 +179,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 m_outcome["edric_army_defeated"] = !edricAlive;
             }
             m_choice = Json::object();
+            m_choiceTrigger.clear();
             s.completeChapter(m_outcome.value("return_to", ""));
         }
         if (a.contains("quest_text"))
@@ -231,7 +239,12 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         }
         if (a.contains("event")) fire(s, a["event"].get<std::string>());
         if (a.contains("xp")) s.grantXp(a["xp"].get<int>());   // a story reward
-        if (a.contains("vanish")) m_vanished.insert(a["vanish"].get<std::string>());
+        for (const char* key : {"vanish", "withdraw"}) {   // withdraw: a guard camp walks away
+            if (!a.contains(key)) continue;
+            const std::string name = a[key].get<std::string>();
+            m_vanished.insert(name);
+            if (s.removeEncounter(name)) fire(s, "cleared");   // its hex, zone and any pending fight go with it
+        }
         if (a.contains("offer"))
             for (const auto& def : m_offerDefs)
                 if (def.id == a["offer"] && !offer(def.id)) m_offers.push_back(def);
@@ -276,7 +289,16 @@ std::optional<std::string> Scenario::choose(AdventureSession& s, const std::stri
             return option.value("locked_text", std::string("That path is not open to you."));
         Json actions = option.value("then", Json::array());
         s.setFlag("choice." + m_choice.value("id", ""), id);   // heavy decisions are remembered
+        if (option.value("again", false) && !m_choiceTrigger.empty()) {
+            // Not now: the trigger stays live and offers the choice on its next event.
+            m_fired.erase(m_choiceTrigger);
+            m_firedOn.erase(m_choiceTrigger);
+            if (auto pending = s.pendingEncounter())     // and a fight it was raised at is not fought
+                if (const MapObjectDef* obj = s.map().objectAt(*pending); obj && engagedAt(m_choiceTrigger) == obj->name)
+                    s.cancelEncounter();
+        }
         m_choice = Json::object();  // commit before executing; a second click cannot take the other path
+        m_choiceTrigger.clear();
         run(s, actions);
         return std::nullopt;
     }
@@ -295,12 +317,13 @@ Scenario::Json Scenario::saveState() const {
             {"won", Json(std::vector<std::string>(m_won.begin(), m_won.end()))},
             {"vanished", Json(std::vector<std::string>(m_vanished.begin(), m_vanished.end()))},
             {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)},
-            {"choice", m_choice}, {"outcome", m_outcome}, {"morale", m_morale}};
+            {"choice", m_choice}, {"choice_trigger", m_choiceTrigger}, {"outcome", m_outcome}, {"morale", m_morale}};
 }
 
 void Scenario::loadState(const Json& state) {
     m_morale = state.value("morale", std::unordered_map<std::string, int>{});
     m_choice = state.value("choice", Json::object());
+    m_choiceTrigger = state.value("choice_trigger", "");
     m_outcome = state.value("outcome", Json::object());
     m_fired.clear();
     for (const auto& id : state.value("fired", Json::array())) m_fired.insert(id.get<std::string>());
@@ -356,4 +379,13 @@ Scenario::Quest* Scenario::quest(const std::string& id) {
     for (auto& q : m_quests)
         if (q.id == id) return &q;
     return nullptr;
+}
+
+std::string Scenario::engagedAt(const std::string& triggerId) const {
+    for (const auto& t : m_triggers)
+        if (t.value("id", "") == triggerId) {
+            const Json when = t.value("when", Json::object());
+            return when.value("event", "") == "engage" ? when.value("name", "") : "";
+        }
+    return "";
 }

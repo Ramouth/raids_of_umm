@@ -272,7 +272,7 @@ SUITE("Hero — cursed item added same as normal item") {
 SUITE("ResourceManager — loads all 14 items (5 desert + 9 northern) from data/items.json") {
     ResourceManager rm;
     rm.load("data");
-    CHECK_EQ((int)rm.allItems().size(), 14);
+    CHECK_EQ((int)rm.allItems().size(), 16);   // + red_hand_sword, hermits_seed (chapter 1)
 }
 
 SUITE("ResourceManager — known item lookup returns correct fields") {

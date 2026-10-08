@@ -1,0 +1,608 @@
+{
+  "start_companions": [],
+  "quests": [
+    {
+      "id": "aldren",
+      "title": "Where did Aldren go?",
+      "text": "Aldren's road runs east across the river fields. Follow it.",
+      "main": true
+    },
+    {
+      "id": "camps",
+      "title": "Camps on Your Fields",
+      "text": "Companies from other houses have camped on your fields on their way east. Ride to each camp and decide: let them stay, take a toll, or turn them away.",
+      "main": false
+    }
+  ],
+  "triggers": [
+    {
+      "id": "start",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "quest": "aldren"
+        },
+        {
+          "quest": "camps"
+        },
+        {
+          "reveal": [
+            -4,
+            2,
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "id": "camp_riverside",
+      "when": {
+        "event": "visit",
+        "name": "Riverside Camp"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "camp_riverside",
+            "title": "Riverside Camp",
+            "text": "",
+            "options": [
+              {
+                "id": "grant",
+                "label": "Let them stay",
+                "then": [
+                  {
+                    "vanish": "Riverside Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "tax",
+                "label": "Take a toll",
+                "then": [
+                  {
+                    "give": {
+                      "Gold": 400
+                    }
+                  },
+                  {
+                    "vanish": "Riverside Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "turn_away",
+                "label": "Turn them away",
+                "then": [
+                  {
+                    "betray": {
+                      "at": "Riverside Camp",
+                      "band": "Riverside Company",
+                      "army": [
+                        {
+                          "id": "woad_runner",
+                          "count": 12
+                        },
+                        {
+                          "id": "cruth_slinger",
+                          "count": 4
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "vanish": "Riverside Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ],
+                "detail": "They will not go quietly."
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Captain",
+                "Every house that can lift a spear is marching for Umm'Natur. One night on your fields, my lord."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "camp_meadow",
+      "when": {
+        "event": "visit",
+        "name": "Meadow Camp"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "camp_meadow",
+            "title": "Meadow Camp",
+            "text": "",
+            "options": [
+              {
+                "id": "grant",
+                "label": "Let them stay",
+                "then": [
+                  {
+                    "vanish": "Meadow Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "tax",
+                "label": "Take a toll",
+                "then": [
+                  {
+                    "give": {
+                      "Gold": 300
+                    }
+                  },
+                  {
+                    "vanish": "Meadow Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "turn_away",
+                "label": "Turn them away",
+                "then": [
+                  {
+                    "vanish": "Meadow Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Captain",
+                "We are a small house and a long way from home. We will be gone by morning."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "camp_strangers",
+      "when": {
+        "event": "visit",
+        "name": "Strangers' Camp"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "camp_strangers",
+            "title": "Strangers' Camp",
+            "text": "",
+            "options": [
+              {
+                "id": "grant",
+                "label": "Let them stay",
+                "then": [
+                  {
+                    "vanish": "Strangers' Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "tax",
+                "label": "Take a toll",
+                "then": [
+                  {
+                    "give": {
+                      "Gold": 150
+                    }
+                  },
+                  {
+                    "vanish": "Strangers' Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "turn_away",
+                "label": "Turn them away",
+                "then": [
+                  {
+                    "vanish": "Strangers' Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Ushari",
+                "I am Ushari. We are four, and we pay our way."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "red_banner",
+      "when": {
+        "event": "visit",
+        "name": "Red Banner Camp"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "red_banner",
+            "title": "The Red Banner",
+            "text": "A red hand is painted on their banner.",
+            "options": [
+              {
+                "id": "let_pass",
+                "label": "Let them pass",
+                "then": [
+                  {
+                    "vanish": "Red Banner Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "make_pay",
+                "label": "Make them pay",
+                "then": [
+                  {
+                    "give": {
+                      "Gold": 600
+                    }
+                  },
+                  {
+                    "vanish": "Red Banner Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ]
+              },
+              {
+                "id": "drive_off",
+                "label": "Drive them off",
+                "then": [
+                  {
+                    "betray": {
+                      "at": "Red Banner Camp",
+                      "band": "Red Banner Company",
+                      "army": [
+                        {
+                          "id": "woad_runner",
+                          "count": 16
+                        },
+                        {
+                          "id": "cruth_slinger",
+                          "count": 6
+                        },
+                        {
+                          "id": "painted_blade",
+                          "count": 3
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "vanish": "Red Banner Camp"
+                  },
+                  {
+                    "xp": 35
+                  },
+                  {
+                    "event": "camp_decided"
+                  }
+                ],
+                "detail": "They will fight for the bridge."
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Captain",
+                "We cross your bridge tonight, and we take what we need from your fields. You may watch."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "red_banner_broken",
+      "when": {
+        "event": "rival_beaten",
+        "name": "Red Banner Company"
+      },
+      "do": [
+        {
+          "flag": {
+            "red_banner_broken": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "riverside_broken",
+      "when": {
+        "event": "rival_beaten",
+        "name": "Riverside Company"
+      },
+      "do": [
+        {
+          "flag": {
+            "riverside_broken": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "camps_done",
+      "when": {
+        "event": "camp_decided",
+        "flag": [
+          "choice.camp_riverside",
+          "choice.camp_meadow",
+          "choice.camp_strangers",
+          "choice.red_banner"
+        ]
+      },
+      "do": [
+        {
+          "quest_done": "camps"
+        }
+      ]
+    },
+    {
+      "id": "east_road_1",
+      "when": {
+        "event": "enter_q",
+        "q_min": 16,
+        "after": "red_banner"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "east_road",
+            "title": "The East Road",
+            "text": "The road climbs east toward the hills.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Take the east road",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_east_road",
+                      "heading": "The East Road",
+                      "next": "1.3",
+                      "body": "The camps are behind you. The road climbs east toward the hills.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The river fields fall behind.\nThe road climbs."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "east_road_2",
+      "when": {
+        "event": "enter_q",
+        "q_min": 16,
+        "after": "east_road_1",
+        "flag": {
+          "choice.east_road": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "east_road",
+            "title": "The East Road",
+            "text": "The road climbs east toward the hills.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Take the east road",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_east_road",
+                      "heading": "The East Road",
+                      "next": "1.3",
+                      "body": "The camps are behind you. The road climbs east toward the hills.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The river fields fall behind.\nThe road climbs."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "east_road_3",
+      "when": {
+        "event": "enter_q",
+        "q_min": 16,
+        "after": "east_road_2",
+        "flag": {
+          "choice.east_road": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "east_road",
+            "title": "The East Road",
+            "text": "The road climbs east toward the hills.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Take the east road",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_east_road",
+                      "heading": "The East Road",
+                      "next": "1.3",
+                      "body": "The camps are behind you. The road climbs east toward the hills.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The river fields fall behind.\nThe road climbs."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "east_road_4",
+      "when": {
+        "event": "enter_q",
+        "q_min": 16,
+        "after": "east_road_3",
+        "flag": {
+          "choice.east_road": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "east_road",
+            "title": "The East Road",
+            "text": "The road climbs east toward the hills.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Take the east road",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_east_road",
+                      "heading": "The East Road",
+                      "next": "1.3",
+                      "body": "The camps are behind you. The road climbs east toward the hills.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The river fields fall behind.\nThe road climbs."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

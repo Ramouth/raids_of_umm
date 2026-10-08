@@ -1,0 +1,429 @@
+{
+  "start_companions": [],
+  "quests": [
+    {
+      "id": "aldren",
+      "title": "Where did Aldren go?",
+      "text": "The east road climbs toward the mountains. Follow it to its end.",
+      "main": true
+    }
+  ],
+  "triggers": [
+    {
+      "id": "start",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "quest": "aldren"
+        }
+      ]
+    },
+    {
+      "id": "cold_fire",
+      "when": {
+        "event": "visit",
+        "name": "Cold Fire"
+      },
+      "do": [
+        {
+          "lore": [
+            "A cold fire",
+            "Ashes banked the careful way Aldren always banked them. Grass flattened for one bedroll."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bridge_post",
+      "when": {
+        "event": "visit",
+        "name": "Bridge Post"
+      },
+      "do": [
+        {
+          "lore": [
+            "The bridge post",
+            "Cut into the post with a knife: an arrow pointing east, and an A, in the hand of his letter."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_drove",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.red_banner": "drive_off"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "The ones you drove from your bridge. They found us instead."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_passed",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.red_banner": "let_pass"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "The ones you let across your bridge. Red hands on their shields."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_paid",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.red_banner": "make_pay"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "The ones who paid for your bridge. They took it back from us."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_night",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "unless_flag": "choice.red_banner"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "They came in the night. Red hands on their shields."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_rested",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.camp_strangers": "grant"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "You let us rest on your land. They did not ask."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_taxed",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.camp_strangers": "tax"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "We paid you for the road. They took the rest."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_turned",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp",
+        "flag": {
+          "choice.camp_strangers": "turn_away"
+        }
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "You turned us off your land. They did not bother."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ushari_road",
+      "when": {
+        "event": "visit",
+        "name": "Broken Camp"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "ushari_road",
+            "title": "The Broken Camp",
+            "text": "Her company is broken. She is the last one standing.",
+            "options": [
+              {
+                "id": "take",
+                "label": "Take her with you",
+                "then": [
+                  {
+                    "join": "ushari"
+                  }
+                ]
+              },
+              {
+                "id": "send_home",
+                "label": "Send her home",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "wardens_won",
+      "when": {
+        "event": "encounter_won",
+        "name": "Root Wardens"
+      },
+      "do": []
+    },
+    {
+      "id": "roots_1",
+      "when": {
+        "event": "visit",
+        "name": "Root-Grown Mine",
+        "after": "wardens_won"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "roots",
+            "title": "The Roots",
+            "text": "Roots have grown across the mine mouth. Someone cut through them not long ago, and they have closed again.",
+            "options": [
+              {
+                "id": "cut",
+                "label": "Cut the roots",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_roots",
+                      "heading": "The Roots",
+                      "body": "You cut through the roots and go down into the dark after him.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The roots part under the axe.\nCold air rises out of the dark."
+                        },
+                        {
+                          "scene": "road",
+                          "text": "Aldren went this way.\nSo do you."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "turn_back",
+                "label": "Turn back",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "roots_2",
+      "when": {
+        "event": "visit",
+        "name": "Root-Grown Mine",
+        "after": "roots_1",
+        "flag": {
+          "choice.roots": "turn_back"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "roots",
+            "title": "The Roots",
+            "text": "Roots have grown across the mine mouth. Someone cut through them not long ago, and they have closed again.",
+            "options": [
+              {
+                "id": "cut",
+                "label": "Cut the roots",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_roots",
+                      "heading": "The Roots",
+                      "body": "You cut through the roots and go down into the dark after him.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The roots part under the axe.\nCold air rises out of the dark."
+                        },
+                        {
+                          "scene": "road",
+                          "text": "Aldren went this way.\nSo do you."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "turn_back",
+                "label": "Turn back",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "roots_3",
+      "when": {
+        "event": "visit",
+        "name": "Root-Grown Mine",
+        "after": "roots_2",
+        "flag": {
+          "choice.roots": "turn_back"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "roots",
+            "title": "The Roots",
+            "text": "Roots have grown across the mine mouth. Someone cut through them not long ago, and they have closed again.",
+            "options": [
+              {
+                "id": "cut",
+                "label": "Cut the roots",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_roots",
+                      "heading": "The Roots",
+                      "body": "You cut through the roots and go down into the dark after him.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The roots part under the axe.\nCold air rises out of the dark."
+                        },
+                        {
+                          "scene": "road",
+                          "text": "Aldren went this way.\nSo do you."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "turn_back",
+                "label": "Turn back",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "roots_4",
+      "when": {
+        "event": "visit",
+        "name": "Root-Grown Mine",
+        "after": "roots_3",
+        "flag": {
+          "choice.roots": "turn_back"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "roots",
+            "title": "The Roots",
+            "text": "Roots have grown across the mine mouth. Someone cut through them not long ago, and they have closed again.",
+            "options": [
+              {
+                "id": "cut",
+                "label": "Cut the roots",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "the_roots",
+                      "heading": "The Roots",
+                      "body": "You cut through the roots and go down into the dark after him.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The roots part under the axe.\nCold air rises out of the dark."
+                        },
+                        {
+                          "scene": "road",
+                          "text": "Aldren went this way.\nSo do you."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "turn_back",
+                "label": "Turn back",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

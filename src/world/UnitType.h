@@ -55,6 +55,8 @@ struct UnitType {
     // ── Companions (faction "companion") ────────────────────────────────────
     // Aura: living friendly stacks within auraRadius hexes (not the source)
     // gain auraDefense.  levelGrowth: gained per companion level above 1.
+    // title: the epithet shown under the name ("Keeper of the old ways").
+    std::string title;
     int auraRadius  = 0;
     int auraDefense = 0;
     struct LevelGrowth { int hitPoints = 0, attack = 0, defense = 0, damage = 0; };

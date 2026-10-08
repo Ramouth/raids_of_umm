@@ -35,6 +35,7 @@ add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/adventure/Specials.cpp"
     "${UMM_ROOT}/src/adventure/SessionSave.cpp"
     "${UMM_ROOT}/src/adventure/CampaignState.cpp"
+    "${UMM_ROOT}/src/adventure/StoryObjectives.cpp"
     combat_session.cpp
     adventure_bridge.cpp)
 target_include_directories(umm_combat_core PUBLIC "${UMM_ROOT}/src" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -50,7 +51,7 @@ set_target_properties(umm_combat PROPERTIES
 enable_testing()
 add_executable(combat_bridge_tests tests.cpp)
 target_link_libraries(combat_bridge_tests PRIVATE umm_combat_core)
-add_test(NAME combat_bridge COMMAND combat_bridge_tests "${UMM_ROOT}/data")
+add_test(NAME combat_bridge COMMAND combat_bridge_tests "${UMM_ROOT}/data" $<TARGET_FILE:demo_bot>)
 add_executable(combat_regression_tests
     "${UMM_ROOT}/tests/main.cpp" "${UMM_ROOT}/tests/test_combat.cpp")
 target_include_directories(combat_regression_tests PRIVATE "${UMM_ROOT}/tests")
@@ -70,6 +71,7 @@ add_executable(adventure_regression_tests
     "${UMM_ROOT}/tests/test_adventure_session.cpp"
     "${UMM_ROOT}/tests/test_adventure_sites.cpp"
     "${UMM_ROOT}/tests/test_campaign.cpp"
+    "${UMM_ROOT}/tests/test_story_objectives.cpp"
     "${UMM_ROOT}/tests/test_level_one.cpp"
     "${UMM_ROOT}/tests/test_tactics.cpp"
     "${UMM_ROOT}/tests/test_town_buildings.cpp"

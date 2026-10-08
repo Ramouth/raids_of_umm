@@ -126,6 +126,7 @@ std::optional<std::string> ResourceManager::loadUnits(const std::string& path) {
         u.description = j.value("description", "");
         u.tier        = j.value("tier",        1);
         u.faction     = j.value("faction",     "");
+        u.title       = j.value("title",       "");
         u.attack      = j.value("attack",      1);
         u.defense     = j.value("defense",     1);
         u.minDamage   = j.value("minDamage",   1);

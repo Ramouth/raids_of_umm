@@ -93,6 +93,10 @@ func _run() -> void:
 
 func _root_scene() -> void:
     var game: Node = load("res://scenes/game.tscn").instantiate()
+    # The game plays a campaign; this one holds just the old demo map.
+    var fixture: GDScript = load("res://tests/campaign_fixture.gd")
+    game.campaign_path = fixture.write_old_passage("user://demo_smoke_campaign")
+    game.save_dir = "user://demo_smoke_campaign"
     root.add_child(game)
     await process_frame
     var intro := _find_cutscene(game)

@@ -79,8 +79,9 @@ var _end_day_button: Button
 var army: Array = STARTING_ARMY.duplicate(true):
     set(value):
         army = value
-        if adventure != null:
+        if adventure != null and not _mirroring:
             state = JSON.parse_string(adventure.set_army(JSON.stringify(value)))
+var _mirroring := false   # true while `army` is copied from a snapshot (no push back)
 var inventory: Array = []
 var cleared_dungeons: Dictionary = {}
 var battle: Control
@@ -91,8 +92,19 @@ var _enter_button: Button
 var _army_label: Label
 var _restart_button: Button
 var encounter: Dictionary = {}
+## Campaign mode (set by game.gd): the native session that holds the campaign,
+## and this map's entry {id, title, max_level, map, encounters, triggers}.
+## Null when the scene runs on its own map_path (tests, F6).
+var campaign: RefCounted
+var campaign_map: Dictionary = {}
+var campaign_save_path := "user://campaign.save.json"
+## A map save to restore once the map is built (Continue); "" starts it fresh.
+var resume_save := ""
+## The campaign_advance reply once this map's ending has moved the campaign on.
+var _campaign_step: Dictionary = {}
 
 func _ready() -> void:
+    camera.make_current()   # the previous map's camera may still be leaving the tree
     if screens == null:
         screens = ScreenStack.new()
         screens.name = "Screens"
@@ -114,6 +126,7 @@ func _ready() -> void:
     fog.name = "Fog"
     fog.z_index = 20
     fog.data = data
+    fog.margin = map_view.margin
     map_view.add_child(fog)
     if not _start_adventure():
         return
@@ -145,8 +158,13 @@ func _ready() -> void:
     _build_map_tools()
     _entered_cell(hero.cell)
     fit_map()
+    if campaign != null:
+        notice.text = "%s. Press Q for the quest log." % str(campaign_map.get("title", data.title))
+        if not resume_save.is_empty() and _map_save_matches(resume_save): _load_map_save(resume_save)
+        else: _write_saves()   # each map's start is a Continue point
 
 func _start_adventure() -> bool:
+    if campaign != null: return _start_campaign_map()
     if not ClassDB.class_exists("UmmAdventure"):
         notice.text = "Native adventure rules are missing. Rebuild with ./scripts/run_godot.sh."
         set_process(false)
@@ -168,6 +186,25 @@ func _start_adventure() -> bool:
         return false
     var intro: Array = state.get("lines", [])
     army = army  # push the expedition's army into the new session (replaces state)
+    state.lines = intro
+    return true
+
+## Starts (or restarts) the campaign's current map with the carried company.
+## The first map, carrying nothing yet, gets the expedition's starting army.
+func _start_campaign_map() -> bool:
+    adventure = campaign
+    var seed: int = passage_seed if passage_seed >= 0 else randi() % 1000000
+    state = JSON.parse_string(adventure.campaign_start_map(seed))
+    _quest_count = 0
+    if not state.get("ok", false):
+        notice.text = "Could not start %s: %s" % [str(campaign_map.get("title", "this map")), str(state.get("error", "unknown error"))]
+        set_process(false)
+        set_process_unhandled_input(false)
+        return false
+    var intro: Array = state.get("lines", [])
+    var carried: bool = state.get("campaign", {}).get("state", {}).get("carried", false)
+    if carried: army = state.army.duplicate(true)
+    else: army = army
     state.lines = intro
     return true
 
@@ -308,6 +345,10 @@ func _hero_cell() -> Vector2i:
 
 func _apply_state(next: Dictionary) -> void:
     state = next
+    if next.get("army") is Array and not _same_army(next.army, army):   # the story gave or took troops
+        _mirroring = true
+        army = next.army.duplicate(true)
+        _mirroring = false
     fog.apply(state)
     var ruled: Dictionary = {}
     for c in state.get("ruled_out", []): ruled[Vector2i(c[0], c[1])] = true
@@ -349,6 +390,12 @@ func _apply_state(next: Dictionary) -> void:
     if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []), _quest_progress())
     _sync_rivals()
     _update_turn_hud()
+
+func _same_army(a: Array, b: Array) -> bool:
+    if a.size() != b.size(): return false
+    for i in a.size():
+        if str(a[i].get("id", "")) != str(b[i].get("id", "")) or int(a[i].get("count", 0)) != int(b[i].get("count", 0)): return false
+    return true
 
 ## Each level-up pops up (HoMM3 style): what the level brought, or, at the
 ## first one, the choice of a path, which opens the path screen.
@@ -640,17 +687,40 @@ func accept_offer(id: String) -> bool:
     return true
 
 const SAVE_PATH := "user://quicksave.json"
+## The map save; in campaign mode game.gd puts it beside the campaign save.
+var save_path := SAVE_PATH
 
 func save_game() -> bool:
     if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return false
-    var extra := {"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])}
-    var reply: Dictionary = JSON.parse_string(adventure.save_game(ProjectSettings.globalize_path(SAVE_PATH), JSON.stringify(extra)))
+    if state.get("won", false): return false   # the map is over; the campaign has moved on
+    var reply := _write_saves()
     notice.text = "Game saved (F9 to load)." if reply.get("ok", false) else str(reply.get("error", "Could not save."))
     return reply.get("ok", false)
 
+## The map save, and in campaign mode the campaign's position beside it.
+func _write_saves() -> Dictionary:
+    var extra := {"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])}
+    if campaign != null: extra["campaign_map"] = str(campaign_map.get("id", ""))
+    var reply: Dictionary = JSON.parse_string(adventure.save_game(ProjectSettings.globalize_path(save_path), JSON.stringify(extra)))
+    if reply.get("ok", false) and campaign != null:
+        reply = JSON.parse_string(campaign.campaign_save(ProjectSettings.globalize_path(campaign_save_path)))
+    if not reply.get("ok", false): push_warning("Could not save: " + str(reply.get("error", "")))
+    return reply
+
+## True when the map save at `path` was taken on this campaign map.
+func _map_save_matches(path: String) -> bool:
+    if not FileAccess.file_exists(path): return false
+    var save: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+    return save is Dictionary and str(save.get("extra", {}).get("campaign_map", "")) == str(campaign_map.get("id", ""))
+
 func load_game() -> bool:
     if adventure == null or hero.moving or is_instance_valid(battle) or turn_busy: return false
-    var reply: Dictionary = JSON.parse_string(adventure.load_game(ProjectSettings.globalize_path(SAVE_PATH)))
+    if campaign != null and is_instance_valid(game_root):
+        return game_root.continue_campaign()   # the save may stand on another map
+    return _load_map_save(save_path)
+
+func _load_map_save(path: String) -> bool:
+    var reply: Dictionary = JSON.parse_string(adventure.load_game(ProjectSettings.globalize_path(path)))
     if not reply.get("ok", false):
         notice.text = str(reply.get("error", "Could not load."))
         return false
@@ -797,10 +867,15 @@ func _update_turn_hud() -> void:
     if is_instance_valid(_xp_bar) and not hp.is_empty():
         var span := maxi(1, int(hp.next) - int(hp.prev))
         var needs: bool = state.get("tree", {}).get("needs_path", false)
-        _xp_title.text = "Commander  ·  Level %d%s" % [int(hp.level), "   ·   choose your path (K)" if needs else ""]
+        var cap := int(hp.get("cap", hp.get("max", 10)))
+        var capped := cap < int(hp.get("max", 10))   # this map holds the commander back
+        _xp_title.text = "Commander  ·  Level %d%s%s" % [int(hp.level), "  ·  cap %d" % cap if capped else "",
+            "   ·   choose your path (K)" if needs else ""]
         _xp_bar.max_value = span
         _xp_bar.value = int(hp.xp) - int(hp.prev)
-        if int(hp.level) >= int(hp.get("max", 10)):
+        if capped and int(hp.level) >= cap:
+            _xp_detail.text = "Level %d is as far as this land can teach you." % cap
+        elif int(hp.level) >= int(hp.get("max", 10)):
             _xp_detail.text = "The height of a commander's craft: level %d." % int(hp.level)
         else:
             _xp_detail.text = "%d / %d XP  ·  %d to level %d" % [
@@ -957,7 +1032,10 @@ func _inspect(cell: Vector2i) -> void:
     overlay.hover = cell
     _preview.clear()
     overlay.reachable = -1
-    if not data.tiles.has(cell):
+    if map_view.margin.has(cell):
+        sidebar.get_node("Inspection").text = "Beyond this land\nThe country runs on, but your road does not lead there."
+        sidebar.get_node("Route").text = "Out of reach."
+    elif not data.tiles.has(cell):
         sidebar.get_node("Inspection").text = "Hover over the land to inspect terrain and landmarks."
         sidebar.get_node("Route").text = "Click a reachable hex to travel."
     elif fog != null and not fog.is_explored(cell):
@@ -1172,6 +1250,9 @@ func _build_expedition_controls() -> void:
     _restart_button = Button.new()
     _restart_button.text = "New expedition"
     _restart_button.tooltip_text = "Reset the army, collected loot, and cleared dungeons; return to Varenhold."
+    if campaign != null:
+        _restart_button.text = "Try this land again"
+        _restart_button.tooltip_text = "Start this map over with the army, items and companions you brought into it."
     _restart_button.pressed.connect(new_expedition)
     sidebar.add_child(_restart_button)
     sidebar.move_child(_restart_button, sidebar.get_node("Spacer").get_index())
@@ -1269,8 +1350,8 @@ func _encounters_for(landmark: Dictionary) -> Array:
 
 ## The map's encounter entry for an object (mirrors the native lookup).
 func _encounter_entry(landmark: Dictionary) -> Dictionary:
-    var path: String = str(map_view.map_path).get_basename() + ".encounters.json"
-    if not FileAccess.file_exists(path): return {}
+    var path: String = str(campaign_map.get("encounters", "")) if campaign != null else str(map_view.map_path).get_basename() + ".encounters.json"
+    if path.is_empty() or not FileAccess.file_exists(path): return {}
     if not has_meta("encounters"):
         set_meta("encounters", JSON.parse_string(FileAccess.get_file_as_string(path)))
     var table: Dictionary = get_meta("encounters")
@@ -1375,7 +1456,11 @@ func _present_story() -> void:
             if state.get("encounter") != null:
                 _engage.call_deferred()
                 return
-            # Keep the committed branch for the next chapter, even after restarting the demo.
+            # Keep the committed branch for the next chapter, even after restarting the demo
+            # (outside a campaign; a campaign carries its flags itself).
+            if campaign != null:
+                _present_story()
+                return
             var saved: Dictionary = JSON.parse_string(adventure.save_game(
                 ProjectSettings.globalize_path("user://chapter_one.json"),
                 JSON.stringify({"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])})))
@@ -1408,9 +1493,44 @@ func _show_end(victory: bool, reason := "") -> void:
         screen.heading = "The Expedition Is Lost"
         screen.body = "The marches keep their secrets. Somewhere under the Greyfangs, the old passage waits, and something in it is still counting."
     screen.stats = "Day %d · Week %d · Gold %d" % [state.day_of_week, state.week, state.treasury.Gold]
-    screens.push(screen, func(result: Dictionary):
-        if result.get("action") == "quit": get_tree().quit()
-        else: _restart())
+    if campaign != null: _campaign_end(screen, victory, reason)
+    screens.push(screen, _end_action)
+
+func _end_action(result: Dictionary) -> void:
+    match str(result.get("action", "")):
+        "quit": get_tree().quit()
+        "continue": game_root.next_map(_campaign_step)
+        "menu": game_root.return_to_menu()
+        "new":
+            if campaign != null and is_instance_valid(game_root): game_root._start_new_expedition()
+            else: _restart()
+        _: _restart()
+
+## A campaign map's end: on a win the campaign moves on at once (and is saved
+## there), and the screen offers the next map; a loss offers this map again.
+func _campaign_end(screen: Control, victory: bool, reason: String) -> void:
+    var title := str(campaign_map.get("title", data.title))
+    screen.eyebrow = "%s  ·  %s" % [title.to_upper(), "MAP COMPLETE" if victory else "EXPEDITION LOST"]
+    if not victory:
+        if reason.is_empty():
+            screen.heading = "The Expedition Is Lost"
+            screen.body = "Your army is broken and the company scatters. You can ride into %s again from its start, with the company you brought here." % title
+        screen.actions = [["Try %s again" % title, "retry"], ["Main menu", "menu"], ["Quit", "quit"]]
+        return
+    var step: Dictionary = JSON.parse_string(campaign.campaign_advance())
+    if not step.get("ok", false):
+        screen.stats += "\nThe campaign could not continue: %s" % str(step.get("error", "unknown error"))
+        screen.actions = [["Main menu", "menu"], ["Quit", "quit"]]
+        return
+    _campaign_step = step
+    var saved: Dictionary = JSON.parse_string(campaign.campaign_save(ProjectSettings.globalize_path(campaign_save_path)))
+    if not saved.get("ok", false): push_warning("Could not save the campaign: " + str(saved.get("error", "")))
+    if step.get("finished", false):
+        screen.eyebrow = "%s  ·  THE CAMPAIGN IS COMPLETE" % title.to_upper()
+        screen.actions = [["New expedition", "new"], ["Main menu", "menu"], ["Quit", "quit"]]
+    else:
+        var next: Dictionary = step.campaign.map
+        screen.actions = [["Onward: %s" % str(next.get("title", "the next land")), "continue"], ["Quit", "quit"]]
 
 func _dungeon_finished(result: Dictionary, cell: Vector2i) -> void:
     if result.result == "victory" and not cleared_dungeons.has(cell):
@@ -1444,7 +1564,11 @@ func _restart() -> void:
     hero.place_at(_hero_cell())
     _entered_cell(hero.cell)
     center_hero()
-    notice.text = "A new expedition sets out. Previous loot and dungeon progress have been reset."
+    if campaign != null:
+        notice.text = "You ride into %s again, with the company you brought here." % str(campaign_map.get("title", data.title))
+        _write_saves()
+    else:
+        notice.text = "A new expedition sets out. Previous loot and dungeon progress have been reset."
 
 func _build_map_tools() -> void:
     _map_tools = PanelContainer.new()

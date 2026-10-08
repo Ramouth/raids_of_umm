@@ -1,0 +1,349 @@
+{
+  "start_companions": [],
+  "quests": [
+    {
+      "id": "aldren",
+      "title": "Where did Aldren go?",
+      "text": "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east.",
+      "main": true
+    },
+    {
+      "id": "wolves",
+      "title": "Wolves in the Vale",
+      "text": "Three wolf packs have come down into the vale. Clear them before you ride out.",
+      "main": false
+    }
+  ],
+  "triggers": [
+    {
+      "id": "start",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "quest": "aldren"
+        },
+        {
+          "quest": "wolves"
+        },
+        {
+          "reveal": [
+            2,
+            0,
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stranger",
+      "when": {
+        "event": "engage",
+        "name": "Hollow Wolves"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "stranger",
+            "title": "The Hooded Stranger",
+            "text": "A hooded man stands among the wolves.",
+            "options": [
+              {
+                "id": "hear",
+                "label": "Hear him out",
+                "then": [
+                  {
+                    "say": [
+                      [
+                        "Hooded Man",
+                        "Your brother would not listen either. Keep this warm."
+                      ]
+                    ]
+                  },
+                  {
+                    "item": "hermits_seed"
+                  }
+                ]
+              },
+              {
+                "id": "attack",
+                "label": "Attack",
+                "then": []
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Hooded Man",
+                "Son of Varen."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "stranger_gone",
+      "when": {
+        "event": "encounter_won",
+        "name": "Hollow Wolves"
+      },
+      "do": [
+        {
+          "vanish": "Hooded Stranger"
+        },
+        {
+          "say": [
+            [
+              "Scout",
+              "He is gone. Only roots, pushed up through frozen ground."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rune_stone",
+      "when": {
+        "event": "visit",
+        "name": "Vale Rune Stone"
+      },
+      "do": [
+        {
+          "lore": [
+            "A rubbing of the rune stone",
+            "Charcoal on cloth. No one at Varenhold can read it."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "barrow",
+      "when": {
+        "event": "visit",
+        "name": "Varen Barrow"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Scout",
+              "The door will not open."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vale_cleared",
+      "when": {
+        "event": "cleared",
+        "names": [
+          "Orchard Wolves",
+          "Ford Wolves",
+          "Hollow Wolves"
+        ]
+      },
+      "do": [
+        {
+          "xp": 85
+        },
+        {
+          "quest_done": "wolves"
+        },
+        {
+          "quest_text": [
+            "aldren",
+            "The vale is clear. Aldren's road runs east, out through the gap in the hills."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "leave_vale_1",
+      "when": {
+        "event": "enter_q",
+        "q_min": 15,
+        "after": "vale_cleared"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "leave_vale",
+            "title": "The East Road",
+            "text": "The road leaves the vale here.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Ride east",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "out_of_the_vale",
+                      "heading": "Out of the Vale",
+                      "next": "1.2",
+                      "body": "You ride out of the vale by the east road, the way Aldren went.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The hills close behind you.\nAhead, the river fields."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "leave_vale_2",
+      "when": {
+        "event": "enter_q",
+        "q_min": 15,
+        "after": "leave_vale_1",
+        "flag": {
+          "choice.leave_vale": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "leave_vale",
+            "title": "The East Road",
+            "text": "The road leaves the vale here.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Ride east",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "out_of_the_vale",
+                      "heading": "Out of the Vale",
+                      "next": "1.2",
+                      "body": "You ride out of the vale by the east road, the way Aldren went.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The hills close behind you.\nAhead, the river fields."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "leave_vale_3",
+      "when": {
+        "event": "enter_q",
+        "q_min": 15,
+        "after": "leave_vale_2",
+        "flag": {
+          "choice.leave_vale": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "leave_vale",
+            "title": "The East Road",
+            "text": "The road leaves the vale here.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Ride east",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "out_of_the_vale",
+                      "heading": "Out of the Vale",
+                      "next": "1.2",
+                      "body": "You ride out of the vale by the east road, the way Aldren went.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The hills close behind you.\nAhead, the river fields."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "leave_vale_4",
+      "when": {
+        "event": "enter_q",
+        "q_min": 15,
+        "after": "leave_vale_3",
+        "flag": {
+          "choice.leave_vale": "not_yet"
+        }
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "leave_vale",
+            "title": "The East Road",
+            "text": "The road leaves the vale here.",
+            "options": [
+              {
+                "id": "go",
+                "label": "Ride east",
+                "then": [
+                  {
+                    "ending": {
+                      "id": "out_of_the_vale",
+                      "heading": "Out of the Vale",
+                      "next": "1.2",
+                      "body": "You ride out of the vale by the east road, the way Aldren went.",
+                      "frames": [
+                        {
+                          "scene": "road",
+                          "text": "The hills close behind you.\nAhead, the river fields."
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "not_yet",
+                "label": "Not yet",
+                "then": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,8 +3,8 @@
 # Agents propose; this script concludes. See docs/agents.md.
 #
 # Usage: scripts/verify.sh [stage...]
-#   stages: engine  native  godot  routes  captures  quick  all (default: all)
-#   quick = engine + native;  all = engine native godot routes (captures need a display)
+#   stages: engine  native  godot  routes  drift  campaign  captures  quick  all (default: all)
+#   quick = engine + native;  all = engine native godot routes drift campaign (captures need a display)
 # Each step writes build/verify/<step>.log; the summary is build/verify/last.json.
 # Exit status is 0 only if every step that ran passed.
 set -uo pipefail
@@ -67,6 +67,25 @@ routes() {
     done
 }
 
+drift() {  # generated story and maps must match their generators exactly
+    local d="$out/drift"
+    step drift_generate bash -c "rm -rf '$d' && mkdir -p '$d/maps' && python3 scripts/gen_chapter1.py --out '$d/maps' >/dev/null && python3 scripts/chapter1_story.py --out '$d/maps' >/dev/null"
+    step drift_compare bash -c "status=0; for f in '$d'/maps/*.json; do cmp -s \"\$f\" \"data/maps/\$(basename \"\$f\")\" || { echo \"DRIFT data/maps/\$(basename \"\$f\") differs from its generator\"; status=1; }; done; cmp -s '$d/campaign.json' data/campaign.json || { echo 'DRIFT data/campaign.json differs from its generator'; status=1; }; exit \$status"
+}
+
+campaign() {  # the data-driven bot plays the whole campaign; CAP lines are the level-cap eval
+    [[ -f "$root/data/campaign.json" ]] || { echo "SKIP  campaign (no data/campaign.json yet)"; return 0; }
+    [[ -x "$root/godot/native/build/demo_bot" ]] || step native_build ./scripts/build_godot_combat.sh
+    local m
+    for m in thorough hasty; do
+        step "campaign_$m" timeout 600 ./godot/native/build/demo_bot . campaign data/campaign.json "$m" 1
+        grep -h '^CAP ' "$out/campaign_$m.log" | sed "s/^/      $m: /"
+        if grep -q 'trivial=yes' "$out/campaign_$m.log"; then
+            echo "      WARN  $m: a level cap is trivial on some map (see CAP lines); the loop logs it"
+        fi
+    done
+}
+
 captures() {  # screenshots for the playtester; needs a display, never a pass/fail on looks
     godot_prepare
     local dir="$root/godot/artifacts/verify"
@@ -86,10 +105,12 @@ for s in "${stages[@]}"; do
         native) native ;;
         godot) godot ;;
         routes) routes ;;
+        drift) drift ;;
+        campaign) campaign ;;
         captures) captures ;;
         quick) engine; native ;;
-        all) engine; native; godot; routes ;;
-        *) echo "Unknown stage: $s (engine native godot routes captures quick all)" >&2; exit 2 ;;
+        all) engine; native; godot; routes; drift; campaign ;;
+        *) echo "Unknown stage: $s (engine native godot routes drift campaign captures quick all)" >&2; exit 2 ;;
     esac
 done
 

@@ -893,6 +893,41 @@
         "companion",
         "opportunity_strike"
       ]
+    },
+    {
+      "id": "aldren",
+      "name": "Aldren",
+      "description": "The heir of Varen. He rides in front and never looks back to see who follows.",
+      "attack": 14,
+      "defense": 10,
+      "minDamage": 18,
+      "maxDamage": 26,
+      "hitPoints": 90,
+      "speed": 8,
+      "moveRange": 6,
+      "shots": 0,
+      "attackType": "physical",
+      "levelGrowth": {
+        "hitPoints": 8,
+        "attack": 1,
+        "defense": 1,
+        "damage": 2
+      },
+      "meshId": "aldren",
+      "textureId": "aldren",
+      "tier": 0,
+      "faction": "companion",
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 0,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "abilities": [
+        "companion"
+      ]
     }
   ]
 }

@@ -74,7 +74,9 @@ public:
     static constexpr int   TOME_XP           = 150;   // a war journal, read once
 
     // Loads the map + data registry and seeds ownership from map factionIds.
-    // Hero starts at the first player-owned town (else first town, else first passable tile).
+    // Hero starts at the map's "start" cell; without one, at the first player-owned
+    // town (else first town, else first passable tile). With no carried state the
+    // army is the triggers' start_army (if any).
     // encountersPath: optional JSON of guard armies + rewards (see data/maps/*.encounters.json).
     // seed picks the discovery mine unless the scenario names a survey_site.
     // triggersPath: optional Scenario script (quests, dialogue, clues).
@@ -121,6 +123,12 @@ public:
     std::optional<HexCoord> guardZoneAt(const HexCoord& c) const;
     const Encounter* encounterAt(const HexCoord& c) const;
     std::optional<HexCoord> pendingEncounter() const { return m_pending; }
+    // The fight about to start is not fought; the hero stays where travel stopped.
+    void cancelEncounter() { m_pending.reset(); m_pendingAmbush = false; m_pendingZone = false; }
+    // Story: the named guard camp or old mine is gone (vanish / withdraw). Its hex
+    // and zone of control clear and a fight pending with it is called off.
+    // False = no standing encounter by that name.
+    bool removeEncounter(const std::string& objectName);
     // Called after the battle. Victory clears the hex, pays the reward and moves the
     // hero onto it (spending its step cost). Returns what an old mine held.
     struct Stack { std::string id; int count = 0; };

@@ -24,6 +24,13 @@ var anchors: Dictionary = {}  # cell -> object anchor node
 @export_tool_button("Rebuild map preview") var rebuild_preview: Callable = rebuild
 var data := UmmMapData.new()
 var world_bounds := Rect2()
+## Land beyond the map's edge, drawn faded and out of reach: cell ->
+## {ring (1 = touching the map), source (the nearest map cell), terrain}.
+## Never routed, never clickable, no objects.
+const MARGIN_RINGS := 3
+## Veil strength by distance from the playable land (rings 0..MARGIN_RINGS+1).
+const MARGIN_FADE := [0.0, 0.42, 0.68, 0.9, 1.0]
+var margin: Dictionary = {}
 
 func _ready() -> void:
     rebuild()
@@ -33,16 +40,22 @@ func rebuild() -> void:
         child.free()
     anchors.clear()
     mountain_groups.clear()
+    margin.clear()
     if not data.read(map_path):
         push_error(data.error)
         return
     var edge_points := PackedVector2Array()
     for cell: Vector2i in data.tiles:
         edge_points.append_array(UmmMapData.hexagon(UmmMapData.cell_to_world(cell)))
-    var outline := Geometry2D.convex_hull(edge_points)
-    world_bounds = Rect2(outline[0], Vector2.ZERO)
-    for point in outline:
+    var playable := Geometry2D.convex_hull(edge_points)
+    world_bounds = Rect2(playable[0], Vector2.ZERO)
+    for point in playable:
         world_bounds = world_bounds.expand(point)
+    _find_margin()
+    for cell: Vector2i in margin:
+        edge_points.append_array(UmmMapData.hexagon(UmmMapData.cell_to_world(cell)))
+    # The ground runs on under the margin; the veil fades it out.
+    var outline := Geometry2D.convex_hull(edge_points)
     var north := data.ground == "grass"
     art_theme.load_for(data.ground)
     var ground := Polygon2D.new()
@@ -103,6 +116,7 @@ func rebuild() -> void:
         terrain.add_child(feature)
     _build_water(terrain)
     _build_roads()
+    _build_margin(north)
     var scenery := Node2D.new()
     scenery.name = "Scenery"
     scenery.y_sort_enabled = true
@@ -158,9 +172,10 @@ func _fit_sprite(sprite: Sprite2D, width: float) -> void:
     sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 ## Scatter plants across cell boundaries, avoiding roads and interaction anchors.
-func _build_undergrowth(scenery: Node2D) -> void:
-    for cell: Vector2i in data.tiles:
-        var tile: Dictionary = data.tiles[cell]
+func _build_undergrowth(scenery: Node2D, only: Dictionary = {}) -> void:
+    var tiles: Dictionary = data.tiles if only.is_empty() else only
+    for cell: Vector2i in tiles:
+        var tile: Dictionary = tiles[cell]
         if data.objects.has(cell) or tile.get("road", false) or tile.terrain not in ["grass", "highland", "forest", "swamp"]: continue
         var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
         if tile.terrain == "grass" and h % 5 != 0: continue
@@ -176,9 +191,10 @@ func _build_undergrowth(scenery: Node2D) -> void:
 
 ## Forest hexes become clumps of pines and oaks, Y-sorted with the hero and
 ## buildings so the expedition walks behind trunks, HoMM3-style.
-func _build_trees(scenery: Node2D) -> void:
-    for cell: Vector2i in data.tiles:
-        if data.tiles[cell].terrain != "forest" or data.objects.has(cell):
+func _build_trees(scenery: Node2D, only: Dictionary = {}) -> void:
+    var tiles: Dictionary = data.tiles if only.is_empty() else only
+    for cell: Vector2i in tiles:
+        if tiles[cell].terrain != "forest" or data.objects.has(cell):
             continue
         var center := UmmMapData.cell_to_world(cell)
         var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
@@ -335,10 +351,11 @@ func _build_object(parent: Node2D, cell: Vector2i, object: Dictionary) -> void:
     label.add_theme_constant_override("outline_size", 5)
     anchor.add_child(label)
 
-func _build_water(parent: Node2D) -> void:
+func _build_water(parent: Node2D, only: Dictionary = {}) -> void:
+    var tiles: Dictionary = data.tiles if only.is_empty() else only
     var regions: Array[PackedVector2Array] = []
-    for cell: Vector2i in data.tiles:
-        if not data.tiles[cell].terrain in WATER_TERRAIN:
+    for cell: Vector2i in tiles:
+        if not tiles[cell].terrain in WATER_TERRAIN:
             continue
         # Slight overlap avoids floating-point cracks when Godot joins hex outlines.
         var merged := UmmMapData.hexagon(UmmMapData.cell_to_world(cell), -0.3)
@@ -378,7 +395,7 @@ func _build_water(parent: Node2D) -> void:
             bank.default_color = art_theme.colour("shore")
             bank.joint_mode = Line2D.LINE_JOINT_ROUND
             parent.add_child(bank)
-    _build_bridges(parent)
+    if only.is_empty(): _build_bridges(parent)
 
 ## A passable water cell is a bridge: timber planks laid along its road.
 func _build_bridges(parent: Node2D) -> void:
@@ -422,3 +439,116 @@ func _build_bridges(parent: Node2D) -> void:
             seam.width = 1.5
             seam.default_color = Color("5a3e22")
             parent.add_child(seam)
+
+## The rings of land around the map: each takes the terrain of the map cell
+## it grew from, so forest runs on as forest and water as water.
+func _find_margin() -> void:
+    var frontier: Array = data.tiles.keys()
+    for ring in range(1, MARGIN_RINGS + 1):
+        var next: Array = []
+        for cell: Vector2i in frontier:
+            var source: Vector2i = cell if data.tiles.has(cell) else margin[cell].source
+            for direction: Vector2i in UmmMapData.DIRECTIONS:
+                var neighbor := cell + direction
+                if data.tiles.has(neighbor) or margin.has(neighbor): continue
+                margin[neighbor] = {"ring": ring, "source": source, "terrain": str(data.tiles[source].terrain)}
+                next.append(neighbor)
+        frontier = next
+
+func _margin_ring(cell: Vector2i) -> int:
+    if data.tiles.has(cell): return 0
+    return int(margin[cell].ring) if margin.has(cell) else MARGIN_RINGS + 1
+
+## Margin scenery (darkened, under the map's own scenery), then one mesh that
+## veils it: faint at the map's edge, solid background a few hexes out.
+func _build_margin(north: bool) -> void:
+    if margin.is_empty(): return
+    var far := Node2D.new()
+    far.name = "MarginScenery"
+    far.modulate = Color(0.72, 0.72, 0.72)
+    add_child(far)
+    var ground_tiles := {}
+    var tall_tiles := {}
+    for cell: Vector2i in margin:
+        var tile := {"q": cell.x, "r": cell.y, "terrain": margin[cell].terrain}
+        if tile.terrain in WATER_TERRAIN:
+            tile["passable"] = false
+            ground_tiles[cell] = tile
+        elif _clear_above(cell):   # tall art here would reach up over the playable map
+            tall_tiles[cell] = tile
+    if not ground_tiles.is_empty(): _build_water(far, ground_tiles)
+    if north:
+        if not tall_tiles.is_empty(): _build_trees(far, tall_tiles)
+        for cell: Vector2i in tall_tiles:
+            if tall_tiles[cell].terrain != "mountain": continue
+            var hill := _sprite(str(art_theme.config.scenery.ridge))
+            hill.name = "MarginHill_%d_%d" % [cell.x, cell.y]
+            _fit_sprite(hill, 112.0)
+            hill.position = UmmMapData.cell_to_world(cell) + Vector2(0, 22)
+            hill.offset.y = -hill.texture.get_height() * 0.37
+            hill.flip_h = posmod(cell.x + cell.y, 2) == 0
+            far.add_child(hill)
+    else:
+        for cell: Vector2i in tall_tiles:
+            var terrain := str(tall_tiles[cell].terrain)
+            if terrain == data.ground or not Art.is_listed("feature." + terrain): continue
+            var feature := _sprite("feature." + terrain)
+            feature.position = UmmMapData.cell_to_world(cell)
+            feature.scale = Vector2(0.8, 0.65)
+            var material := ShaderMaterial.new()
+            material.shader = PATCH_SHADER
+            feature.material = material
+            far.add_child(feature)
+    add_child(_margin_veil())   # a sibling, so the darkening does not tint the veil
+
+func _clear_above(cell: Vector2i) -> bool:
+    for direction in [Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0)]:
+        if data.tiles.has(cell + direction): return false
+    return true
+
+## Triangles over every non-map cell in the ground's reach. Each hex is a fan
+## whose corners average the rings of the three cells that meet there, so the
+## fade is smooth and the map's edge itself stays clear.
+func _margin_veil() -> MeshInstance2D:
+    var shade: Color = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color", Color(0.075, 0.06, 0.045))
+    var area := Rect2(world_bounds)
+    for cell: Vector2i in margin: area = area.expand(UmmMapData.cell_to_world(cell))
+    area = area.grow(UmmMapData.HEX_SIZE.x)
+    var step := UmmMapData.HEX_SIZE.x * 0.75
+    var corner_cells := [[Vector2i(1, 0), Vector2i(1, -1)], [Vector2i(1, 0), Vector2i(0, 1)], [Vector2i(0, 1), Vector2i(-1, 1)],
+        [Vector2i(-1, 1), Vector2i(-1, 0)], [Vector2i(-1, 0), Vector2i(0, -1)], [Vector2i(0, -1), Vector2i(1, -1)]]
+    var points := PackedVector2Array()
+    var colours := PackedColorArray()
+    for q in range(floori(area.position.x / step), ceili(area.end.x / step) + 1):
+        var r_from := floori(area.position.y / UmmMapData.HEX_SIZE.y - q * 0.5)
+        var r_to := ceili(area.end.y / UmmMapData.HEX_SIZE.y - q * 0.5)
+        for r in range(r_from, r_to + 1):
+            var cell := Vector2i(q, r)
+            if data.tiles.has(cell): continue
+            var center := UmmMapData.cell_to_world(cell)
+            var corners := UmmMapData.hexagon(center)   # no overlap: seams would blend twice
+            var own := _margin_ring(cell)
+            var middle := Color(shade, MARGIN_FADE[own])
+            for i in 6:
+                var j := (i + 1) % 6
+                points.append_array([center, corners[i], corners[j]])
+                if own > MARGIN_RINGS:   # past the margin: solid, so no ground shows through
+                    colours.append_array([middle, middle, middle])
+                else:
+                    colours.append_array([middle, _corner_shade(shade, cell, own, corner_cells[i]), _corner_shade(shade, cell, own, corner_cells[j])])
+    var arrays := []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = points
+    arrays[Mesh.ARRAY_COLOR] = colours
+    var mesh := ArrayMesh.new()
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    var veil := MeshInstance2D.new()
+    veil.name = "MarginVeil"
+    veil.mesh = mesh
+    return veil
+
+func _corner_shade(shade: Color, cell: Vector2i, own: int, touching: Array) -> Color:
+    var rings := float(own + _margin_ring(cell + touching[0]) + _margin_ring(cell + touching[1])) / 3.0
+    var low := floori(rings)
+    var fade: float = MARGIN_FADE[low] if low >= MARGIN_FADE.size() - 1 else lerpf(MARGIN_FADE[low], MARGIN_FADE[low + 1], rings - low)
+    return Color(shade, fade)

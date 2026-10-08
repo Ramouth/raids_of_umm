@@ -66,7 +66,7 @@ ENGINE_PATHS = ("src/*", "tests/*", "godot/native/*.cpp", "godot/native/*.h",
 GODOT_PATHS = ("godot/scripts/*", "godot/scenes/*", "godot/tests/*", "godot/shaders/*",
                "godot/themes/*", "godot/content_source/*", "godot/project.godot")
 STORY_PATHS = ("scripts/north_story.py", "scripts/gen_north_map.py", "scripts/north_vale.json",
-               "scripts/gen_old_passage_map.py", "data/*.json", "data/maps/*",
+               "scripts/gen_old_passage_map.py", "scripts/gen_chapter*.py", "scripts/chapter*_story.py", "data/*.json", "data/maps/*",
                "docs/demo_flow.md", "docs/world_design.md", "docs/map_story_handoff.md")
 
 ROLES: dict[str, Role] = {r.name: r for r in [

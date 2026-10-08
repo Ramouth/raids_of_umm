@@ -5,9 +5,12 @@ extends Node2D
 
 const OWNER_COLORS := {1: Color("e8dcc0"), 2: Color("b8402c")}  # Ivory Compact, Shariw
 const SHROUD := Color(0.07, 0.05, 0.03, 0.5)
-const VOID := Color(0.07, 0.05, 0.03, 1.0)
+const VOID := Color(0.075, 0.06, 0.045, 1.0)   # the clear colour, so fog meets the margin without a seam
 
 var data: UmmMapData
+## The map view's faded margin (cell -> {source, ...}): land beyond the edge
+## stays dark until the map cell it grew from has been explored.
+var margin: Dictionary = {}
 var explored: Dictionary = {}
 var visible_cells: Dictionary = {}
 var owners: Dictionary = {}
@@ -47,7 +50,10 @@ func _draw() -> void:
         else:
             # Slight overlap hides seams between opaque hexes.
             draw_colored_polygon(UmmMapData.hexagon(center, -0.6), VOID)
-            _cover_rim(cell, center)
+            if margin.is_empty(): _cover_rim(cell, center)
+    for cell: Vector2i in margin:
+        if not explored.has(margin[cell].source):
+            draw_colored_polygon(UmmMapData.hexagon(UmmMapData.cell_to_world(cell), -0.6), VOID)
 
 ## The sand foundation is the convex hull of the map, so it pokes out past
 ## rim hexes. Extrude each outward-facing edge of an unexplored rim hex.

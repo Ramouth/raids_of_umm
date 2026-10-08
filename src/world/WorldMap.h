@@ -27,7 +27,8 @@
  * Serialisation format (JSON v1):
  *   { "version":1, "name":"...", "radius":N,
  *     "tiles":[{"q":Q,"r":R,"terrain":"sand","passable":true,"moveCost":1.0},...],
- *     "objects":[{"q":Q,"r":R,"type":"town","name":"..."},...]  }
+ *     "objects":[{"q":Q,"r":R,"type":"town","name":"..."},...],
+ *     "start":{"q":Q,"r":R} }   — optional: where the hero sets out
  */
 class WorldMap {
 public:
@@ -103,12 +104,16 @@ public:
     int                radius() const { return m_radius; }
 
     void setName(std::string n) { m_name = std::move(n); }
+    // The authored start cell (root "start"); nullopt = let the session pick.
+    const std::optional<HexCoord>& start() const { return m_start; }
+    void setStart(std::optional<HexCoord> c) { m_start = c; }
 
 private:
     HexGrid<MapTile>        m_grid;
     std::vector<MapObjectDef> m_objects;
     std::string             m_name   = "Untitled Map";
     int                     m_radius = 0;
+    std::optional<HexCoord> m_start;
 
     // Internal helper used by both generateProcedural and JSON loader.
     void ensureObjectTilesPassable();

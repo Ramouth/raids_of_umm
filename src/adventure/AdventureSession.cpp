@@ -167,7 +167,9 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
             if (better) spawn = &obj;
         }
     }
-    if (spawn) {
+    if (m_map.start() && m_map.tileAt(*m_map.start())) {   // the author placed the hero
+        m_hero.pos = *m_map.start();
+    } else if (spawn) {
         m_hero.pos = spawn->pos;
     } else {
         for (const auto& [coord, tile] : m_map) {
@@ -208,6 +210,9 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
         for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{}))
             joinSpecial(id);
     } else {
+        std::vector<Stack> army;                  // a fresh start: the map's own muster, if it names one
+        for (const auto& st : m_scenario.startArmy()) army.push_back({st.value("id", ""), st.value("count", 0)});
+        if (!army.empty()) setArmy(army);
         for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{"ushari"}))
             joinSpecial(id);
     }
@@ -586,6 +591,16 @@ std::optional<HexCoord> AdventureSession::guardZoneAt(const HexCoord& c) const {
         if (const MapObjectDef* obj = m_map.objectAt(nb); obj && obj->type == ObjType::Guard) return nb;
     }
     return std::nullopt;
+}
+
+bool AdventureSession::removeEncounter(const std::string& objectName) {
+    for (const auto& obj : m_map.objects()) {
+        if (obj.name != objectName || !m_encounters.count(obj.pos)) continue;
+        m_encounters.erase(obj.pos);
+        if (m_pending == obj.pos) cancelEncounter();
+        return true;
+    }
+    return false;
 }
 
 bool AdventureSession::isEncounter(const HexCoord& c) const {

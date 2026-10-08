@@ -112,6 +112,7 @@ WorldMap WorldMap::clone() const {
     WorldMap copy;
     copy.m_name   = m_name;
     copy.m_radius = m_radius;
+    copy.m_start  = m_start;
     copy.m_objects = m_objects;
     for (const auto& [coord, tile] : m_grid)
         copy.m_grid.set(coord, tile);
@@ -122,6 +123,7 @@ void WorldMap::clear(int radius) {
     m_grid   = HexGrid<MapTile>{};
     m_objects.clear();
     m_radius = radius;
+    m_start.reset();
 
     // Fill with bare Sand tiles so the editor has a canvas.
     for (int q = -radius; q <= radius; ++q) {
@@ -136,6 +138,7 @@ void WorldMap::generateProcedural(int radius, uint32_t seed) {
     m_radius = radius;
     m_grid   = HexGrid<MapTile>{};
     m_objects.clear();
+    m_start.reset();
 
     // ── Terrain generation ───────────────────────────────────────────────────
     for (int q = -radius; q <= radius; ++q) {
@@ -233,6 +236,7 @@ std::optional<std::string> WorldMap::saveJson(const std::string& path) const {
             if (!obj.kind.empty()) objs.back()["kind"] = obj.kind;
         }
         j["objects"] = std::move(objs);
+        if (m_start) j["start"] = {{"q", m_start->q}, {"r", m_start->r}};
 
         std::ofstream f(path);
         if (!f.is_open())
@@ -263,6 +267,9 @@ std::optional<std::string> WorldMap::loadJson(const std::string& path) {
 
         m_name   = j.value("name",   "Untitled Map");
         m_radius = j.value("radius", 0);
+        m_start.reset();
+        if (j.contains("start"))
+            m_start = HexCoord{ j["start"].at("q").get<int>(), j["start"].at("r").get<int>() };
 
         for (const auto& t : j.at("tiles")) {
             HexCoord coord{ t.at("q").get<int>(), t.at("r").get<int>() };

@@ -42,7 +42,9 @@ If you do not yet know where the task lives, send **umm-scout** first, with the 
 - Run `scripts/verify.sh <stages>` yourself, or via **umm-verify** to keep logs out of
   context. Either way, read `build/verify/last.json` before saying anything passed.
 - Stages: `engine` (SDL build + raids_tests), `native` (bridge + regressions ctest), `godot`
-  (headless smoke tests), `routes` (demo_bot conquest/bypass/slow/escort), `captures`
+  (headless smoke tests), `routes` (demo_bot conquest/bypass/slow/escort; retiring), `campaign`
+  (the data-driven bot plays data/campaign.json thorough and hasty; its CAP lines are the
+  level-cap eval, and `trivial=yes` is a WARN the loop logs), `captures`
   (screenshots, need a display), `quick` = engine+native, `all` = everything but captures.
 - A failure has one address: the step name and its log in `build/verify/`. Send the builder
   that owns the failing path back with that log tail, not a description of it.
@@ -64,8 +66,8 @@ If you do not yet know where the task lives, send **umm-scout** first, with the 
 Story is told through play: the user judges a beat by whether a first-time player gets
 it, and whether the late game points back to the beginning.
 
-1. `python3 scripts/player_view.py transcript <mode> <seed>` (modes: escort, bypass,
-   slow, conquest) writes `build/player_view/<mode>-<seed>.txt`.
+1. `python3 scripts/player_view.py transcript campaign <seed> <thorough|hasty>` writes
+   `build/player_view/campaign-<policy>-<seed>.txt` (old_passage routes still work until retired).
 2. Send **umm-player** with only the transcript path. **Never put plot, intent, names
    or what the change was meant to achieve in its prompt**: that lifts the veil.
 3. `python3 scripts/player_view.py check build/player_view/<mode>-<seed>.graph.json`.

@@ -1,0 +1,163 @@
+{
+  "start_companions": [
+    "aldren"
+  ],
+  "quests": [
+    {
+      "id": "hunt",
+      "title": "The Last Hunt",
+      "text": "Two wolf packs have been taking the herds. Hunt them down with Aldren.",
+      "main": true
+    },
+    {
+      "id": "hall",
+      "title": "The Hall",
+      "text": "The hunt is over. End the day: your father is waiting in the hall.",
+      "main": false
+    }
+  ],
+  "triggers": [
+    {
+      "id": "start",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "quest": "hunt"
+        },
+        {
+          "reveal": [
+            0,
+            0,
+            10
+          ]
+        },
+        {
+          "say": [
+            [
+              "Aldren",
+              "Two packs before dark. Keep up, little brother."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hunt_done",
+      "when": {
+        "event": "cleared",
+        "names": [
+          "Thicket Wolves",
+          "Stream Wolves"
+        ]
+      },
+      "do": [
+        {
+          "quest_done": "hunt"
+        },
+        {
+          "quest": "hall"
+        }
+      ]
+    },
+    {
+      "id": "toast",
+      "when": {
+        "event": "night",
+        "after": "hunt_done"
+      },
+      "do": [
+        {
+          "quest_done": "hall"
+        },
+        {
+          "choice": {
+            "id": "toast",
+            "title": "Varenhold · The hall · That night",
+            "text": "Every cup in the hall goes up.",
+            "options": [
+              {
+                "id": "raise_cup",
+                "label": "Raise your cup to him",
+                "then": [
+                  {
+                    "event": "dawn"
+                  }
+                ]
+              },
+              {
+                "id": "leave_hall",
+                "label": "Leave the hall",
+                "then": [
+                  {
+                    "event": "dawn"
+                  }
+                ]
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Your father",
+                "To Aldren. To my heir."
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dawn",
+      "when": {
+        "event": "dawn"
+      },
+      "do": [
+        {
+          "leave": "aldren"
+        },
+        {
+          "item": "red_hand_sword"
+        },
+        {
+          "lore": [
+            "Aldren's letter",
+            "“The sword is yours now. Do not come after me. — A.”"
+          ]
+        },
+        {
+          "xp": 60
+        },
+        {
+          "ending": {
+            "id": "gone_at_dawn",
+            "heading": "Gone at Dawn",
+            "next": "1.1",
+            "body": "Aldren rode out before first light. His sword is yours now.",
+            "frames": [
+              {
+                "scene": "home",
+                "text": "Dawn. Aldren's horse is gone from the stable."
+              },
+              {
+                "scene": "home",
+                "text": "On your bed lies his sword,\nand a letter in his hand."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "_comment": "start_army is not read by the engine yet; see the chapter 1 report.",
+  "start_army": [
+    {
+      "id": "woad_runner",
+      "count": 10
+    },
+    {
+      "id": "cruth_slinger",
+      "count": 4
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "chapters": [
+    {
+      "id": "marches",
+      "title": "The Marches",
+      "maps": [
+        {
+          "id": "1.0",
+          "title": "The last hunt",
+          "map": "maps/ch1_1_0_hunt.json",
+          "encounters": "maps/ch1_1_0_hunt.encounters.json",
+          "triggers": "maps/ch1_1_0_hunt.triggers.json",
+          "max_level": 2
+        },
+        {
+          "id": "1.1",
+          "title": "Varenhold",
+          "map": "maps/ch1_1_1_varenhold.json",
+          "encounters": "maps/ch1_1_1_varenhold.encounters.json",
+          "triggers": "maps/ch1_1_1_varenhold.triggers.json",
+          "max_level": 3
+        },
+        {
+          "id": "1.2",
+          "title": "The camps",
+          "map": "maps/ch1_1_2_camps.json",
+          "encounters": "maps/ch1_1_2_camps.encounters.json",
+          "triggers": "maps/ch1_1_2_camps.triggers.json",
+          "max_level": 4
+        },
+        {
+          "id": "1.3",
+          "title": "The east road",
+          "map": "maps/ch1_1_3_east_road.json",
+          "encounters": "maps/ch1_1_3_east_road.encounters.json",
+          "triggers": "maps/ch1_1_3_east_road.triggers.json",
+          "max_level": 5
+        }
+      ]
+    }
+  ]
+}

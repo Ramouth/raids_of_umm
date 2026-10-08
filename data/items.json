@@ -189,6 +189,27 @@
           "amount": 2
         }
       ]
+    },
+    {
+      "id": "red_hand_sword",
+      "name": "The Red-Hand Sword",
+      "slot": "weapon",
+      "cursed": false,
+      "description": "Given to the heir. Left to the second son.",
+      "passiveEffects": [
+        {
+          "stat": "attack",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "hermits_seed",
+      "name": "The Hermit's Seed",
+      "slot": "trinket",
+      "cursed": false,
+      "description": "It was warm when he dropped it. It is still warm.",
+      "passiveEffects": []
     }
   ]
 }

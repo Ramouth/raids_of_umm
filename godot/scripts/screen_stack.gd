@@ -31,6 +31,12 @@ func push(screen: Control, on_close: Callable = Callable()) -> void:
     screen.finished.connect(_on_finished.bind(screen), CONNECT_ONE_SHOT)
     changed.emit()
 
+## Drops every screen without running their callbacks (leaving a map).
+func clear() -> void:
+    for entry in _stack: entry.layer.queue_free()
+    _stack.clear()
+    changed.emit()
+
 func top() -> Control:
     return null if _stack.is_empty() else _stack[-1].screen
 

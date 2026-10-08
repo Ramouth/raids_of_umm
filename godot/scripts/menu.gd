@@ -5,6 +5,8 @@ signal finished(result: Dictionary)
 
 var in_game := false
 var can_load := false
+## A problem to tell the player (e.g. the campaign file is missing); "" for none.
+var message := ""
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -33,6 +35,15 @@ func _ready() -> void:
 	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override("font_color", Color("b99762"))
 	body.add_child(subtitle)
+	if not message.is_empty():
+		var note := Label.new()
+		note.name = "Message"
+		note.text = message
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		note.add_theme_font_size_override("font_size", 13)
+		note.add_theme_color_override("font_color", Color("d98a6a"))
+		body.add_child(note)
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 10
 	body.add_child(gap)
@@ -44,7 +55,7 @@ func _ready() -> void:
 		_add_button(body, "Quit", "quit")
 	else:
 		_add_button(body, "New expedition", "new", true)
-		_add_button(body, "Load game", "load", can_load)
+		_add_button(body, "Continue", "load", can_load)
 		_add_button(body, "Quit", "quit")
 
 func _add_button(parent: VBoxContainer, text: String, action: String, enabled := true) -> void:

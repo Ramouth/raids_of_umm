@@ -4,13 +4,14 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <sys/wait.h>
 using Json = CombatSession::Json;
 static void check(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
 }
 int main(int argc, char** argv) {
     try {
-        check(argc == 2, "Pass the data directory");
+        check(argc == 2 || argc == 3, "Pass the data directory (and demo_bot)");
         AdventureBridge adventure;
         const std::string data = argv[1];
         check(adventure.start(data + "/maps/old_passage.json", data, data + "/maps/old_passage.encounters.json", 1,
@@ -64,6 +65,102 @@ int main(int argc, char** argv) {
             check(second["flags"]["choice.oath"] == "spare", "Flags carried into the next map");
             auto last = resumed.campaign_current();
             check(last["campaign"]["chapter"]["id"] == "two", "Current chapter reported");
+        }
+        {   // A campaign's first map: its start cell, start_army and Aldren reach the snapshot;
+            // a choice at engage can withdraw the pack.
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_chapter").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::Guard, "Ford Wolves", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Chapter fixture map written");
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": ["aldren"],
+                "start_army": [{"id": "woad_runner", "count": 10}, {"id": "cruth_slinger", "count": 4}],
+                "triggers": [{"id": "meet", "when": {"event": "engage", "name": "Ford Wolves"},
+                  "do": [{"choice": {"id": "pack", "options": [{"id": "spare", "then": [{"withdraw": "Ford Wolves"}]}]}}]}]})";
+            std::ofstream(dir + "/campaign.json") << Json{{"chapters", {{{"id", "one"}, {"title", "One"}, {"maps", {
+                {{"id", "1.0"}, {"title", "A"}, {"map", dir + "/field.json"}, {"triggers", dir + "/field.triggers.json"}}}}}}}}.dump();
+            AdventureBridge camp;
+            check(camp.campaign_load(dir + "/campaign.json", data).at("ok"), "Chapter fixture campaign loads");
+            auto map = camp.campaign_start_map(1);
+            check(map.at("ok") && map["hero"] == Json::array({0, 0}), "Hero starts on the map's start cell, not the town");
+            check(map["army"].size() == 2 && map["army"][0]["id"] == "woad_runner" && map["army"][0]["count"] == 10,
+                  "A fresh campaign start fields the map's start_army");
+            check(map["specials"].size() == 1 && map["specials"][0]["id"] == "aldren"
+                  && map["battle_companions"].size() == 1, "Aldren rides and fights as a companion");
+            auto met = camp.travel(2, 0);
+            check(met["encounter"].is_object() && met["story_choice"]["id"] == "pack", "Engage raises the choice with the fight pending");
+            auto spared = camp.choose_story("spare");
+            check(spared.at("ok") && spared["encounter"].is_null(), "Withdraw calls the pending fight off");
+        }
+        if (argc == 3) {   // demo_bot's campaign mode plays a fixture campaign from its story data alone
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bot_campaign").string();
+            std::filesystem::create_directories(dir);
+            WorldMap hunt;
+            hunt.clear(6);
+            hunt.placeObject({{-5, 0}, ObjType::Town, "Home", 1, ""});
+            hunt.placeObject({{2, 0}, ObjType::Guard, "Ford Wolves", 0, ""});
+            hunt.placeObject({{-4, 4}, ObjType::Pickup, "Old Journal", 0, "tome"});
+            check(!hunt.saveJson(dir + "/hunt.json"), "Bot fixture map 1 written");
+            WorldMap shrine;
+            shrine.clear(6);
+            shrine.placeObject({{-5, 0}, ObjType::Town, "Home", 1, ""});
+            shrine.placeObject({{3, -1}, ObjType::QuestGiver, "Shrine", 0, ""});
+            shrine.placeObject({{-1, 4}, ObjType::QuestGiver, "Altar", 0, ""});
+            check(!shrine.saveJson(dir + "/shrine.json"), "Bot fixture map 2 written");
+            std::ofstream(dir + "/hunt.encounters.json") << R"({"objects": {"Ford Wolves": {"guards": [{"id": "grey_wolf", "count": 4}]}}})";
+            // The first option is locked, so the default policy takes "spare"; the wolves
+            // are named only by the encounter_won trigger, never by the bot.
+            std::ofstream(dir + "/hunt.triggers.json") << R"({"start_companions": [],
+                "quests": [{"id": "hunt", "title": "The hunt", "text": "Drive off the wolves.", "main": true}],
+                "triggers": [
+                {"id": "intro", "when": {"event": "start"}, "do": [{"quest": "hunt"},
+                    {"troops": [{"id": "woad_runner", "count": 30}]},
+                    {"choice": {"id": "oath", "title": "Oath", "options": [
+                        {"id": "burn", "label": "Burn", "requires_flag": "torch", "then": []},
+                        {"id": "spare", "label": "Spare", "then": [{"flag": {"mercy": true}}]},
+                        {"id": "hunt", "label": "Hunt", "then": []}]}}]},
+                {"id": "won", "when": {"event": "encounter_won", "name": "Ford Wolves", "after": "intro"},
+                 "do": [{"quest_done": "hunt"}, {"xp": 300}, {"ending": {"id": "ford", "heading": "The ford is clear"}}]}]})";
+            // Only the flag set by map 1's choice arms one of the two endings.
+            std::ofstream(dir + "/shrine.triggers.json") << R"({"start_companions": [], "triggers": [
+                {"id": "shrine", "when": {"event": "visit", "name": "Shrine", "flag": {"choice.oath": "spare"}},
+                 "do": [{"say": [["Priest", "The shrine remembers mercy."]]}, {"ending": {"id": "s", "heading": "Mercy"}}]},
+                {"id": "altar", "when": {"event": "visit", "name": "Altar", "flag": {"choice.oath": "hunt"}},
+                 "do": [{"say": [["Hunter", "Blood for the altar."]]}, {"ending": {"id": "a", "heading": "Blood"}}]}]})";
+            std::ofstream(dir + "/campaign.json") << Json{{"chapters", {{{"id", "one"}, {"title", "One"}, {"maps", {
+                {{"id", "1.0"}, {"title", "The hunt"}, {"map", dir + "/hunt.json"}, {"encounters", dir + "/hunt.encounters.json"},
+                 {"triggers", dir + "/hunt.triggers.json"}, {"max_level", 2}},
+                {{"id", "1.1"}, {"title", "The shrine"}, {"map", dir + "/shrine.json"}, {"triggers", dir + "/shrine.triggers.json"}}}}}}}}.dump();
+            auto bot = [&](const std::string& args, std::string& out) {
+                const std::string cmd = "\"" + std::string(argv[2]) + "\" \"" + data + "/..\" campaign \"" + dir + "/campaign.json\" " + args + " 2>/dev/null";
+                FILE* pipe = popen(cmd.c_str(), "r");
+                check(pipe, "demo_bot runs");
+                char buf[512];
+                while (fgets(buf, sizeof buf, pipe)) out += buf;
+                const int status = pclose(pipe);
+                return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+            };
+            auto has = [](const std::string& out, const std::string& text) { return out.find(text) != std::string::npos; };
+            std::string hasty;
+            check(bot("hasty 1", hasty) == 0, "Hasty campaign route exits 0");
+            check(has(hasty, "MAP 1.0 The hunt\n") && has(hasty, "MAP 1.1 The shrine\n"), "Each map announced");
+            check(has(hasty, "CHOICE oath=spare"), "Default policy takes the first unlocked option");
+            check(has(hasty, "CAP map=1.0 cap=2 reached_day=1 map_days=1 xp_lost="), "Map 1's cap reported");
+            check(has(hasty, "trivial=yes\nMAP 1.1"), "Reaching the cap on day 1 is trivial");
+            check(has(hasty, "CAP map=1.1 cap=10 reached_day=never map_days="), "No cap reached on map 2");
+            check(has(hasty, "CAMPAIGN result=FINISHED map=1.1 day="), "Campaign finished");
+            check(!has(hasty, "Old Journal"), "Hasty skips side pickups");
+            std::string thorough;
+            check(bot("thorough 1 --transcript --choose oath=hunt", thorough) == 0, "Thorough campaign route exits 0");
+            check(has(thorough, "MAP 1.0 The hunt\n") && has(thorough, "MAP 1.1 The shrine\n"), "Transcript carries the title cards");
+            check(has(thorough, "VISIT Old Journal"), "Thorough takes the pickup");
+            check(has(thorough, "CHOSE Hunt"), "--choose overrides the default");
+            check(has(thorough, "SAY Hunter: Blood for the altar.") && !has(thorough, "Priest"),
+                  "Map 2's flag-gated trigger follows map 1's choice");
+            check(!has(thorough, "CAP ") && !has(thorough, "GOAL "), "Transcript holds only player-visible lines");
         }
         check(adventure.resolve_encounter(false, Json::parse(R"([{"id":"grey_wolf","count":3.0}])")).at("ok"),
               "Godot integral JSON floats are accepted for enemy survivors");

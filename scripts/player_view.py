@@ -9,7 +9,8 @@ quoted line is real, how much the player had to hold in mind at once, which
 threads were opened or closed by play rather than by talk, and whether the late
 game points back to the beginning.
 
-  python3 scripts/player_view.py transcript [mode] [seed]   -> build/player_view/<mode>-<seed>.txt
+  python3 scripts/player_view.py transcript [mode] [seed] [policy]  -> build/player_view/<mode>-<seed>.txt
+      mode = campaign (policy thorough|hasty) or an old_passage route
   python3 scripts/player_view.py check <graph.json>         -> the report; exit 1 if the graph cites lines that do not say it
 
 Graph format (written by the player agent; every number is a transcript line number):
@@ -49,19 +50,34 @@ def _slide_lines(block: str) -> list[str]:
 
 
 def intro_lines() -> list[str]:
-    """Slides that exist only in Godot: the title intro, then the new-expedition cutscene."""
-    intro = (ROOT / "godot" / "scripts" / "intro.gd").read_text()
-    game = (ROOT / "godot" / "scripts" / "game.gd").read_text()
-    start = game[game.index("func _start_new_expedition"):]
-    blocks = [intro[intro.index("const SLIDES"):intro.index("const TITLE")],
-              start[start.index("cutscene.slides"):start.index("cutscene.show_title")]]
-    return ["INTRO " + l for b in blocks for l in _slide_lines(b)]
+    """Slides that exist only in Godot: the title intro, then the new-expedition cutscene.
+    Tolerant: if the Godot scripts change shape, the transcript says so instead of guessing."""
+    out = []
+    try:
+        intro = (ROOT / "godot" / "scripts" / "intro.gd").read_text()
+        out += _slide_lines(intro[intro.index("const SLIDES"):intro.index("const TITLE")])
+    except (OSError, ValueError):
+        print("warning: intro slides not found in intro.gd; transcript has no intro", file=sys.stderr)
+    try:
+        game = (ROOT / "godot" / "scripts" / "game.gd").read_text()
+        start = game[game.index("func _start_new_expedition"):]
+        out += _slide_lines(start[start.index("cutscene.slides"):start.index("cutscene.show_title")])
+    except (OSError, ValueError):
+        pass
+    return ["INTRO " + l for l in out]
 
 
-def transcript(mode: str = "escort", seed: str = "1") -> Path:
+def transcript(mode: str = "escort", seed: str = "1", policy: str = "thorough") -> Path:
+    """mode: an old_passage route (escort, bypass, slow, conquest) or `campaign`
+    (plays data/campaign.json with the given policy: thorough or hasty)."""
     if not BOT.exists():
         subprocess.run([str(ROOT / "scripts" / "build_godot_combat.sh")], check=True)
-    run = subprocess.run([str(BOT), str(ROOT), mode, seed, "--transcript"], capture_output=True, text=True)
+    if mode == "campaign":
+        args = [str(BOT), str(ROOT), "campaign", "data/campaign.json", policy, seed, "--transcript"]
+        mode = f"campaign-{policy}"
+    else:
+        args = [str(BOT), str(ROOT), mode, seed, "--transcript"]
+    run = subprocess.run(args, capture_output=True, text=True, cwd=ROOT)
     lines = intro_lines()
     for l in (l for l in run.stdout.splitlines() if l.strip()):
         if l.startswith("DAY ") and lines and lines[-1].startswith("DAY "):
@@ -253,7 +269,7 @@ def check(graph_path: Path) -> int:
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "transcript":
-        transcript(*sys.argv[2:4])
+        transcript(*sys.argv[2:5])
     elif cmd == "check" and len(sys.argv) > 2:
         sys.exit(check(Path(sys.argv[2]).resolve()))
     else:

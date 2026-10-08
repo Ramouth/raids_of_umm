@@ -80,6 +80,9 @@ func _ready() -> void:
             button.custom_minimum_size.y = 60
             button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
             button.visible = _next_line == null
+            # An option whose story condition does not hold yet: shown, not takeable.
+            button.disabled = bool(option.get("locked", false))
+            if button.disabled: button.tooltip_text = "Not open to you yet."
             button.pressed.connect(select.bind(str(option.id)))
             _buttons.add_child(button)
     else:
@@ -90,9 +93,14 @@ func _ready() -> void:
         button.custom_minimum_size.y = 44
         button.pressed.connect(advance)
         _buttons.add_child(button)
-        advance()
+        # An ending without frames closes at once: after the stack has connected to us.
+        if outcome.get("frames", []).is_empty(): advance.call_deferred()
+        else: advance()
     if _next_line != null: _advance_conversation()
-    (_buttons.get_child(0) as Button).grab_focus()
+    for button in _buttons.get_children():
+        if not button.disabled:
+            button.grab_focus()
+            break
 
 func _advance_conversation() -> void:
     _conversation_index += 1
@@ -109,7 +117,10 @@ func _advance_conversation() -> void:
     _next_line.hide()
     for button in _buttons.get_children():
         if button != _next_line: button.show()
-    (_buttons.get_child(1) as Button).grab_focus()
+    for button in _buttons.get_children():
+        if button != _next_line and not button.disabled:
+            button.grab_focus()
+            break
 
 func _label(text: String, font_size: int, colour: Color) -> Label:
     var label := Label.new()
@@ -123,7 +134,7 @@ func _label(text: String, font_size: int, colour: Color) -> Label:
 func select(id: String) -> void:
     if _closed or choice.is_empty(): return
     if _next_line != null and _next_line.visible: return
-    if not choice.options.any(func(option): return str(option.id) == id): return
+    if not choice.options.any(func(option): return str(option.id) == id and not option.get("locked", false)): return
     _closed = true
     finished.emit({"choice": id})
 

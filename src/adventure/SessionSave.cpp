@@ -168,6 +168,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         m_specials.clear();
         for (const auto& s : save.at("specials")) {
             joinSpecial(s.at("id").get<std::string>());
+            if (m_specials.empty() || m_specials.back().id != s.at("id")) continue;   // no longer defined
             Special& sc = m_specials.back();
             sc.level = s.at("level").get<int>();
             sc.xp = s.at("xp").get<int>();

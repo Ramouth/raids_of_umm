@@ -18,13 +18,17 @@ class AdventureSession;
  *
  *   { "quests":   [ { "id", "title", "text", "main": bool } ],
  *     "triggers": [ { "id", "when": {...}, "do": [ {...}, ... ] } ],
- *     "start_companions": [id, ...] }   — who rides with the hero on day 1
+ *     "start_companions": [id, ...],    — who rides with the hero on day 1
  *                                          (absent = the default, Ushari)
+ *     "start_army": [{"id","count"}] }  — the hero's army when the map starts
+ *                                          without carried state (a new campaign
+ *                                          or a lone map); carried state wins
  *
  * when.event:  "start" | "night" (End Day) | "day" (day) | "see" (cell) | "see_type" (type)
  *              | "enter_q" (q_min) | "visit" (name) | "capture" (name)
  *              | "encounter_won" (name) | "mines_held" (count) | "item" (item)
  *              | "cleared" (names: [...]) — every named guard camp has been beaten
+ *                                             or has left the map (vanish / withdraw)
  *              | "engage" (name) — the hero is about to fight that guard camp
  * do actions:  "say": [[speaker, text], ...]   — dialogue lines for the UI
  *              "quest": id / "quest_done": id / "quest_text": [id, text]
@@ -47,7 +51,12 @@ class AdventureSession;
  *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
  *                                               — that site turns rival; a war-band rides out
  *              "xp": n                          — experience for the commander and travelling companions
- *              "vanish": name                   — that map object leaves the map (a figure walks off)
+ *              "vanish": name                   — that map object leaves the map (a figure walks off);
+ *                                                 a guard camp takes its hex, zone of control and
+ *                                                 any fight about to start with it along
+ *              "withdraw": name                 — a guard camp walks away: a fight pending with it
+ *                                                 is called off and it leaves the map (as vanish).
+ *                                                 Use in a choice option's "then" at an "engage".
  *              "turncoats": {"unit": id, "band": name, "say": [[speaker, text], ...]}
  *                                               — hired men of that unit turn and ambush the hero
  * (event "quests_done" (count) fires as optional quests complete;
@@ -66,6 +75,10 @@ class AdventureSession;
  * Choice options take "requires_flag": condition — refused until it holds; the
  * snapshot marks such options "locked". Every resolved choice records the flag
  * "choice.<choice id>" = "<option id>" before its "then" actions run.
+ * An option with "again": true closes the choice without using up the trigger
+ * that raised it: that trigger fires again on its next matching event ("Turn
+ * back", "Not yet"). If it was raised at an "engage", the fight is not fought;
+ * the camp stays where it is.
  * Flags live in AdventureSession: they persist in saves and carry to the next
  * campaign map (CampaignState).
  * Root rival_lord configures a castle opponent: home, name, army, garrison,
@@ -104,6 +117,9 @@ public:
         auto it = m_firedOn.find(id);
         return it == m_firedOn.end() ? -1 : it->second;
     }
+    // True once the trigger has fired, been overtaken (when.unless) or is held (when.wait).
+    bool fired(const std::string& id) const { return m_fired.count(id) > 0; }
+    const Json& triggers() const { return m_triggers; }   // definitions, as loaded
     bool essential(const std::string& id) const { return m_essential.count(id) > 0; }
     bool passageEndsScenario() const { return m_passageEndsScenario; }
     const Json& choice() const { return m_choice; }
@@ -119,7 +135,13 @@ public:
     std::optional<std::string> choose(AdventureSession& s, const std::string& id);
     // Companions with the hero at the start; nullopt = the file does not say.
     const std::optional<std::vector<std::string>>& startCompanions() const { return m_startCompanions; }
-    // Map objects a "vanish" action has taken off the map.
+    // The army the hero starts with absent carried state ([{"id","count"}]; empty = none named).
+    const Json& startArmy() const { return m_startArmy; }
+    // The engage trigger's guard name ("" = that trigger is not an engage).
+    std::string engagedAt(const std::string& triggerId) const;
+    // The trigger that raised the open choice ("" = none / raised by a choice or offer).
+    const std::string& choiceTrigger() const { return m_choiceTrigger; }
+    // Map objects a "vanish" or "withdraw" action has taken off the map.
     const std::unordered_set<std::string>& vanished() const { return m_vanished; }
 
     // Event hooks — AdventureSession calls these; matching triggers fire.
@@ -150,6 +172,8 @@ private:
     std::unordered_set<std::string> m_essential;
     std::unordered_map<std::string, int> m_morale; // persistent companion combat attack modifier
     Json                            m_choice = Json::object();
+    std::string                     m_choiceTrigger;  // trigger that raised m_choice (saved)
+    std::string                     m_firing;         // trigger whose actions are running
     Json                            m_outcome = Json::object();
     Json                            m_triggers = Json::array();
     std::unordered_set<std::string> m_fired;
@@ -160,6 +184,7 @@ private:
     std::vector<Line>               m_lines;
     std::vector<Lore>               m_lore;
     std::optional<std::vector<std::string>> m_startCompanions;
+    Json                            m_startArmy = Json::array();
     std::unordered_set<std::string> m_won;          // guard camps beaten, by name
     std::unordered_set<std::string> m_vanished;     // map objects gone from the map
     std::vector<std::string>        m_waiting;      // triggers held by when.wait

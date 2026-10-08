@@ -75,6 +75,10 @@ void AdventureSession::joinSpecial(const std::string& id) {
             report(def.name, std::string("I will ride with the Compact. My upkeep is modest, for now."));
         return;
     }
+    // Any other companion comes from data: a unit of faction "companion" (name, title).
+    const UnitType* unit = m_resources ? m_resources->unit(id) : nullptr;
+    if (unit && unit->isCompanion())
+        m_specials.push_back({unit->id, unit->name, unit->title, 1, 0, std::nullopt, 0});
 }
 
 void AdventureSession::leaveSpecial(const std::string& id) {
