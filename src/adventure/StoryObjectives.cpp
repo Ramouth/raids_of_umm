@@ -2,6 +2,7 @@
 #include "StoryObjectives.h"
 #include "AdventureSession.h"
 #include <set>
+#include <string>
 #include <tuple>
 
 using Json = Scenario::Json;
@@ -59,6 +60,13 @@ std::vector<StoryObjective> storyObjectives(const AdventureSession& s) {
             for (const auto& n : when.value("names", Json::array())) {
                 const auto* o = n.is_string() ? objectNamed(s, n.get<std::string>()) : nullptr;
                 if (o && s.isEncounter(o->pos)) add(o->name, o->pos, event, id, ready);
+            }
+        } else if (event == "enter_q") {
+            // Every path east crosses the column q == q_min, so its open tiles are the targets.
+            const int q = when.value("q_min", 999);
+            for (const auto& [c, tile] : s.map()) {
+                if (c.q != q || !tile.passable || s.isEncounter(c) || s.map().objectAt(c)) continue;
+                add("the road east (" + std::to_string(c.q) + "," + std::to_string(c.r) + ")", c, event, id, ready);
             }
         } else if (event == "rival_beaten") {
             for (const auto& r : s.rivals())

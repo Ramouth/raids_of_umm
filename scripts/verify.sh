@@ -52,15 +52,20 @@ godot_prepare() {
 godot() {
     godot_prepare
     local t
-    for t in art_smoke smoke combat_smoke demo_smoke expanded_demo_smoke fieldworks_smoke \
+    for t in art_smoke smoke campaign_smoke combat_smoke demo_smoke expanded_demo_smoke fieldworks_smoke \
              north_theme_smoke rookwatch_smoke story_effects_smoke tactics_smoke; do
         step "godot_$t" timeout 600 "$godot_bin" --headless --audio-driver Dummy --path godot --script "res://tests/$t.gd"
     done
 }
 
+bot_build() {  # incremental, once per run: a stage run alone must not use a stale demo_bot
+    [[ -n "${_bot_built:-}" ]] && return 0
+    step native_build ./scripts/build_godot_combat.sh
+    _bot_built=1
+}
+
 routes() {
-    native_built=1
-    [[ -x "$root/godot/native/build/demo_bot" ]] || step native_build ./scripts/build_godot_combat.sh
+    bot_build
     local m
     for m in conquest bypass slow escort; do
         step "route_$m" timeout 300 ./godot/native/build/demo_bot . "$m" 1
@@ -75,7 +80,7 @@ drift() {  # generated story and maps must match their generators exactly
 
 campaign() {  # the data-driven bot plays the whole campaign; CAP lines are the level-cap eval
     [[ -f "$root/data/campaign.json" ]] || { echo "SKIP  campaign (no data/campaign.json yet)"; return 0; }
-    [[ -x "$root/godot/native/build/demo_bot" ]] || step native_build ./scripts/build_godot_combat.sh
+    bot_build
     local m
     for m in thorough hasty; do
         step "campaign_$m" timeout 600 ./godot/native/build/demo_bot . campaign data/campaign.json "$m" 1

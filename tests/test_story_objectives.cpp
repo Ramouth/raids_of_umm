@@ -34,7 +34,8 @@ const Json kTriggers = Json::parse(R"({
     {"id": "shrine",  "when": {"event": "visit", "name": "Shrine", "after": "mine"}, "do": []},
     {"id": "mercy",   "when": {"event": "visit", "name": "Shrine", "flag": "mercy"}, "do": []},
     {"id": "tower",   "when": {"event": "visit", "name": "Old Tower", "unless": "mine"}, "do": []},
-    {"id": "nowhere", "when": {"event": "visit", "name": "Nowhere"}, "do": []}
+    {"id": "nowhere", "when": {"event": "visit", "name": "Nowhere"}, "do": []},
+    {"id": "east",    "when": {"event": "enter_q", "q_min": 5, "after": "wolves"}, "do": []}
   ]})");
 
 const StoryObjective* find(const std::vector<StoryObjective>& list, const std::string& name,
@@ -64,6 +65,9 @@ SUITE("StoryObjectives — places come from the triggers and quests, armed by th
     CHECK(quest && quest->event == "quest" && quest->armed);
     CHECK(!std::any_of(list.begin(), list.end(), [](const StoryObjective& o) { return o.name == "Nowhere"; }));
     CHECK(!find(list, "Home", "intro"));                                               // fired, and no place
+    const auto* east = find(list, "the road east (5,0)", "east");                     // column q_min, open tiles
+    CHECK(east && east->event == "enter_q" && !east->armed && east->at == HexCoord(5, 0));
+    CHECK(std::all_of(list.begin(), list.end(), [](const StoryObjective& o) { return o.event != "enter_q" || o.at.q == 5; }));
 
     s.setFlag("mercy", true);
     list = storyObjectives(s);
@@ -83,4 +87,10 @@ SUITE("StoryObjectives — places come from the triggers and quests, armed by th
     list = storyObjectives(s);
     CHECK(!find(list, "Hill Wolves", "wolves"));
     CHECK(find(list, "Den Wolves", "wolves"));                                         // still unbeaten
+
+    for (int day = 0; day < 3 && !s.pendingEncounter(); ++day) { s.travel({0, -5}); if (!s.pendingEncounter()) s.endDay(); }
+    CHECK(s.pendingEncounter() && *s.pendingEncounter() == HexCoord(0, -5));
+    s.resolveEncounter(true);                // beat the other: the way east is armed
+    list = storyObjectives(s);
+    CHECK(find(list, "the road east (5,0)", "east") && find(list, "the road east (5,0)", "east")->armed);
 }

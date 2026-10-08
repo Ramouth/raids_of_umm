@@ -15,6 +15,8 @@ class AdventureSession;
  *   visit / capture / encounter_won / engage   when.name (a map object)
  *   cleared                                    each of when.names still unbeaten
  *   rival_beaten                               when.name (a living war-band)
+ *   enter_q                                    each open tile in column q_min, named
+ *                                              "the road east (q,r)"
  * Places already done for that event drop out: a captured object, a beaten
  * guard, a vanished object. A trigger overtaken by its when.unless is gone.
  *
@@ -33,7 +35,7 @@ class AdventureSession;
 struct StoryObjective {
     std::string name;      // map object or war-band
     HexCoord    at;        // where it is now
-    std::string event;     // visit | capture | encounter_won | engage | cleared | rival_beaten | quest
+    std::string event;     // visit | capture | encounter_won | engage | cleared | rival_beaten | enter_q | quest
     std::string trigger;   // trigger id; "" for a quest mention
     bool        armed = false;
 };
