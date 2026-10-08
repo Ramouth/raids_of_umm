@@ -13,6 +13,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <set>
 #include <unordered_set>
 #include <vector>
 
@@ -131,7 +132,8 @@ public:
     bool removeEncounter(const std::string& objectName);
     // Called after the battle. Victory clears the hex, pays the reward and moves the
     // hero onto it (spending its step cost). Returns what an old mine held.
-    struct Stack { std::string id; int count = 0; };
+    // bitten: rabies (see CombatEngine::kBiteChance); kept per unit id in the hero's army.
+    struct Stack { std::string id; int count = 0; bool bitten = false; };
     MineFind resolveEncounter(bool victory, const std::optional<std::vector<Stack>>& enemySurvivors = std::nullopt);
     bool won() const { return m_won; }
     std::optional<HexCoord> passageMine() const { return m_passage; }
@@ -149,7 +151,13 @@ public:
 
     std::vector<Stack> army() const;
     // Replaces the hero's army (e.g. with combat survivors). Unknown ids are dropped.
+    // Stacks of one id merge; the merged stack is bitten if any of them was.
     void setArmy(const std::vector<Stack>& stacks);
+    // Rabies: unit ids in the hero's army that carry a bite. A stack that dies
+    // out (or leaves the army) loses its mark. Ending a day in a player-owned
+    // town tends them all; endDay() then says so and tendedIn() names the town.
+    bool isBitten(const std::string& unitId) const { return m_bitten.count(unitId) > 0; }
+    const std::string& tendedIn() const { return m_tendedIn; }   // "" = no one tended last endDay()
 
     // ── Garrisons (HoMM3-style: troops left at an owned mine or town) ────────
     const std::vector<Stack>* garrison(const HexCoord& c) const;
@@ -215,6 +223,13 @@ public:
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }
     void addItem(const std::string& id);
     bool hasItem(const std::string& id) const { return m_items.count(id) > 0; }
+    // Story "open": [q, r] — a closed tile (map "passable": false, e.g. a
+    // gatekeeper's bridge) becomes passable for the rest of this map. Saved,
+    // not carried. False if the map has no such tile.
+    bool openTile(const HexCoord& c);
+    const std::unordered_set<HexCoord>& opened() const { return m_opened; }
+    // The map's passability with the opened tiles applied (false off the map).
+    bool passable(const HexCoord& c) const;
     const std::unordered_set<std::string>& items() const { return m_items; }
     // Accept a scenario offer at the hero's current object. Error or nullopt.
     std::optional<std::string> acceptOffer(const std::string& id);
@@ -413,6 +428,9 @@ private:
     Scenario                         m_scenario;
     std::unordered_set<HexCoord>     m_ruledOut;
     std::unordered_set<std::string>  m_items;
+    std::set<std::string>            m_bitten;     // rabies, by unit id in the hero's army
+    std::string                      m_tendedIn;   // town where the bitten were tended last endDay()
+    std::unordered_set<HexCoord>     m_opened;     // tiles the story opened ("open")
     std::map<std::string, std::string> m_equipped;   // slot → item id
     std::unordered_map<HexCoord, std::vector<Stack>> m_garrisons;
     std::map<std::string, int>        m_fieldworkStock;

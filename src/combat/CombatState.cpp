@@ -181,7 +181,8 @@ void CombatState::tickAnimation(float dt) {
     if (m_pendingChoiceEvent.has_value()) return;
 
     bool aiShouldAct = !m_engine.currentTurn().isPlayer
-                    || m_autoBattle;
+                    || m_autoBattle
+                    || m_engine.activeUnit().mad;   // a mad stack takes no orders
     if (aiShouldAct) {
         CombatAI::takeTurn(m_engine);
         for (auto& ev : m_engine.drainEvents())

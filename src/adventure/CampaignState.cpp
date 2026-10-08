@@ -26,7 +26,10 @@ std::vector<CampaignState::Companion> companionsFrom(const Json& j) {
 
 Json CampaignState::toJson() const {
     Json stacks = Json::array();
-    for (const auto& s : army) stacks.push_back({{"id", s.id}, {"count", s.count}});
+    for (const auto& s : army) {
+        stacks.push_back({{"id", s.id}, {"count", s.count}});
+        if (s.bitten) stacks.back()["bitten"] = true;
+    }
     return {{"chapter", chapter}, {"map", map}, {"carried", carried},
             {"level", level}, {"xp", xp}, {"path", path}, {"learned", learned},
             {"army", stacks}, {"items", items}, {"equipped", equipped},
@@ -44,7 +47,8 @@ CampaignState CampaignState::fromJson(const Json& j) {
     s.xp       = j.value("xp", 0);
     s.path     = j.value("path", "");
     s.learned  = j.value("learned", std::vector<std::string>{});
-    for (const auto& st : j.value("army", Json::array())) s.army.push_back({st.value("id", ""), st.value("count", 0)});
+    for (const auto& st : j.value("army", Json::array()))
+        s.army.push_back({st.value("id", ""), st.value("count", 0), st.value("bitten", false)});
     s.items    = j.value("items", std::vector<std::string>{});
     s.equipped = j.value("equipped", std::map<std::string, std::string>{});
     s.companions = companionsFrom(j.value("companions", Json::array()));

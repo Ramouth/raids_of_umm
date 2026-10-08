@@ -350,6 +350,7 @@ func _apply_state(next: Dictionary) -> void:
         army = next.army.duplicate(true)
         _mirroring = false
     fog.apply(state)
+    map_view.set_opened(state.get("opened", []))
     var ruled: Dictionary = {}
     for c in state.get("ruled_out", []): ruled[Vector2i(c[0], c[1])] = true
     map_view.mark_ruled_out(ruled)
@@ -395,6 +396,7 @@ func _same_army(a: Array, b: Array) -> bool:
     if a.size() != b.size(): return false
     for i in a.size():
         if str(a[i].get("id", "")) != str(b[i].get("id", "")) or int(a[i].get("count", 0)) != int(b[i].get("count", 0)): return false
+        if bool(a[i].get("bitten", false)) != bool(b[i].get("bitten", false)): return false   # bitten in battle, or tended in town
     return true
 
 ## Each level-up pops up (HoMM3 style): what the level brought, or, at the
@@ -892,7 +894,7 @@ func end_day() -> void:
     if not next.get("ok", false): return
     turn_busy = true
     _apply_state(next)
-    await _day_transition()
+    await _day_transition(str(next.get("tended", "")))
     _say(next)
     var message := "Day %d of week %d dawns. Your expedition is rested." % [state.day_of_week, state.week]
     if state.get("story_choice", {}).get("id", "") == "ushari_at_night":
@@ -900,6 +902,9 @@ func end_day() -> void:
     if not str(next.get("event", "")).is_empty():
         message += " " + str(next.event)
     notice.text = message
+    if not str(next.get("tended", "")).is_empty():
+        _float_text("The bitten are cured", Color("b9e0cc"))
+        _update_expedition()
     _inspect(_hover)
     if _check_lost():
         turn_busy = false
@@ -914,7 +919,8 @@ func end_day() -> void:
     if state.get("encounter") != null and not is_instance_valid(battle):
         _engage()
 
-func _day_transition() -> void:
+## `tended`: the town where the bitten were cured tonight ("" if none).
+func _day_transition(tended := "") -> void:
     var overlay := ColorRect.new()
     overlay.name = "DayTransition"
     overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -929,6 +935,8 @@ func _day_transition() -> void:
     words.text = "WEEK %d\nA new week begins" % int(state.week) if new_week else "DAY %d  ·  WEEK %d\nA new day dawns" % [int(state.day_of_week), int(state.week)]
     if state.get("story_choice", {}).get("id", "") == "ushari_at_night":
         words.text = "NIGHT FALLS\nA rider on the west road"
+    if not tended.is_empty():
+        words.text += "\n\nThe bitten are tended in %s.\nThe sickness has left them." % tended
     words.add_theme_font_size_override("font_size", 32 if new_week else 26)
     words.add_theme_color_override("font_color", Color("edcf91"))
     overlay.add_child(words)
@@ -1054,6 +1062,10 @@ func _inspect(cell: Vector2i) -> void:
             sidebar.get_node("Inspection").text = "%s\n%s" % [rival.name, _army_text(rival.army)]
         elif _guarded(cell):
             sidebar.get_node("Inspection").text += "\nGuarded by: " + _army_text(_encounters_for(landmark))
+            for stack in _encounters_for(landmark):
+                if "rabid" in unit_defs.get(str(stack.id), {}).get("abilities", []):
+                    sidebar.get_node("Inspection").text += "\nRabid: a bite can drive your troops mad."
+                    break
         var xp_here := _xp_at(cell)
         if xp_here > 0:
             var gold := int(_encounter_entry(landmark).get("reward", {}).get("Gold", 0))
@@ -1062,7 +1074,10 @@ func _inspect(cell: Vector2i) -> void:
         var about := _site_text(cell, landmark)
         if not about.is_empty():
             sidebar.get_node("Inspection").text += "\n" + about
-        if not data.is_passable(cell):
+        if map_view.is_shut_bridge(cell):
+            sidebar.get_node("Inspection").text = "Bridge · shut\n%s" % _bridge_keeper_text(cell)
+            sidebar.get_node("Route").text = "The gate is barred. No way across yet."
+        elif not data.is_passable(cell):
             sidebar.get_node("Route").text = "Impassable terrain."
         elif cell == hero.cell:
             sidebar.get_node("Route").text = "Your expedition is here."
@@ -1091,6 +1106,15 @@ func _inspect(cell: Vector2i) -> void:
     elif _planned != NO_CELL and cell == _planned and not _preview.is_empty():
         sidebar.get_node("Route").text = sidebar.get_node("Route").text.split("\n")[0] + "\nClick again (or Enter) to set off · Esc cancels."
     overlay.queue_redraw()
+
+## Who holds a shut bridge: the nearest quest giver within two hexes, named.
+func _bridge_keeper_text(cell: Vector2i) -> String:
+    for other: Vector2i in data.objects:
+        var landmark: Dictionary = data.objects[other]
+        var d := other - cell
+        if landmark.get("type", "") == "quest_giver" and (absi(d.x) + absi(d.y) + absi(d.x + d.y)) / 2 <= 2:
+            return "%s keeps this gate. Speak to %s to learn what opens it." % [landmark.get("name", "A gatekeeper"), landmark.get("name", "the gatekeeper")]
+    return "The gate is barred from the far side."
 
 ## A left click on the map: plan a route there, or set off if it is the planned one.
 func click_cell(cell: Vector2i) -> bool:
@@ -1262,8 +1286,13 @@ func _update_expedition() -> void:
     _gate_button.visible = _at_gate()
     _gate_button.disabled = hero.moving
     var summary: Array[String] = []
-    for stack in army: summary.append("%d %s" % [stack.count, str(stack.id).replace("_", " ")])
+    var bitten := false
+    for stack in army:
+        summary.append("%d %s%s" % [stack.count, str(stack.id).replace("_", " "), " (bitten)" if stack.get("bitten", false) else ""])
+        bitten = bitten or stack.get("bitten", false)
     _army_label.text = ", ".join(summary) if not army.is_empty() else "Your army has fallen. Start a new expedition to fight again."
+    if bitten:
+        _army_label.text += "\nBitten stacks may go mad in battle and attack their own side. End the day in a town you hold to cure them."
     var companions: Array[String] = []
     for sc in state.get("specials", []):
         var note := " (governing)" if sc.stationed != null else (" (wounded until day %d)" % int(sc.wounded_until) if sc.get("wounded", false) else "")

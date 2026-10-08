@@ -12,10 +12,10 @@
     }
   },
   "objects": {
-    "Orchard Wolves": {
+    "Orchard Dogs": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 12
         }
       ],
@@ -23,10 +23,10 @@
         "Gold": 150
       }
     },
-    "Ford Wolves": {
+    "Ford Dogs": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 14
         }
       ],
@@ -34,10 +34,10 @@
         "Gold": 150
       }
     },
-    "Hollow Wolves": {
+    "Hollow Dogs": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 16
         }
       ],

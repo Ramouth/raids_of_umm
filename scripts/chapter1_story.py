@@ -48,6 +48,10 @@ def wolves(n, gold=0):
     return {"guards": [{"id": "grey_wolf", "count": n}], "reward": {"Gold": gold} if gold else {}}
 
 
+def dogs(n, gold=0):
+    return {"guards": [{"id": "rabid_hound", "count": n}], "reward": {"Gold": gold} if gold else {}}
+
+
 def conversation(id, title, lines, text, options):
     c = {"id": id, "title": title, "text": text, "options": options}
     if lines:
@@ -124,37 +128,46 @@ def hunt():
 
 
 # ── 1.1 Varenhold ────────────────────────────────────────────────────────────
-PACKS = ["Orchard Wolves", "Ford Wolves", "Hollow Wolves"]
+PACKS = ["Orchard Dogs", "Ford Dogs", "Hollow Dogs"]
+KEEPER = "Bridge Keeper"
 
 
 def varenhold(land):
     s = Story("ch1_1_1_varenhold", [])
-    s.quest("aldren", "Where did Aldren go?", "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east.", main=True)
-    s.quest("wolves", "Wolves in the Vale", "Three wolf packs have come down into the vale. Clear them before you ride out.")
-    s.encounters["objects"] = {"Orchard Wolves": wolves(12, 150), "Ford Wolves": wolves(14, 150),
-                               "Hollow Wolves": wolves(16, 200)}
+    s.quest("aldren", "Where did Aldren go?", "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east, over the bridge.", main=True)
+    s.quest("dogs", "Rabid Dogs in the Vale", "Three packs of rabid dogs are loose in the vale. Kill them before they get at the herds.")
+    s.encounters["objects"] = {"Orchard Dogs": dogs(12, 150), "Ford Dogs": dogs(14, 150),
+                               "Hollow Dogs": dogs(16, 200)}
     s.encounters["pickups"] = {"Shepherd's Purse": {"reward": {"Gold": 300}}}
 
-    s.trig("start", {"event": "start"}, {"quest": "aldren"}, {"quest": "wolves"}, {"reveal": [2, 0, 13]})
+    s.trig("start", {"event": "start"}, {"quest": "aldren"}, {"quest": "dogs"}, {"reveal": [2, 0, 13]})
     # The hooded man stands with the third pack. Both answers end in the fight.
-    s.trig("stranger", {"event": "engage", "name": "Hollow Wolves"},
+    s.trig("stranger", {"event": "engage", "name": "Hollow Dogs"},
            conversation("stranger", "The Hooded Stranger", [("Hooded Man", "Son of Varen.")],
-                        "A hooded man stands among the wolves.",
+                        "A hooded man stands among the dogs.",
                         [option("hear", "Hear him out",
                                 say(("Hooded Man", "Your brother would not listen either. Keep this warm.")),
                                 {"item": "hermits_seed"}),
                          option("attack", "Attack")]))
-    s.trig("stranger_gone", {"event": "encounter_won", "name": "Hollow Wolves"},
+    s.trig("stranger_gone", {"event": "encounter_won", "name": "Hollow Dogs"},
            {"vanish": "Hooded Stranger"},
            say(("Scout", "He is gone. Only roots, pushed up through frozen ground.")))
     s.trig("rune_stone", {"event": "visit", "name": "Vale Rune Stone"},
            lore("A rubbing of the rune stone", "Charcoal on cloth. No one at Varenhold can read it."))
     s.trig("barrow", {"event": "visit", "name": "Varen Barrow"},
            say(("Scout", "The door will not open.")))
+    # The east bridge stays shut while the dogs run loose. Each trigger fires once,
+    # so the keeper says his piece on the first visit; the quest text keeps the reason.
+    s.trig("gate_shut", {"event": "visit", "name": KEEPER, "unless": "vale_cleared"},
+           say(("Bridge Keeper", "We won't open until the rabid dogs are killed.")))
     s.trig("vale_cleared", {"event": "cleared", "names": PACKS},
-           {"xp": 85}, {"quest_done": "wolves"},
-           {"quest_text": ["aldren", "The vale is clear. Aldren's road runs east, out through the gap in the hills."]})
-    s.leave_by(land.exit_q, "vale_cleared", "leave_vale", "The East Road",
+           {"xp": 85}, {"quest_done": "dogs"},
+           {"quest_text": ["aldren", "The rabid dogs are dead. The Bridge Keeper will open the east bridge now."]})
+    s.trig("gate_open", {"event": "visit", "name": KEEPER, "after": "vale_cleared"},
+           say(("Bridge Keeper", "Lord Aldren crossed at first light, before we shut it.")),
+           {"open": list(land.gate)},
+           {"quest_text": ["aldren", "The bridge is open. Aldren crossed it at first light; follow his road east."]})
+    s.leave_by(land.exit_q, "gate_open", "leave_vale", "The East Road",
                "The road leaves the vale here.", "Ride east",
                {"id": "out_of_the_vale", "heading": "Out of the Vale", "next": "1.2",
                 "body": "You ride out of the vale by the east road, the way Aldren went.",
@@ -348,7 +361,11 @@ def check(stories, lands, out, data_out):
         objs = {o["name"]: o for o in m["objects"]}
         cell = {n: (o["q"], o["r"]) for n, o in objs.items()}
         guards = {n for n, o in objs.items() if o["type"] == "guard"}
-        ok = lambda c: c in tiles and tiles[c]["passable"]
+        opened = {tuple(a["open"]) for t in s.root["triggers"] for a in walk_actions(t["do"]) if "open" in a}
+        for c in opened:
+            if c not in tiles or tiles[c]["passable"]:
+                problems.append(f"{s.stem}: 'open' {list(c)} is not a closed tile on the map")
+        ok = lambda c: c in tiles and (tiles[c]["passable"] or c in opened)
         start = (m["start"]["q"], m["start"]["r"])
 
         def reach(blocked=frozenset()):
@@ -366,6 +383,8 @@ def check(stories, lands, out, data_out):
                 problems.append(f"{s.stem}: {n} cannot be reached from the start")
         if land.exit_q is not None and not any(c[0] >= land.exit_q for c in seen):
             problems.append(f"{s.stem}: no walkable cell at the exit (q >= {land.exit_q})")
+        if opened and land.exit_q is not None and any(c[0] >= land.exit_q for c in reach(frozenset(opened))):
+            problems.append(f"{s.stem}: the exit can be reached without opening {sorted(opened)}")
         # Sites stood next to a guard are guarded on purpose; list them.
         guarded = sorted(f"{n} (by {g})" for n, c in cell.items() if n not in guards
                          for g in guards if gen.dist(c, cell[g]) == 1)

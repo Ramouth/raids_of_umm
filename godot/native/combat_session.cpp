@@ -50,6 +50,7 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
         army.stacks.back().defenseBonus = std::clamp(entry.value("defense_bonus", 0), -20, 20);
         army.stacks.back().speedBonus   = std::clamp(entry.value("speed_bonus", 0), -5, 5);
         army.stacks.back().readiedShot  = entry.value("readied_shot", false);
+        army.stacks.back().bitten       = entry.value("bitten", false);   // rabies carried from earlier battles
     }
     if (troops == 0) throw std::runtime_error("An army must contain between one and five stacks.");
     return army;
@@ -119,6 +120,7 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
         CombatAI::takeTurn(*engine_);
     } else {
         if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
+        if (engine_->activeUnit().mad) return failure("That stack has gone mad and takes no orders this turn.");
         if (action == "move") {
             if (!engine_->canMoveTo(cell)) return failure("That hex is not reachable.");
             engine_->doMove(cell);
@@ -175,6 +177,7 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     }
     if (opening_ > 0) return failure("Give your opening orders first (or skip them).");
     if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
+    if (engine_->activeUnit().mad) return failure("That stack has gone mad and takes no orders this turn.");
     if (action == "move") {
         if (!engine_->doMoveAlong(path)) return failure("That route is blocked or too long.");
     } else if (action == "strike") {
@@ -229,7 +232,8 @@ Json CombatSession::snapshot() const {
                 {"weakened_turns", unit.curseTurns}, {"bound_turns", unit.curseSlows ? unit.curseTurns : 0}, {"curse_slows", unit.curseSlows}, {"move", unit.effectiveMove()}, {"abilities", unit.type->abilities},
                 {"retaliated", unit.hasRetaliated},
                 {"speed", unit.effectiveSpeed()}, {"initiative_roll", unit.initiativeRoll},
-                {"initiative_score", unit.initiativeScore()}, {"defending", unit.isDefending}});
+                {"initiative_score", unit.initiativeScore()}, {"defending", unit.isDefending},
+                {"bitten", unit.bitten}, {"mad", unit.mad}});
             if (player && unit.isSpecialCharacter) {
                 if (unit.isDead()) state["fallen"].push_back(unit.scId);
                 else {
@@ -240,14 +244,16 @@ Json CombatSession::snapshot() const {
                     state["units"].back()["threats"] = threats;
                 }
             } else if (!unit.isDead()) {
-                state[player ? "survivors" : "enemy_survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}});
+                state[player ? "survivors" : "enemy_survivors"].push_back({{"id", unit.type->id}, {"count", unit.count}, {"bitten", unit.bitten}});
             }
         }
     }
     if (!engine_->isOver()) {
         const auto& turn = engine_->currentTurn();
         state["active"] = key(turn.isPlayer, turn.stackIndex);
-        state["player_turn"] = turn.isPlayer;
+        // A mad stack's turn is played by the AI ("ai"), whichever side it is on.
+        state["mad_turn"] = engine_->activeUnit().mad;
+        state["player_turn"] = turn.isPlayer && !engine_->activeUnit().mad;
         state["reaction_fire"] = Json::array();   // hexes whose approach draws enemy shots
         for (auto cell : engine_->reachableTiles()) {
             state["reachable"].push_back(hex(cell));
@@ -387,7 +393,8 @@ Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int i
 }
 
 Json CombatSession::response() {
-    static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "curse", "choice"};
+    static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "curse", "choice",
+                                  "bitten", "madness"};
     Json events = Json::array();
     for (const auto& event : engine_->drainEvents()) {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},

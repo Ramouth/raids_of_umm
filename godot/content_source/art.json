@@ -1,5 +1,5 @@
 {
- "_about": "Every image the Godot client shows, by logical id. A value is a file under res://content/textures/ or {file, fallback?, mipmaps?, frames?, size?}. A missing file shows a generated placeholder (fallback id first, if given). unit.<id> needs no entry when the file is units/<id>.png. See godot/README.md, 'Swapping art'.",
+ "_about": "Every image the Godot client shows, by logical id. A value is a file under res://content/textures/ or {file, fallback?, mipmaps?, frames?, size?, tint?}. A missing file shows a generated placeholder (fallback id first, if given). unit.<id> needs no entry when the file is units/<id>.png. See godot/README.md, 'Swapping art'.",
  "ids": {
   "feature.dune": "terrain/dune/dune.png",
   "feature.forest": "terrain/forest/forest.png",
@@ -115,6 +115,7 @@
   "unit.mummy": "units/mummy.png",
   "unit.painted_blade": "units/painted_blade.png",
   "unit.pharaoh_lich": "units/pharaoh_lich.png",
+  "unit.rabid_hound": {"file": "units/grey_wolf.png", "tint": "#b08a78"},
   "unit.rider_archer": "units/rider_archer.png",
   "unit.rider_banner": "units/rider_banner.png",
   "unit.rider_knight": "units/rider_knight.png",

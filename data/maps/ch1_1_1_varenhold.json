@@ -2349,24 +2349,24 @@
     {
       "q": 13,
       "r": -7,
-      "terrain": "highland",
+      "terrain": "river",
       "passable": false,
-      "moveCost": 1.25,
+      "moveCost": 0.0,
       "variant": 0
     },
     {
       "q": 13,
       "r": -6,
-      "terrain": "highland",
+      "terrain": "river",
       "passable": false,
-      "moveCost": 1.25,
+      "moveCost": 0.0,
       "variant": 0
     },
     {
       "q": 13,
       "r": -5,
-      "terrain": "grass",
-      "passable": true,
+      "terrain": "river",
+      "passable": false,
       "moveCost": 0.5,
       "variant": 0,
       "road": true
@@ -2374,9 +2374,9 @@
     {
       "q": 13,
       "r": -4,
-      "terrain": "highland",
+      "terrain": "river",
       "passable": false,
-      "moveCost": 1.25,
+      "moveCost": 0.0,
       "variant": 0
     },
     {
@@ -2651,19 +2651,19 @@
       "q": 1,
       "r": -5,
       "type": "guard",
-      "name": "Orchard Wolves"
+      "name": "Orchard Dogs"
     },
     {
       "q": 6,
       "r": 0,
       "type": "guard",
-      "name": "Ford Wolves"
+      "name": "Ford Dogs"
     },
     {
       "q": 7,
       "r": -6,
       "type": "guard",
-      "name": "Hollow Wolves"
+      "name": "Hollow Dogs"
     },
     {
       "q": 8,
@@ -2671,6 +2671,12 @@
       "type": "quest_giver",
       "name": "Hooded Stranger",
       "kind": "druid"
+    },
+    {
+      "q": 12,
+      "r": -4,
+      "type": "quest_giver",
+      "name": "Bridge Keeper"
     }
   ]
 }

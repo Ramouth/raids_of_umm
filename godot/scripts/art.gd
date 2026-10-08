@@ -97,6 +97,7 @@ static func texture(id: String, fallback := "") -> Texture2D:
         relative = _resolve(fallback, 0)
     if not relative.is_empty():
         result = _load(relative, bool(_entry(id).get("mipmaps", false)))
+        if result != null and _entry(id).has("tint"): result = _tinted(result, Color(str(_entry(id).tint)))
     if result == null:
         if not _warned.has(id):
             _warned[id] = true
@@ -162,6 +163,20 @@ static func _load(relative: String, mipmaps: bool) -> Texture2D:
             if not bitmap.has_mipmaps(): bitmap.generate_mipmaps()
             texture = ImageTexture.create_from_image(bitmap)
     return texture
+
+## Another creature drawn from shared art: every pixel multiplied by `tint`
+## ("tint": "#rrggbb" in art.json), so a reused sprite still reads as its own unit.
+static func _tinted(texture: Texture2D, tint: Color) -> Texture2D:
+    var bitmap := texture.get_image()
+    if bitmap == null: return texture
+    bitmap = bitmap.duplicate()
+    if bitmap.is_compressed(): bitmap.decompress()
+    bitmap.convert(Image.FORMAT_RGBA8)
+    for y in bitmap.get_height():
+        for x in bitmap.get_width():
+            var pixel := bitmap.get_pixel(x, y)
+            if pixel.a > 0.0: bitmap.set_pixel(x, y, Color(pixel.r * tint.r, pixel.g * tint.g, pixel.b * tint.b, pixel.a))
+    return ImageTexture.create_from_image(bitmap)
 
 static func _describe(id: String) -> String:
     if "/" in id: return "file %s%s not found" % [ROOT, id]

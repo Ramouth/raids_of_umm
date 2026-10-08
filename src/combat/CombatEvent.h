@@ -79,6 +79,8 @@ struct CombatEvent {
         ScLevelUp,       // isPlayer, stackIndex, newLevel
         CurseCast,      // target, curseRoll; succeeds on 3+
         ScChoicePending, // isPlayer, stackIndex, choiceLevel, branchOptions
+        Bitten,          // isPlayer, stackIndex (the bitten stack); targetIsPlayer, targetIndex (the biter)
+        Madness,         // isPlayer, stackIndex: this stack is mad for its turn
     };
 
     Type         type           = Type::BattleEnded;

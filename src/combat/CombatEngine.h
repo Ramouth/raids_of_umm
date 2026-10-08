@@ -190,6 +190,22 @@ public:
     static bool fightsAlone(const std::vector<CombatUnit>& friends, int self, HexCoord at);
     static int  loneWolfDamage(int damage) { return damage + damage / 4; }
 
+    // ── Rabies ───────────────────────────────────────────────────────────────
+    // A "rabid" stack that lands damage (strike, retaliation, opportunity blow
+    // or shot) on a player troop stack bites it kBiteChance% of the time;
+    // companions and the enemy side are never bitten. A bitten stack goes mad
+    // kMadnessChance% of its turns: the turn is not the player's (CombatAI
+    // plays it through doMadTurn) and it attacks the nearest living stack,
+    // friend or foe. Both rolls use the damage RNG.
+    static constexpr int kBiteChance    = 10;   // percent per landed hit
+    static constexpr int kMadnessChance = 15;   // percent per own turn
+    static bool isRabid(const CombatUnit& u) { return u.type->hasAbility("rabid"); }
+    // The mad active stack's whole turn: shoot or strike the nearest living
+    // stack of either side (ties: player army first, lower index), walking
+    // next to it first if needed, or as close as it can get. False (nothing
+    // happens) if the active stack is not mad.
+    bool doMadTurn();
+
     // ── Engaged shooters (HoMM3) ─────────────────────────────────────────────
     // A shooter with a living enemy next to it cannot shoot: it must deal
     // with that enemy in melee first (and fires no reaction shots).
@@ -333,6 +349,14 @@ private:
     // Resolve the active unit's attack (and retaliation) from where it stands,
     // then advance the turn.
     void resolveAttack(int targetIndex);
+    // Same, on a stack of either army (a mad stack may strike its own side:
+    // no pinning, no renown, no kill XP for that).
+    void resolveAttackOn(bool targetIsPlayer, int targetIndex);
+
+    // A rabid striker's bite on the stack it just hurt (see kBiteChance).
+    void maybeBite(const CombatUnit* striker, bool targetIsPlayer, int targetIndex);
+    // Start of a stack's turn: a bitten stack rolls for madness.
+    void rollMadness(const TurnSlot& slot);
 
     // ATK/DEF multiplier shared by calcDamage and damageRange.
     static double damageMultiplier(const CombatUnit& attacker, const CombatUnit& defender, bool melee = false);
@@ -346,7 +370,9 @@ private:
 
     // Deal `damage` to a stack (splitting a melee blow on a companion with its
     // bodyguard) and emit the Damaged/Died events.  Returns true if it died.
-    bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee);
+    // `striker` (if given) may bite every stack it hurt (rabies).
+    bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee,
+                  const CombatUnit* striker = nullptr);
 
     // A stack that destroyed an enemy stack gains its renown (if it has any).
     void gainRenown(CombatUnit& victor);

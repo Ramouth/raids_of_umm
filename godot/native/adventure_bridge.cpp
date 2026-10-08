@@ -66,7 +66,9 @@ Json AdventureBridge::snapshot() const {
                           {"prev", AdventureSession::xpForLevel(hp.level)},
                           {"next", AdventureSession::xpForLevel(hp.level + 1)}};
     Json army = Json::array();
-    for (const auto& s : session_.army()) army.push_back({{"id", s.id}, {"count", s.count}});
+    for (const auto& s : session_.army()) army.push_back({{"id", s.id}, {"count", s.count}, {"bitten", s.bitten}});
+    Json opened = Json::array();             // closed tiles the story has opened (a gate)
+    for (const auto& c : session_.opened()) opened.push_back(cell(c));
     Json towns = Json::array();
     for (const auto& obj : session_.map().objects()) {
         const TownState* t = session_.town(obj.pos);
@@ -245,6 +247,7 @@ Json AdventureBridge::snapshot() const {
         {"level_cap", session_.levelCap()}, {"cap_reached_day", session_.capReachedDay()},
         {"xp_lost_to_cap", session_.xpLostToCap()},
         {"army", army},
+        {"opened", opened},
         {"towns", towns},
         {"building_defs", building_defs},
         {"market", session_.hasMarket()},
@@ -369,7 +372,7 @@ Json AdventureBridge::trade_quote(const std::string& give, const std::string& ge
 
 Json AdventureBridge::set_army(const Json& stacks) {
     std::vector<AdventureSession::Stack> out;
-    for (const auto& s : stacks) out.push_back({s.value("id", ""), s.value("count", 0)});
+    for (const auto& s : stacks) out.push_back({s.value("id", ""), s.value("count", 0), s.value("bitten", false)});
     session_.setArmy(out);
     return snapshot();
 }
@@ -458,6 +461,7 @@ Json AdventureBridge::end_day() {
     std::string event = session_.endDay();
     Json out = snapshot();
     out["event"] = event;
+    out["tended"] = session_.tendedIn();   // town where the bitten were cured ("" = none)
     return with_lines(out);
 }
 

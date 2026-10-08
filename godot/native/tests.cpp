@@ -304,6 +304,56 @@ int main(int argc, char** argv) {
         check(!fieldworks.command("place_stakes", 3, 0)["ok"], "No construction once battle starts");
         check(!fieldworks.command("remove_fieldwork", 2, 1)["ok"], "No removal once battle starts");
 
+        {   // Rabies: a bitten fighter shows its mark, may go mad (refuses orders; "ai" plays it)
+            // and leaves the battle still bitten.
+            bool sawMad = false, sawSurvivor = false;
+            for (unsigned seed = 0; seed < 300 && !(sawMad && sawSurvivor); ++seed) {
+                CombatSession rabid;
+                const Json fighters = {{{"id", "woad_runner"}, {"count", 30}, {"bitten", true}},
+                                       {{"id", "cruth_slinger"}, {"count", 5}}};
+                auto turn = rabid.start(argv[1], fighters, {{"guards", {{{"id", "grey_wolf"}, {"count", 4}}}}, {"seed", seed}});
+                check(turn.at("ok"), "A bitten army starts a battle");
+                check(turn["state"]["units"][0]["bitten"] == true && turn["state"]["units"][1]["bitten"] == false
+                      && turn["state"]["units"][0]["mad"].is_boolean(), "Units report bitten and mad");
+                for (int n = 0; n < 300 && turn["state"]["result"] == "ongoing"; ++n) {
+                    rabid.acknowledge(turn["ticket"]);
+                    const auto& state = turn["state"];
+                    if (state["mad_turn"] == true) {
+                        sawMad = true;
+                        check(state["active"] == "p0" && state["player_turn"] == false, "A mad turn is not the player's");
+                        bool announced = false;
+                        for (const auto& event : turn["events"]) announced |= event["type"] == "madness" && event["unit"] == "p0";
+                        check(announced, "The madness event names the stack");
+                        for (const auto& unit : state["units"]) if (unit["key"] == "p0") check(unit["mad"] == true, "The mad unit is marked");
+                        check(!rabid.command("defend").at("ok"), "A mad stack refuses orders");
+                        check(!rabid.command_route("move", Json::array({Json::array({1, 1})})).at("ok"), "A mad stack refuses a route");
+                    }
+                    turn = rabid.command("ai");
+                    check(turn.at("ok"), "The AI plays every turn, mad or not");
+                }
+                if (turn["state"]["result"] == "victory")
+                    for (const auto& s : turn["state"]["survivors"])
+                        if (s["id"] == "woad_runner") { sawSurvivor = true; check(s["bitten"] == true, "Survivors keep the bite"); }
+                        else check(s["bitten"] == false, "Clean survivors stay clean");
+            }
+            check(sawMad && sawSurvivor, "Madness seen and a bitten stack survived");
+
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_rabies").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(3);
+            field.placeObject({{-2, 0}, ObjType::Town, "Home", 1, ""});
+            check(!field.saveJson(dir + "/home.json"), "Rabies fixture map written");
+            AdventureBridge home;
+            check(home.start(dir + "/home.json", data).at("ok"), "Rabies fixture starts in the player's town");
+            auto snap = home.set_army(Json::parse(R"([{"id": "woad_runner", "count": 5, "bitten": true}])"));
+            check(snap["army"][0]["bitten"] == true && snap["opened"].is_array(), "set_army takes the bite; the snapshot shows it");
+            auto night = home.end_day();
+            check(night["tended"] == "Home" && night["army"][0]["bitten"] == false
+                  && night["event"].get<std::string>().find("The bitten are tended in Home.") != std::string::npos,
+                  "A night in your own town tends the bitten");
+        }
+
         CombatSession invalid;
         check(!invalid.start(argv[1], {{{"id", "not_a_unit"}, {"count", 1}}}, guards).at("ok"), "Invalid registry references rejected");
         check(!invalid.start(argv[1], Json::array(), guards).at("ok"), "Empty army rejected");

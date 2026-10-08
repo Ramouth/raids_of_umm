@@ -13,6 +13,8 @@ const ENEMY_COLOR := Color("bc7660")
 const COMPANION_COLOR := Color("f7d580")
 const DANGER_COLOR := Color("ff5a3c")
 const PIN_COLOR := Color("ffb347")
+## Rabies: the bite mark on a bitten stack, and the ring and tag of a mad one.
+const MAD_COLOR := Color("e46ad2")
 var state: Dictionary = {}
 var actors: Dictionary = {}
 var locked := true
@@ -194,7 +196,9 @@ func _draw() -> void:
         if ring.is_empty(): continue
         var points := hex_points(cell_point(unit.cell))
         points.append(points[0])
-        draw_polyline(points, Color("f7d580") if ring == "active" else Color("ffffff"), 3.0, true)
+        var ring_color := Color("f7d580") if ring == "active" else Color("ffffff")
+        if ring == "active" and unit.get("mad", false): ring_color = MAD_COLOR
+        draw_polyline(points, ring_color, 3.0, true)
     _draw_danger()
     _place_forecast()
 
@@ -427,6 +431,20 @@ func sync(snapshot: Dictionary) -> void:
             stance.z_index = 4
             stance.visible = false
             actor.add_child(stance)
+            actor.add_child(_bite_mark())
+            var mad := Label.new()   # "MAD" beside the count on the turn madness takes it
+            mad.name = "Mad"
+            mad.text = "MAD"
+            mad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+            mad.position = Vector2(15, 15)   # right of the head count, inside the hex
+            mad.size = Vector2(30, 20)
+            mad.add_theme_font_size_override("font_size", 14)
+            mad.add_theme_color_override("font_color", MAD_COLOR)
+            mad.add_theme_color_override("font_outline_color", Color("16100a"))
+            mad.add_theme_constant_override("outline_size", 6)
+            mad.z_index = 6
+            mad.visible = false
+            actor.add_child(mad)
         var node: Node2D = actors[unit.key]
         node.position = cell_point(unit.cell)
         node.visible = unit.count > 0
@@ -438,11 +456,39 @@ func sync(snapshot: Dictionary) -> void:
         if unit.get("companion", false): node.get_node("Count").add_theme_color_override("font_color", COMPANION_COLOR)
         node.get_node("Shield").visible = false
         node.get_node("Stance").visible = unit.get("defending", false) and int(unit.count) > 0
+        node.get_node("Bitten").visible = unit.get("bitten", false) and int(unit.count) > 0
+        node.get_node("Mad").visible = unit.get("mad", false) and int(unit.count) > 0
     # A gold shield marks each stack guarding a companion.
     for unit in state.units:
         var guard: String = unit.get("bodyguard", "")
         if int(unit.count) > 0 and actors.has(guard): actors[guard].get_node("Shield").visible = true
     queue_redraw()
+
+## Bite mark left of the head count: a dark wound with two fangs, rimmed in the madness colour.
+static func _bite_mark() -> Node2D:
+    var mark := Node2D.new()
+    mark.name = "Bitten"
+    mark.position = Vector2(-27, 26)
+    mark.z_index = 5
+    var disc := PackedVector2Array()
+    for step in 12: disc.append(Vector2(cos(step * TAU / 12.0), sin(step * TAU / 12.0)) * 8.0)
+    var wound := Polygon2D.new()
+    wound.polygon = disc
+    wound.color = Color("4a1018")
+    mark.add_child(wound)
+    var rim := Line2D.new()
+    disc.append(disc[0])
+    rim.points = disc
+    rim.width = 2.0
+    rim.default_color = MAD_COLOR
+    mark.add_child(rim)
+    for x in [-3.0, 3.0]:
+        var fang := Polygon2D.new()
+        fang.polygon = PackedVector2Array([Vector2(x - 2, -4), Vector2(x + 2, -4), Vector2(x, 3)])
+        fang.color = Color("f3e6c4")
+        mark.add_child(fang)
+    mark.visible = false
+    return mark
 
 ## Troops show their head count; a companion (one figure) shows its health.
 static func _badge(companion: bool, hp: int, unit_hp: int, count: int) -> String:
@@ -534,5 +580,18 @@ func animate(event: Dictionary, speed: float) -> void:
                 actor.hide()
         "defend":
             if actor: await float_text(actor, "DEFEND", Color("b9e0cc"), duration)
+        "bitten":
+            # `unit` is the stack that was bitten, `target` the biter.
+            if actor:
+                actor.get_node("Bitten").visible = true
+                await float_text(actor, "BITTEN", MAD_COLOR, duration * 3)
+        "madness":
+            if actor:
+                actor.get_node("Mad").visible = true
+                actor.modulate = Color(1.8, 0.6, 1.6)
+                var tween := create_tween()
+                tween.tween_property(actor, "modulate", Color.WHITE, duration * 2)
+                float_text(actor, "GONE MAD!", MAD_COLOR, duration * 4)
+                await tween.finished
         _:
             await get_tree().process_frame

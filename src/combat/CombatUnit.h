@@ -69,6 +69,13 @@ struct CombatUnit {
     // Renown (the Cruths' paint): attack earned this battle by destroying enemy stacks.
     int renown       = 0;
 
+    // Rabies: a troop stack bitten by a "rabid" stack stays bitten after the battle
+    // (the hero's army carries the mark) until it is tended in an own town.
+    // A bitten stack may go mad at the start of its turn: for that turn CombatAI
+    // plays it against the nearest stack of either side (CombatEngine::doMadTurn).
+    bool bitten      = false;
+    bool mad         = false;
+
     // Rolled once at battle start; speed + d6 determines the normal turn order.
     int initiativeRoll = 0;
     int initiativeScore() const { return effectiveSpeed() + initiativeRoll; }

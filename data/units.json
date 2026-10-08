@@ -623,6 +623,34 @@
       "textureId": "grey_wolf"
     },
     {
+      "id": "rabid_hound",
+      "name": "Rabid Hound",
+      "description": "Farm dogs gone mad and running in packs. Their bite carries the sickness to men.",
+      "tier": 1,
+      "attack": 6,
+      "defense": 2,
+      "minDamage": 2,
+      "maxDamage": 3,
+      "hitPoints": 10,
+      "speed": 9,
+      "moveRange": 6,
+      "shots": 0,
+      "weeklyGrowth": 12,
+      "cost": {
+        "Gold": 70,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [
+        "rabid"
+      ],
+      "meshId": "grey_wolf",
+      "textureId": "grey_wolf"
+    },
+    {
       "id": "brigand",
       "name": "Brigand",
       "description": "Deserters and outlaws who hold the forest roads with crossbows and nerve.",

@@ -245,6 +245,8 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             m_vanished.insert(name);
             if (s.removeEncounter(name)) fire(s, "cleared");   // its hex, zone and any pending fight go with it
         }
+        if (a.contains("open"))                       // a gate opens: that tile is passable from now on
+            s.openTile({a["open"].at(0).get<int>(), a["open"].at(1).get<int>()});
         if (a.contains("offer"))
             for (const auto& def : m_offerDefs)
                 if (def.id == a["offer"] && !offer(def.id)) m_offers.push_back(def);

@@ -59,6 +59,9 @@ class AdventureSession;
  *                                                 Use in a choice option's "then" at an "engage".
  *              "turncoats": {"unit": id, "band": name, "say": [[speaker, text], ...]}
  *                                               — hired men of that unit turn and ambush the hero
+ *              "open": [q, r]                   — that closed tile (map "passable": false, e.g. a
+ *                                                 gatekeeper's bridge) is passable for the rest of
+ *                                                 this map; saved, not carried to the next map
  * (event "quests_done" (count) fires as optional quests complete;
  *  event "rival_beaten" (name) fires when the hero breaks a war-band)
  *

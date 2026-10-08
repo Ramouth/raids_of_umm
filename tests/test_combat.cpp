@@ -2558,4 +2558,135 @@ SUITE("Melee penalty — shots are unaffected; no_melee_penalty exempts") {
     CHECK_EQ(near.previewAttack(0).damage.min, 10);
 }
 
+
+// ── Rabies: bites and madness ───────────────────────────────────────────────────
+
+static const UnitType* rabidType(const std::string& name, int speed) {
+    UnitType t;
+    t.id = t.name = name;
+    t.speed = speed; t.minDamage = t.maxDamage = 1; t.hitPoints = 10;
+    t.attack = 5; t.defense = 5; t.moveRange = 3;
+    t.abilities.push_back("rabid");
+    s_aiTypes.push_back(std::move(t));
+    return &s_aiTypes.back();
+}
+
+// One strike by the opener on the other side's stack 0 (adjacent); returns the engine.
+static CombatEngine rabiesDuel(CombatUnit player, CombatUnit enemy, uint32_t seed) {
+    CombatArmy p; p.isPlayer = true; p.ownerName = "Player";
+    p.stacks.push_back(std::move(player));
+    CombatArmy e; e.isPlayer = false; e.ownerName = "Enemy";
+    e.stacks.push_back(std::move(enemy));
+    CombatEngine eng(std::move(p), std::move(e), 0, seed);
+    const HexCoord at = CombatMap::toHex(4, 2);
+    eng.teleportUnit(true, 0, at);
+    eng.teleportUnit(false, 0, at.neighbor(0));
+    return eng;
+}
+
+SUITE("Rabies — a rabid strike or retaliation bites a player troop about 1 time in 10") {
+    const UnitType* dog = rabidType("Rabid Dog", 9);
+    const UnitType* troop = aiType("Spearman", 1, 1, 1000, 5, 5);
+    const UnitType* fast = aiType("Fast Spearman", 12, 1, 1000, 5, 5);
+    int struck = 0, retaliated = 0, events = 0;
+    for (uint32_t seed = 1; seed <= 1000; ++seed) {
+        CombatEngine a = rabiesDuel(CombatUnit::make(troop, 10, true), CombatUnit::make(dog, 1, false), seed);
+        CHECK(!a.currentTurn().isPlayer);                         // the dog opens
+        a.doAttack(0);
+        if (a.playerArmy().stacks[0].bitten) ++struck;
+        for (const auto& ev : a.drainEvents())
+            if (ev.type == CombatEvent::Type::Bitten) { ++events; CHECK(ev.isPlayer && ev.stackIndex == 0 && !ev.targetIsPlayer); }
+        CHECK(!a.enemyArmy().stacks[0].bitten);                   // the troop's retaliation never bites back
+
+        CombatEngine b = rabiesDuel(CombatUnit::make(fast, 1, true), CombatUnit::make(dog, 1, false), seed);
+        CHECK(b.currentTurn().isPlayer);                          // the troop strikes; the dog retaliates
+        b.doAttack(0);
+        if (b.playerArmy().stacks[0].bitten) ++retaliated;
+    }
+    CHECK_EQ(events, struck);
+    CHECK(struck >= 70 && struck <= 130);                         // 10% of 1000, fixed seeds
+    CHECK(retaliated >= 70 && retaliated <= 130);
+}
+
+SUITE("Rabies — never bites companions, the enemy side, or without the ability") {
+    const UnitType* dog = rabidType("Rabid Hound", 9);
+    UnitType hero = *aiType("Companion", 1, 1, 1000, 5, 5);
+    hero.id = hero.name = "Companion";
+    s_aiTypes.push_back(hero);
+    const UnitType* companion = &s_aiTypes.back();
+    const UnitType* plainDog = aiType("Plain Dog", 9, 1, 10, 5, 5);
+    const UnitType* troop = aiType("Militia", 1, 1, 1000, 5, 5);
+    int bitten = 0;
+    for (uint32_t seed = 1; seed <= 300; ++seed) {
+        CombatEngine a = rabiesDuel(CombatUnit::companion(companion, 1, true), CombatUnit::make(dog, 1, false), seed);
+        a.doAttack(0);
+        bitten += a.playerArmy().stacks[0].bitten;
+        CombatUnit rabidFriend = CombatUnit::make(dog, 1, true);   // a rabid stack on the player's side
+        CombatEngine b = rabiesDuel(rabidFriend, CombatUnit::make(troop, 10, false), seed);
+        b.doAttack(0);
+        bitten += b.enemyArmy().stacks[0].bitten;
+        CombatEngine c = rabiesDuel(CombatUnit::make(troop, 10, true), CombatUnit::make(plainDog, 1, false), seed);
+        c.doAttack(0);
+        bitten += c.playerArmy().stacks[0].bitten;
+    }
+    CHECK_EQ(bitten, 0);
+}
+
+SUITE("Madness — a bitten stack goes mad about 15% of its turns, and only then") {
+    const UnitType* troop = aiType("Runner", 9, 1, 100, 5, 5);
+    const UnitType* foe = aiType("Target", 1, 1, 100, 5, 5);
+    int mad = 0, events = 0;
+    for (uint32_t seed = 1; seed <= 1000; ++seed) {
+        CombatUnit bitten = CombatUnit::make(troop, 5, true);
+        bitten.bitten = true;
+        CombatEngine eng = rabiesDuel(bitten, CombatUnit::make(foe, 5, false), seed);
+        CHECK(eng.currentTurn().isPlayer);
+        if (eng.activeUnit().mad) ++mad;
+        for (const auto& ev : eng.drainEvents()) events += ev.type == CombatEvent::Type::Madness;
+        CombatEngine calm = rabiesDuel(CombatUnit::make(troop, 5, true), CombatUnit::make(foe, 5, false), seed);
+        CHECK(!calm.activeUnit().mad);
+        CHECK(!calm.doMadTurn());                                  // nothing to play
+    }
+    CHECK_EQ(events, mad);
+    CHECK(mad >= 110 && mad <= 190);                               // 15% of 1000, fixed seeds
+}
+
+SUITE("Madness — the mad stack attacks the nearest stack, even a friend, and takes no orders") {
+    const UnitType* troop = aiType("Painted", 9, 2, 100, 5, 5);
+    const UnitType* friendType = aiType("Slinger", 2, 1, 100, 5, 5);
+    const UnitType* foe = aiType("Raider", 1, 1, 100, 5, 5);
+    int checked = 0;
+    for (uint32_t seed = 1; seed <= 200 && checked < 3; ++seed) {
+        for (int gap : {1, 3}) {                                   // next to it, or a walk away
+            CombatArmy p; p.isPlayer = true;
+            p.stacks.push_back(CombatUnit::make(troop, 5, true));
+            p.stacks.back().bitten = true;
+            p.stacks.push_back(CombatUnit::make(friendType, 5, true));
+            CombatArmy e; e.isPlayer = false;
+            e.stacks.push_back(CombatUnit::make(foe, 5, false));
+            CombatEngine eng(std::move(p), std::move(e), 0, seed);
+            if (!eng.activeUnit().mad) continue;
+            HexCoord friendAt = CombatMap::toHex(1, 2);
+            for (int i = 0; i < gap; ++i) friendAt = friendAt.neighbor(0);
+            eng.teleportUnit(true, 0, CombatMap::toHex(1, 2));
+            eng.teleportUnit(true, 1, friendAt);
+            eng.teleportUnit(false, 0, CombatMap::toHex(9, 2));
+            eng.drainEvents();
+            CombatAI::takeTurn(eng);                               // the AI plays it, though it is the player's stack
+            CHECK(eng.playerArmy().stacks[1].totalHp() < 500);     // the friend was struck
+            CHECK_EQ(eng.enemyArmy().stacks[0].totalHp(), 500);    // the far enemy was not
+            CHECK_EQ(eng.playerArmy().stacks[0].pos.distanceTo(friendAt), 1);
+            bool friendlyFire = false;
+            for (const auto& ev : eng.drainEvents())
+                friendlyFire |= ev.type == CombatEvent::Type::UnitAttacked && !ev.isRetaliation
+                                && ev.isPlayer && ev.targetIsPlayer && ev.targetIndex == 1;
+            CHECK(friendlyFire);
+            CHECK(!eng.playerArmy().stacks[0].mad);                // madness lasts one turn
+            CHECK(eng.playerArmy().stacks[0].bitten);              // the bite stays
+            ++checked;
+        }
+    }
+    CHECK(checked >= 3);
+}
+
 #endif // COMBAT_ENGINE_IMPL

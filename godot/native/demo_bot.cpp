@@ -151,7 +151,7 @@ static void fight(AdventureSession& s) {
 }
 static HexCoord nextStop(AdventureSession& s,HexCoord goal) {
     if (s.heroPos()==goal || !s.route(goal).empty()) return goal;
-    auto path=s.map().findPathWeighted(s.heroPos(),goal,[](const HexCoord&){return false;});
+    auto path=s.map().findPathWeighted(s.heroPos(),goal,[](const HexCoord&){return false;},[&](const HexCoord& c){return s.opened().count(c)>0;});
     for(auto at:path) if(at!=s.heroPos() && s.isEncounter(at)) return at;
     return goal;
 }
@@ -186,7 +186,7 @@ enum class End { Finished, Incomplete, Lost };
 struct Target { HexCoord at; std::string name, why; bool extra=false, bounce=false; };
 
 static std::vector<HexCoord> openPath(const AdventureSession& s,HexCoord goal) {   // ignores guards
-    auto p=s.map().findPathWeighted(s.heroPos(),goal,[](const HexCoord&){return false;});
+    auto p=s.map().findPathWeighted(s.heroPos(),goal,[](const HexCoord&){return false;},[&](const HexCoord& c){return s.opened().count(c)>0;});
     if(!p.empty()) p.erase(p.begin());
     return p;
 }

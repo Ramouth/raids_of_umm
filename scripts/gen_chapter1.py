@@ -3,7 +3,7 @@
 gen_chapter1.py — the four maps of chapter 1, "The Marches".
 
     1.0 The last hunt   a small glade between woods and a stream; two wolf packs
-    1.1 Varenhold       a closed bowl of hills; one way out, east
+    1.1 Varenhold       a closed bowl of hills; one way out, east, over a bridge the keeper shuts
     1.2 The camps       wide river fields; one bridge over the burn
     1.3 The east road   a long ribbon climbing into the foothills; the Greyfangs at its end
 
@@ -172,6 +172,8 @@ class Land:
         self.tiles = {}
         self.locked = set()       # cells the trail cutter must not touch
         self.bridges = set()
+        self.gates = set()        # shut bridges: road on the river, closed until a story "open"
+        self.gate = None          # the shut bridge the story opens, if any
         self.objects = []
         self.road_cells = set()
         self.exit_q = None        # the map ends when the hero walks to q >= exit_q
@@ -261,6 +263,8 @@ class Land:
             if ((q, r) in self.road_cells and ok) or t == "bridge":
                 tile["road"] = True
                 tile["moveCost"] = min(cost, 0.5)
+            if (q, r) in self.gates:
+                tile["passable"] = False             # the story opens it ({"open": [q, r]})
             out_tiles.append(tile)
         radius = max(dist(c, (0, 0)) for c in self.tiles)
         return {"version": 1, "name": self.name, "radius": radius, "ground": "grass",
@@ -339,6 +343,11 @@ def varenhold():
         return "grass"
 
     L.shape(inside, edge, ground, open_edge=lambda q, y: q >= 18 and abs(y - 1) <= 1.2)
+    # A brook across the gap, bank to bank; its one bridge is shut until the dogs are dead.
+    bridge = at(13, 1)
+    bq, br = bridge
+    L.stream([at(13, -6), (bq, br - 2), (bq, br - 1), bridge, (bq, br + 1), (bq, br + 2), at(13, 8)], [bridge])
+    L.gates.add(bridge)
     home = L.place("town", "Varenhold", at(-5, 0), 1)
     L.place("sawmill", "Varen Sawmill", at(-6, -5), 1)
     L.place("quarry", "Varen Quarry", at(-2, 5), 1)
@@ -350,12 +359,14 @@ def varenhold():
     L.place("pickup", "Shepherd's Purse", at(9, -3), 0, "gold")
     L.place("dungeon", "Varen Barrow", at(-9, -2), 0, "sealed")
     L.place("quest_giver", "Vale Rune Stone", at(2, 1))
-    L.place("guard", "Orchard Wolves", at(1, -4.5))
-    L.place("guard", "Ford Wolves", at(6, 3))
-    hollow = L.place("guard", "Hollow Wolves", at(7, -2.5))
+    L.place("guard", "Orchard Dogs", at(1, -4.5))
+    L.place("guard", "Ford Dogs", at(6, 3))
+    hollow = L.place("guard", "Hollow Dogs", at(7, -2.5))
     L.place("quest_giver", "Hooded Stranger", (hollow[0] + 1, hollow[1] - 1), 0, "druid", exact=True)
-    L.finish(home, road=[home, at(1, 0.5), at(9, 1), at(18, 1)])
+    L.place("quest_giver", "Bridge Keeper", (bq - 1, br + 1), exact=True)   # west bank, by the bridge
+    L.finish(home, road=[home, at(1, 0.5), at(9, 1), bridge, at(18, 1)])
     L.exit_q = 15
+    L.gate = bridge
     return L
 
 

@@ -33,7 +33,7 @@
  */
 struct CampaignState {
     using Json = nlohmann::json;
-    struct Stack { std::string id; int count = 0; };
+    struct Stack { std::string id; int count = 0; bool bitten = false; };   // bitten: rabies
     struct Companion {
         std::string id, name, title;
         int level = 1, xp = 0, morale = 0;

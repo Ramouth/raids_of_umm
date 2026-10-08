@@ -421,6 +421,7 @@ CombatAI::Candidate CombatAI::chooseAction(CombatEngine& engine) {
 
 void CombatAI::takeTurn(CombatEngine& engine) {
     if (engine.isOver()) return;
+    if (engine.doMadTurn()) return;   // a mad stack goes for whatever is nearest
     // A witch binds a nearby unbound melee threat before trading damage.
     const auto& foes = engine.activeUnit().isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
     for (int i = 0; i < static_cast<int>(foes.size()); ++i)

@@ -31,6 +31,10 @@ const MARGIN_RINGS := 3
 ## Veil strength by distance from the playable land (rings 0..MARGIN_RINGS+1).
 const MARGIN_FADE := [0.0, 0.42, 0.68, 0.9, 1.0]
 var margin: Dictionary = {}
+## Shut bridges (impassable road over water) -> their gate node; and the cells
+## the story has opened since (snapshot "opened"), walkable from then on.
+var gates: Dictionary = {}
+var opened: Dictionary = {}
 
 func _ready() -> void:
     rebuild()
@@ -39,11 +43,14 @@ func rebuild() -> void:
     for child in get_children():
         child.free()
     anchors.clear()
+    gates.clear()
     mountain_groups.clear()
     margin.clear()
     if not data.read(map_path):
         push_error(data.error)
         return
+    for cell: Vector2i in opened:
+        if data.tiles.has(cell): data.tiles[cell]["passable"] = true
     var edge_points := PackedVector2Array()
     for cell: Vector2i in data.tiles:
         edge_points.append_array(UmmMapData.hexagon(UmmMapData.cell_to_world(cell)))
@@ -397,11 +404,34 @@ func _build_water(parent: Node2D, only: Dictionary = {}) -> void:
             parent.add_child(bank)
     if only.is_empty(): _build_bridges(parent)
 
-## A passable water cell is a bridge: timber planks laid along its road.
+## True for a bridge whose gate is still barred.
+func is_shut_bridge(cell: Vector2i) -> bool:
+    return gates.has(cell) and not opened.has(cell)
+
+## Cells the story opened (snapshot "opened": [[q, r], …]): their gates swing
+## aside and the tiles become walkable for the client's own route and hover logic.
+func set_opened(cells: Array) -> void:
+    for c in cells:
+        var cell := Vector2i(int(c[0]), int(c[1]))
+        if opened.has(cell): continue
+        opened[cell] = true
+        if data.tiles.has(cell): data.tiles[cell]["passable"] = true
+        if gates.has(cell): _show_gate(gates[cell], false)
+
+static func _show_gate(gate: Node2D, shut: bool) -> void:
+    gate.get_node("Barrier").visible = shut
+    gate.get_node("Open").visible = not shut
+    gate.set_meta("shut", shut)
+
+## A passable water cell is a bridge: timber planks laid along its road. A road
+## over water that is not passable is a shut bridge: the same deck, barred by a gate.
 func _build_bridges(parent: Node2D) -> void:
     for cell: Vector2i in data.tiles:
         var tile: Dictionary = data.tiles[cell]
-        if not tile.terrain in WATER_TERRAIN or not tile.get("passable", false) or tile.terrain == "oasis":
+        if not tile.terrain in WATER_TERRAIN or tile.terrain == "oasis":
+            continue
+        var shut: bool = not tile.get("passable", false) and tile.get("road", false)
+        if not tile.get("passable", false) and not shut:
             continue
         var center := UmmMapData.cell_to_world(cell)
         var ends: Array[Vector2] = []
@@ -439,6 +469,60 @@ func _build_bridges(parent: Node2D) -> void:
             seam.width = 1.5
             seam.default_color = Color("5a3e22")
             parent.add_child(seam)
+        if shut or opened.has(cell):
+            var gate := _gate(a.lerp(b, 0.5), (b - a).orthogonal().normalized())
+            gate.name = "Gate_%d_%d" % [cell.x, cell.y]
+            parent.add_child(gate)
+            gates[cell] = gate
+            _show_gate(gate, not opened.has(cell))
+
+## A gate across the deck at `at` (`across` runs from rail to rail): a stout
+## post at each rail always; when shut, two pale beams crossed flat over the deck
+## from rail to rail; when open, only the posts and one beam laid by the rail.
+func _gate(at: Vector2, across: Vector2) -> Node2D:
+    var gate := Node2D.new()
+    var ink := Color("2a1a0e")
+    var wood := Color("5a3e22")
+    var light := Color("c49a5c")
+    var along := across.orthogonal()
+    var barrier := Node2D.new()
+    barrier.name = "Barrier"
+    for d in [1.0, -1.0]:   # an X of beams nailed across the planks, rail to rail
+        barrier.add_child(_beam(at + along * 14.0 * d + across * -14.0, at - along * 14.0 * d + across * 14.0, 8.0, ink, light))
+    gate.add_child(barrier)
+    var leaves := Node2D.new()
+    leaves.name = "Open"
+    leaves.add_child(_beam(at + across * 15.0 + along * 3.0 + Vector2(0, -2), at + across * 15.0 + along * 17.0 + Vector2(0, -2), 5.0, ink, light))
+    gate.add_child(leaves)
+    for side in [-1.0, 1.0]:
+        gate.add_child(_stake(at + across * 16.0 * side, 6.0, 14.0, ink, wood))
+    return gate
+
+## A timber beam from `a` to `b`: an ink outline under a wood fill.
+static func _beam(a: Vector2, b: Vector2, width: float, ink: Color, fill: Color) -> Node2D:
+    var beam := Node2D.new()
+    for layer in [[ink, width + 2.0], [fill, width]]:
+        var line := Line2D.new()
+        line.points = PackedVector2Array([a, b])
+        line.default_color = layer[0]
+        line.width = layer[1]
+        beam.add_child(line)
+    return beam
+
+## One upright pointed stake standing on `foot`, outlined in `ink`.
+static func _stake(foot: Vector2, width: float, height: float, ink: Color, fill: Color) -> Polygon2D:
+    var half := width / 2.0
+    var shape := PackedVector2Array([foot + Vector2(-half, 0), foot + Vector2(-half, -height), foot + Vector2(0, -height - half - 2),
+        foot + Vector2(half, -height), foot + Vector2(half, 0)])
+    var outline := Polygon2D.new()
+    var grown := Geometry2D.offset_polygon(shape, 1.0)
+    outline.polygon = grown[0] if not grown.is_empty() else shape
+    outline.color = ink
+    var body := Polygon2D.new()
+    body.polygon = shape
+    body.color = fill
+    outline.add_child(body)
+    return outline
 
 ## The rings of land around the map: each takes the terrain of the map cell
 ## it grew from, so forest runs on as forest and water as water.

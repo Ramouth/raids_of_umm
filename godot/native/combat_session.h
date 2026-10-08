@@ -12,6 +12,8 @@ public:
     Json start(const std::string& data_dir, const Json& army, const Json& encounter);
     // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
     // the enemy on (q, r) after walking to the standing hex (fq, fr).
+    // A mad stack (rabies) refuses orders: the snapshot says "mad_turn" and
+    // "player_turn": false, and the caller plays it with "ai".
     Json command(const std::string& action, int q = 0, int r = 0, int fq = 0, int fr = 0);
     // Player-chosen route: walk `route` ([[q, r], ...], ending on the
     // destination), then for "strike" attack the enemy on (q, r).

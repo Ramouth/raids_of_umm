@@ -93,10 +93,12 @@ public:
                                    const HexCoord& to) const;
 
     // Path with weighted movement costs (uses MapTile::moveCost).
-    // 'blocked' marks extra impassable cells (e.g. guarded hexes) for this query.
+    // 'blocked' marks extra impassable cells (e.g. guarded hexes) for this query;
+    // 'opened' marks impassable tiles a session has opened (e.g. a gate).
     std::vector<HexCoord> findPathWeighted(const HexCoord& from,
                                            const HexCoord& to,
-                                           const std::function<bool(const HexCoord&)>& blocked = {}) const;
+                                           const std::function<bool(const HexCoord&)>& blocked = {},
+                                           const std::function<bool(const HexCoord&)>& opened = {}) const;
 
     // ── Metadata ─────────────────────────────────────────────────────────────
 

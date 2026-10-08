@@ -4,7 +4,8 @@
 // triggers, seed); loading replays start() and then applies what changed
 // during play. Saves are only taken between actions, never mid-battle.
 // Version 2 adds the story flags and the map's level cap and its stats;
-// version 1 saves still load (no flags, cap 10).
+// version 1 saves still load (no flags, cap 10). Later optional fields (older
+// saves load without them): a stack's "bitten" (rabies) and "opened" tiles.
 #include "AdventureSession.h"
 
 using Json = Scenario::Json;
@@ -23,12 +24,15 @@ ResourcePool poolFrom(const Json& j) {
 
 Json stacksJson(const std::vector<AdventureSession::Stack>& stacks) {
     Json out = Json::array();
-    for (const auto& s : stacks) out.push_back({{"id", s.id}, {"count", s.count}});
+    for (const auto& s : stacks) {
+        out.push_back({{"id", s.id}, {"count", s.count}});
+        if (s.bitten) out.back()["bitten"] = true;   // omitted when false
+    }
     return out;
 }
 std::vector<AdventureSession::Stack> stacksFrom(const Json& j) {
     std::vector<AdventureSession::Stack> out;
-    for (const auto& s : j) out.push_back({s.value("id", ""), s.value("count", 0)});
+    for (const auto& s : j) out.push_back({s.value("id", ""), s.value("count", 0), s.value("bitten", false)});
     return out;
 }
 
@@ -80,6 +84,8 @@ Json AdventureSession::saveState() const {
     for (const auto& [c, w] : m_siteWeek) siteWeeks.push_back({c.q, c.r, w});
     Json visited = Json::array();
     for (const auto& c : m_visitedOnce) visited.push_back(cellJson(c));
+    Json opened = Json::array();
+    for (const auto& c : m_opened) opened.push_back(cellJson(c));
     return {
         {"version", 2},
         {"flags", m_flags},
@@ -87,6 +93,7 @@ Json AdventureSession::saveState() const {
         {"fieldwork_stock", m_fieldworkStock},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
         {"stables_week", m_stablesWeek},
+        {"opened", opened},
         {"hero_progress", {m_heroProgress.level, m_heroProgress.xp}},
         {"path", m_path}, {"learned", Json(m_learned)},
         {"start", {{"map", m_startArgs->map}, {"data", m_startArgs->data}, {"encounters", m_startArgs->encounters},
@@ -202,6 +209,10 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             m_heroProgress = {hp.at(0).get<int>(), hp.at(1).get<int>()};
         }
         m_fieldworkStock = save.value("fieldwork_stock", std::map<std::string, int>{});
+        if (save.contains("opened")) {            // older saves keep what the replayed start opened
+            m_opened.clear();
+            for (const auto& c : save.at("opened")) m_opened.insert(cellFrom(c));
+        }
         m_path = save.value("path", std::string{});
         m_learned = save.value("learned", std::vector<std::string>{});
         m_levelUps.clear();

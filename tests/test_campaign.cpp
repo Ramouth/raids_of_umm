@@ -348,3 +348,100 @@ SUITE("Campaign — save and load round trip") {
     CHECK(back.state().toJson() == camp.state().toJson());
     CHECK(back.loadFile(f.path("missing.json")).has_value());
 }
+
+// ── Rabies: the bitten mark outside battle ────────────────────────────────────
+
+SUITE("Rabies — the bitten mark merges, survives a save and a campaign carry, and dies with its stack") {
+    Fixture f;
+    AdventureSession a;
+    CHECK(!a.start(f.path("maps/b.json"), "data", "", 1, f.path("maps/b.triggers.json")));
+    a.setArmy({{"woad_runner", 6}, {"woad_runner", 4, true}, {"cruth_slinger", 5}});   // merged: bitten
+    CHECK(a.isBitten("woad_runner"));
+    CHECK(!a.isBitten("cruth_slinger"));
+    CHECK(a.army()[0].id == "woad_runner" && a.army()[0].count == 10 && a.army()[0].bitten);
+    a.scenario().run(a, Json::parse(R"([{"troops": [{"id": "woad_runner", "count": 2}]}])"));
+    CHECK(a.isBitten("woad_runner"));                           // reinforcements join a bitten stack
+
+    Json save = a.saveState();
+    AdventureSession b;
+    CHECK(!b.loadState(save));
+    CHECK(b.isBitten("woad_runner") && !b.isBitten("cruth_slinger"));
+    save["army"] = Json::parse(R"([{"id": "woad_runner", "count": 12}])");   // an older save: no "bitten"
+    AdventureSession old;
+    CHECK(!old.loadState(save));
+    CHECK(!old.isBitten("woad_runner"));
+
+    CampaignState carried = CampaignState::fromJson(a.carryOut().toJson());
+    AdventureSession c;
+    CHECK(!c.start(f.path("maps/a.json"), "data", "", 1, "", carried));
+    CHECK(c.isBitten("woad_runner") && !c.isBitten("cruth_slinger"));
+
+    c.setArmy({{"cruth_slinger", 5}});                         // the bitten stack died out
+    CHECK(!c.isBitten("woad_runner"));
+    c.setArmy({{"cruth_slinger", 5}, {"woad_runner", 3}});      // fresh recruits are clean
+    CHECK(!c.isBitten("woad_runner"));
+}
+
+SUITE("Rabies — a night in your own town tends the bitten; a night in the field does not") {
+    Fixture f;
+    AdventureSession s;
+    CHECK(!s.start(f.path("maps/b.json"), "data", "", 1, f.path("maps/b.triggers.json")));
+    const HexCoord home{-3, 0};
+    CHECK(s.heroPos() == home && s.owner(home) == Faction::Player);
+    std::string event = s.endDay();                            // nobody bitten: nothing to tend
+    CHECK(s.tendedIn().empty());
+    CHECK(event.find("tended") == std::string::npos);
+    s.setArmy({{"woad_runner", 10, true}});
+    s.travel({0, 0});
+    CHECK(s.heroPos() == HexCoord(0, 0));
+    s.endDay();
+    CHECK(s.isBitten("woad_runner"));                          // out in the field
+    CHECK(s.tendedIn().empty());
+    s.travel(home);
+    CHECK(s.heroPos() == home);
+    event = s.endDay();
+    CHECK(!s.isBitten("woad_runner"));
+    CHECK(s.tendedIn() == "Home");
+    CHECK(event.find("The bitten are tended in Home.") != std::string::npos);
+    CHECK(!s.army()[0].bitten);
+}
+
+// ── Gates: a closed tile the story opens ──────────────────────────────────────
+
+SUITE("Gate — a closed bridge blocks the route until \"open\"; the opening survives a save, not a new map") {
+    Fixture f;
+    WorldMap map = smallMap();
+    for (const auto& [c, t] : smallMap())                       // a river cuts the map at q == 0
+        if (c.q == 0) map.setTile(c, makeTile(Terrain::Lake));
+    MapTile bridge = makeTile(Terrain::River);
+    bridge.passable = false;                                     // the gatekeeper's bridge, shut
+    bridge.road = true;
+    bridge.moveCost = 1.0f;
+    map.setTile({0, 0}, bridge);
+    CHECK(!map.saveJson(f.path("maps/gate.json")));
+    WorldMap reread;
+    CHECK(!reread.loadJson(f.path("maps/gate.json")));
+    CHECK(!reread.tileAt(HexCoord(0, 0))->passable && reread.tileAt(HexCoord(0, 0))->terrain == Terrain::River);
+
+    AdventureSession s;
+    CHECK(!s.start(f.path("maps/gate.json"), "data", "", 1, f.path("maps/b.triggers.json")));
+    const HexCoord across{3, 0};
+    CHECK(s.route(across).empty());
+    CHECK(!s.passable(HexCoord(0, 0)));
+    Json closed = s.saveState();
+    s.scenario().run(s, Json::parse(R"([{"open": [0, 0]}])"));
+    CHECK(s.passable(HexCoord(0, 0)));
+    auto path = s.route(across);
+    CHECK(!path.empty() && std::find(path.begin(), path.end(), HexCoord(0, 0)) != path.end());
+
+    AdventureSession loaded;
+    CHECK(!loaded.loadState(s.saveState()));
+    CHECK(!loaded.route(across).empty());
+    CHECK(loaded.opened().count(HexCoord(0, 0)) == 1);
+    CHECK(!loaded.loadState(closed));                            // a save from before the gate opened
+    CHECK(loaded.route(across).empty());
+
+    AdventureSession next;                                       // per map: the next map starts shut
+    CHECK(!next.start(f.path("maps/gate.json"), "data", "", 1, "", s.carryOut()));
+    CHECK(next.route(across).empty());
+}

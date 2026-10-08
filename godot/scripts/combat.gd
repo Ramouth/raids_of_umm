@@ -7,6 +7,10 @@ const DIM := Color("a8977a")
 const FRIEND := Color("9fd4b4")
 const FOE := Color("ff9f86")
 const GOLD := Color("f7d580")
+const MAD := Board.MAD_COLOR
+## What a bite means, said wherever a bitten stack is described.
+const BITE_RULE := "each of its turns it may go mad (15%) and attack the nearest stack, friend or foe"
+const CURE_RULE := "End the day in a town you hold to cure it"
 var bridge: RefCounted
 var state: Dictionary = {}
 var units: Dictionary = {}   # key -> unit dictionary of the current state
@@ -55,6 +59,8 @@ var _orders_list: VBoxContainer
 var _fieldwork_box: VBoxContainer
 var _fieldwork_kind := "barricade"
 var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
+## The stack taken by madness this turn: its blows are logged as madness, not orders.
+var _mad_key := ""
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -309,8 +315,16 @@ func _consume(reply: Dictionary) -> void:
     board.set_hover("", "")
     _refresh()
     var strike := {}   # the attack event whose damage comes next
+    _mad_key = str(state.get("active", "")) if state.get("mad_turn", false) else ""
     for event in reply.events:
         match event.type:
+            "bitten":
+                var cure := (" " + CURE_RULE + ".") if units.has(event.unit) and units[event.unit].player else ""
+                _log("%s is BITTEN by %s and carries the rabies: %s.%s" % [_unit_label(event.unit), _unit_label(event.target), BITE_RULE, cure], MAD)
+            "madness":
+                _mad_key = event.unit
+                var side := "Your" if units.has(event.unit) and units[event.unit].player else "The enemy's"
+                _log("%s %s HAS GONE MAD from a rabid bite: it takes no orders this turn and attacks the nearest stack, friend or foe." % [side, _unit_label(event.unit)], MAD)
             "curse": _log("%s casts Binding Thread on %s: d6 = %d — %s." % [_unit_name(event.unit), _unit_name(event.target), int(event.roll), ("Bound and slowed" if event.get("slows", false) else "Weakened") if int(event.roll) >= 3 else "Resisted"], GOLD, event.target)
             "attack": strike = event
             "damage": _log_damage(event, strike)
@@ -355,6 +369,11 @@ func _log_damage(event: Dictionary, strike: Dictionary) -> void:
             return
         var pinned := " PINNED (+50%, no retaliation)" if strike.flanked else ""
         if strike.get("blocked", false): pinned += " through the ranks (blocked shot: half damage)"
+        if strike.unit == _mad_key and not _mad_key.is_empty():
+            var own_side: bool = units.has(strike.unit) and units.has(victim) and units[strike.unit].player == units[victim].player
+            var why := "its own side" if own_side else "the nearest stack"
+            _log("In its madness %s %s %s (%s)%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), why, pinned, outcome], MAD)
+            return
         _log("%s %s %s%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), pinned, outcome], TEXT, strike.unit)
 
 func _unit_name(key: String) -> String:
@@ -393,6 +412,9 @@ func _refresh() -> void:
         elif _opening() > 0:
             turn_label.text = "BEFORE BATTLE   ·   MARSHAL: CHOOSE WHO ACTS FIRST"
             turn_label.add_theme_color_override("font_color", GOLD)
+        elif state.get("mad_turn", false):
+            turn_label.text = "ROUND %d   ·   %s HAS GONE MAD" % [state.get("round", 1), _unit_label(state.get("active", "")).to_upper()]
+            turn_label.add_theme_color_override("font_color", MAD)
         else:
             turn_label.text = "ROUND %d   ·   %s   ·   %s" % [state.get("round", 1), _unit_label(state.get("active", "")), whose]
             turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
@@ -482,6 +504,7 @@ func _portrait(key: String, active: bool, upcoming := false, place := 1) -> Cont
     frame.name = ("Next_" if upcoming else "Turn_") + key
     frame.custom_minimum_size = Vector2(62, 70)
     frame.tooltip_text = "%s ×%d · %s · Speed %d + d6 %d = initiative %d" % [unit.name, unit.count, "yours" if unit.player else "enemy", unit.speed, int(unit.get("initiative_roll", 0)), int(unit.get("initiative_score", unit.speed))]
+    if unit.get("bitten", false): frame.tooltip_text += "\nBITTEN (rabies): " + BITE_RULE + "."
     var style := StyleBoxFlat.new()
     style.bg_color = Color("26372c") if unit.player else Color("3f2320")
     style.border_color = GOLD if active else (FRIEND if unit.player else FOE)
@@ -516,6 +539,11 @@ func _portrait(key: String, active: bool, upcoming := false, place := 1) -> Cont
     number.add_theme_constant_override("outline_size", 5)
     number.mouse_filter = Control.MOUSE_FILTER_IGNORE
     frame.add_child(number)
+    if unit.get("bitten", false):
+        var bite := Board._bite_mark()
+        bite.position = Vector2(52, 10)
+        bite.visible = true
+        frame.add_child(bite)
     if _opening() > 0 and unit.player and not upcoming:
         frame.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
         frame.tooltip_text += " · Click to choose or remove a Marshal opening order"
@@ -593,6 +621,12 @@ func _inspect(unit: Dictionary) -> void:
         notes.append("BOUND: moves and initiative reduced for %d more turn(s)" % int(unit.bound_turns))
     if "binding_thread" in unit.get("abilities", []) and int(unit.get("level", 1)) < 3:
         lines.append("At level 3, Binding Thread also slows its target.")
+    if unit.get("mad", false):
+        lines.append("[color=#%s][b]MAD[/b] this turn: takes no orders and attacks the nearest stack, friend or foe[/color]" % MAD.to_html(false))
+    if unit.get("bitten", false):
+        lines.append("[color=#%s][b]BITTEN[/b] (rabies): %s. %s.[/color]" % [MAD.to_html(false), BITE_RULE, CURE_RULE])
+    if "rabid" in unit.get("abilities", []):
+        lines.append("[color=#%s]Rabid: 1 bite in 10 that lands infects the stack it hits[/color]" % MAD.to_html(false))
     if unit.defending: notes.append("DEFENDING: +25% defence until its next turn")
     notes.append("retaliation used this round" if unit.get("retaliated", false) else "will retaliate once this round")
     var acted := false
@@ -802,7 +836,8 @@ func _update_status() -> void:
         text = "[b]TACTICS[/b]: click up to %d stack%s to act first · %s · Enter" % [
             _opening(), "" if _opening() == 1 else "s", (" → ".join(chosen)) if not chosen.is_empty() else "none: usual order"]
     elif not my_turn:
-        if auto_battle: text = "Auto-battle: the AI commands your stacks. Untick Auto-battle to take over."
+        if state.get("mad_turn", false) and not busy: text = "[color=#%s]%s is mad (rabid bite): it attacks the nearest stack, friend or foe.[/color]" % [MAD.to_html(false), _unit_label(state.get("active", ""))]
+        elif auto_battle: text = "Auto-battle: the AI commands your stacks. Untick Auto-battle to take over."
         elif busy: text = "Resolving…"
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
         if not unit.is_empty(): text = "%s (%s) — right-click to keep its details on screen." % [_unit_label(unit.key), "yours" if unit.player else "enemy"]
@@ -1144,8 +1179,13 @@ func _show_result() -> void:
     turn_label.add_theme_color_override("font_color", GOLD)
     _log(turn_label.text, GOLD)
     var survivors: Array[String] = []
-    for unit in state.survivors: survivors.append("%d %s" % [unit.count, str(unit.id).replace("_", " ")])
+    var bitten := false
+    for unit in state.survivors:
+        survivors.append("%d %s%s" % [unit.count, str(unit.id).replace("_", " "), " (bitten)" if unit.get("bitten", false) else ""])
+        bitten = bitten or unit.get("bitten", false)
     var text := "[b]SURVIVORS[/b]\n" + (", ".join(survivors) if not survivors.is_empty() else "None") + "\n\n"
+    if bitten:
+        text += "[color=#%s][b]BITTEN[/b]: bitten stacks may go mad in the next battle. End the day in a town you hold to cure them.[/color]\n\n" % MAD.to_html(false)
     var fallen: Array = state.get("fallen", [])
     if not fallen.is_empty():
         var names: Array[String] = []

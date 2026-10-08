@@ -65,7 +65,7 @@ std::vector<StoryObjective> storyObjectives(const AdventureSession& s) {
             // Every path east crosses the column q == q_min, so its open tiles are the targets.
             const int q = when.value("q_min", 999);
             for (const auto& [c, tile] : s.map()) {
-                if (c.q != q || !tile.passable || s.isEncounter(c) || s.map().objectAt(c)) continue;
+                if (c.q != q || !s.passable(c) || s.isEncounter(c) || s.map().objectAt(c)) continue;
                 add("the road east (" + std::to_string(c.q) + "," + std::to_string(c.r) + ")", c, event, id, ready);
             }
         } else if (event == "rival_beaten") {

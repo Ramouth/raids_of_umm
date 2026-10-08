@@ -35,6 +35,7 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy, int initiativeDi
         CombatUnit& firstUnit = first.isPlayer ? m_player.stacks[first.stackIndex]
                                                : m_enemy.stacks[first.stackIndex];
         awardScXp(firstUnit, first, firstUnit.perTurnXp);
+        rollMadness(first);
     }
 }
 
@@ -360,16 +361,22 @@ bool CombatEngine::doAttackFrom(HexCoord from, int targetIndex) {
 
 void CombatEngine::resolveAttack(int targetIndex) {
     if (isOver()) return;
+    resolveAttackOn(!currentTurn().isPlayer, targetIndex);
+}
+
+void CombatEngine::resolveAttackOn(bool targetIsPlayer, int targetIndex) {
+    if (isOver()) return;
 
     TurnSlot& slot = m_queue[m_turn];
     CombatUnit& attacker = slot.isPlayer ? m_player.stacks[slot.stackIndex]
                                          : m_enemy.stacks[slot.stackIndex];
-    auto& enemyStacks = slot.isPlayer ? m_enemy.stacks : m_player.stacks;
+    auto& enemyStacks = targetIsPlayer ? m_player.stacks : m_enemy.stacks;
+    const bool friendlyFire = targetIsPlayer == slot.isPlayer;   // a mad stack turns on its own
 
     // Bounds and liveness guard — silently ignore invalid or dead targets.
     if (targetIndex < 0 || targetIndex >= static_cast<int>(enemyStacks.size())) return;
     CombatUnit& target = enemyStacks[targetIndex];
-    if (target.isDead()) return;
+    if (target.isDead() || &target == &attacker) return;
 
     // Determine if ranged: unit has shots, has ammo, and target is not adjacent
     bool isRanged = canShoot(attacker)
@@ -384,7 +391,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
     // Flanking / Pinned: target has attackers on two opposite hex sides.
     // Pinned units take 150% damage and lose their retaliation.
     const auto& friendlyStacks = slot.isPlayer ? m_player.stacks : m_enemy.stacks;
-    bool pinned = !isRanged && isFlanked(target, friendlyStacks);
+    bool pinned = !isRanged && !friendlyFire && isFlanked(target, friendlyStacks);
     if (pinned) {
         target.hasRetaliated = true;  // suppress retaliation before it fires
         std::cout << "[CombatEngine] " << target.type->name << " is PINNED — no retaliation, +50% damage\n";
@@ -396,7 +403,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
         ev.type           = CombatEvent::Type::UnitAttacked;
         ev.isPlayer       = slot.isPlayer;
         ev.stackIndex     = slot.stackIndex;
-        ev.targetIsPlayer = !slot.isPlayer;
+        ev.targetIsPlayer = targetIsPlayer;
         ev.targetIndex    = targetIndex;
         ev.wasFlanked     = pinned;
         ev.blockedShot    = blocked;
@@ -417,7 +424,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
     int rawDef    = target.effectiveDefense();
     int reducedDef = knife ? rawDef : static_cast<int>(rawDef * (1.0f - attacker.type->defBypassRatio));
 
-    const bool targetKilled = hitStack(!slot.isPlayer, targetIndex, damage, !isRanged);
+    const bool targetKilled = hitStack(targetIsPlayer, targetIndex, damage, !isRanged, &attacker);
 
     std::cout << "[CombatEngine] " << attacker.type->name
               << " attacks " << target.type->name
@@ -425,7 +432,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
               << " [" << atName << " | effDef " << rawDef << "→" << reducedDef << "]"
               << " (" << target.count << " survivors)\n";
 
-    if (targetKilled) {
+    if (targetKilled && !friendlyFire) {
         awardScXp(attacker, slot, attacker.killXp);   // kill XP if the attacker is an SC
         gainRenown(attacker);
     }
@@ -437,7 +444,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
         {
             CombatEvent ev;
             ev.type           = CombatEvent::Type::UnitAttacked;
-            ev.isPlayer       = !slot.isPlayer;   // retaliator
+            ev.isPlayer       = targetIsPlayer;   // retaliator
             ev.stackIndex     = targetIndex;
             ev.targetIsPlayer = slot.isPlayer;
             ev.targetIndex    = slot.stackIndex;
@@ -448,7 +455,7 @@ void CombatEngine::resolveAttack(int targetIndex) {
         int retDamage = calcDamage(target, attacker, m_rng, true);
         if (meleePenalty(target)) retDamage = std::max(1, retDamage / 2);        // a shooter strikes back weakly
         target.hasRetaliated = true;
-        if (hitStack(slot.isPlayer, slot.stackIndex, retDamage, true)) gainRenown(target);
+        if (hitStack(slot.isPlayer, slot.stackIndex, retDamage, true, &target) && !friendlyFire) gainRenown(target);
 
         std::cout << "[CombatEngine] " << target.type->name
                   << " retaliates for " << retDamage << " damage"
@@ -476,6 +483,74 @@ void CombatEngine::resolveAttack(int targetIndex) {
     }
     m_strikeOrigin.reset();
     advance();
+}
+
+// ── Rabies ────────────────────────────────────────────────────────────────────
+
+void CombatEngine::maybeBite(const CombatUnit* striker, bool targetIsPlayer, int targetIndex) {
+    if (!striker || !isRabid(*striker) || !targetIsPlayer) return;
+    CombatUnit& victim = m_player.stacks[targetIndex];
+    if (victim.isDead() || victim.isSpecialCharacter || victim.bitten) return;
+    if (std::uniform_int_distribution<int>(1, 100)(m_rng) > kBiteChance) return;
+    victim.bitten = true;
+    CombatEvent ev;
+    ev.type           = CombatEvent::Type::Bitten;
+    ev.isPlayer       = true;
+    ev.stackIndex     = targetIndex;
+    ev.targetIsPlayer = striker->isPlayer;
+    ev.targetIndex    = static_cast<int>(striker - (striker->isPlayer ? m_player.stacks.data() : m_enemy.stacks.data()));
+    m_events.push_back(ev);
+    std::cout << "[CombatEngine] " << victim.type->name << " is bitten\n";
+}
+
+void CombatEngine::rollMadness(const TurnSlot& slot) {
+    CombatUnit& unit = (slot.isPlayer ? m_player : m_enemy).stacks[slot.stackIndex];
+    unit.mad = false;
+    if (!unit.bitten || unit.isDead() || unit.isSpecialCharacter) return;
+    if (std::uniform_int_distribution<int>(1, 100)(m_rng) > kMadnessChance) return;
+    unit.mad = true;
+    CombatEvent ev;
+    ev.type       = CombatEvent::Type::Madness;
+    ev.isPlayer   = slot.isPlayer;
+    ev.stackIndex = slot.stackIndex;
+    m_events.push_back(ev);
+    std::cout << "[CombatEngine] " << unit.type->name << " goes mad\n";
+}
+
+bool CombatEngine::doMadTurn() {
+    if (isOver() || hasPendingChoice() || !activeUnit().mad) return false;
+    const TurnSlot slot = currentTurn();
+    CombatUnit& actor = (slot.isPlayer ? m_player : m_enemy).stacks[slot.stackIndex];
+    // The nearest living stack, friend or foe.
+    bool victimSide = true;
+    int victim = -1, nearest = INT_MAX;
+    for (bool side : {true, false}) {
+        const auto& stacks = side ? m_player.stacks : m_enemy.stacks;
+        for (int i = 0; i < static_cast<int>(stacks.size()); ++i) {
+            if (stacks[i].isDead() || &stacks[i] == &actor) continue;
+            const int d = stacks[i].pos.distanceTo(actor.pos);
+            if (d < nearest) { nearest = d; victimSide = side; victim = i; }
+        }
+    }
+    if (victim < 0) { advance(); return true; }
+    const HexCoord at = (victimSide ? m_player : m_enemy).stacks[victim].pos;
+    if (nearest == 1 || (canShoot(actor) && clearTerrainSight(actor.pos, at))) {
+        resolveAttackOn(victimSide, victim);
+        return true;
+    }
+    // Walk next to it if it can (shortest walk), else as close as it can get.
+    HexCoord best = actor.pos;
+    int bestKey = INT_MAX;
+    for (const HexCoord& h : reachableFor(actor)) {
+        const int key = h.distanceTo(at) * 1000 + static_cast<int>(walkTo(actor, h).size());
+        if (key < bestKey) { bestKey = key; best = h; }
+    }
+    if (best.distanceTo(at) >= nearest) { advance(); return true; }   // nowhere closer: it snarls in place
+    const bool strike = best.distanceTo(at) == 1;
+    if (!arrive(best, {})) { advance(); return true; }                // cut down on the way
+    if (strike && !(victimSide ? m_player : m_enemy).stacks[victim].isDead()) resolveAttackOn(victimSide, victim);
+    else advance();
+    return true;
 }
 
 void CombatEngine::gainRenown(CombatUnit& victor) {
@@ -857,7 +932,8 @@ void CombatEngine::applyDamage(CombatUnit& target, int damage) {
     }
 }
 
-bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee) {
+bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee,
+                            const CombatUnit* striker) {
     auto& stacks = targetIsPlayer ? m_player.stacks : m_enemy.stacks;
     CombatUnit& target = stacks[targetIndex];
     auto emitDamage = [&](int index, int amount, int before, bool guard) {
@@ -886,10 +962,12 @@ bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bo
         const int before = stacks[guard].count;
         applyDamage(stacks[guard], share);
         emitDamage(guard, share, before, true);
+        maybeBite(striker, targetIsPlayer, guard);
     }
     const int before = target.count;
     applyDamage(target, damage);
     emitDamage(targetIndex, damage, before, false);
+    maybeBite(striker, targetIsPlayer, targetIndex);
     if (guard >= 0 && stacks[guard].isDead()) refreshAuras();
     if (target.isDead()) refreshAuras();
     return target.isDead();
@@ -915,7 +993,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
         m_events.push_back(blow);
         int damage = calcDamage(g, actor, m_rng, true);
         if (meleePenalty(g)) damage /= 2;
-        if (hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), true)) return false;   // cut down mid-step
+        if (hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), true, &g)) return false;   // cut down mid-step
     }
     // Who may react is judged before the mover arrives (it may end up adjacent).
     std::vector<int> ready;
@@ -952,7 +1030,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
         m_events.push_back(shot);
         int damage = static_cast<int>(calcDamage(s, actor, m_rng) * kReactionFactor);
         if (blocked) damage /= 2;
-        hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), false);
+        hitStack(slot.isPlayer, slot.stackIndex, std::max(1, damage), false, &s);
     }
     return !actor.isDead();
 }
@@ -1124,6 +1202,8 @@ bool CombatEngine::setOpeningOrder(const std::vector<int>& playerStacks, int lim
         // The opening turn's experience goes to whoever actually opens.
         CombatUnit& opener = now.isPlayer ? m_player.stacks[now.stackIndex] : m_enemy.stacks[now.stackIndex];
         awardScXp(opener, m_queue[0], opener.perTurnXp);
+        (before.isPlayer ? m_player : m_enemy).stacks[before.stackIndex].mad = false;   // it has not started its turn
+        rollMadness(m_queue[0]);
     }
     return true;
 }
@@ -1137,6 +1217,7 @@ void CombatEngine::advance() {
     const auto completed = currentTurn();
     auto& actor = (completed.isPlayer ? m_player : m_enemy).stacks[completed.stackIndex];
     if (actor.curseTurns > 0 && --actor.curseTurns == 0) actor.curseSlows = false;
+    actor.mad = false;   // madness lasts one turn
     ++m_turn;
 
     // Skip any stacks that died mid-round (retaliation, splash, etc.)
@@ -1168,6 +1249,7 @@ void CombatEngine::advance() {
                                                  : m_enemy.stacks[newSlot.stackIndex];
         newActive.isDefending = false;   // a defensive stance lasts until the stack's next turn (HoMM3)
         awardScXp(newActive, newSlot, newActive.perTurnXp);
+        rollMadness(newSlot);
     }
 }
 

@@ -118,6 +118,9 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
     m_won = false;
     m_ruledOut.clear();
     m_items.clear();
+    m_bitten.clear();
+    m_tendedIn.clear();
+    m_opened.clear();
     m_scenario = Scenario{};
     m_rivals.clear();
     m_rivalMoves.clear();
@@ -232,7 +235,7 @@ void AdventureSession::applyCarry(const CampaignState& carry) {
         m_path = carry.path;
         m_learned = carry.learned;
         std::vector<Stack> stacks;
-        for (const auto& st : carry.army) stacks.push_back({st.id, st.count});
+        for (const auto& st : carry.army) stacks.push_back({st.id, st.count, st.bitten});
         setArmy(stacks);
         m_items = {carry.items.begin(), carry.items.end()};
         m_equipped = carry.equipped;
@@ -256,7 +259,7 @@ CampaignState AdventureSession::carryOut() const {
     out.xp = m_heroProgress.xp;
     out.path = m_path;
     out.learned = m_learned;
-    for (const auto& st : army()) out.army.push_back({st.id, st.count});
+    for (const auto& st : army()) out.army.push_back({st.id, st.count, st.bitten});
     out.items = {m_items.begin(), m_items.end()};
     std::sort(out.items.begin(), out.items.end());
     out.equipped = m_equipped;
@@ -322,12 +325,13 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
 
 std::vector<HexCoord> AdventureSession::route(const HexCoord& to) const {
     if (to == m_hero.pos) return {};
+    auto opened = [&](const HexCoord& c) { return m_opened.count(c) > 0; };
     // Prefer a route that skirts guard zones; if none exists, walk into one.
     auto path = m_map.findPathWeighted(m_hero.pos, to,
-        [&](const HexCoord& c) { return c != to && (isEncounter(c) || guardZoneAt(c)); });
+        [&](const HexCoord& c) { return c != to && (isEncounter(c) || guardZoneAt(c)); }, opened);
     if (path.size() < 2)
         path = m_map.findPathWeighted(m_hero.pos, to,
-            [&](const HexCoord& c) { return c != to && isEncounter(c); });
+            [&](const HexCoord& c) { return c != to && isEncounter(c); }, opened);
     if (path.size() < 2) return {};
     path.erase(path.begin());
     return path;
@@ -518,8 +522,7 @@ bool AdventureSession::betray(const std::string& objectName, const std::string& 
     if (at == m_hero.pos)                     // the band forms up beside the hero
         for (int d = 0; d < 6; ++d) {
             HexCoord nb = obj->pos.neighbor(d);
-            const MapTile* t = m_map.tileAt(nb);
-            if (t && t->passable && !isEncounter(nb) && !m_map.objectAt(nb)) { at = nb; break; }
+            if (passable(nb) && !isEncounter(nb) && !m_map.objectAt(nb)) { at = nb; break; }
         }
     Rival r;
     r.id   = static_cast<int>(m_rivals.size()) + 1;
@@ -548,8 +551,7 @@ int AdventureSession::turncoats(const std::string& unitId, const std::string& ba
     HexCoord at = m_hero.pos;
     for (int d = 0; d < 6; ++d) {
         HexCoord nb = m_hero.pos.neighbor(d);
-        const MapTile* t = m_map.tileAt(nb);
-        if (t && t->passable && !isEncounter(nb) && !m_map.objectAt(nb) && !rivalAt(nb)) { at = nb; break; }
+        if (passable(nb) && !isEncounter(nb) && !m_map.objectAt(nb) && !rivalAt(nb)) { at = nb; break; }
     }
     Rival r;
     r.id   = static_cast<int>(m_rivals.size()) + 1;
@@ -822,6 +824,15 @@ std::string AdventureSession::endDay() {
     // TurnManager ticks weekly growth on day 7, 14, 21 …
     if (event.empty() && dayOfWeek() == 7)
         event = "Recruits gather in the towns for the coming week.";
+    // A night under a roof of your own cures the bitten.
+    m_tendedIn.clear();
+    const MapObjectDef* here = m_map.objectAt(m_hero.pos);
+    if (!m_bitten.empty() && here && here->type == ObjType::Town && owner(m_hero.pos) == Faction::Player) {
+        m_bitten.clear();
+        m_tendedIn = here->name;
+        const std::string note = "The bitten are tended in " + here->name + ".";
+        event = event.empty() ? note : event + " " + note;
+    }
     m_scenario.fire(*this, "night", {{"day", day()}});
     m_scenario.fire(*this, "day", {{"day", day()}});
     return event;
@@ -832,15 +843,16 @@ std::string AdventureSession::endDay() {
 std::vector<AdventureSession::Stack> AdventureSession::army() const {
     std::vector<Stack> out;
     for (const auto& slot : m_hero.army)
-        if (!slot.isEmpty()) out.push_back({slot.unitType->id, slot.count});
+        if (!slot.isEmpty()) out.push_back({slot.unitType->id, slot.count, isBitten(slot.unitType->id)});
     return out;
 }
 
 void AdventureSession::setArmy(const std::vector<Stack>& stacks) {
     m_hero.army = {};
+    m_bitten.clear();   // a stack that died out (or left) loses its mark
     for (const auto& s : stacks)
-        if (const UnitType* u = m_resources->unit(s.id); u && s.count > 0)
-            m_hero.addUnit(u, s.count);
+        if (const UnitType* u = m_resources->unit(s.id); u && s.count > 0 && m_hero.addUnit(u, s.count) && s.bitten)
+            m_bitten.insert(s.id);
 }
 
 // ── Garrisons ─────────────────────────────────────────────────────────────────
@@ -863,7 +875,7 @@ std::optional<std::string> AdventureSession::transfer(const HexCoord& site, cons
         if (m_hero.armySize() == 1 && slot->count == count) return "The hero cannot travel without an army.";
         if (inGarrison == held.end() && (int)held.size() >= 5) return "The garrison has no free slot.";
         slot->count -= count;
-        if (slot->count == 0) *slot = ArmySlot{};
+        if (slot->count == 0) { *slot = ArmySlot{}; m_bitten.erase(unitId); }
         if (inGarrison == held.end()) held.push_back({unitId, count});
         else inGarrison->count += count;
     } else {
@@ -1143,6 +1155,17 @@ ResourcePool AdventureSession::dailyIncome(int faction) const {
             total += m_resources->mineIncome(ctrl.objType);
     total += extraIncome(faction);
     return total;
+}
+
+bool AdventureSession::openTile(const HexCoord& c) {
+    if (!m_map.tileAt(c)) return false;
+    m_opened.insert(c);
+    return true;
+}
+
+bool AdventureSession::passable(const HexCoord& c) const {
+    const MapTile* t = m_map.tileAt(c);
+    return t && (t->passable || m_opened.count(c) > 0);
 }
 
 int AdventureSession::owner(const HexCoord& c) const {

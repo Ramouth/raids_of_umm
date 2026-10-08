@@ -74,8 +74,10 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
         army.ownerName = player ? "Attackers" : "Defenders";
         for (const auto& s : stacks) {
             if ((int)army.stacks.size() >= MAX_STACKS) break;
-            if (const UnitType* u = m_resources->unit(s.id); u && s.count > 0)
+            if (const UnitType* u = m_resources->unit(s.id); u && s.count > 0) {
                 army.stacks.push_back(CombatUnit::make(u, s.count, player));
+                army.stacks.back().bitten = s.bitten;
+            }
         }
         return army;
     };
@@ -99,9 +101,9 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
     out.attackerWon = engine.result() == CombatResult::PlayerWon;
     for (const auto& u : engine.playerArmy().stacks) {
         if (u.isSpecialCharacter) { if (u.isDead()) out.fallen.push_back(u.scId); }
-        else if (!u.isDead()) out.attacker.push_back({u.type->id, u.count});
+        else if (!u.isDead()) out.attacker.push_back({u.type->id, u.count, u.bitten});
     }
-    for (const auto& u : engine.enemyArmy().stacks)  if (!u.isDead()) out.defender.push_back({u.type->id, u.count});
+    for (const auto& u : engine.enemyArmy().stacks)  if (!u.isDead()) out.defender.push_back({u.type->id, u.count, u.bitten});
     return out;
 }
 
@@ -152,7 +154,7 @@ std::vector<HexCoord> AdventureSession::rivalRoute(const Rival& r, const HexCoor
         if (!m_scenario.rivalLord().empty())
             if (auto zone = guardZoneAt(c); zone && *zone != to) return true;
         return owner(c) == Faction::Player && m_control.at(c).objType == ObjType::Town;
-    });
+    }, [&](const HexCoord& c) { return m_opened.count(c) > 0; });
     if (path.size() < 2) return {};
     path.erase(path.begin());
     return path;
@@ -406,8 +408,7 @@ bool AdventureSession::ambushFrom(const std::string& townName, const std::string
     std::optional<HexCoord> at;
     for (int d = 0; d < 6; ++d) {
         auto cell = m_hero.pos.neighbor(d);
-        const auto* tile = m_map.tileAt(cell);
-        if (tile && tile->passable && !isEncounter(cell) && !m_map.objectAt(cell)) { at = cell; break; }
+        if (passable(cell) && !isEncounter(cell) && !m_map.objectAt(cell)) { at = cell; break; }
     }
     if (!at && !isEncounter(m_hero.pos)) at = m_hero.pos;
     if (!at) return false;

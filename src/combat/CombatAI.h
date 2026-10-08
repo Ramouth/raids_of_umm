@@ -47,7 +47,8 @@ class CombatAI {
 public:
     // Compute and execute the best single action for the current actor.
     // Caller is responsible for ensuring it is not the human player's turn
-    // (or that auto-battle mode is active).
+    // (or that auto-battle mode is active). A mad stack (rabies) is always
+    // played here, whichever side it is on: CombatEngine::doMadTurn.
     static void takeTurn(CombatEngine& engine);
 
     // One scored option, exposed for tests and debugging.

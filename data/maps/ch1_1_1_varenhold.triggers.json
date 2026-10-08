@@ -4,13 +4,13 @@
     {
       "id": "aldren",
       "title": "Where did Aldren go?",
-      "text": "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east.",
+      "text": "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east, over the bridge.",
       "main": true
     },
     {
-      "id": "wolves",
-      "title": "Wolves in the Vale",
-      "text": "Three wolf packs have come down into the vale. Clear them before you ride out.",
+      "id": "dogs",
+      "title": "Rabid Dogs in the Vale",
+      "text": "Three packs of rabid dogs are loose in the vale. Kill them before they get at the herds.",
       "main": false
     }
   ],
@@ -25,7 +25,7 @@
           "quest": "aldren"
         },
         {
-          "quest": "wolves"
+          "quest": "dogs"
         },
         {
           "reveal": [
@@ -40,14 +40,14 @@
       "id": "stranger",
       "when": {
         "event": "engage",
-        "name": "Hollow Wolves"
+        "name": "Hollow Dogs"
       },
       "do": [
         {
           "choice": {
             "id": "stranger",
             "title": "The Hooded Stranger",
-            "text": "A hooded man stands among the wolves.",
+            "text": "A hooded man stands among the dogs.",
             "options": [
               {
                 "id": "hear",
@@ -87,7 +87,7 @@
       "id": "stranger_gone",
       "when": {
         "event": "encounter_won",
-        "name": "Hollow Wolves"
+        "name": "Hollow Dogs"
       },
       "do": [
         {
@@ -136,13 +136,31 @@
       ]
     },
     {
+      "id": "gate_shut",
+      "when": {
+        "event": "visit",
+        "name": "Bridge Keeper",
+        "unless": "vale_cleared"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Bridge Keeper",
+              "We won't open until the rabid dogs are killed."
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "id": "vale_cleared",
       "when": {
         "event": "cleared",
         "names": [
-          "Orchard Wolves",
-          "Ford Wolves",
-          "Hollow Wolves"
+          "Orchard Dogs",
+          "Ford Dogs",
+          "Hollow Dogs"
         ]
       },
       "do": [
@@ -150,12 +168,42 @@
           "xp": 85
         },
         {
-          "quest_done": "wolves"
+          "quest_done": "dogs"
         },
         {
           "quest_text": [
             "aldren",
-            "The vale is clear. Aldren's road runs east, out through the gap in the hills."
+            "The rabid dogs are dead. The Bridge Keeper will open the east bridge now."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gate_open",
+      "when": {
+        "event": "visit",
+        "name": "Bridge Keeper",
+        "after": "vale_cleared"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Bridge Keeper",
+              "Lord Aldren crossed at first light, before we shut it."
+            ]
+          ]
+        },
+        {
+          "open": [
+            13,
+            -5
+          ]
+        },
+        {
+          "quest_text": [
+            "aldren",
+            "The bridge is open. Aldren crossed it at first light; follow his road east."
           ]
         }
       ]
@@ -165,7 +213,7 @@
       "when": {
         "event": "enter_q",
         "q_min": 15,
-        "after": "vale_cleared"
+        "after": "gate_open"
       },
       "do": [
         {
