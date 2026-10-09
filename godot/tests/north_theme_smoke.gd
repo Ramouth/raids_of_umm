@@ -108,21 +108,32 @@ func _run() -> void:
     print("North package: %s" % ("PASS" if failures == 0 else "%d failures" % failures))
     quit(0 if failures == 0 else 1)
 
-## A grass-ground map with a snowy northern strip: every snow hex gets the snow
-## drift (real art, not a placeholder), no undergrowth grows on it, and the faded
-## land beyond the snowy border is snow too.
+## A grass-ground map with a snowy northern strip (two hexes deep) and a wood at
+## its eastern end: the snow is one continuous layer (no per-hex sprites), every
+## snow hex is covered, deep snow is full cover, edge hexes are partial, it fades
+## out one hex onto the meadow and is gone two hexes out, frost on the grass
+## reaches two hexes and no further, a camp in the snow stands on trodden
+## ground, no undergrowth grows on snow, the land beyond a snowy border is snow too, and the trees touching
+## the snow carry it on their crowns.
 func _check_snow() -> void:
     var tiles: Array = []
     var snowy: Array[Vector2i] = []
-    for q in range(-3, 4):
-        for r in range(-3, 4):
-            if absi(q + r) > 3: continue
-            var north_edge := r - maxi(-3, -3 - q) <= 0   # the top hex of each column
-            tiles.append({"q": q, "r": r, "terrain": "snow" if north_edge else "grass", "passable": true, "moveCost": 1.5 if north_edge else 1.0})
-            if north_edge: snowy.append(Vector2i(q, r))
+    var woods := Vector2i(6, -4)
+    var peak := Vector2i(-6, 2)
+    var camp := Vector2i(0, -6)   # a camp standing in the deep snow
+    for q in range(-6, 7):
+        for r in range(-6, 7):
+            if absi(q + r) > 6: continue
+            var depth := r - maxi(-6, -6 - q)   # 0 = the top hex of each column
+            var terrain := "snow" if depth <= 1 else "grass"
+            if Vector2i(q, r) == woods: terrain = "forest"
+            if Vector2i(q, r) == peak: terrain = "mountain"
+            tiles.append({"q": q, "r": r, "terrain": terrain, "passable": terrain in ["snow", "grass"], "moveCost": 1.5 if terrain != "grass" else 1.0})
+            if terrain == "snow": snowy.append(Vector2i(q, r))
     var fixture := "user://snow_fixture.json"
     var file := FileAccess.open(fixture, FileAccess.WRITE)
-    file.store_string(JSON.stringify({"version": 1, "name": "Snow fixture", "ground": "grass", "tiles": tiles, "objects": []}))
+    file.store_string(JSON.stringify({"version": 1, "name": "Snow fixture", "ground": "grass", "tiles": tiles,
+        "objects": [{"q": camp.x, "r": camp.y, "type": "quest_giver", "name": "Snow Camp"}]}))
     file.close()
     check(Art.is_listed("feature.snow") and Art.has_art("feature.snow"), "feature.snow has a real image")
     var snow_art: Texture2D = Art.texture("feature.snow")
@@ -134,27 +145,79 @@ func _check_snow() -> void:
     await process_frame
     check(view.art_theme.config.id == "north", "Snow fixture uses the North package")
     var features: Node2D = view.get_node("TerrainFeatures")
+    check(features.has_node("SnowField") and features.get_node("SnowField").get_index() == 0, "Snow is one layer under the other ground features")
+    if features.has_node("SnowField"):
+        var layer: Polygon2D = features.get_node("SnowField")
+        check(layer.texture == snow_art and layer.material is ShaderMaterial, "The snow layer paints feature.snow through its shader")
+    var deep := 0
+    var edge := 0
+    # A camp in the snow stands on trodden ground: thin snow and frost, not a drift.
+    check(view.snow_at(UmmMapData.cell_to_world(camp)) < 0.5, "A camp in the snow stands on trodden ground (%.2f)" % view.snow_at(UmmMapData.cell_to_world(camp)))
+    check(view.dust_at(UmmMapData.cell_to_world(camp)) > 0.9, "Trodden ground by a camp is frosted")
     for cell in snowy:
-        var name := "snow_%d_%d" % [cell.x, cell.y]
-        check(features.has_node(name), "Snow hex %s draws a snow drift" % cell)
-        if features.has_node(name):
-            var drift: Sprite2D = features.get_node(name)
-            check(drift.texture == snow_art and drift.material is ShaderMaterial, "Snow drift uses feature.snow, feathered: %s" % cell)
-            check(drift.scale.x * snow_art.get_width() > UmmMapData.HEX_SIZE.x, "Snow drift overlaps its neighbours: %s" % cell)
+        if cell == camp: continue
+        var here: float = view.snow_at(UmmMapData.cell_to_world(cell))
+        check(here > 0.5, "Snow hex %s is covered (%.2f)" % [cell, here])
+        var inland := true
+        for direction: Vector2i in UmmMapData.DIRECTIONS:
+            if view._terrain_at(cell + direction) == "grass": inland = false
+        if inland:
+            deep += 1
+            if _hex_distance(cell, camp) > 1:   # beside the camp it is trodden thinner
+                check(here > 0.9, "Deep snow at %s is full cover (%.2f)" % [cell, here])
+        else:
+            edge += 1
+            check(here < 0.95, "Edge snow at %s is broken cover (%.2f)" % [cell, here])
         check(not view.get_node("Scenery").has_node("Scrub_%d_%d" % [cell.x, cell.y]), "No undergrowth on snow: %s" % cell)
+    check(deep > 0 and edge > 0, "Fixture has deep and edge snow (%d, %d)" % [deep, edge])
+    var fringe := 0
+    for cell: Vector2i in view.data.tiles:
+        if view.data.tiles[cell].terrain != "grass": continue
+        var here: float = view.snow_at(UmmMapData.cell_to_world(cell))
+        if view._touches_snow(cell):
+            fringe += 1
+            check(here < 0.5, "Meadow beside snow is not deep snow: %s (%.2f)" % [cell, here])
+        else:
+            var near_snowy_wood := false
+            for direction: Vector2i in UmmMapData.DIRECTIONS:
+                if view._snow_weight(cell + direction) > 0.0: near_snowy_wood = true
+            check(here < (0.3 if near_snowy_wood else 0.05), "Meadow away from the snow is bare: %s (%.2f)" % [cell, here])
+    check(fringe > 0, "Fixture has meadow beside the snow")
+    # Frosted grass: thick beside the snow, sparse two hexes out, none three hexes or more away.
+    var bands := {1: 0, 2: 0, 3: 0}
+    for cell: Vector2i in view.data.tiles:
+        if view.data.tiles[cell].terrain != "grass": continue
+        var steps := 99
+        for other in snowy: steps = mini(steps, _hex_distance(cell, other))
+        var dust: float = view.dust_at(UmmMapData.cell_to_world(cell))
+        if steps == 1:
+            bands[1] += 1
+            check(dust > 0.6, "Grass beside the snow is frosted: %s (%.2f)" % [cell, dust])
+        elif steps == 2:
+            bands[2] += 1
+            check(dust > 0.0 and dust < 0.5, "Grass two hexes out is sparsely frosted: %s (%.2f)" % [cell, dust])
+        elif steps >= 3:
+            bands[3] += 1
+            check(dust == 0.0, "Grass three or more hexes from the snow has no frost: %s (%.2f)" % [cell, dust])
+    check(bands[1] > 0 and bands[2] > 0 and bands[3] > 0, "Fixture covers near, mid and far grass: %s" % bands)
+    var ridge: Node = view.get_node("Scenery").get_node_or_null("Ridge_%d_%d" % [peak.x, peak.y])
+    check(ridge != null and ridge.material is ShaderMaterial, "A ridge beside the snow wears a snow cap")
     var margin_snow := 0
-    if view.has_node("MarginGround"):
-        margin_snow = view.get_node("MarginGround").get_child_count()
-        check(view.get_node("MarginGround").get_index() < features.get_index(), "Margin snow lies under the map's own features")
-    var expected := 0
     for cell: Vector2i in view.margin:
-        if view.margin[cell].terrain == "snow": expected += 1
-    check(expected > 0 and margin_snow == expected, "Land beyond a snowy border is snow (%d of %d)" % [margin_snow, expected])
+        if view.margin[cell].terrain != "snow": continue
+        margin_snow += 1
+        check(view.snow_at(UmmMapData.cell_to_world(cell)) > 0.5, "Land beyond a snowy border is snow: %s" % cell)
+    check(margin_snow > 0, "Fixture has a snowy border")
+    var dusted := 0
+    for tree in view.get_node("Scenery").get_children():
+        if not tree.name.begins_with("Tree_%d_%d_" % [woods.x, woods.y]): continue
+        dusted += 1
+        check(tree.material is ShaderMaterial, "Trees touching snow carry snow: " + tree.name)
+    check(dusted > 0, "The wood beside the snow has trees")
     if capture:
         var camera := Camera2D.new()
         view.add_child(camera)
         camera.position = UmmMapData.cell_to_world(Vector2i(0, -2))
-        camera.zoom = Vector2.ONE * 1.5
         camera.make_current()
         await shot("north_snow")
         camera.queue_free()
@@ -171,3 +234,7 @@ func _check_dogs() -> void:
         for x in range(0, dog.get_width(), 4):
             if dog.get_pixel(x, y).a > 0.0 and not dog.get_pixel(x, y).is_equal_approx(hound.get_pixel(x, y)): differs = true
     check(differs, "Foaming Dogs are tinted apart from rabid hounds")
+
+static func _hex_distance(a: Vector2i, b: Vector2i) -> int:
+    var d := a - b
+    return (absi(d.x) + absi(d.y) + absi(d.x + d.y)) / 2

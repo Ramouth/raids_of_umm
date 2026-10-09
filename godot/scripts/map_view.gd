@@ -88,16 +88,14 @@ func rebuild() -> void:
     var terrain := Node2D.new()
     terrain.name = "TerrainFeatures"
     add_child(terrain)
+    _build_snow(terrain)
     for cell: Vector2i in data.tiles:
         var tile: Dictionary = data.tiles[cell]
-        if tile.terrain in WATER_TERRAIN or tile.terrain == data.ground:
+        if tile.terrain in WATER_TERRAIN or tile.terrain == data.ground or tile.terrain == "snow":
             continue
         if north and tile.terrain in ["forest", "mountain", "highland", "swamp"]:
             continue  # Northern relief is composed as scenery, without polygon-shaped tile bases.
         if not Art.is_listed("feature." + tile.terrain):
-            continue
-        if tile.terrain == "snow":
-            terrain.add_child(_snow_patch(cell))
             continue
         var feature := _sprite("feature." + tile.terrain)
         feature.name = "%s_%d_%d" % [tile.terrain, cell.x, cell.y]
@@ -138,23 +136,145 @@ func rebuild() -> void:
         _build_trees(scenery)
         _build_undergrowth(scenery)
 
-## Snow lies as a pale drift over its hex, wider than the hex so a strip of snow
-## cells reads as one field, feathered at the rim into the meadow (or margin) around it.
-## Flipped per cell so neighbouring drifts do not repeat. No undergrowth grows on it.
-func _snow_patch(cell: Vector2i) -> Sprite2D:
-    var patch := _sprite("feature.snow")
-    patch.name = "snow_%d_%d" % [cell.x, cell.y]
-    patch.position = UmmMapData.cell_to_world(cell)
-    patch.scale = Vector2(1.2, 0.95)
-    var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
-    patch.flip_h = h % 2 == 0
-    patch.flip_v = (h >> 1) % 2 == 0
+## The snowy north is one continuous layer, not a sprite per hex, so no cell
+## outline shows. A coarse field holds, per point: (red) the snow fraction of the
+## land around it (snow hexes, map or margin, count fully; forest and ridges
+## touching snow count half, since snow lies under those trees and rocks too),
+## smoothed with a Gaussian across neighbouring hexes; (green) "dust", how near
+## the nearest snow hex is, 1 on it and 0 about two hexes out; (blue) "trodden",
+## near a camp or site standing in the snow, whose ground is thin snow broken by
+## frost and grass rather than a deep drift around a green hole. The shader
+## (snow_field.gdshader) draws deep snow where red (less SNOW_TRODDEN x blue) is
+## high, with a low-frequency drift outline, and beyond it frost on the grass:
+## irregular patches, thick beside the snow, fewer and smaller two hexes out.
+## Woods and ridges with dust >= SNOW_CAP get snow on their tops.
+const SNOW_SHADER = preload("res://shaders/snow_field.gdshader")
+const SNOW_DUST_SHADER = preload("res://shaders/snow_dust.gdshader")
+const SNOW_STEP := 8.0      # world units per density texel
+const SNOW_SIGMA := 38.0    # smoothing radius, about half a hex
+const SNOW_SPACING := 87.0  # average distance between neighbouring hex centres
+const SNOW_REACH := 2.0     # hexes of frosted grass beyond the snow
+const SNOW_CAP := 0.2       # dust at which trees and ridges carry snow (about two hexes out)
+const SNOW_TRODDEN := 0.75  # how much a camp in the snow thins it (snow_field.gdshader's `trodden`)
+const SNOW_CAMP_SIGMA := 55.0   # reach of that thinning, a little over half a hex
+var snow_density: Image     # the field (red = snow, green = dust, blue = trodden), null when the map has no snow
+var snow_origin := Vector2.ZERO
+
+func _terrain_at(cell: Vector2i) -> String:
+    if data.tiles.has(cell): return str(data.tiles[cell].terrain)
+    if margin.has(cell): return str(margin[cell].terrain)
+    return ""
+
+func _touches_snow(cell: Vector2i) -> bool:
+    for direction: Vector2i in UmmMapData.DIRECTIONS:
+        if _terrain_at(cell + direction) == "snow": return true
+    return false
+
+func _snow_weight(cell: Vector2i) -> float:
+    var terrain := _terrain_at(cell)
+    if terrain == "snow": return 1.0
+    if terrain in ["forest", "mountain"] and _touches_snow(cell): return 0.5
+    return 0.0
+
+## Snow fraction (0..1) at a world point, as the shader sees it.
+func snow_at(point: Vector2) -> float:
+    if snow_density == null: return 0.0
+    var texel := ((point - snow_origin) / SNOW_STEP - Vector2(0.5, 0.5)).round()
+    var x := clampi(int(texel.x), 0, snow_density.get_width() - 1)
+    var y := clampi(int(texel.y), 0, snow_density.get_height() - 1)
+    var texel_value := snow_density.get_pixel(x, y)
+    return maxf(0.0, texel_value.r - texel_value.b * SNOW_TRODDEN)
+
+## Dust (0..1) at a world point: how thickly the grass there is dotted with snow.
+func dust_at(point: Vector2) -> float:
+    if snow_density == null: return 0.0
+    var texel := ((point - snow_origin) / SNOW_STEP - Vector2(0.5, 0.5)).round()
+    if texel.x < 0 or texel.y < 0 or texel.x >= snow_density.get_width() or texel.y >= snow_density.get_height(): return 0.0
+    return snow_density.get_pixel(int(texel.x), int(texel.y)).g
+
+## Trees and ridges this close to the snow carry it on their tops.
+func _snow_capped(cell: Vector2i) -> bool:
+    return dust_at(UmmMapData.cell_to_world(cell)) >= SNOW_CAP
+
+## A material that lays snow on the upper edges of a sprite (snow_dust.gdshader).
+## `depth` is in texels of that sprite's texture.
+func _snow_cap_material(depth: float, cap := 1.0, rock := false) -> ShaderMaterial:
     var material := ShaderMaterial.new()
-    material.shader = PATCH_SHADER
-    material.set_shader_parameter("edge_start", 0.5)
-    material.set_shader_parameter("opacity", 1.0)
-    patch.material = material
-    return patch
+    material.shader = SNOW_DUST_SHADER
+    material.set_shader_parameter("depth", depth)
+    material.set_shader_parameter("cap", cap)
+    material.set_shader_parameter("rock", rock)
+    return material
+
+## Ridge art near the snow wears snow caps on its upper rock.
+func _cap_ridge(sprite: Sprite2D, cells: Array) -> void:
+    for cell: Vector2i in cells:
+        if _snow_capped(cell):
+            sprite.material = _snow_cap_material(sprite.texture.get_height() * 0.03, 0.5, true)
+            return
+
+func _build_snow(parent: Node2D) -> void:
+    snow_density = null
+    var cells: Array[Vector2i] = []
+    for cell: Vector2i in data.tiles:
+        if data.tiles[cell].terrain == "snow": cells.append(cell)
+    for cell: Vector2i in margin:
+        if margin[cell].terrain == "snow": cells.append(cell)
+    if cells.is_empty(): return
+    var area := Rect2(UmmMapData.cell_to_world(cells[0]), Vector2.ZERO)
+    for cell in cells: area = area.expand(UmmMapData.cell_to_world(cell))
+    area = area.grow(SNOW_SPACING * (SNOW_REACH + 0.6))
+    var size := Vector2i(ceili(area.size.x / SNOW_STEP), ceili(area.size.y / SNOW_STEP))
+    snow_origin = area.position
+    var weights := {}
+    var field := Image.create_empty(size.x, size.y, false, Image.FORMAT_RGB8)
+    var centres := PackedVector2Array()
+    for cell in cells: centres.append(UmmMapData.cell_to_world(cell))
+    # Camps and sites in the snow: their ground is trodden to thin snow and frost.
+    var camps := {}
+    for cell: Vector2i in data.objects:
+        var snowy := 0
+        for direction: Vector2i in UmmMapData.DIRECTIONS:
+            if _terrain_at(cell + direction) == "snow": snowy += 1
+        if _terrain_at(cell) == "snow" or snowy >= 3: camps[cell] = true
+    var reach := []
+    for dq in range(-2, 3):
+        for dr in range(-2, 3):
+            if absi(dq + dr) <= 2: reach.append(Vector2i(dq, dr))
+    for y in size.y:
+        for x in size.x:
+            var point := snow_origin + (Vector2(x, y) + Vector2(0.5, 0.5)) * SNOW_STEP
+            var home := UmmMapData.world_to_cell(point)
+            var snow := 0.0
+            var trodden := 0.0
+            var total := 0.0
+            for offset: Vector2i in reach:
+                var cell: Vector2i = home + offset
+                var k := exp(-point.distance_squared_to(UmmMapData.cell_to_world(cell)) / (2.0 * SNOW_SIGMA * SNOW_SIGMA))
+                if not weights.has(cell): weights[cell] = _snow_weight(cell)
+                snow += k * weights[cell]
+                if camps.has(cell): trodden += exp(-point.distance_squared_to(UmmMapData.cell_to_world(cell)) / (2.0 * SNOW_CAMP_SIGMA * SNOW_CAMP_SIGMA))
+                total += k
+            var nearest := INF
+            for centre in centres: nearest = minf(nearest, point.distance_squared_to(centre))
+            var dust := clampf(1.0 - (sqrt(nearest) - SNOW_SPACING * 0.5) / (SNOW_SPACING * SNOW_REACH), 0.0, 1.0)
+            field.set_pixel(x, y, Color(snow / total, dust, minf(1.0, trodden)))
+    snow_density = field
+    var layer := Polygon2D.new()
+    layer.name = "SnowField"
+    var extent := Vector2(size) * SNOW_STEP
+    layer.polygon = PackedVector2Array([snow_origin, snow_origin + Vector2(extent.x, 0), snow_origin + extent, snow_origin + Vector2(0, extent.y)])
+    layer.texture = Art.texture("feature.snow")
+    layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+    layer.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+    var material := ShaderMaterial.new()
+    material.shader = SNOW_SHADER
+    material.set_shader_parameter("density", ImageTexture.create_from_image(field))
+    material.set_shader_parameter("origin", snow_origin)
+    material.set_shader_parameter("extent", extent)
+    material.set_shader_parameter("trodden", SNOW_TRODDEN)
+    layer.material = material
+    parent.add_child(layer)
 
 ## One painted ridge spans a connected group of up to three blocked cells.
 ## Geometry stays authoritative: no passable cells or map objects enter a group.
@@ -183,6 +303,7 @@ func _build_mountains(scenery: Node2D) -> void:
         ridge.flip_h = posmod(start.x * 7 + start.y * 13, 2) == 0
         ridge.position = (first + last) / 2.0 + Vector2(0, 24)
         ridge.offset.y = -ridge.texture.get_height() * 0.37
+        _cap_ridge(ridge, group)
         # A wide ridge cannot cover the vertical span of an axial group.
         # Give each blocked cell its own visible foothill before adding the crest.
         for cell: Vector2i in group:
@@ -192,6 +313,7 @@ func _build_mountains(scenery: Node2D) -> void:
             foothill.position = UmmMapData.cell_to_world(cell) + Vector2(0, 22)
             foothill.offset.y = -foothill.texture.get_height() * 0.37
             foothill.flip_h = posmod(cell.x + cell.y, 2) == 0
+            _cap_ridge(foothill, [cell])
             scenery.add_child(foothill)
         scenery.add_child(ridge)
 
@@ -226,6 +348,7 @@ func _build_trees(scenery: Node2D, only: Dictionary = {}) -> void:
             continue
         var center := UmmMapData.cell_to_world(cell)
         var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
+        var dusted := _snow_capped(cell)   # woods near the snow carry it on their crowns
         var offsets := [Vector2(-24, -11), Vector2(21, -6), Vector2(-4, 19)]
         if h % 3 == 0: offsets.resize(2)
         for i in range(offsets.size()):
@@ -239,6 +362,7 @@ func _build_trees(scenery: Node2D, only: Dictionary = {}) -> void:
             tree.offset = Vector2(0, -52)
             tree.position = center + offsets[i] + jitter + Vector2(0, 26)
             tree.scale = Vector2.ONE * (0.38 + ((h >> i) % 6) * 0.035)
+            if dusted: tree.material = _snow_cap_material(7.0)
             scenery.add_child(tree)
 
 ## Collected pickups vanish; weekly sites already used this week fade.
@@ -579,16 +703,8 @@ func _build_margin(north: bool) -> void:
         if tile.terrain in WATER_TERRAIN:
             tile["passable"] = false
             ground_tiles[cell] = tile
-        elif tile.terrain == "snow":   # flat ground art, laid under the map's own features
-            var drift := _snow_patch(cell)
-            drift.name = "MarginSnow_%d_%d" % [cell.x, cell.y]
-            drift.modulate = far.modulate
-            if not has_node("MarginGround"):
-                var flat := Node2D.new()
-                flat.name = "MarginGround"
-                add_child(flat)
-                move_child(flat, get_node("TerrainFeatures").get_index())
-            get_node("MarginGround").add_child(drift)
+        elif tile.terrain == "snow":
+            pass   # part of the SnowField layer (_build_snow), laid under the map's features
         elif _clear_above(cell):   # tall art here would reach up over the playable map
             tall_tiles[cell] = tile
     if not ground_tiles.is_empty(): _build_water(far, ground_tiles)
@@ -602,6 +718,7 @@ func _build_margin(north: bool) -> void:
             hill.position = UmmMapData.cell_to_world(cell) + Vector2(0, 22)
             hill.offset.y = -hill.texture.get_height() * 0.37
             hill.flip_h = posmod(cell.x + cell.y, 2) == 0
+            _cap_ridge(hill, [cell])
             far.add_child(hill)
     else:
         for cell: Vector2i in tall_tiles:
@@ -621,49 +738,39 @@ func _clear_above(cell: Vector2i) -> bool:
         if data.tiles.has(cell + direction): return false
     return true
 
-## Triangles over every non-map cell in the ground's reach. Each hex is a fan
-## whose corners average the rings of the three cells that meet there, so the
-## fade is smooth and the map's edge itself stays clear.
-func _margin_veil() -> MeshInstance2D:
+## One layer over the whole map and its margin; its shader (margin_veil.gdshader)
+## blends the margin rings of the hexes around each point, so the fade is one
+## smooth sweep with no hex-shaped bands: faint at the map's edge, solid
+## background a few hexes out.
+const VEIL_SHADER = preload("res://shaders/margin_veil.gdshader")
+
+func _margin_veil() -> Polygon2D:
     var shade: Color = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color", Color(0.075, 0.06, 0.045))
     var area := Rect2(world_bounds)
     for cell: Vector2i in margin: area = area.expand(UmmMapData.cell_to_world(cell))
     area = area.grow(UmmMapData.HEX_SIZE.x)
-    var step := UmmMapData.HEX_SIZE.x * 0.75
-    var corner_cells := [[Vector2i(1, 0), Vector2i(1, -1)], [Vector2i(1, 0), Vector2i(0, 1)], [Vector2i(0, 1), Vector2i(-1, 1)],
-        [Vector2i(-1, 1), Vector2i(-1, 0)], [Vector2i(-1, 0), Vector2i(0, -1)], [Vector2i(0, -1), Vector2i(1, -1)]]
-    var points := PackedVector2Array()
-    var colours := PackedColorArray()
-    for q in range(floori(area.position.x / step), ceili(area.end.x / step) + 1):
-        var r_from := floori(area.position.y / UmmMapData.HEX_SIZE.y - q * 0.5)
-        var r_to := ceili(area.end.y / UmmMapData.HEX_SIZE.y - q * 0.5)
-        for r in range(r_from, r_to + 1):
-            var cell := Vector2i(q, r)
-            if data.tiles.has(cell): continue
-            var center := UmmMapData.cell_to_world(cell)
-            var corners := UmmMapData.hexagon(center)   # no overlap: seams would blend twice
-            var own := _margin_ring(cell)
-            var middle := Color(shade, MARGIN_FADE[own])
-            for i in 6:
-                var j := (i + 1) % 6
-                points.append_array([center, corners[i], corners[j]])
-                if own > MARGIN_RINGS:   # past the margin: solid, so no ground shows through
-                    colours.append_array([middle, middle, middle])
-                else:
-                    colours.append_array([middle, _corner_shade(shade, cell, own, corner_cells[i]), _corner_shade(shade, cell, own, corner_cells[j])])
-    var arrays := []
-    arrays.resize(Mesh.ARRAY_MAX)
-    arrays[Mesh.ARRAY_VERTEX] = points
-    arrays[Mesh.ARRAY_COLOR] = colours
-    var mesh := ArrayMesh.new()
-    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-    var veil := MeshInstance2D.new()
+    var first := Vector2i(MAX_INT, MAX_INT)
+    var last := Vector2i(-MAX_INT, -MAX_INT)
+    for cell: Vector2i in margin:
+        first = first.min(cell)
+        last = last.max(cell)
+    first -= Vector2i(3, 3)
+    last += Vector2i(3, 3)
+    var rings := Image.create_empty(last.x - first.x + 1, last.y - first.y + 1, false, Image.FORMAT_RF)
+    for x in rings.get_width():
+        for y in rings.get_height():
+            rings.set_pixel(x, y, Color(_margin_ring(first + Vector2i(x, y)) / 4.0, 0, 0))
+    var veil := Polygon2D.new()
     veil.name = "MarginVeil"
-    veil.mesh = mesh
+    veil.polygon = PackedVector2Array([area.position, Vector2(area.end.x, area.position.y), area.end, Vector2(area.position.x, area.end.y)])
+    var material := ShaderMaterial.new()
+    material.shader = VEIL_SHADER
+    material.set_shader_parameter("rings", ImageTexture.create_from_image(rings))
+    material.set_shader_parameter("first", first)
+    material.set_shader_parameter("hex", UmmMapData.HEX_SIZE)
+    material.set_shader_parameter("shade", shade)
+    material.set_shader_parameter("fade", Vector4(MARGIN_FADE[1], MARGIN_FADE[2], MARGIN_FADE[3], MARGIN_FADE[4]))
+    veil.material = material
     return veil
 
-func _corner_shade(shade: Color, cell: Vector2i, own: int, touching: Array) -> Color:
-    var rings := float(own + _margin_ring(cell + touching[0]) + _margin_ring(cell + touching[1])) / 3.0
-    var low := floori(rings)
-    var fade: float = MARGIN_FADE[low] if low >= MARGIN_FADE.size() - 1 else lerpf(MARGIN_FADE[low], MARGIN_FADE[low + 1], rings - low)
-    return Color(shade, fade)
+const MAX_INT := 1 << 30

@@ -392,8 +392,6 @@ def camps():
     def ground(q, y, n, c):
         if c > 0.7:
             return "forest"
-        if q < 3 and y < -4.3 + 2.0 * (n - 0.5) + 2.0 * (c - 0.5):
-            return "snow"                                # the first snow, west of the burn
         if y > 5.0 and n < 0.4:
             return "swamp"                               # water meadows by the river
         return "grass"
@@ -408,6 +406,11 @@ def camps():
     L.stream([at(4, -12), (bq, br - 2), (bq, br - 1), bridge, (bq, br + 1), (bq, br + 2), at(6, 12)], [bridge])
     camp = (bq + 1, br)
     L.paint([(bq + 1, br - 1)], "forest", lock=True)    # the camp holds the only east bank
+    # Where the burn comes in from the north: two short ridges with the water running
+    # down between them, and the first snow on the west bank under them.
+    L.paint([(3, -9), (2, -8), (3, -8)], "mountain", lock=True)              # west ridge
+    L.paint([(6, -10), (7, -10), (6, -9), (7, -9)], "mountain", lock=True)   # east ridge
+    L.paint([(4, -9), (4, -8), (4, -7), (3, -7), (0, -7), (1, -8), (1, -7), (1, -6), (2, -6)], "snow")
 
     start = at(-18, 0)
     L.place("sawmill", "North Field Sawmill", at(-10, -5), 1)
@@ -423,7 +426,7 @@ def camps():
     L.place("guard", "Field Brigands", at(11, 3))
     L.place("pickup", "Brigand Purse", at(12, 3.5), 0, "gold")
     L.place("pickup", "Drover's Cart", at(9, -4), 0, "wood")
-    L.place("quest_giver", "Empty Camp", at(-6, -5))          # where the dogs came from: the snow edge
+    L.place("quest_giver", "Empty Camp", (4, -6), exact=True)  # where the dogs came from: the foot of the snow, by the burn
     L.finish(start, road=[start, at(-6, 0), at(-2, 0.5), bridge, camp, at(12, 0), at(18, 0)])
     L.exit_q = 16
     L.chokes = {"Red Banner Camp": "exit"}
