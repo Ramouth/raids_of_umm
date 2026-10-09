@@ -37,6 +37,21 @@
       ]
     },
     {
+      "id": "empty_camp",
+      "when": {
+        "event": "visit",
+        "name": "Empty Camp"
+      },
+      "do": [
+        {
+          "lore": [
+            "An empty camp",
+            "Dog-pens of split pine, their gates hanging open, and sled tracks coming down out of the north. A cut leash lies in the mud, on a studded collar no one in the Marches makes. Snagged on a gatepost: a scrap of white fur, and a few strands of pale hair."
+          ]
+        }
+      ]
+    },
+    {
       "id": "camp_riverside",
       "when": {
         "event": "visit",

@@ -651,6 +651,32 @@
       "textureId": "grey_wolf"
     },
     {
+      "id": "feral_dog",
+      "name": "Foaming Dog",
+      "description": "Someone's dogs, run wild. Foam at the mouth, and no fear of people.",
+      "tier": 1,
+      "attack": 6,
+      "defense": 3,
+      "minDamage": 2,
+      "maxDamage": 3,
+      "hitPoints": 10,
+      "speed": 9,
+      "moveRange": 6,
+      "shots": 0,
+      "weeklyGrowth": 12,
+      "cost": {
+        "Gold": 70,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "grey_wolf",
+      "textureId": "grey_wolf"
+    },
+    {
       "id": "brigand",
       "name": "Brigand",
       "description": "Deserters and outlaws who hold the forest roads with crossbows and nerve.",

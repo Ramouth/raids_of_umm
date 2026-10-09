@@ -21,6 +21,8 @@
 #include "world/MapObject.h"
 #include "hex/HexCoord.h"
 #include "worldbuilder/EditorTool.h"   // EditorTool enum + EDITOR_TOOL_COUNT
+#include <fstream>
+#include <iterator>
 
 // ── Helper: mirror the applyToolAt logic without the full GameState ───────────
 
@@ -349,9 +351,38 @@ SUITE("WorldMap — variant=0 default is preserved on save/load") {
 
 // ── 5. New terrain types (Grass, Forest, Highland) ───────────────────────────
 
-SUITE("Terrain — COUNT is 17 (10 desert + 3 biome + 2 edge + lake + swamp)") {
-    CHECK_EQ(static_cast<int>(Terrain::COUNT), 17);
-    CHECK_EQ(TERRAIN_COUNT, 17);
+SUITE("Terrain — COUNT is 18 (10 desert + 3 biome + 2 edge + lake + swamp + snow)") {
+    CHECK_EQ(static_cast<int>(Terrain::COUNT), 18);
+    CHECK_EQ(TERRAIN_COUNT, 18);
+}
+
+SUITE("Terrain — Snow is walkable, costs 1.5, and survives save/load") {
+    CHECK_EQ(static_cast<int>(Terrain::Snow), 17);
+    CHECK(terrainName(Terrain::Snow) == "Snow");
+    MapTile s = makeTile(Terrain::Snow);
+    CHECK(s.passable);
+    CHECK_NEAR(s.moveCost, 1.5f, 0.001f);
+
+    WorldMap map;
+    map.clear(2);
+    paintTile(map, {1, 0}, Terrain::Snow, 0);
+    const std::string path = "/tmp/raids_test_snow.json";
+    CHECK(!map.saveJson(path).has_value());
+    {
+        // Written as "snow", not silently as the "sand" fallback.
+        std::ifstream f(path);
+        std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        CHECK(text.find("\"snow\"") != std::string::npos);
+    }
+    WorldMap loaded;
+    CHECK(!loaded.loadJson(path).has_value());
+    const MapTile* t = loaded.tileAt({1, 0});
+    CHECK(t != nullptr);
+    if (t) {
+        CHECK_EQ(static_cast<int>(t->terrain), static_cast<int>(Terrain::Snow));
+        CHECK(t->passable);
+        CHECK_NEAR(t->moveCost, 1.5f, 0.001f);
+    }
 }
 
 SUITE("Terrain — new biome enum values are correct") {

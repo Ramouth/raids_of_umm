@@ -3,7 +3,8 @@ class_name Art
 extends RefCounted
 ## The art registry, used statically: Art.texture(id). Every image the client shows is looked up
 ## here by a logical id ("unit.woad_runner", "portrait.ushari", "screen.victory").
-## godot/content_source/art.json maps ids to files under res://content/textures/.
+## godot/content_source/art.json maps ids to files under res://content/textures/
+## (or to a full res:// path, for art the Godot client owns, e.g. res://themes/north/).
 ## texture() never returns null: a missing or unknown image becomes a generated
 ## placeholder (a flat shape in its category colour with the id's initials),
 ## warned about once. Swapping art = editing art.json or dropping in a file.
@@ -79,7 +80,7 @@ static func is_listed(id: String) -> bool:
 ## The file shown for this id (after fallbacks), as a res:// path; "" when none exists.
 static func path(id: String) -> String:
     var relative := _resolve(id, 0)
-    return "" if relative.is_empty() else ROOT + relative
+    return "" if relative.is_empty() else _full(relative)
 
 ## True when this id (or its fallback) has a real image on disk.
 static func has_art(id: String) -> bool:
@@ -145,11 +146,15 @@ static func _resolve(id: String, depth: int) -> String:
     if not file.is_empty() and _exists(file): return file
     return _resolve(str(entry.get("fallback", "")), depth + 1)
 
+## A registry file as a res:// path: relative to ROOT unless it is already absolute.
+static func _full(relative: String) -> String:
+    return relative if relative.begins_with("res://") else ROOT + relative
+
 static func _exists(relative: String) -> bool:
-    return ResourceLoader.exists(ROOT + relative) or FileAccess.file_exists(ROOT + relative)
+    return ResourceLoader.exists(_full(relative)) or FileAccess.file_exists(_full(relative))
 
 static func _load(relative: String, mipmaps: bool) -> Texture2D:
-    var full := ROOT + relative
+    var full := _full(relative)
     var texture: Texture2D = null
     if ResourceLoader.exists(full):
         texture = load(full) as Texture2D
@@ -179,10 +184,10 @@ static func _tinted(texture: Texture2D, tint: Color) -> Texture2D:
     return ImageTexture.create_from_image(bitmap)
 
 static func _describe(id: String) -> String:
-    if "/" in id: return "file %s%s not found" % [ROOT, id]
+    if "/" in id: return "file %s not found" % _full(id)
     var entry := _entry(id)
     if entry.is_empty(): return "id not listed"
-    return "file %s%s not found" % [ROOT, entry.get("file", "")]
+    return "file %s not found" % _full(str(entry.get("file", "")))
 
 static func _initials(id: String) -> String:
     var name := id.get_file().get_basename() if "/" in id else id.get_slice(".", id.get_slice_count(".") - 1)

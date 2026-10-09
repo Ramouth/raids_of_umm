@@ -132,6 +132,19 @@ SUITE("AdventureSession — mountains block sight") {
     CHECK(!s.isExplored({-3, 0}));                        // but not what lies behind
 }
 
+SUITE("AdventureSession — snow slows the march but does not block sight") {
+    WorldMap map = testMap();
+    for (int r = -8; r <= 8; ++r)
+        if (map.hasTile({-4, r})) map.setTile({-4, r}, makeTile(Terrain::Snow));
+    map.setTile({-5, 0}, makeTile(Terrain::Snow));
+    auto s = started(std::move(map));
+    CHECK(s.isVisible({-4, 0}));
+    CHECK(s.isVisible({-3, 0}));                          // seen across the snowfield
+    auto path = s.route({-4, 0});
+    CHECK_EQ((int)path.size(), 2);
+    CHECK(s.routeCost(path) == 3.0f);                     // two snow hexes at 1.5
+}
+
 // ── Encounters ────────────────────────────────────────────────────────────────
 
 namespace {

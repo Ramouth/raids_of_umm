@@ -4,7 +4,7 @@
     "guard": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 10
         }
       ],
@@ -12,10 +12,10 @@
     }
   },
   "objects": {
-    "Road Wolves": {
+    "Road Dogs": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 16
         }
       ],

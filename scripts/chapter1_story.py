@@ -44,11 +44,13 @@ def lore(title, text):
     return {"lore": [title, text]}
 
 
-def wolves(n, gold=0):
-    return {"guards": [{"id": "grey_wolf", "count": n}], "reward": {"Gold": gold} if gold else {}}
+def mad_dogs(n, gold=0):
+    """1.0 only: the dogs look sick but do not bite-infect (the prologue's promise)."""
+    return {"guards": [{"id": "feral_dog", "count": n}], "reward": {"Gold": gold} if gold else {}}
 
 
 def dogs(n, gold=0):
+    """1.1 on: the promise kept; their bite carries the rabies."""
     return {"guards": [{"id": "rabid_hound", "count": n}], "reward": {"Gold": gold} if gold else {}}
 
 
@@ -71,7 +73,7 @@ class Story:
     def __init__(self, stem, start_companions):
         self.stem = stem
         self.root = {"start_companions": start_companions, "quests": [], "triggers": []}
-        self.encounters = {"defaults": {"guard": wolves(10)}, "objects": {}, "pickups": {}}
+        self.encounters = {"defaults": {"guard": dogs(10)}, "objects": {}, "pickups": {}}
 
     def quest(self, id, title, text, main=False):
         self.root["quests"].append({"id": id, "title": title, "text": text, "main": main})
@@ -99,15 +101,17 @@ def hunt():
     # (24 runners, 10 slingers, 3 blades). The hunt wants a small household party.
     s.root["_comment"] = "start_army is not read by the engine yet; see the chapter 1 report."
     s.root["start_army"] = [{"id": "woad_runner", "count": 10}, {"id": "cruth_slinger", "count": 4}]
-    s.quest("hunt", "The Last Hunt", "Two wolf packs have been taking the herds. Hunt them down with Aldren.", main=True)
+    s.quest("hunt", "The Last Hunt", "Two packs of dogs have been killing the herds. They foam at the mouth and do not run from people. Hunt them down with Aldren.", main=True)
     s.quest("hall", "The Hall", "The hunt is over. End the day: your father is waiting in the hall.")
-    s.encounters["objects"] = {"Thicket Wolves": wolves(6), "Stream Wolves": wolves(8)}
+    s.encounters["objects"] = {"Thicket Dogs": mad_dogs(6), "Stream Dogs": mad_dogs(8)}
 
     s.trig("start", {"event": "start"},
            {"quest": "hunt"}, {"reveal": [0, 0, 10]},
-           say(("Aldren", "Two packs before dark. Keep up, little brother.")))
-    s.trig("hunt_done", {"event": "cleared", "names": ["Thicket Wolves", "Stream Wolves"]},
-           {"quest_done": "hunt"}, {"quest": "hall"})
+           say(("Herdsman", "They came right into the fold, my lord. They bit my boy."),
+               ("Aldren", "Two packs before dark. Keep up, little brother.")))
+    s.trig("hunt_done", {"event": "cleared", "names": ["Thicket Dogs", "Stream Dogs"]},
+           {"quest_done": "hunt"}, {"quest": "hall"},
+           say(("Aldren", "Dogs don't fight like that. Something is wrong with them.")))
     s.trig("toast", {"event": "night", "after": "hunt_done"},
            {"quest_done": "hall"},
            conversation("toast", "Varenhold · The hall · That night",
@@ -135,9 +139,9 @@ KEEPER = "Bridge Keeper"
 def varenhold(land):
     s = Story("ch1_1_1_varenhold", [])
     s.quest("aldren", "Where did Aldren go?", "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east, over the bridge.", main=True)
-    s.quest("dogs", "Rabid Dogs in the Vale", "Three packs of rabid dogs are loose in the vale. Kill them before they get at the herds.")
+    s.quest("dogs", "Rabid Dogs in the Vale", "More of the mad dogs: three packs loose in the vale, and their bite carries the sickness. Kill them before they get at the herds.")
     s.encounters["objects"] = {"Orchard Dogs": dogs(12, 150), "Ford Dogs": dogs(14, 150),
-                               "Hollow Dogs": dogs(16, 200)}
+                               "Hollow Dogs": dogs(18, 200)}
     s.encounters["pickups"] = {"Shepherd's Purse": {"reward": {"Gold": 300}}}
 
     s.trig("start", {"event": "start"}, {"quest": "aldren"}, {"quest": "dogs"}, {"reveal": [2, 0, 13]})
@@ -197,11 +201,17 @@ def camps(land):
     s.quest("aldren", "Where did Aldren go?", "Aldren's road runs east across the river fields. Follow it.", main=True)
     s.quest("camps", "Camps on Your Fields",
             "Companies from other houses have camped on your fields on their way east. Ride to each camp and decide: let them stay, take a toll, or turn them away.")
-    s.encounters["objects"] = {"Copse Wolves": wolves(16, 200),
+    s.encounters["objects"] = {"Copse Dogs": dogs(12, 200),
                                "Field Brigands": {"guards": [{"id": "brigand", "count": 12}], "reward": {"Gold": 300}}}
     s.encounters["pickups"] = {"Brigand Purse": {"reward": {"Gold": 500}}}
 
     s.trig("start", {"event": "start"}, {"quest": "aldren"}, {"quest": "camps"}, {"reveal": [-4, 2, 9]})
+    # Where the dogs came from: northern settlers on the road south (not named yet; the
+    # user names them). Only what is seen; no faction name.
+    s.trig("empty_camp", {"event": "visit", "name": "Empty Camp"},
+           lore("An empty camp", "Dog-pens of split pine, their gates hanging open, and sled tracks coming down out of the north. "
+                "A cut leash lies in the mud, on a studded collar no one in the Marches makes. "
+                "Snagged on a gatepost: a scrap of white fur, and a few strands of pale hair."))
     for cid, name, speaker, line, toll, refused in CAMPS:
         gone = {"vanish": name}
         turn = ([{"betray": {"at": name, "band": "Riverside Company", "army": RIVERSIDE_BAND}}, gone]
@@ -246,7 +256,7 @@ def east_road(land):
     s = Story("ch1_1_3_east_road", [])
     s.quest("aldren", "Where did Aldren go?", "The east road climbs toward the mountains. Follow it to its end.", main=True)
     s.encounters["objects"] = {
-        "Road Wolves": wolves(16, 200),
+        "Road Dogs": dogs(16, 200),
         "Ridge Bears": {"guards": [{"id": "highland_bear", "count": 4}], "reward": {"Gold": 300}},
         "Stone Trolls": {"guards": [{"id": "forest_troll", "count": 2}], "reward": {"Gold": 400}},
         "Root Wardens": {"guards": [{"id": "ancient_treant", "count": 1}]},

@@ -96,6 +96,9 @@ func rebuild() -> void:
             continue  # Northern relief is composed as scenery, without polygon-shaped tile bases.
         if not Art.is_listed("feature." + tile.terrain):
             continue
+        if tile.terrain == "snow":
+            terrain.add_child(_snow_patch(cell))
+            continue
         var feature := _sprite("feature." + tile.terrain)
         feature.name = "%s_%d_%d" % [tile.terrain, cell.x, cell.y]
         feature.position = UmmMapData.cell_to_world(cell)
@@ -134,6 +137,24 @@ func rebuild() -> void:
         _build_mountains(scenery)
         _build_trees(scenery)
         _build_undergrowth(scenery)
+
+## Snow lies as a pale drift over its hex, wider than the hex so a strip of snow
+## cells reads as one field, feathered at the rim into the meadow (or margin) around it.
+## Flipped per cell so neighbouring drifts do not repeat. No undergrowth grows on it.
+func _snow_patch(cell: Vector2i) -> Sprite2D:
+    var patch := _sprite("feature.snow")
+    patch.name = "snow_%d_%d" % [cell.x, cell.y]
+    patch.position = UmmMapData.cell_to_world(cell)
+    patch.scale = Vector2(1.2, 0.95)
+    var h := posmod(cell.x * 73856093 ^ cell.y * 19349663, 1000)
+    patch.flip_h = h % 2 == 0
+    patch.flip_v = (h >> 1) % 2 == 0
+    var material := ShaderMaterial.new()
+    material.shader = PATCH_SHADER
+    material.set_shader_parameter("edge_start", 0.5)
+    material.set_shader_parameter("opacity", 1.0)
+    patch.material = material
+    return patch
 
 ## One painted ridge spans a connected group of up to three blocked cells.
 ## Geometry stays authoritative: no passable cells or map objects enter a group.
@@ -558,6 +579,16 @@ func _build_margin(north: bool) -> void:
         if tile.terrain in WATER_TERRAIN:
             tile["passable"] = false
             ground_tiles[cell] = tile
+        elif tile.terrain == "snow":   # flat ground art, laid under the map's own features
+            var drift := _snow_patch(cell)
+            drift.name = "MarginSnow_%d_%d" % [cell.x, cell.y]
+            drift.modulate = far.modulate
+            if not has_node("MarginGround"):
+                var flat := Node2D.new()
+                flat.name = "MarginGround"
+                add_child(flat)
+                move_child(flat, get_node("TerrainFeatures").get_index())
+            get_node("MarginGround").add_child(drift)
         elif _clear_above(cell):   # tall art here would reach up over the playable map
             tall_tiles[cell] = tile
     if not ground_tiles.is_empty(): _build_water(far, ground_tiles)

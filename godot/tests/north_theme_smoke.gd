@@ -98,6 +98,8 @@ func _run() -> void:
     if capture: await shot("north_ridges")
     scene.queue_free()
     await process_frame
+    await _check_snow()
+    _check_dogs()
     var desert: Node2D = load("res://scripts/map_view.gd").new()
     desert.map_path = "res://content/maps/default.json"
     root.add_child(desert)
@@ -105,3 +107,67 @@ func _run() -> void:
     check(desert.object_texture({"type": "quarry"}) == "object.quarry", "Desert retains its own quarry")
     print("North package: %s" % ("PASS" if failures == 0 else "%d failures" % failures))
     quit(0 if failures == 0 else 1)
+
+## A grass-ground map with a snowy northern strip: every snow hex gets the snow
+## drift (real art, not a placeholder), no undergrowth grows on it, and the faded
+## land beyond the snowy border is snow too.
+func _check_snow() -> void:
+    var tiles: Array = []
+    var snowy: Array[Vector2i] = []
+    for q in range(-3, 4):
+        for r in range(-3, 4):
+            if absi(q + r) > 3: continue
+            var north_edge := r - maxi(-3, -3 - q) <= 0   # the top hex of each column
+            tiles.append({"q": q, "r": r, "terrain": "snow" if north_edge else "grass", "passable": true, "moveCost": 1.5 if north_edge else 1.0})
+            if north_edge: snowy.append(Vector2i(q, r))
+    var fixture := "user://snow_fixture.json"
+    var file := FileAccess.open(fixture, FileAccess.WRITE)
+    file.store_string(JSON.stringify({"version": 1, "name": "Snow fixture", "ground": "grass", "tiles": tiles, "objects": []}))
+    file.close()
+    check(Art.is_listed("feature.snow") and Art.has_art("feature.snow"), "feature.snow has a real image")
+    var snow_art: Texture2D = Art.texture("feature.snow")
+    var pixel := snow_art.get_image().get_pixel(64, 64)
+    check(pixel.b >= pixel.r and pixel.get_luminance() > 0.5, "Snow art is pale and cool")
+    var view: Node2D = load("res://scripts/map_view.gd").new()
+    view.map_path = fixture
+    root.add_child(view)
+    await process_frame
+    check(view.art_theme.config.id == "north", "Snow fixture uses the North package")
+    var features: Node2D = view.get_node("TerrainFeatures")
+    for cell in snowy:
+        var name := "snow_%d_%d" % [cell.x, cell.y]
+        check(features.has_node(name), "Snow hex %s draws a snow drift" % cell)
+        if features.has_node(name):
+            var drift: Sprite2D = features.get_node(name)
+            check(drift.texture == snow_art and drift.material is ShaderMaterial, "Snow drift uses feature.snow, feathered: %s" % cell)
+            check(drift.scale.x * snow_art.get_width() > UmmMapData.HEX_SIZE.x, "Snow drift overlaps its neighbours: %s" % cell)
+        check(not view.get_node("Scenery").has_node("Scrub_%d_%d" % [cell.x, cell.y]), "No undergrowth on snow: %s" % cell)
+    var margin_snow := 0
+    if view.has_node("MarginGround"):
+        margin_snow = view.get_node("MarginGround").get_child_count()
+        check(view.get_node("MarginGround").get_index() < features.get_index(), "Margin snow lies under the map's own features")
+    var expected := 0
+    for cell: Vector2i in view.margin:
+        if view.margin[cell].terrain == "snow": expected += 1
+    check(expected > 0 and margin_snow == expected, "Land beyond a snowy border is snow (%d of %d)" % [margin_snow, expected])
+    if capture:
+        var camera := Camera2D.new()
+        view.add_child(camera)
+        camera.position = UmmMapData.cell_to_world(Vector2i(0, -2))
+        camera.zoom = Vector2.ONE * 1.5
+        camera.make_current()
+        await shot("north_snow")
+        camera.queue_free()
+    view.queue_free()
+    await process_frame
+
+## 1.0's Foaming Dogs: the wolf sprite in their own sickly tint, not a placeholder.
+func _check_dogs() -> void:
+    check(Art.is_listed("unit.feral_dog") and Art.has_art("unit.feral_dog"), "unit.feral_dog is listed with real art")
+    var dog: Image = Art.texture("unit.feral_dog").get_image()
+    var hound: Image = Art.texture("unit.rabid_hound").get_image()
+    var differs := false
+    for y in range(0, dog.get_height(), 4):
+        for x in range(0, dog.get_width(), 4):
+            if dog.get_pixel(x, y).a > 0.0 and not dog.get_pixel(x, y).is_equal_approx(hound.get_pixel(x, y)): differs = true
+    check(differs, "Foaming Dogs are tinted apart from rabid hounds")

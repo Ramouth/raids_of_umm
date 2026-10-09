@@ -4,7 +4,7 @@
     "guard": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 10
         }
       ],
@@ -38,7 +38,7 @@
       "guards": [
         {
           "id": "rabid_hound",
-          "count": 16
+          "count": 18
         }
       ],
       "reward": {

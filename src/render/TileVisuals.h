@@ -37,6 +37,7 @@ inline glm::vec3 terrainColor(Terrain t) noexcept {
         case Terrain::GrassSandEdge2: return { 0.78f, 0.63f, 0.35f };  // sand base — transparent pixels show sand, grass pixels show grass texture
         case Terrain::Lake:           return { 0.20f, 0.42f, 0.62f };  // cold northern lake
         case Terrain::Swamp:          return { 0.28f, 0.34f, 0.20f };  // murky bog
+        case Terrain::Snow:           return { 0.86f, 0.89f, 0.93f };  // pale blue-white snowfield
         default:                      return { 1.00f, 0.00f, 1.00f };  // magenta = unknown
     }
 }

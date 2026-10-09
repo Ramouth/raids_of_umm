@@ -2,7 +2,7 @@
 """
 gen_chapter1.py — the four maps of chapter 1, "The Marches".
 
-    1.0 The last hunt   a small glade between woods and a stream; two wolf packs
+    1.0 The last hunt   a small glade between woods and a stream; two packs of mad dogs
     1.1 Varenhold       a closed bowl of hills; one way out, east, over a bridge the keeper shuts
     1.2 The camps       wide river fields; one bridge over the burn
     1.3 The east road   a long ribbon climbing into the foothills; the Greyfangs at its end
@@ -37,6 +37,7 @@ TERRAIN = {
     "grass":    (True,  1.0),
     "highland": (True,  1.25),
     "swamp":    (True,  1.75),
+    "snow":     (True,  1.5),
     "bridge":   (True,  0.5),
     "forest":   (False, 1.5),
     "crag":     (False, 1.25),
@@ -306,8 +307,8 @@ def hunt():
         return "grass"
 
     L.shape(inside, edge, ground)
-    L.place("guard", "Thicket Wolves", at(-1, -2))
-    L.place("guard", "Stream Wolves", at(4, 0.5))
+    L.place("guard", "Thicket Dogs", at(-1, -2))
+    L.place("guard", "Stream Dogs", at(4, 0.5))
     L.finish(at(-5, -1))
     return L
 
@@ -391,6 +392,8 @@ def camps():
     def ground(q, y, n, c):
         if c > 0.7:
             return "forest"
+        if q < 3 and y < -4.3 + 2.0 * (n - 0.5) + 2.0 * (c - 0.5):
+            return "snow"                                # the first snow, west of the burn
         if y > 5.0 and n < 0.4:
             return "swamp"                               # water meadows by the river
         return "grass"
@@ -411,14 +414,16 @@ def camps():
     L.place("quarry", "River Quarry", at(-7, 4.5), 1)
     L.place("quest_giver", "Riverside Camp", at(-4, 3))
     L.place("quest_giver", "Meadow Camp", at(-1, -3.5))
-    L.place("quest_giver", "Strangers' Camp", at(2, -6))
+    strangers = L.place("quest_giver", "Strangers' Camp", at(2, -6))
+    L.tiles[strangers] = "grass"                         # only the Empty Camp sits on snow
     L.place("quest_giver", "Red Banner Camp", camp, exact=True)
-    L.place("guard", "Copse Wolves", at(-12, -3.5))
+    L.place("guard", "Copse Dogs", at(-12, -3.5))
     L.place("pickup", "Woodcutters' Stack", at(-13, -4.5), 0, "wood")
     L.place("pickup", "Mason's Cart", at(-12, 3), 0, "stone")
     L.place("guard", "Field Brigands", at(11, 3))
     L.place("pickup", "Brigand Purse", at(12, 3.5), 0, "gold")
     L.place("pickup", "Drover's Cart", at(9, -4), 0, "wood")
+    L.place("quest_giver", "Empty Camp", at(-6, -5))          # where the dogs came from: the snow edge
     L.finish(start, road=[start, at(-6, 0), at(-2, 0.5), bridge, camp, at(12, 0), at(18, 0)])
     L.exit_q = 16
     L.chokes = {"Red Banner Camp": "exit"}
@@ -430,7 +435,7 @@ def east_road():
     """A ribbon up a gorge into the foothills; the Greyfangs close it at the mine."""
     L = Land("The East Road", "ch1_1_3_east_road", 131, (-24, 24), (-14, 14))
     yc = lambda q: -0.3 * q                                  # the road climbs north-east
-    pinches = (-11, -2, 12)                                   # wolves, the broken camp, trolls
+    pinches = (-11, -2, 12)                                   # dogs, the broken camp, trolls
 
     def half(q, side):
         h = 3.0 + 0.7 * math.sin(0.5 * q)
@@ -477,7 +482,7 @@ def east_road():
     start = at(-23, yc(-23))
     L.place("sawmill", "East Road Sawmill", at(-17, yc(-17) - 1.5))
     L.place("pickup", "Fallen Pine", at(-14, yc(-14) + 1.5), 0, "wood")
-    L.place("guard", "Road Wolves", at(-11, yc(-11)))
+    L.place("guard", "Road Dogs", at(-11, yc(-11)))
     L.place("quest_giver", "Cold Fire", at(-6, yc(-6) - 3.5))
     L.place("quest_giver", "Broken Camp", at(-2, yc(-2)))
     L.place("quest_giver", "Bridge Post", (bq + 1, br - 1), exact=True)
@@ -488,7 +493,7 @@ def east_road():
     L.place("guard", "Root Wardens", corridor[2], exact=True)
     L.place("dungeon", "Root-Grown Mine", corridor[4], 0, "sealed", exact=True)
     L.finish(start, road=[start, at(-11, yc(-11)), at(-2, yc(-2)), bridge, (bq + 1, br), at(12, yc(12)), corridor[1]])
-    L.chokes = {"Road Wolves": "Root-Grown Mine", "Broken Camp": "Root-Grown Mine",
+    L.chokes = {"Road Dogs": "Root-Grown Mine", "Broken Camp": "Root-Grown Mine",
                 "Stone Trolls": "Root-Grown Mine", "Root Wardens": "Root-Grown Mine"}
     return L
 

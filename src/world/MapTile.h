@@ -35,6 +35,7 @@ enum class Terrain : uint8_t {
     GrassSandEdge2 = 14, // same as above with sand removed (transparent overlay)
     Lake         = 15, // still water — impassable, does not block sight
     Swamp        = 16, // boggy lowland — very slow movement
+    Snow         = 17, // far-north snowfield — slow, does not block sight
 
     COUNT  // must remain last — used for iteration and bounds checks
 };
@@ -72,6 +73,7 @@ constexpr std::string_view terrainName(Terrain t) noexcept {
         case Terrain::GrassSandEdge2: return "Grass-Sand Edge 2";
         case Terrain::Lake:           return "Lake";
         case Terrain::Swamp:          return "Swamp";
+        case Terrain::Snow:           return "Snow";
         default:                      return "Unknown";
     }
 }
@@ -98,6 +100,7 @@ constexpr float terrainDefaultMoveCost(Terrain t) noexcept {
         case Terrain::Highland: return 1.25f; // rocky moorland — slightly slower
         case Terrain::Lake:     return 0.0f;  // impassable
         case Terrain::Swamp:    return 1.75f; // bog — the slowest walkable ground
+        case Terrain::Snow:     return 1.5f;  // snowfield — slow going
         default:                return 1.0f;
     }
 }

@@ -4,7 +4,7 @@
     "guard": {
       "guards": [
         {
-          "id": "grey_wolf",
+          "id": "rabid_hound",
           "count": 10
         }
       ],
@@ -12,11 +12,11 @@
     }
   },
   "objects": {
-    "Copse Wolves": {
+    "Copse Dogs": {
       "guards": [
         {
-          "id": "grey_wolf",
-          "count": 16
+          "id": "rabid_hound",
+          "count": 12
         }
       ],
       "reward": {

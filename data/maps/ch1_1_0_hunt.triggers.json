@@ -6,7 +6,7 @@
     {
       "id": "hunt",
       "title": "The Last Hunt",
-      "text": "Two wolf packs have been taking the herds. Hunt them down with Aldren.",
+      "text": "Two packs of dogs have been killing the herds. They foam at the mouth and do not run from people. Hunt them down with Aldren.",
       "main": true
     },
     {
@@ -36,6 +36,10 @@
         {
           "say": [
             [
+              "Herdsman",
+              "They came right into the fold, my lord. They bit my boy."
+            ],
+            [
               "Aldren",
               "Two packs before dark. Keep up, little brother."
             ]
@@ -48,8 +52,8 @@
       "when": {
         "event": "cleared",
         "names": [
-          "Thicket Wolves",
-          "Stream Wolves"
+          "Thicket Dogs",
+          "Stream Dogs"
         ]
       },
       "do": [
@@ -58,6 +62,14 @@
         },
         {
           "quest": "hall"
+        },
+        {
+          "say": [
+            [
+              "Aldren",
+              "Dogs don't fight like that. Something is wrong with them."
+            ]
+          ]
         }
       ]
     },

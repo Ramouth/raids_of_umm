@@ -1,5 +1,5 @@
 {
- "_about": "Every image the Godot client shows, by logical id. A value is a file under res://content/textures/ or {file, fallback?, mipmaps?, frames?, size?, tint?}. A missing file shows a generated placeholder (fallback id first, if given). unit.<id> needs no entry when the file is units/<id>.png. See godot/README.md, 'Swapping art'.",
+ "_about": "Every image the Godot client shows, by logical id. A value is a file under res://content/textures/ (or a full res:// path for client-owned art, e.g. res://themes/north/) or {file, fallback?, mipmaps?, frames?, size?, tint?}. A missing file shows a generated placeholder (fallback id first, if given). unit.<id> needs no entry when the file is units/<id>.png. See godot/README.md, 'Swapping art'.",
  "ids": {
   "feature.dune": "terrain/dune/dune.png",
   "feature.forest": "terrain/forest/forest.png",
@@ -12,6 +12,7 @@
   "feature.river": "terrain/river/river.png",
   "feature.rock": "terrain/rock/rock1.png",
   "feature.ruins": "terrain/ruins/ruins1.png",
+  "feature.snow": "res://themes/north/snow1.png",
   "feature.scrub.north": {"file": "themes/north/scrub.png", "mipmaps": true},
   "feature.swamp": "terrain/highland/highland1.png",
   "feature.wall": "terrain/wall/wall.png",
@@ -103,6 +104,7 @@
   "unit.djinn": "units/djinn.png",
   "unit.dune_stalker": "units/enemy_scout.png",
   "unit.enemy_scout": "units/enemy_scout.png",
+  "unit.feral_dog": {"file": "units/grey_wolf.png", "tint": "#c2b06a"},
   "unit.forest_troll": "units/forest_troll.png",
   "unit.gododdin_rider": "units/gododdin_rider.png",
   "unit.grey_wolf": "units/grey_wolf.png",

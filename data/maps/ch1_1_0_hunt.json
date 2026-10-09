@@ -806,13 +806,13 @@
       "q": -1,
       "r": -1,
       "type": "guard",
-      "name": "Thicket Wolves"
+      "name": "Thicket Dogs"
     },
     {
       "q": 4,
       "r": -1,
       "type": "guard",
-      "name": "Stream Wolves"
+      "name": "Stream Dogs"
     }
   ]
 }

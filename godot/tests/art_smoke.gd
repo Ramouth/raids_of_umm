@@ -49,7 +49,8 @@ func _run() -> void:
     for id: String in registry.ids:
         var value: Variant = registry.ids[id]
         var file: String = value if value is String else str(value.file)
-        if not ResourceLoader.exists("res://content/textures/" + file): missing.append("%s -> %s" % [id, file])
+        var full := file if file.begins_with("res://") else "res://content/textures/" + file
+        if not ResourceLoader.exists(full): missing.append("%s -> %s" % [id, file])
         check(Art.has_art(id) and Art.texture(id) != null, "Listed id resolves: " + id)
     check(missing.is_empty(), "Every art.json file exists; missing: " + ", ".join(missing))
     print("art.json: %d ids, %d missing" % [registry.ids.size(), missing.size()])
