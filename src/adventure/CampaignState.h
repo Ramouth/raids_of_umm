@@ -22,6 +22,10 @@
  *                     start_companions still join (a returning companion keeps
  *                     her progression), but the default Ushari does not.
  *
+ * At most two companions ride (AdventureSession::MAX_RIDING): a third is
+ * carried in departed with waiting = true. shownTips: combat tip ids already
+ * shown; they carry even on a new campaign's first map (as flags do).
+ *
  * flags are the story's memory (name → any JSON value), set by the "flag"
  * action and by every resolved choice ("choice.<id>" = option id). Triggers
  * read them with when.flag / when.unless_flag (see Scenario.h).
@@ -37,6 +41,7 @@ struct CampaignState {
     struct Companion {
         std::string id, name, title;
         int level = 1, xp = 0, morale = 0;
+        bool waiting = false;   // departed: stayed behind for want of room, not left
     };
 
     // Position in the campaign.
@@ -55,6 +60,7 @@ struct CampaignState {
     ResourcePool treasury;
 
     Json flags = Json::object();
+    std::vector<std::string> shownTips;       // combat tips already shown (once per campaign)
     int  levelCap = 10;                       // AdventureSession::MAX_HERO_LEVEL unless the map says less
     Json lastMap = Json::object();            // stats of the map carryOut() was taken from
     Json history = Json::array();             // stats of every finished map, in order

@@ -170,6 +170,33 @@ SUITE("Scenario — withdraw in a choice at engage calls the fight off and the p
     CHECK(!loaded.isEncounter({3, 0}) && loaded.scenario().vanished().count("Hill Wolves"));
 }
 
+SUITE("Scenario — a fight waits for the choice raised at its engage; other choices do not hold it") {
+    const std::string mapPath = tempPath("awaits_map.json");
+    CHECK(!fieldMap(HexCoord{0, 0}).saveJson(mapPath));
+    const std::string trig = writeTriggers("awaits", Json::parse(R"({"start_companions": [], "triggers": [
+        {"id": "meet", "when": {"event": "engage", "name": "Hill Wolves"}, "do": [{"choice": {"id": "pack", "options": [
+            {"id": "spare", "then": [{"withdraw": "Hill Wolves"}]},
+            {"id": "fight", "then": []}]}}]}]})"));
+    AdventureSession s;
+    CHECK(!s.start(mapPath, "data", "", 1, trig));
+    CHECK(!s.encounterAwaitsChoice());           // nothing pending
+    s.travel({3, 0});
+    CHECK(s.pendingEncounter() && s.encounterAwaitsChoice());
+    CHECK(!s.scenario().choose(s, "fight"));
+    CHECK(s.pendingEncounter() && !s.encounterAwaitsChoice());   // answered: now it is fought
+
+    const std::string roots = writeTriggers("awaits_roots", Json::parse(R"({"start_companions": [], "triggers": [
+        {"id": "shrine", "when": {"event": "visit", "name": "Shrine"}, "do": [{"choice": {"id": "roots",
+            "allow_exploration": true, "options": [{"id": "go", "then": []}]}}]}]})"));
+    AdventureSession other;                      // an unrelated open choice does not hold a fight
+    CHECK(!other.start(mapPath, "data", "", 1, roots));
+    other.travel({-3, 3});
+    CHECK(other.scenario().awaitingChoice());
+    for (int day = 0; day < 4 && !other.pendingEncounter(); ++day) { other.travel({3, 0}); if (!other.pendingEncounter()) other.endDay(); }
+    CHECK(other.pendingEncounter() && other.scenario().awaitingChoice());
+    CHECK(!other.encounterAwaitsChoice());
+}
+
 SUITE("Scenario — an option with again closes the choice and leaves its trigger live") {
     const std::string mapPath = tempPath("again_map.json");
     CHECK(!fieldMap(HexCoord{0, 0}).saveJson(mapPath));

@@ -28,6 +28,8 @@ var _gate_button: Button
 const EndScreen = preload("res://scripts/end_screen.gd")
 ## Fixed passage seed for tests; -1 picks a random old mine per expedition.
 var passage_seed := -1
+## Unit and item definitions the session reads (tests point it at a fixture copy).
+var data_dir := "res://content/data"
 var unit_names: Dictionary = {}
 var unit_defs: Dictionary = {}
 var item_defs: Dictionary = {}
@@ -49,12 +51,30 @@ const QuestLog = preload("res://scripts/quest_log.gd")
 const GarrisonScreen = preload("res://scripts/garrison_screen.gd")
 const PartyScreen = preload("res://scripts/party_screen.gd")
 const TreeScreen = preload("res://scripts/tree_screen.gd")
+const BattleReport = preload("res://scripts/battle_report.gd")
+## While a battle's close is being handled, the story waits in its queue: the
+## result and spoils screens go in front of it.
+var _holding := false
+var _battle_title := ""
 var _garrison_button: Button
 var _town_button: Button
 var dialogue: PanelContainer
 var quest_log: PanelContainer
 var _offer_box: VBoxContainer
-var _held_lines: Array = []  # dialogue from a journey, shown on arrival
+var _held_story: Array = []  # story events from a journey, played on arrival
+## The engine's story events ("story" in every reply), played strictly in the
+## order the actions ran: lines and notices in the dialogue panel, scenes (and a
+## battle's result and spoils screens) full-screen. Entries are {"line": {...}}
+## for the dialogue panel, {"frames": [...]} for a scene, {"report": ...} for a
+## result screen.
+var _story_queue: Array = []
+var _story_busy := ""   # "" | "screen" (a scene or report is up) | "dialogue" (the panel is speaking)
+var _scene_screen: Control
+var _scene_epoch := 0   # bumped when queued story is dropped: waiters stand down
+## Emitted when no scene or result screen is up or queued (lines may still play).
+signal scenes_done
+## Emitted when every queued story event has been shown, lines included.
+signal story_done
 var _rival_sprites: Dictionary = {}  # rival id -> Node2D on the map
 var _quest_count := 0
 const CombatView = preload("res://scripts/combat.gd")
@@ -82,7 +102,6 @@ var army: Array = STARTING_ARMY.duplicate(true):
         if adventure != null and not _mirroring:
             state = JSON.parse_string(adventure.set_army(JSON.stringify(value)))
 var _mirroring := false   # true while `army` is copied from a snapshot (no push back)
-var inventory: Array = []
 var cleared_dungeons: Dictionary = {}
 var battle: Control
 ## Injected by game.gd; when the scene runs alone (tests, F6) it makes its own.
@@ -138,12 +157,12 @@ func _ready() -> void:
     sidebar.get_node("Overview").pressed.connect(fit_map)
     sidebar.get_node("Portrait").texture = Art.texture("hero.portrait")
     encounter = JSON.parse_string(FileAccess.get_file_as_string("res://content_source/dungeon_encounter.json"))
-    var units: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/units.json"))
+    var units: Variant = JSON.parse_string(FileAccess.get_file_as_string(data_dir.path_join("units.json")))
     if units is Dictionary:
         for unit in units.units:
             unit_names[unit.id] = unit.name
             unit_defs[unit.id] = unit
-    var items: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://content/data/items.json"))
+    var items: Variant = JSON.parse_string(FileAccess.get_file_as_string(data_dir.path_join("items.json")))
     if items is Dictionary:
         for item in items.items: item_defs[item.id] = item
     map_view.art_theme.apply_ui($HUD/Layout)
@@ -175,7 +194,7 @@ func _start_adventure() -> bool:
     var triggers: String = str(map_view.map_path).get_basename() + ".triggers.json"
     var passage: int = passage_seed if passage_seed >= 0 else randi() % 1000000
     state = JSON.parse_string(adventure.start(ProjectSettings.globalize_path(map_view.map_path),
-        ProjectSettings.globalize_path("res://content/data"),
+        ProjectSettings.globalize_path(data_dir),
         ProjectSettings.globalize_path(encounters) if FileAccess.file_exists(encounters) else "", passage,
         ProjectSettings.globalize_path(triggers) if FileAccess.file_exists(triggers) else ""))
     _quest_count = 0
@@ -184,9 +203,9 @@ func _start_adventure() -> bool:
         set_process(false)
         set_process_unhandled_input(false)
         return false
-    var intro: Array = state.get("lines", [])
+    var intro: Array = state.get("story", [])
     army = army  # push the expedition's army into the new session (replaces state)
-    state.lines = intro
+    state.story = intro + state.get("story", [])
     return true
 
 ## Starts (or restarts) the campaign's current map with the carried company.
@@ -201,11 +220,11 @@ func _start_campaign_map() -> bool:
         set_process(false)
         set_process_unhandled_input(false)
         return false
-    var intro: Array = state.get("lines", [])
+    var intro: Array = state.get("story", [])
     var carried: bool = state.get("campaign", {}).get("state", {}).get("carried", false)
     if carried: army = state.army.duplicate(true)
     else: army = army
-    state.lines = intro
+    state.story = intro + state.get("story", [])
     return true
 
 ## Called by the town screen. Returns the native reply (ok/error + snapshot).
@@ -214,6 +233,7 @@ func recruit(town: Vector2i, unit_id: String, count: int) -> Dictionary:
     if reply.get("ok", false):
         state = reply
         army = reply.army.duplicate(true)
+        _say(reply)
         _update_turn_hud()
         _update_expedition()
     return reply
@@ -223,6 +243,7 @@ func build(town: Vector2i, building_id: String) -> Dictionary:
     var reply: Dictionary = JSON.parse_string(adventure.build(town.x, town.y, building_id))
     if reply.get("ok", false):
         state = reply
+        _say(reply)
         _update_turn_hud()
         _update_expedition()
     return reply
@@ -254,6 +275,10 @@ func station(id: String, stay: bool) -> Dictionary:
         _apply_state(reply)
         _say(reply)
     return reply
+
+## Companions riding with the hero (not governing a town, not left behind).
+func riding_count() -> int:
+    return state.get("specials", []).filter(func(sc): return sc.get("stationed") == null).size()
 
 func can_govern() -> bool:
     return _owned_town(hero.cell) and data.objects.get(hero.cell, {}).get("type", "") == "town"
@@ -387,7 +412,6 @@ func _apply_state(next: Dictionary) -> void:
     map_view.mark_sites(state.get("sites", []))
     _show_xp_gain()
     _announce_levels(next)
-    _sync_inventory()
     if quest_log != null and quest_log.visible: quest_log.show_quests(quests, state.get("lore", []), _quest_progress())
     _sync_rivals()
     _update_turn_hud()
@@ -462,15 +486,16 @@ func _level_note(gain: int) -> String:
     if hp.is_empty(): return ""
     return "  → level %d!" % (int(hp.level) + 1) if int(hp.xp) + gain >= int(hp.next) else ""
 
-## Items handed over by the story or found at sites join the combat loot list.
-func _sync_inventory() -> void:
-    var held: Dictionary = {}
-    for item in inventory: held[str(item.id)] = true
+## The items the commander carries (the session's "items"), keepsakes aside:
+## those have their own shelf on the Hero screen. [{id, name}]
+func loot() -> Array:
+    var keepsakes: Dictionary = {}
+    for keepsake in state.get("keepsakes", []): keepsakes[str(keepsake.id)] = true
+    var out: Array = []
     for id in state.get("items", []):
-        if held.has(str(id)): continue
-        var def: Dictionary = item_defs.get(str(id), {})
-        inventory.append({"id": str(id), "name": str(def.get("name", str(id).capitalize())),
-            "description": str(def.get("description", ""))})
+        if keepsakes.has(str(id)): continue
+        out.append({"id": str(id), "name": str(item_defs.get(str(id), {}).get("name", str(id).capitalize()))})
+    return out
 
 ## HoMM3 treasure chest: gold now, or experience for the companions.
 func claim_chest(gold: bool) -> bool:
@@ -664,10 +689,143 @@ func _army_text(stacks: Array) -> String:
     for stack in stacks: parts.append("%d %s" % [stack.count, unit_names.get(stack.id, str(stack.id).replace("_", " "))])
     return ", ".join(parts)
 
-## Shows dialogue carried by a native reply (WC3 transmission).
-func _say(reply: Dictionary) -> void:
-    var lines: Array = reply.get("lines", [])
-    if not lines.is_empty() and dialogue != null: dialogue.say(lines)
+## Plays what a native reply carries: its "story" events, strictly in the order
+## the engine produced them. Lines and notices go to the dialogue panel (the
+## player keeps control); a scene takes the screen and waits for the line before
+## it to be heard. `shown_items`: ids the spoils screen already showed, whose
+## "item" events are not announced again.
+func _say(reply: Dictionary, shown_items: Array = []) -> void:
+    var skip := shown_items.map(func(id): return str(id))
+    for event in reply.get("story", []):
+        var entry := _story_entry(event, skip)
+        if not entry.is_empty(): _story_queue.append(entry)
+    _pump_story()
+
+## One engine story event as a queue entry ({} = nothing to show).
+func _story_entry(event: Dictionary, skip: Array) -> Dictionary:
+    match str(event.get("kind", "")):
+        "line":
+            return {"line": {"speaker": str(event.get("speaker", "")), "text": str(event.get("text", ""))}}
+        "scene":
+            return {"frames": event.get("frames", [])} if not event.get("frames", []).is_empty() else {}
+        "lore":
+            return {"line": {"speaker": "", "title": "Journal", "portrait": "",
+                "text": "New in your journal: %s. Press Q to read it." % str(event.get("title", ""))}}
+        "item":
+            var id := str(event.get("id", ""))
+            if id in skip:
+                skip.erase(id)   # the spoils screen showed this one
+                return {}
+            var keepsake := str(event.get("item_kind", "")) == "keepsake"
+            return {"line": {"speaker": "", "title": "Found", "portrait": "item." + id,
+                "text": "You found: %s. %s" % [str(event.get("name", id)),
+                    "Read it on the Hero screen (H)." if keepsake else "Wear it from the Hero screen (H)."]}}
+        "item_lost":
+            return {"line": {"speaker": "", "title": "Given up", "portrait": "item." + str(event.get("id", "")),
+                "text": "You gave up: %s." % str(event.get("name", event.get("id", "")))}}
+        "party":
+            return {"line": {"speaker": "", "title": "Companions", "portrait": "portrait.companion." + str(event.get("id", "")),
+                "text": str(event.get("text", "")) + "  (P: companions)"}}
+    return {}
+
+## Shows the next queued story entries: every line up to the next scene goes to
+## the dialogue panel; a scene or report waits until the panel has been heard.
+func _pump_story() -> void:
+    if _holding: return
+    while not _story_queue.is_empty():
+        var entry: Dictionary = _story_queue[0]
+        if entry.has("line"):
+            if _story_busy == "screen" or dialogue == null: return
+            _story_queue.pop_front()
+            dialogue.say([entry.line])
+            if _story_busy.is_empty(): _await_dialogue()
+            continue
+        if not _story_busy.is_empty(): break
+        _story_queue.pop_front()
+        _open_story_screen(entry)
+        return
+    if not is_showing_scene(): scenes_done.emit()
+    if not is_playing_story(): story_done.emit()
+
+func _await_dialogue() -> void:
+    _story_busy = "dialogue"
+    var epoch := _scene_epoch
+    await dialogue.drained
+    if epoch != _scene_epoch: return
+    _story_busy = ""
+    _pump_story()
+
+func _open_story_screen(entry: Dictionary) -> void:
+    _story_busy = "screen"
+    var view: Control
+    if entry.has("report"):
+        view = BattleReport.new()
+        view.name = "BattleReport" if entry.report == "result" else "Spoils"
+        view.kind = str(entry.report)
+        view.record = entry.get("record", {})
+        view.spoils = entry.get("spoils", {})
+        view.title = _battle_title
+        view.unit_names = unit_names
+        view.wounded_until = _wounded_days()
+    else:
+        view = ChapterScene.new()
+        view.outcome = {"frames": entry.get("frames", [])}
+        view.heading = _scene_heading()
+        view.close_label = "Back to the map"
+    view.theme = $HUD/Layout.theme
+    _scene_screen = view
+    var epoch := _scene_epoch
+    screens.push(view, func(_result: Dictionary):
+        if epoch != _scene_epoch: return
+        _scene_screen = null
+        _story_busy = ""
+        _pump_story())
+
+## Companion id -> the day their wound heals, for the result screen.
+func _wounded_days() -> Dictionary:
+    var out: Dictionary = {}
+    for sc in state.get("specials", []):
+        if sc.get("wounded", false): out[str(sc.id)] = int(sc.get("wounded_until", 0))
+    return out
+
+## True while a story scene (or a battle's result screen) is on screen or waiting to be.
+func is_showing_scene() -> bool:
+    return _holding or _story_busy == "screen" or _story_queue.any(func(entry): return not entry.has("line"))
+
+## True while any story (a line, a notice, a scene, a report) is on screen or queued.
+func is_playing_story() -> bool:
+    return _holding or not _story_busy.is_empty() or not _story_queue.is_empty()
+
+## True while a battle's result or spoils screen is on screen or waiting.
+func is_showing_report() -> bool:
+    if is_instance_valid(_scene_screen) and _scene_screen is BattleReport: return true
+    return _story_queue.any(func(entry): return entry.has("report"))
+
+## Queues the result screen (and, after a victory that found anything, the
+## spoils screen) ahead of every scene and line the battle set off.
+func _report_battle(record: Dictionary, spoils: Dictionary) -> void:
+    if not str(record.get("result", "")) in ["victory", "defeat", "retreat"]: return
+    var entries: Array = [{"report": "result", "record": record}]
+    var found: bool = not spoils.get("resources", {}).is_empty() or not spoils.get("items", []).is_empty()
+    if record.result == "victory" and found: entries.append({"report": "spoils", "spoils": spoils})
+    for i in entries.size(): _story_queue.insert(i, entries[i])
+
+## Where the scene happens: the landmark the hero stands on, else the map.
+func _scene_heading() -> String:
+    var place := ""
+    if state.has("hero"): place = str(data.objects.get(_hero_cell(), {}).get("name", ""))
+    if place.is_empty(): place = str(campaign_map.get("title", data.title))
+    return place.to_upper()
+
+## Drops story not yet seen (a load or restart replaces the session).
+func _drop_scenes() -> void:
+    _scene_epoch += 1
+    _story_queue.clear()
+    _story_busy = ""
+    if is_instance_valid(_scene_screen): _scene_screen.finished.emit({})
+    _scene_screen = null
+    scenes_done.emit()
+    story_done.emit()
 
 func _update_offers() -> void:
     if _offer_box == null: return
@@ -701,8 +859,9 @@ func save_game() -> bool:
 
 ## The map save, and in campaign mode the campaign's position beside it.
 func _write_saves() -> Dictionary:
-    var extra := {"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])}
-    if campaign != null: extra["campaign_map"] = str(campaign_map.get("id", ""))
+    var extra := {"cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])}
+    if campaign != null:
+        extra["campaign_map"] = str(campaign_map.get("id", ""))
     var reply: Dictionary = JSON.parse_string(adventure.save_game(ProjectSettings.globalize_path(save_path), JSON.stringify(extra)))
     if reply.get("ok", false) and campaign != null:
         reply = JSON.parse_string(campaign.campaign_save(ProjectSettings.globalize_path(campaign_save_path)))
@@ -728,10 +887,11 @@ func _load_map_save(path: String) -> bool:
         return false
     _gate_dismissed = false
     var extra: Dictionary = reply.get("extra", {})
-    inventory = extra.get("inventory", [])
     cleared_dungeons.clear()
     for c in extra.get("cleared_dungeons", []): cleared_dungeons[Vector2i(c[0], c[1])] = true
     if dialogue != null: dialogue.skip_all()
+    _drop_scenes()
+    _held_story = []
     for id in _rival_sprites: _rival_sprites[id].queue_free()
     _rival_sprites.clear()
     state = reply
@@ -744,6 +904,7 @@ func _load_map_save(path: String) -> bool:
     _entered_cell(hero.cell)
     center_hero()
     notice.text = "Game loaded: day %d of week %d." % [state.day_of_week, state.week]
+    _say(reply)   # story still pending when the game was saved
     return true
 
 func toggle_quest_log() -> void:
@@ -1157,7 +1318,7 @@ func travel_to(cell: Vector2i) -> bool:
         return false
     _pending_steps = reply.steps
     _destination = cell
-    _held_lines = reply.get("lines", [])
+    _held_story = reply.get("story", [])
     var walked: Array[Vector2i] = []
     for step in reply.steps: walked.append(Vector2i(step.cell[0], step.cell[1]))
     if reply.encounter != null:
@@ -1203,9 +1364,9 @@ func _journey_finished() -> void:
     if hero.cell == _planned or state.get("encounter") != null:
         _planned = NO_CELL           # arrived, or the road was barred: the plan is done
     if _check_lost(): return
-    if not _held_lines.is_empty():
-        dialogue.say(_held_lines)
-        _held_lines = []
+    if not _held_story.is_empty():
+        _say({"story": _held_story})
+        _held_story = []
     if state.get("encounter") != null:
         _engage()
         return
@@ -1297,12 +1458,18 @@ func _update_expedition() -> void:
     for sc in state.get("specials", []):
         var note := " (governing)" if sc.stationed != null else (" (wounded until day %d)" % int(sc.wounded_until) if sc.get("wounded", false) else "")
         companions.append("%s L%d%s" % [sc.name, sc.level, note])
+    for sc in state.get("departed", []):
+        if sc.get("waiting", false): companions.append("%s (waiting)" % sc.name)
     if not companions.is_empty():
-        _army_label.text += "\nCompanions: " + ", ".join(companions)
-    if not inventory.is_empty():
-        var loot: Array[String] = []
-        for item in inventory: loot.append(item.name)
-        _army_label.text += "\nLoot: " + ", ".join(loot)
+        _army_label.text += "\nCompanions %d/%d: %s" % [riding_count(), int(state.get("max_riding", 2)), ", ".join(companions)]
+    var carried: Array[String] = []
+    for item in loot(): carried.append(str(item.name))
+    if not carried.is_empty():
+        _army_label.text += "\nItems: %s  (H to wear)" % ", ".join(carried)
+    var keepsakes: Array[String] = []
+    for keepsake in state.get("keepsakes", []): keepsakes.append(str(keepsake.name))
+    if not keepsakes.is_empty():
+        _army_label.text += "\nKeepsakes: %s  (H to read)" % ", ".join(keepsakes)
     var at_dungeon: bool = data.objects.get(hero.cell, {}).get("type", "") == "dungeon"
     _enter_button.visible = at_dungeon
     _enter_button.disabled = hero.moving or army.is_empty() or cleared_dungeons.has(hero.cell)
@@ -1327,11 +1494,15 @@ func enter_dungeon() -> bool:
 ## Pushes a combat screen. on_result receives the combat result Dictionary.
 func start_battle(guards: Dictionary, title: String, on_result: Callable) -> bool:
     var view := CombatView.new()
+    _battle_title = title
     screens.push(view, func(result: Dictionary):
         battle = null
+        _holding = true      # the result screen goes before anything this battle sets off
         army = result.survivors.duplicate(true)
         _companions_after(result)
         on_result.call(result)
+        _holding = false
+        _pump_story()
         _update_expedition())
     # Companions ride in beside the troops (wounded or unpaid ones stay behind).
     var fighters: Array = army.duplicate(true)
@@ -1343,6 +1514,7 @@ func start_battle(guards: Dictionary, title: String, on_result: Callable) -> boo
         stack["readied_shot"] = bool(bonus.get("readied_shot", false))   # Marksmen's Tower
     guards["fieldworks"] = state.get("fieldwork_stock", {}).duplicate()
     guards["tactics"] = int(state.get("tactics_rank", 0))   # opening orders the commander may give
+    guards["tips"] = state.get("tip_context", {})            # the engine decides which companion tip is due
     if not army.is_empty(): fighters.append_array(state.get("battle_companions", []))
     if not view.begin(fighters, guards, title):
         view.finished.emit({"result": "error", "survivors": army.duplicate(true), "rewards": []})
@@ -1395,10 +1567,22 @@ var _encounter_type := ""
 ## Starts the pending fight, once whoever is speaking has had their say
 ## (a battle screen would hide the transmission).
 func _engage() -> void:
+    if is_playing_story():
+        if dialogue != null and dialogue.is_speaking():
+            notice.text = "Click the message to hear them out; the fight follows."
+        var epoch := _scene_epoch
+        await story_done
+        if epoch != _scene_epoch or state.get("encounter") == null or is_instance_valid(battle): return   # walked away meanwhile
     if dialogue != null and dialogue.is_speaking():
         notice.text = "Click the message to hear them out; the fight follows."
         await dialogue.drained
-        if state.get("encounter") == null or is_instance_valid(battle): return   # walked away meanwhile
+        if state.get("encounter") == null or is_instance_valid(battle): return
+    if state.get("encounter_awaits_choice", false):
+        # An engage trigger raised a conversation (the Northern Warrior, the Hooded
+        # Stranger): it is answered first. _present_story shows it next frame, and
+        # comes back here only if the answer leaves the fight standing.
+        notice.text = "%s bars the way." % str(state.encounter.get("name", "Someone"))
+        return
     _begin_encounter(state.encounter)
 
 func _begin_encounter(encounter: Dictionary) -> void:
@@ -1407,17 +1591,21 @@ func _begin_encounter(encounter: Dictionary) -> void:
     notice.text = ("The %s attacks!" if encounter.type == "ambush" else "%s bars the way!") % encounter.name
     if int(encounter.get("xp", 0)) > 0: notice.text += "  Victory is worth +%d XP." % int(encounter.xp)
     if army.is_empty() or not start_battle(guards, str(encounter.name), _encounter_finished):
-        adventure.resolve_encounter(false)
+        _apply_state(JSON.parse_string(adventure.resolve_encounter(false)))
 
 func _encounter_finished(result: Dictionary) -> void:
     var victory: bool = result.result == "victory"
     result["encounter_type"] = _encounter_type
-    if victory:
-        inventory.append_array(result.rewards.duplicate(true))
-    var reply: Dictionary = JSON.parse_string(adventure.resolve_encounter(victory, JSON.stringify(result.get("enemy_survivors", null))))
+    var reply: Dictionary = JSON.parse_string(adventure.resolve_encounter(victory, JSON.stringify(result.get("enemy_survivors", null)), JSON.stringify(result.get("battle", null))))
+    if not reply.get("ok", true):
+        notice.text = str(reply.get("error", "The battle could not be settled."))
+        _apply_state(reply)
+        return
+    if result.result != "error": _report_battle(reply.get("battle", {}), reply.get("spoils", {}))
     var place := str(data.objects.get(Vector2i(reply.hero[0], reply.hero[1]), {}).get("name", "The guards"))
     _apply_state(reply)
-    _say(reply)
+    var shown: Array = reply.get("spoils", {}).get("items", []).map(func(item): return str(item.get("id", "")))
+    _say(reply, shown if result.result != "error" else [])
     hero.place_at(_hero_cell())
     _entered_cell(hero.cell)
     if _check_lost(): return
@@ -1460,7 +1648,7 @@ func _at_gate() -> bool:
 func _present_story() -> void:
     if state.is_empty() or is_instance_valid(_story_screen) or is_instance_valid(_end_screen): return
     if hero.moving or is_instance_valid(battle) or turn_busy or is_instance_valid(popup): return
-    if screens.depth() > 0 or dialogue.is_speaking(): return
+    if screens.depth() > 0 or dialogue.is_speaking() or is_playing_story(): return
     var choice: Dictionary = state.get("story_choice", {})
     var outcome: Dictionary = state.get("story_outcome", {})
     if choice.is_empty() and outcome.is_empty(): return
@@ -1492,7 +1680,7 @@ func _present_story() -> void:
                 return
             var saved: Dictionary = JSON.parse_string(adventure.save_game(
                 ProjectSettings.globalize_path("user://chapter_one.json"),
-                JSON.stringify({"inventory": inventory, "cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])})))
+                JSON.stringify({"cleared_dungeons": cleared_dungeons.keys().map(func(c): return [c.x, c.y])})))
             if not saved.get("ok", false): push_warning("Could not save chapter outcome: " + str(saved.get("error", "")))
             _present_story()
         elif result.get("action", "") == "leave_gate":
@@ -1503,6 +1691,10 @@ func _present_story() -> void:
 
 func _show_end(victory: bool, reason := "") -> void:
     if is_instance_valid(_end_screen): return  # already showing
+    if is_showing_scene():   # the scene the ending came with plays first
+        var epoch := _scene_epoch
+        await scenes_done
+        if epoch != _scene_epoch or is_instance_valid(_end_screen): return
     var screen := EndScreen.new()
     screen.theme = $HUD/Layout.theme
     _end_screen = screen
@@ -1562,13 +1754,23 @@ func _campaign_end(screen: Control, victory: bool, reason: String) -> void:
         screen.actions = [["Onward: %s" % str(next.get("title", "the next land")), "continue"], ["Quit", "quit"]]
 
 func _dungeon_finished(result: Dictionary, cell: Vector2i) -> void:
+    # A dungeon is not a map encounter: its record and loot come from the battle itself.
+    var found: Array = []
+    if result.result == "victory" and not cleared_dungeons.has(cell):
+        for item in result.get("rewards", []):
+            var def: Dictionary = item_defs.get(str(item.id), {})
+            var keepsake := str(def.get("kind", "")) == "keepsake"
+            found.append({"id": str(item.id), "name": str(item.name), "kind": "keepsake" if keepsake else "commander",
+                "text": str(def.get("text", "")) if keepsake else str(item.get("description", ""))})
+    _report_battle(result.get("battle", {"result": result.result}), {"resources": {}, "items": found})
+    for id in result.get("battle", {}).get("tips", []):   # a dungeon is no map encounter: its tips are recorded here
+        state = JSON.parse_string(adventure.tip_shown(str(id)))
     if result.result == "victory" and not cleared_dungeons.has(cell):
         cleared_dungeons[cell] = true
-        inventory.append_array(result.rewards.duplicate(true))
         for item in result.rewards:
             var reply: Dictionary = JSON.parse_string(adventure.add_item(str(item.id)))
             _apply_state(reply)
-            _say(reply)
+            _say(reply, found.map(func(f): return f.id))
     notice.text = {"victory": "Victory! Survivors and loot have returned to the expedition.", "defeat": "The army has fallen.", "retreat": "Your survivors return. The dungeon remains guarded."}.get(result.result, "Returned to the map.")
     _check_defeat()
 
@@ -1581,10 +1783,10 @@ func _restart() -> void:
     _end_screen = null
     _story_screen = null
     if dialogue != null: dialogue.skip_all()
+    _drop_scenes()
     for id in _rival_sprites: _rival_sprites[id].queue_free()
     _rival_sprites.clear()
     army = STARTING_ARMY.duplicate(true)  # pushed into the new session by _start_adventure
-    inventory.clear()
     cleared_dungeons.clear()
     if not _start_adventure(): return
     _last_xp = -1

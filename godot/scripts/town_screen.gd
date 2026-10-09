@@ -11,7 +11,7 @@ const CARD := Vector2(170, 360)
 var host: Node        # desert.gd: provides state, unit_defs, recruit()
 var cell := Vector2i.ZERO
 var view_art := "screen.town_khemret"   # Art id (or data file); dwellings pass their map sprite
-var eyebrow_text := "IVORY COMPACT  ·  TOWN"
+var eyebrow_text := "TOWN"
 var can_build := true   # dwellings on the map only recruit
 var tab := "recruit"
 var _tabs: Dictionary = {}       # name -> Button
@@ -24,6 +24,7 @@ var _trade_amount: SpinBox
 var _quote: Label
 var _treasury: Label
 var _army: HBoxContainer
+var _army_heading: Label
 var _cards: HBoxContainer
 var _message: Label
 var _home_report: Label
@@ -37,7 +38,7 @@ func _ready() -> void:
     var town := _town()
     _is_home = can_build and town.get("name", "") == "Varenhold"
     if _is_home: tab = "hall"
-    if can_build and not str(town.get("title", "")).is_empty(): eyebrow_text = "IVORY COMPACT  ·  " + str(town.title).to_upper()
+    if can_build and not str(town.get("title", "")).is_empty(): eyebrow_text = str(town.title).to_upper()   # e.g. "SEAT OF HOUSE VAREN"
     if can_build and not str(town.get("art", "")).is_empty(): view_art = str(town.art)
     _panel(Rect2(24, 18, 1232, 96))
     var title := _label(str(town.get("name", "Town")).to_upper(), 30, Color("f3dfb0"))
@@ -111,9 +112,10 @@ func _ready() -> void:
     add_child(_message)
 
     _panel(Rect2(24, 662, 1232, 120))
-    var army_heading := _label("YOUR ARMY", 13, Color("ad854a"))
-    army_heading.position = Vector2(46, 672)
-    add_child(army_heading)
+    _army_heading = _label("YOUR ARMY", 13, Color("ad854a"))
+    _army_heading.name = "ArmyHeading"
+    _army_heading.position = Vector2(46, 672)
+    add_child(_army_heading)
     _army = HBoxContainer.new()
     _army.position = Vector2(46, 694)
     _army.add_theme_constant_override("separation", 10)
@@ -193,17 +195,22 @@ func _home_page() -> Control:
 
 func _refresh_home() -> void:
     if _home_report == null: return
-    var searching := false
-    var road_clear := false
-    for quest in host.state.get("quests", []):
-        if quest.id == "aldren": searching = true
-        if quest.id == "wolves" and quest.done: road_clear = true
-    if not road_clear:
-        _home_report.text = "Aldren's rooms are ready for his guest. The steward is waiting for word that the west road is safe."
-    elif searching:
-        _home_report.text = "Your father expects you to bring Aldren home. If the trail fails, return here and wait. His place at the table is still set."
-    else:
-        _home_report.text = "The gates are open to your expedition. Muster your household, provision the wagons, and prepare for the road."
+    # What the household says follows the story: the quests given on this map.
+    var quests := {}
+    for quest in host.state.get("quests", []): quests[str(quest.id)] = bool(quest.done)
+    var lines: Array[String] = []
+    if quests.has("hunt") and not quests.hunt:
+        lines.append("Your father waits in the hall to hear how the hunt went.")
+    elif quests.has("hall") and not quests.hall:
+        lines.append("The hall is being made ready. Your father means to toast Aldren tonight.")
+    if quests.has("aldren") and not quests.aldren:
+        lines.append("Aldren's rooms are empty. His place at the table is still set.")
+    if quests.has("dogs"):
+        lines.append("The herds are back out on the hills now that the mad dogs are dead." if quests.dogs
+            else "The herdsmen keep their flocks inside the walls while the mad dogs run loose in the vale.")
+    if lines.is_empty():
+        lines.append("The household goes about its day. The steward keeps the hall in order for your father.")
+    _home_report.text = " ".join(lines)
     var garrison := 0
     for entry in host.state.get("garrisons", []):
         if Vector2i(entry.cell[0], entry.cell[1]) == cell:
@@ -474,6 +481,11 @@ func refresh() -> void:
             int(town.get("gold", 0)), growth]
     _update_quote()
     for child in _army.get_children(): child.queue_free()
+    # The column's limit (the engine's max_stacks): a sixth kind of soldier has no room.
+    var stacks: int = state.get("army", []).size()
+    var most := int(state.get("max_stacks", 5))
+    _army_heading.text = "YOUR ARMY   ·   STACKS %d/%d%s" % [stacks, most,
+        "   ·   FULL: only troops you already lead can be recruited" if stacks >= most else ""]
     for stack in state.get("army", []):
         var slot := VBoxContainer.new()
         slot.custom_minimum_size = Vector2(120, 0)

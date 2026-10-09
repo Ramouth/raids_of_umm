@@ -2,13 +2,16 @@ extends Control
 ## Companions (P): each companion's level and XP, battle stats at that level,
 ## aura, map abilities, upkeep and status (travelling, governing, wounded, unpaid).
 ## In an owned town a companion can be left to govern (+100 gold per level a
-## day, no XP) or recalled.
+## day, no XP) or recalled. Companions who stayed behind wait, greyed out, below
+## the riders. The header gives the engine's limits: riding companions out of
+## max_riding, troop stacks out of max_stacks.
 
 signal finished(result: Dictionary)
 
 var host: Node   # desert.gd: provides state, station()
 var _list: VBoxContainer
 var _message: Label
+var _limits: Label
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -28,6 +31,12 @@ func _ready() -> void:
     var sub := _label("Special characters grow stranger and stronger with every victory, and dearer to keep.", 14, Color("c8b08a"))
     sub.position = Vector2(120, 118)
     add_child(sub)
+    _limits = _label("", 16, Color("f0c870"))
+    _limits.name = "Limits"
+    _limits.position = Vector2(640, 84)
+    _limits.size = Vector2(520, 24)
+    _limits.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    add_child(_limits)
     var scroll := ScrollContainer.new()
     scroll.position = Vector2(120, 150)
     scroll.size = Vector2(1040, 500)
@@ -59,6 +68,35 @@ func refresh() -> void:
         _list.add_child(_label("No companions ride with you.", 16, Color("9a8468")))
     for sc in specials:
         _list.add_child(_card(sc))
+    for sc in host.state.get("departed", []):
+        if sc.get("waiting", false): _list.add_child(_waiting_card(sc))
+    var riding: int = specials.filter(func(sc): return sc.get("stationed") == null).size()
+    _limits.text = "Companions %d/%d   ·   Stacks %d/%d" % [riding, int(host.state.get("max_riding", 2)),
+        host.state.get("army", []).size(), int(host.state.get("max_stacks", 5))]
+
+## A companion who stayed behind: greyed, and where they are.
+func _waiting_card(sc: Dictionary) -> Control:
+    var row := HBoxContainer.new()
+    row.name = "Waiting_" + str(sc.id)
+    row.add_theme_constant_override("separation", 18)
+    row.modulate = Color(0.6, 0.6, 0.6)
+    var portrait := TextureRect.new()
+    portrait.texture = Art.texture("portrait.companion." + str(sc.id), "portrait.default")
+    portrait.custom_minimum_size = Vector2(96, 96)
+    portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+    row.add_child(portrait)
+    var column := VBoxContainer.new()
+    row.add_child(column)
+    var title := str(sc.get("title", ""))
+    column.add_child(_label("%s%s" % [sc.name, ("  ·  " + title) if not title.is_empty() else ""], 18, Color("c8b08a")))
+    var status := _label("Level %d   ·   WAITING: stayed behind when the company was full, and waits for word from you." % int(sc.level), 13, Color("9a8468"))
+    status.name = "Status"
+    status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    status.custom_minimum_size = Vector2(700, 0)
+    column.add_child(status)
+    return row
 
 func _card(sc: Dictionary) -> Control:
     var row := HBoxContainer.new()
@@ -78,7 +116,7 @@ func _card(sc: Dictionary) -> Control:
     if int(sc.unpaid) >= 3: status = "UNPAID %d days — abilities withheld, leaves at 7" % int(sc.unpaid)
     elif int(sc.unpaid) > 0: status += "  ·  unpaid %d day(s)" % int(sc.unpaid)
     if int(sc.get("morale", 0)) < 0: status += "  ·  Distant since your conversation"
-    column.add_child(_label("%s  ·  %s" % [sc.name, sc.title], 18, Color("f0c870")))
+    column.add_child(_label("%s%s" % [sc.name, ("  ·  " + str(sc.title)) if not str(sc.get("title", "")).is_empty() else ""], 18, Color("f0c870")))
     column.add_child(_label("Level %d   ·   XP %d / %d   ·   Upkeep %d gold a day   ·   %s" % [sc.level, sc.xp, sc.next, sc.upkeep, status], 13, Color("c8b08a")))
     var bar := ProgressBar.new()
     bar.max_value = maxi(1, int(sc.next))

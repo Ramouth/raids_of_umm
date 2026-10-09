@@ -59,7 +59,7 @@ to adjacent stacks), companion level growth.
 
 - 16 items. Their effects are attack, defense and speed only, and they apply to troops, not companions.
 - 3 are cursed and cannot be removed: Cursed Eye of Set, Drowned Crown, Warm Stone.
-- The Hermit's Seed has no effect.
+- A Warm Seed has no effect.
 - No item can grant an ability.
 
 ## 5. Statuses
@@ -88,3 +88,10 @@ bitten, mad.
   - a data record for a status: its name, what it does and what cures it;
   - an active ability with a cost or cooldown, on the map or in battle;
   - a single place that defines an ability as data, shared by units, companions, path nodes and items.
+
+## Added since (2026-10-09)
+
+- Drest (companion, `drest`): defence aura +2, radius 1 (same mechanic as Ushari's). Battle tips in `data/combat_tips.json`.
+- `feral_dog` (1.0, no abilities: the sickness is text only) and `northern_warrior` (1.2, no abilities).
+- Keepsake items (`kind: keepsake`): readable, no effects; first is the Dog Tag.
+- Story conditions are one system now (`docs/story_conditions.md`); ability conditions should reuse it.

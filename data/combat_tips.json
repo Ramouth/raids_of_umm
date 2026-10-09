@@ -1,0 +1,71 @@
+{
+  "_about": "Short lines a companion says during battle to teach the rules. The engine (src/combat/CombatTips.cpp) decides when a tip is due: at most once per campaign, the first time its 'when' holds on one of its 'maps' (campaign map ids) while its speaker is fighting and standing; Godot only shows it. 'when' is one of the keys in when_keys; nothing else is read. Checked by scripts/chapter1_story.py.",
+  "when_keys": {
+    "battle_start": "the first battle",
+    "first_turn_shooter": "a player stack with shots left takes its turn",
+    "enemy_adjacent": "an enemy stack stands next to one of the player's stacks",
+    "flanked": "a player stack has enemies on two opposite sides (pinned)",
+    "low_stack": "a player stack is below a quarter of the count it started the battle with",
+    "defend_available": "the first time the player could choose Defend",
+    "victory_first": "after the first battle the player wins",
+    "companion_hit": "a companion takes damage"
+  },
+  "tips": [
+    {
+      "id": "drest_battle_start",
+      "when": "battle_start",
+      "speaker": "Drest",
+      "text": "Keep me next to whoever takes the first blow, boy. Men stand steadier with me beside them.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_shooters",
+      "when": "first_turn_shooter",
+      "speaker": "Drest",
+      "text": "Let the slingers throw while the field is open. Once something is at their throats they can't sling, and they fight badly hand to hand.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_retaliation",
+      "when": "enemy_adjacent",
+      "speaker": "Drest",
+      "text": "Whatever you hit hits back, but only once a round. Send the cheap blades in first; the good ones strike after.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_flanked",
+      "when": "flanked",
+      "speaker": "Drest",
+      "text": "They're on both sides of you. Pinned men can't strike back, and every blow bites deeper. Get out, then do it to them.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_low_stack",
+      "when": "low_stack",
+      "speaker": "Drest",
+      "text": "Those few won't win it. Pull them back behind the others before you lose them all.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_defend",
+      "when": "defend_available",
+      "speaker": "Drest",
+      "text": "Nothing worth hitting? Then defend. They hold their guard until their next turn.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_lone_wolf",
+      "when": "victory_first",
+      "speaker": "Drest",
+      "text": "Not bad, boy. Remember: Woad Runners and Painted Blades hit hardest with no friend at their elbow.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    },
+    {
+      "id": "drest_companion_hit",
+      "when": "companion_hit",
+      "speaker": "Drest",
+      "text": "Mind the ones with names, boy. You can raise more slingers. You can't raise another of us.",
+      "maps": ["1.0", "1.1", "1.2", "1.3"]
+    }
+  ]
+}

@@ -98,6 +98,9 @@ public:
     int               roundNumber() const { return m_round; }
     const std::vector<TurnSlot>& turnOrder() const { return m_queue; }
     int               turnIndex() const { return m_turn; }
+    // Battle record so far (see BattleStats) and each side's losses by unit id.
+    const BattleStats& stats() const { return m_stats; }
+    std::vector<BattleLoss> losses(bool isPlayer) const;
 
     // Returns the unit currently acting.
     const CombatUnit& activeUnit() const;
@@ -374,6 +377,10 @@ private:
     bool hitStack(bool targetIsPlayer, int targetIndex, int damage, bool melee,
                   const CombatUnit* striker = nullptr);
 
+    // Credit `striker` (if it is a stack on the other side) with one blow.
+    // Membership is tested by address equality, never by pointer subtraction.
+    void recordHit(const CombatUnit* striker, bool targetIsPlayer, int hpLost, int kills);
+
     // A stack that destroyed an enemy stack gains its renown (if it has any).
     void gainRenown(CombatUnit& victor);
 
@@ -404,6 +411,7 @@ private:
     std::mt19937          m_aiRng;
 
     std::vector<CombatEvent> m_events;   // output queue; drained by CombatState
+    BattleStats              m_stats;
 
     // Pending branch choice state.
     bool m_pendingChoice         = false;

@@ -1,5 +1,7 @@
 # Map and story handoff
 
+> **Archived (2026-10-09).** This describes the old "Old Passage" demo (wolves, the hooded druid, Corvin, Kaldur). It is kept for its method and history. The current story is Chapter 1 "The Marches": its single source is the header of `scripts/chapter1_story.py`, published as the "Chapter 1 — The Marches" tab of the story doc. Factions: `Factions.md`.
+
 One challenge that remains is moving from a computer world to a fantasy world
 with verisimilitude. The challenge is to build a world that makes the demo feel
 like a place—not through good sprites, but through design.

@@ -10,7 +10,7 @@
 #include <vector>
 
 /*
- * ArmySlot — one of a hero's 7 unit stack slots.
+ * ArmySlot — one of a hero's 5 unit stack slots.
  *
  * unitType points into the ResourceManager registry (never owned here).
  * count is the number of creatures in the stack.
@@ -47,14 +47,16 @@ struct Hero {
     bool hasMoves()         const { return movesLeft > 0; }
     bool canReach(int steps) const { return steps <= movesLeft; }
 
-    // ── Army (up to 7 stacks, HoMM3-style) ───────────────────────────────────
-    static constexpr int ARMY_SLOTS = 7;
+    // ── Army (up to 5 stacks: one per row of the battlefield) ───────────────
+    // A hero rides with at most 5 troop stacks and 2 companions (design rule,
+    // 2026-10-09); AdventureSession enforces both.
+    static constexpr int ARMY_SLOTS = 5;
     std::array<ArmySlot, ARMY_SLOTS> army{};
 
     // Number of non-empty slots.
     int  armySize() const;
 
-    // True when all 7 slots are occupied.
+    // True when all ARMY_SLOTS slots are occupied.
     bool armyFull() const;
 
     // Find an existing stack of this unit type (first match), or nullptr.
@@ -74,8 +76,8 @@ struct Hero {
     // True if inventory contains an item with this id.
     bool hasItem(const std::string& id) const;
 
-    // ── Special Characters (up to 3 party members) ───────────────────────────
-    static constexpr int SC_SLOTS = 3;
+    // ── Special Characters (up to 2 riding companions) ───────────────────────
+    static constexpr int SC_SLOTS = 2;
     std::vector<SpecialCharacter> specials;  // max SC_SLOTS entries
 
     // True when all SC slots are occupied.

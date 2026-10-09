@@ -4,6 +4,7 @@
 #include "world/WondrousItem.h"
 #include "world/MapObject.h"
 #include "world/BuildingDef.h"
+#include "world/CombatTip.h"
 #include "world/Resources.h"
 #include <string>
 #include <vector>
@@ -52,9 +53,13 @@ public:
     const std::vector<const SpellDef*>&     allSpells()   const { return m_allSpells; }
     const std::vector<const WondrousItem*>& allItems()    const { return m_allItems; }
 
+    // Companion lines in battle (combat_tips.json, optional), in file order.
+    const std::vector<CombatTip>& combatTips() const { return m_combatTips; }
+
     bool loaded() const { return m_loaded; }
 
 private:
+    std::vector<CombatTip>                        m_combatTips;
     std::unordered_map<std::string, UnitType>     m_units;
     std::unordered_map<std::string, SpellDef>     m_spells;
     std::unordered_map<std::string, WondrousItem> m_items;
@@ -72,6 +77,7 @@ private:
     std::optional<std::string> loadSpells   (const std::string& path);
     std::optional<std::string> loadBuildings(const std::string& path);
     std::optional<std::string> loadItems    (const std::string& path);
+    std::optional<std::string> loadCombatTips(const std::string& path);
     void rebuildViews();
 
     // Keyed by ObjType cast to int; populated by loadBuildings().

@@ -119,8 +119,13 @@ add_executable(raids_tests
     tests/test_tactics.cpp
     tests/test_town_buildings.cpp
     tests/test_hero_equipment.cpp
+    tests/test_battle_spoils.cpp
+    tests/test_conditions.cpp
+    tests/test_party_limits.cpp
+    tests/test_combat_tips.cpp
     src/adventure/AdventureSession.cpp
     src/adventure/Scenario.cpp
+    src/adventure/Condition.cpp
     src/adventure/Rivals.cpp
     src/adventure/Specials.cpp
     src/adventure/SessionSave.cpp
@@ -132,6 +137,7 @@ add_executable(raids_tests
     src/render/RenderOffsets.cpp
     src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
+    src/combat/CombatTips.cpp
     src/core/ResourceManager.cpp
     src/core/TurnManager.cpp
     src/hero/Hero.cpp

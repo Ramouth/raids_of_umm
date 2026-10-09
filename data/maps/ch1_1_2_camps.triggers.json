@@ -1,5 +1,7 @@
 {
-  "start_companions": [],
+  "start_companions": [
+    "drest"
+  ],
   "quests": [
     {
       "id": "aldren",
@@ -47,6 +49,103 @@
           "lore": [
             "An empty camp",
             "Dog-pens of split pine, their gates hanging open, and sled tracks coming down out of the north. A cut leash lies in the mud, on a studded collar no one in the Marches makes. Snagged on a gatepost: a scrap of white fur, and a few strands of pale hair."
+          ]
+        },
+        {
+          "say": [
+            [
+              "Drest",
+              "Read the ground, boy. Someone came down the burn after those dogs, and not long ago."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "warrior",
+      "when": {
+        "event": "engage",
+        "name": "Northern Warrior"
+      },
+      "do": [
+        {
+          "choice": {
+            "id": "warrior",
+            "title": "A Man in the Snow",
+            "text": "A big man in white furs stands in the snow above the burn, the end of a cut leash in his fist. Further up the burn, others in white furs wait. He whistles, waits, and whistles again. Then he sees you, and his hand goes to his axe.",
+            "options": [
+              {
+                "id": "give_tag",
+                "label": "Hand him the dog tag",
+                "if": {
+                  "item": "dog_tag"
+                },
+                "then": [
+                  {
+                    "take_item": "dog_tag"
+                  },
+                  {
+                    "say": [
+                      [
+                        "Northern Warrior",
+                        "Drusk... Grath vorrn uthk."
+                      ],
+                      [
+                        "Drest",
+                        "Well done. Your brother would have reached for his sword."
+                      ]
+                    ]
+                  },
+                  {
+                    "scene": {
+                      "frames": [
+                        {
+                          "scene": "dog_tag",
+                          "text": "He closes his fist on the tag\nand says the dog's name once more, softly."
+                        },
+                        {
+                          "scene": "dog_tag",
+                          "text": "Then he looks north, and goes."
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "withdraw": "Northern Warrior"
+                  }
+                ]
+              },
+              {
+                "id": "fight",
+                "label": "Fight",
+                "then": [],
+                "detail": "His kin will come down the burn with him."
+              }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Northern Warrior",
+                "Drusk! Hrakh, Drusk!"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "warrior_fought",
+      "when": {
+        "event": "encounter_won",
+        "name": "Northern Warrior"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Drest",
+              "Northmen, this far south. Not in my lifetime."
+            ]
           ]
         }
       ]
@@ -219,10 +318,66 @@
       ]
     },
     {
+      "id": "ushari_bridge",
+      "when": {
+        "event": "visit",
+        "name": "Red Banner Camp"
+      },
+      "if": {
+        "all": [
+          {
+            "not": {
+              "companion": "ushari"
+            }
+          },
+          {
+            "not": {
+              "trigger_fired": "camp_strangers"
+            }
+          }
+        ]
+      },
+      "do": [
+        {
+          "scene": {
+            "frames": [
+              {
+                "scene": "road",
+                "text": "As you near the bridge, a rider comes up the road behind you.\nA woman, riding alone."
+              }
+            ]
+          }
+        },
+        {
+          "say": [
+            [
+              "Ushari",
+              "I am Ushari. That sword: the man who carried it rode past us going east, and would not take me with him."
+            ],
+            [
+              "Ushari",
+              "My people have gone on ahead. I ride with you."
+            ]
+          ]
+        },
+        {
+          "join": "ushari"
+        },
+        {
+          "vanish": "Strangers' Camp"
+        }
+      ]
+    },
+    {
       "id": "camp_strangers",
       "when": {
         "event": "visit",
         "name": "Strangers' Camp"
+      },
+      "if": {
+        "not": {
+          "trigger_fired": "ushari_bridge"
+        }
       },
       "do": [
         {
@@ -243,6 +398,17 @@
                   },
                   {
                     "event": "camp_decided"
+                  },
+                  {
+                    "say": [
+                      [
+                        "Ushari",
+                        "Then I owe you. The others go on east in the morning. I ride with you."
+                      ]
+                    ]
+                  },
+                  {
+                    "join": "ushari"
                   }
                 ]
               },
@@ -263,6 +429,17 @@
                   },
                   {
                     "event": "camp_decided"
+                  },
+                  {
+                    "say": [
+                      [
+                        "Ushari",
+                        "Paid, then. The others go on ahead. I ride with you, and owe you nothing."
+                      ]
+                    ]
+                  },
+                  {
+                    "join": "ushari"
                   }
                 ]
               },
@@ -278,6 +455,17 @@
                   },
                   {
                     "event": "camp_decided"
+                  },
+                  {
+                    "say": [
+                      [
+                        "Ushari",
+                        "Then the others go tonight. You are going where he went, and so am I."
+                      ]
+                    ]
+                  },
+                  {
+                    "join": "ushari"
                   }
                 ]
               }
@@ -287,6 +475,10 @@
               [
                 "Ushari",
                 "I am Ushari. We are four, and we pay our way."
+              ],
+              [
+                "Ushari",
+                "That sword. The man who carried it rode past us going east, and would not let me ride with him."
               ]
             ]
           }
@@ -304,7 +496,7 @@
           "choice": {
             "id": "red_banner",
             "title": "The Red Banner",
-            "text": "A red hand is painted on their banner.",
+            "text": "A red hand is painted on their banner, and on every shield.",
             "options": [
               {
                 "id": "let_pass",
@@ -382,7 +574,11 @@
             "lines": [
               [
                 "Captain",
-                "We cross your bridge tonight, and we take what we need from your fields. You may watch."
+                "We hold your bridge tonight, and we take what we need from your fields. You may watch."
+              ],
+              [
+                "Drest",
+                "Look at their shields, boy. That is the hand on your sword."
               ]
             ]
           }
@@ -420,12 +616,29 @@
     {
       "id": "camps_done",
       "when": {
-        "event": "camp_decided",
-        "flag": [
-          "choice.camp_riverside",
-          "choice.camp_meadow",
-          "choice.camp_strangers",
-          "choice.red_banner"
+        "event": "camp_decided"
+      },
+      "if": {
+        "all": [
+          {
+            "flag": "choice.camp_riverside"
+          },
+          {
+            "flag": "choice.camp_meadow"
+          },
+          {
+            "any": [
+              {
+                "flag": "choice.camp_strangers"
+              },
+              {
+                "trigger_fired": "ushari_bridge"
+              }
+            ]
+          },
+          {
+            "flag": "choice.red_banner"
+          }
         ]
       },
       "do": [
@@ -483,10 +696,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 16,
-        "after": "east_road_1",
-        "flag": {
-          "choice.east_road": "not_yet"
-        }
+        "after": "east_road_1"
+      },
+      "if": {
+        "flag": "choice.east_road",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -530,10 +744,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 16,
-        "after": "east_road_2",
-        "flag": {
-          "choice.east_road": "not_yet"
-        }
+        "after": "east_road_2"
+      },
+      "if": {
+        "flag": "choice.east_road",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -577,10 +792,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 16,
-        "after": "east_road_3",
-        "flag": {
-          "choice.east_road": "not_yet"
-        }
+        "after": "east_road_3"
+      },
+      "if": {
+        "flag": "choice.east_road",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -619,5 +835,9 @@
         }
       ]
     }
+  ],
+  "essential_companions": [
+    "drest",
+    "ushari"
   ]
 }

@@ -14,7 +14,14 @@ public:
     Json preview(int q, int r) const;
     Json travel(int q, int r);
     Json end_day();
-    Json resolve_encounter(bool victory, const Json& enemy_survivors = nullptr);
+    // battle: the combat snapshot's "battle" record (null = none). The reply adds
+    //   "battle": that record with result (victory | defeat | retreat) and xp (what
+    //   the commander gained, after the level cap), and
+    //   "spoils": {resources: {name: n} (non-zero only), items: [{id, name, kind, text}]}.
+    // The record's "tips" (ids the battle showed) are remembered for the campaign.
+    // Refused ({ok: false}) while "encounter_awaits_choice" holds.
+    Json resolve_encounter(bool victory, const Json& enemy_survivors = nullptr, const Json& battle = nullptr);
+    Json tip_shown(const std::string& id);   // a combat tip was shown: never again this campaign
     Json set_army(const Json& stacks);
     Json build(int q, int r, const std::string& id);
     Json equip(const std::string& id);       // commander's paper doll
@@ -65,7 +72,11 @@ public:
     Json campaign_load_save(const std::string& path);
 
 private:
-    Json with_lines(Json out);  // attaches dialogue produced by the last action
+    // Attaches what the last action produced for the UI: "story" (every event in
+    // order, see Scenario::drainStory: line | scene | lore | item | item_lost | party),
+    // "lines" and "scenes" (the same events filtered, for older callers), "level_ups".
+    Json with_lines(Json out);
+    void attach_story(Json& out);   // drains the story queue into story / lines / scenes
     Json campaign_json() const;
     AdventureSession session_;
     Campaign         campaign_;

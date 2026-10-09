@@ -1,6 +1,6 @@
 extends Control
 ## Garrison: move stacks between the hero's army and troops left at a mine
-## or town (HoMM3-style). A Shariw war-band must beat the garrison to take it.
+## or town (HoMM3-style). Raiders must beat the garrison to take it.
 
 signal finished(result: Dictionary)
 
@@ -18,7 +18,7 @@ func _ready() -> void:
     var heading := _label("GARRISON  ·  " + title.to_upper(), 24, Color("f3dfb0"))
     heading.position = Vector2(170, 110)
     add_child(heading)
-    var hint := _label("Troops left here defend it when the Shariw come. Stronger garrisons scare raiders off.", 14, Color("c8b08a"))
+    var hint := _label("Troops left here defend it when trouble comes. Stronger garrisons scare raiders off.", 14, Color("c8b08a"))
     hint.position = Vector2(170, 150)
     add_child(hint)
     var left := _label("YOUR ARMY", 13, Color("ad854a"))

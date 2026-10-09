@@ -175,13 +175,15 @@ SUITE("Hero — addUnit returns false when army full with new type") {
     ResourceManager rm;
     rm.load("data");
     Hero h;
-    const char* ids[] = {
-        "skeleton_warrior","mummy","djinn",
-        "sand_scorpion","desert_archer","ancient_guardian","pharaoh_lich"
-    };
+    // Five stacks at most (design rule 2026-10-09): the sixth type is refused.
+    const char* ids[] = {"skeleton_warrior","mummy","djinn","sand_scorpion","desert_archer"};
+    CHECK_EQ(Hero::ARMY_SLOTS, 5);
     for (const char* id : ids)
-        h.addUnit(rm.unit(id), 1);
+        CHECK(h.addUnit(rm.unit(id), 1));
     CHECK(h.armyFull());
+    CHECK(!h.addUnit(rm.unit("ancient_guardian"), 1));
+    CHECK(h.addUnit(rm.unit("mummy"), 4));             // a stack already riding still merges
+    CHECK_EQ(h.findStack("mummy")->count, 5);
     // A genuinely new unit type (not yet in any slot) must fail to add.
     UnitType newType;
     newType.id = "ghost";
@@ -272,7 +274,7 @@ SUITE("Hero — cursed item added same as normal item") {
 SUITE("ResourceManager — loads all 14 items (5 desert + 9 northern) from data/items.json") {
     ResourceManager rm;
     rm.load("data");
-    CHECK_EQ((int)rm.allItems().size(), 16);   // + red_hand_sword, hermits_seed (chapter 1)
+    CHECK_EQ((int)rm.allItems().size(), 17);   // + red_hand_sword, hermits_seed (A Warm Seed), dog_tag (chapter 1)
 }
 
 SUITE("ResourceManager — known item lookup returns correct fields") {
@@ -400,8 +402,9 @@ SUITE("Hero — addSpecial rejects duplicate id") {
     CHECK_EQ((int)h.specials.size(), 1);
 }
 
-SUITE("Hero — scFull after 3 specials, rejects 4th") {
+SUITE("Hero — scFull after 2 specials, rejects 3rd") {
     Hero h;
+    CHECK_EQ(Hero::SC_SLOTS, 2);
     for (int i = 0; i < Hero::SC_SLOTS; ++i) {
         SpecialCharacter sc;
         sc.id = std::string("sc") + std::to_string(i);
@@ -411,7 +414,7 @@ SUITE("Hero — scFull after 3 specials, rejects 4th") {
     SpecialCharacter extra;
     extra.id = "extra";
     CHECK(!h.addSpecial(extra));
-    CHECK_EQ((int)h.specials.size(), 3);
+    CHECK_EQ((int)h.specials.size(), 2);
 }
 
 SUITE("Hero — findSpecial returns pointer when present") {

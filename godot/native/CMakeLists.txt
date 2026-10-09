@@ -24,6 +24,7 @@ get_filename_component(UMM_ROOT "../.." ABSOLUTE)
 add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/combat/CombatEngine.cpp"
     "${UMM_ROOT}/src/combat/CombatAI.cpp"
+    "${UMM_ROOT}/src/combat/CombatTips.cpp"
     "${UMM_ROOT}/src/core/ResourceManager.cpp"
     "${UMM_ROOT}/src/core/TurnManager.cpp"
     "${UMM_ROOT}/src/hero/Hero.cpp"
@@ -31,6 +32,7 @@ add_library(umm_combat_core STATIC
     "${UMM_ROOT}/src/world/WorldMap.cpp"
     "${UMM_ROOT}/src/adventure/AdventureSession.cpp"
     "${UMM_ROOT}/src/adventure/Scenario.cpp"
+    "${UMM_ROOT}/src/adventure/Condition.cpp"
     "${UMM_ROOT}/src/adventure/Rivals.cpp"
     "${UMM_ROOT}/src/adventure/Specials.cpp"
     "${UMM_ROOT}/src/adventure/SessionSave.cpp"

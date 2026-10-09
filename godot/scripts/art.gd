@@ -21,7 +21,7 @@ const CATEGORIES := {
     "kind": [Color("a08a3c"), Vector2i(64, 64)], "feature": [Color("5f6f4a"), Vector2i(128, 128)],
     "tree": [Color("3f6a3a"), Vector2i(128, 128)], "terrain": [Color("7a6a50"), Vector2i(64, 64)],
     "screen": [Color("4a3a2a"), Vector2i(640, 400)], "slide": [Color("2e2a36"), Vector2i(640, 360)],
-    "icon": [Color("6a5a3a"), Vector2i(32, 32)],
+    "icon": [Color("6a5a3a"), Vector2i(32, 32)], "item": [Color("7c6440"), Vector2i(88, 64)],
 }
 const OTHER := [Color("8a2f6a"), Vector2i(64, 64)]
 const OUTLINE := Color("1a120c")
@@ -99,6 +99,7 @@ static func texture(id: String, fallback := "") -> Texture2D:
     if not relative.is_empty():
         result = _load(relative, bool(_entry(id).get("mipmaps", false)))
         if result != null and _entry(id).has("tint"): result = _tinted(result, Color(str(_entry(id).tint)))
+        if result != null and _entry(id).has("wash"): result = _washed(result, Color(str(_entry(id).wash)), float(_entry(id).get("wash_amount", 0.35)))
     if result == null:
         if not _warned.has(id):
             _warned[id] = true
@@ -168,6 +169,23 @@ static func _load(relative: String, mipmaps: bool) -> Texture2D:
             if not bitmap.has_mipmaps(): bitmap.generate_mipmaps()
             texture = ImageTexture.create_from_image(bitmap)
     return texture
+
+## Moves every pixel `amount` of the way toward `colour` (paler, colder: snow),
+## leaving the near-black outline alone so the sprite keeps its 1px edge.
+static func _washed(texture: Texture2D, colour: Color, amount: float) -> Texture2D:
+    var bitmap := texture.get_image()
+    if bitmap == null: return texture
+    bitmap = bitmap.duplicate()
+    if bitmap.is_compressed(): bitmap.decompress()
+    bitmap.convert(Image.FORMAT_RGBA8)
+    for y in bitmap.get_height():
+        for x in bitmap.get_width():
+            var pixel := bitmap.get_pixel(x, y)
+            if pixel.a > 0.0 and pixel.get_luminance() > 0.1:
+                var washed := pixel.lerp(colour, amount)
+                washed.a = pixel.a
+                bitmap.set_pixel(x, y, washed)
+    return ImageTexture.create_from_image(bitmap)
 
 ## Another creature drawn from shared art: every pixel multiplied by `tint`
 ## ("tint": "#rrggbb" in art.json), so a reused sprite still reads as its own unit.

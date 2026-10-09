@@ -7,7 +7,9 @@
 #include "world/ObjectControl.h"
 #include "world/TownState.h"
 #include "world/WorldMap.h"
+#include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <unordered_map>
 #include <map>
@@ -37,6 +39,7 @@
 // Bonuses every troop stack of the hero's army fights with (commander's
 // items, town buildings such as the Drill Yard).
 struct ArmyBonus { int attack = 0, defense = 0, speed = 0; bool readiedShot = false; };
+class CombatEngine;
 
 class AdventureSession {
 public:
@@ -49,6 +52,22 @@ public:
         std::string guardsJson = "[]";  // combat army, opaque to the session
         ResourcePool reward;            // paid on victory
         std::string item;               // item id granted on victory ("" = none)
+        std::vector<std::string> items; // reward "items": more ids granted on victory (keepsakes)
+    };
+
+    // What the last resolveEncounter() handed over: the reward (Warlord bonus
+    // included), an old mine's loot, and items newly gained (one already
+    // carried is not listed). Empty after a defeat, a retreat or a war-band.
+    // xp: the experience the commander actually gained for the victory, after
+    // the level cap (a war-band's too); 0 after a defeat. Not part of empty().
+    struct Spoils {
+        ResourcePool resources;
+        std::vector<std::string> items;
+        int xp = 0;
+        bool empty() const {
+            return items.empty() && std::all_of(resources.amounts.begin(), resources.amounts.end(),
+                                                [](int n) { return n == 0; });
+        }
     };
 
     // Outcome of clearing an old mine.
@@ -126,6 +145,10 @@ public:
     std::optional<HexCoord> pendingEncounter() const { return m_pending; }
     // The fight about to start is not fought; the hero stays where travel stopped.
     void cancelEncounter() { m_pending.reset(); m_pendingAmbush = false; m_pendingZone = false; }
+    // The story choice raised at this fight's "engage" is still open: the fight
+    // waits for the answer (an option may withdraw the camp). resolveEncounter()
+    // refuses while it holds (nothing changes, the fight stays pending).
+    bool encounterAwaitsChoice() const;
     // Story: the named guard camp or old mine is gone (vanish / withdraw). Its hex
     // and zone of control clear and a fight pending with it is called off.
     // False = no standing encounter by that name.
@@ -135,6 +158,7 @@ public:
     // bitten: rabies (see CombatEngine::kBiteChance); kept per unit id in the hero's army.
     struct Stack { std::string id; int count = 0; bool bitten = false; };
     MineFind resolveEncounter(bool victory, const std::optional<std::vector<Stack>>& enemySurvivors = std::nullopt);
+    const Spoils& lastSpoils() const { return m_spoils; }
     bool won() const { return m_won; }
     std::optional<HexCoord> passageMine() const { return m_passage; }
 
@@ -152,7 +176,10 @@ public:
     std::vector<Stack> army() const;
     // Replaces the hero's army (e.g. with combat survivors). Unknown ids are dropped.
     // Stacks of one id merge; the merged stack is bitten if any of them was.
-    void setArmy(const std::vector<Stack>& stacks);
+    // At most Hero::ARMY_SLOTS (5) stacks ride: stacks of a sixth (or later) unit
+    // are left out, logged to stderr, and returned (empty = everyone fit).
+    std::vector<Stack> setArmy(const std::vector<Stack>& stacks);
+    std::string unitName(const std::string& unitId) const;   // display name (the id if unknown)
     // Rabies: unit ids in the hero's army that carry a bite. A stack that dies
     // out (or leaves the army) loses its mark. Ending a day in a player-owned
     // town tends them all; endDay() then says so and tendedIn() names the town.
@@ -195,7 +222,7 @@ public:
     std::optional<std::string> equip(const std::string& itemId);
     std::optional<std::string> unequip(const std::string& slot);
     const std::map<std::string, std::string>& equipped() const { return m_equipped; }
-    std::vector<std::string> backpack() const;   // owned, not worn (sorted)
+    std::vector<std::string> backpack() const;   // owned, not worn, not keepsakes (sorted)
     using ArmyBonus = ::ArmyBonus;
     ArmyBonus armyBonus() const;                  // worn items + buildings (e.g. Drill Yard)
     // Marketplace: sell `amount` of `give` for as much `get` as it buys.
@@ -223,6 +250,10 @@ public:
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }
     void addItem(const std::string& id);
     bool hasItem(const std::string& id) const { return m_items.count(id) > 0; }
+    // Story "take_item": the hero hands it over (taken off if worn). False = not carried.
+    bool takeItem(const std::string& id);
+    // Keepsakes carried (items.json "kind": "keepsake"), sorted by id: read, never worn.
+    std::vector<const WondrousItem*> keepsakes() const;
     // Story "open": [q, r] — a closed tile (map "passable": false, e.g. a
     // gatekeeper's bridge) becomes passable for the rest of this map. Saved,
     // not carried. False if the map has no such tile.
@@ -284,6 +315,9 @@ public:
     std::vector<LevelUp> drainLevelUps();
 
     // ── Special characters (see Specials.cpp) ────────────────────────────────
+    // Companions are units of faction "companion" in units.json (name, title,
+    // upkeep, lines). At most MAX_RIDING ride with the hero; others govern a
+    // town (stationed) or wait (departed with waiting = true).
     struct Ability { int level; std::string name, text; };
     struct Special {
         std::string             id, name, title;
@@ -292,30 +326,59 @@ public:
         std::optional<HexCoord> stationed;   // governing an owned town
         int                     unpaidDays = 0;
         int                     woundedUntil = 0;   // wounded (no battles, no abilities) while day() < this
+        bool                    waiting = false;    // departed: stayed behind for want of room (not left)
     };
+    static constexpr int MAX_RIDING = Hero::SC_SLOTS;   // 2 companions ride with the hero
     static constexpr int WOUND_DAYS = 3;   // a companion who falls in battle is out this long
     static constexpr int SULK_DAYS  = 3;   // unpaid this long: abilities stop
     static constexpr int LEAVE_DAYS = 7;   // unpaid this long: the SC leaves
     const std::vector<Special>& specials() const { return m_specials; }
+    // Gone for now with their progression: left (story "leave", unpaid) or waiting.
+    const std::vector<Special>& departedSpecials() const { return m_departedSpecials; }
     static std::vector<Ability> abilitiesOf(const std::string& id);
     static int xpForLevel(int level);      // total xp needed to reach 'level'
     static int companionXpForLevel(const std::string& id, int level);
-    static int upkeepFor(int level);       // gold per day
+    static int upkeepFor(int level);       // the standard wage table, gold per day
+    // This companion's wage: the table scaled by its units.json "upkeep" (0 = none).
+    int upkeepOf(const Special& sc) const;
+    // What a companion says at a moment ("join", "unpaid", "paid", "leaves",
+    // "wounded"): units.json "lines", else a neutral default ("join": none).
+    std::string companionLine(const std::string& id, const std::string& moment) const;
     bool hasAbility(const std::string& abilityName) const;  // active on an SC travelling with the hero
+    int  ridingCount() const;              // companions travelling with the hero (not stationed)
+    // A companion joins (story "join"; a departed or waiting one comes back with
+    // her progression). If that makes three riding, the story choice "Who stays
+    // behind?" opens ({"id": "stay_behind", "kind": "party", "newcomer": id,
+    // options: one per riding companion and the newcomer, essential companions
+    // left out, each {"id": companion id, "then": [{"stay_behind": id}]}}).
+    // Adventure waits for the answer; until then three ride, and battles field two.
     void joinSpecial(const std::string& id);
     void leaveSpecial(const std::string& id);  // retain progression for a later reunion
+    // The companion stops riding: she governs the nearest town the player holds
+    // (hex distance from the hero), else waits off the map (departed, waiting) until
+    // the story brings her back. Pushes a "party" story event. False = no such rider.
+    bool stayBehind(const std::string& id);
     void completeChapter(const std::string& returnTo = "");
     std::string departureRoute() const;
     bool rivalMobilized() const;
     bool isWounded(const Special& sc) const { return day() < sc.woundedUntil; }
-    // Companions who ride into the hero's next battle: travelling, unwounded, paid.
+    // Companions who ride into the hero's next battle: travelling, unwounded, paid;
+    // at most MAX_RIDING of them (the earliest to join).
     struct Companion { std::string id; int level = 1; };
     std::vector<Companion> battleCompanions() const;
     // After a battle: each fallen companion is wounded for WOUND_DAYS, or lost
     // for good if the battle was lost as well.
     void companionsFell(const std::vector<std::string>& fallen, bool battleLost);
-    std::optional<std::string> station(const std::string& id, bool stay);  // stay=false recalls
+    // stay=false recalls (refused while MAX_RIDING already ride).
+    std::optional<std::string> station(const std::string& id, bool stay);
     int upkeepPerDay() const;
+
+    // ── Combat tips (data/combat_tips.json, see combat/CombatTips.h) ────────
+    // Tips already shown, once per campaign: saved, and carried map to map.
+    const std::set<std::string>& shownTips() const { return m_shownTips; }
+    void markTipShown(const std::string& tipId) { if (!tipId.empty()) m_shownTips.insert(tipId); }
+    // The campaign map this session plays ("1.0"; "" = a map started on its own).
+    const std::string& campaignMap() const { return m_campaignMap; }
 
     // ── Rivals (Shariw AI, see Rivals.cpp) ───────────────────────────────────
     struct Rival {
@@ -346,9 +409,12 @@ public:
         std::vector<std::string> fallen;   // attacker companions who fell
     };
     // Resolves a battle with no player involvement (AI vs guards) using the real
-    // engine; `companions` fight on the attacking side.
+    // engine; `companions` fight on the attacking side (at most MAX_RIDING, and
+    // at most five troop stacks a side). `watch`, if set, sees the engine at the
+    // start and after every turn (demo_bot's combat tips).
     AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender,
-                          const std::vector<Companion>& companions = {}, ArmyBonus attackerBonus = {}) const;
+                          const std::vector<Companion>& companions = {}, ArmyBonus attackerBonus = {},
+                          const std::function<void(const CombatEngine&)>& watch = nullptr) const;
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 
@@ -403,6 +469,10 @@ private:
     void report(const std::string& speaker, const std::string& text);
     std::string adviser() const;   // who reports news: Ushari once she rides with you
     void loadHeroTree(const std::string& path);
+    // Puts the companion with the hero (from the departed/waiting list, else from
+    // units.json): no line, no limit. Null if unknown or already riding.
+    Special* addSpecial(const std::string& id);
+    void askWhoStaysBehind(const std::string& newcomer);
     void payUpkeep();
     float movesBonus() const;
     int   sightBonus() const;
@@ -427,7 +497,8 @@ private:
     bool                             m_won = false;
     Scenario                         m_scenario;
     std::unordered_set<HexCoord>     m_ruledOut;
-    std::unordered_set<std::string>  m_items;
+    std::unordered_set<std::string>  m_items;      // commander items and keepsakes
+    Spoils                           m_spoils;     // from the last resolveEncounter()
     std::set<std::string>            m_bitten;     // rabies, by unit id in the hero's army
     std::string                      m_tendedIn;   // town where the bitten were tended last endDay()
     std::unordered_set<HexCoord>     m_opened;     // tiles the story opened ("open")
@@ -436,6 +507,8 @@ private:
     std::map<std::string, int>        m_fieldworkStock;
     std::vector<Special>             m_specials;
     std::vector<Special>             m_departedSpecials;
+    std::set<std::string>            m_shownTips;    // combat tips shown this campaign
+    std::string                      m_campaignMap;  // campaign map id ("" = none)
     HeroProgress                     m_heroProgress;
     int                              m_levelCap = MAX_HERO_LEVEL;
     int                              m_capReachedDay = -1;

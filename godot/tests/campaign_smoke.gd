@@ -108,12 +108,13 @@ func _run() -> void:
     # The company rode in.
     check(_count(scene.army, "woad_runner") == _count(army_a, "woad_runner") and _count(army_a, "woad_runner") == 29, "The army is carried (with the troops the choice gave)")
     check(int(scene.state.hero_progress.level) == 2 and int(scene.state.hero_progress.xp) == xp_a, "Commander level and XP are carried")
-    check("bearhide_cloak" in scene.state.get("items", []) and scene.inventory.any(func(i): return i.id == "bearhide_cloak"), "Items are carried")
+    check("bearhide_cloak" in scene.state.get("items", []) and scene.loot().any(func(i): return i.id == "bearhide_cloak"), "Items are carried")
     check(scene.state.get("specials", []).any(func(sc): return sc.id == "ushari"), "Companions are carried")
     check(int(scene.state.get("level_cap", 0)) == 4 and "cap 4" in scene._xp_title.text, "The new map's level cap replaces the old one")
     check(scene.dialogue._text.text == "You spared them. The vale will remember it.", "A line gated on the first map's choice plays on the second")
     var leaked := false
-    for line in scene.state.get("lines", []): leaked = leaked or "FLAG LEAK" in str(line.text)
+    for event in scene.state.get("story", []): leaked = leaked or "FLAG LEAK" in str(event.get("text", ""))
+    for line in scene.dialogue._queue: leaked = leaked or "FLAG LEAK" in str(line.get("text", ""))
     check(not leaked, "A line gated on the absence of a carried flag stays silent")
     scene.dialogue.skip_all()
 

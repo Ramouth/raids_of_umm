@@ -21,7 +21,8 @@ class AdventureSession;
  * guard, a vanished object. A trigger overtaken by its when.unless is gone.
  *
  * armed = the trigger's story conditions hold now (when.after fired, its
- * when.delay has passed, when.flag matches, when.unless_flag does not), so
+ * when.delay has passed, when.flag matches, when.unless_flag does not, its
+ * "if" holds; Scenario::armed, the same evaluator that fires it), so
  * getting there would fire it. Unarmed objectives are listed for context.
  *
  * Open (not done) quests add event "quest" objectives (armed, no trigger) for

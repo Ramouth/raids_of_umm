@@ -16,18 +16,6 @@ const MapObjectDef* objectNamed(const AdventureSession& s, const std::string& na
     return nullptr;
 }
 
-// The trigger's own story conditions (not its event) hold right now.
-bool armed(const AdventureSession& s, const Json& when) {
-    const Scenario& sc = s.scenario();
-    const std::string after = when.value("after", "");
-    if (!after.empty() && !sc.fired(after)) return false;
-    const int delay = when.value("delay", 0);
-    if (delay > 0 && (after.empty() || s.day() < sc.firedOn(after) + delay)) return false;
-    if (when.contains("flag") && !Scenario::flagsMatch(s.flags(), when["flag"])) return false;
-    if (when.contains("unless_flag") && Scenario::flagsMatch(s.flags(), when["unless_flag"])) return false;
-    return true;
-}
-
 } // namespace
 
 std::vector<StoryObjective> storyObjectives(const AdventureSession& s) {
@@ -39,14 +27,14 @@ std::vector<StoryObjective> storyObjectives(const AdventureSession& s) {
         if (seen.insert({name, event, trigger}).second) out.push_back({name, at, event, trigger, ready});
     };
 
-    for (const auto& t : sc.triggers()) {
+    for (size_t i = 0; i < sc.triggers().size(); ++i) {
+        const Json& t = sc.triggers()[i];
         const std::string id = t.value("id", "");
         if (sc.fired(id)) continue;
+        if (sc.overtaken(s, i)) continue;   // overtaken: it can never fire
         const Json when = t.value("when", Json::object());
-        const std::string unless = when.value("unless", "");
-        if (!unless.empty() && sc.fired(unless)) continue;   // overtaken: it can never fire
         const std::string event = when.value("event", "");
-        const bool ready = armed(s, when);
+        const bool ready = sc.armed(s, i);   // its story conditions, by the scenario's own evaluator
         if (event == "visit") {
             if (const auto* o = objectNamed(s, when.value("name", ""))) add(o->name, o->pos, event, id, ready);
         } else if (event == "capture") {

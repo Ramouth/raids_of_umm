@@ -21,6 +21,15 @@ Json pool(const ResourcePool& p) {
         out[std::string(resourceName(static_cast<Resource>(i)))] = p.amounts[i];
     return out;
 }
+
+// An item as the spoils screen shows it: kind "keepsake" (text = what it reads)
+// or "commander" (text = its description). An id items.json lacks keeps its id as name.
+Json itemJson(const ResourceManager& resources, const std::string& id) {
+    const WondrousItem* item = resources.item(id);
+    if (!item) return {{"id", id}, {"name", id}, {"kind", ""}, {"text", ""}};
+    return {{"id", id}, {"name", item->name}, {"kind", item->isKeepsake() ? "keepsake" : "commander"},
+            {"text", item->isKeepsake() ? item->text : item->description}};
+}
 } // namespace
 
 Json AdventureBridge::start(const std::string& map_path, const std::string& data_dir,
@@ -32,15 +41,27 @@ Json AdventureBridge::start(const std::string& map_path, const std::string& data
 }
 
 Json AdventureBridge::with_lines(Json out) {
-    Json lines = Json::array();
-    for (const auto& l : session_.scenario().drainLines())
-        lines.push_back({{"speaker", l.speaker}, {"text", l.text}});
-    out["lines"] = lines;
+    attach_story(out);
     Json ups = Json::array();            // level-ups since the last reply: the UI pops them up
     for (const auto& u : session_.drainLevelUps())
         ups.push_back({{"level", u.level}, {"skill", u.skill}, {"text", u.text}});
     out["level_ups"] = ups;
     return out;
+}
+
+void AdventureBridge::attach_story(Json& out) {
+    // One ordered queue (Scenario::drainStory): the UI plays it in this order.
+    // "lines" and "scenes" are the same events filtered by kind, for older callers.
+    Json story = Json::array(), lines = Json::array(), scenes = Json::array();
+    for (auto& e : session_.scenario().drainStory()) {
+        const std::string kind = e.value("kind", "");
+        if (kind == "line") lines.push_back({{"speaker", e.value("speaker", "")}, {"text", e.value("text", "")}});
+        if (kind == "scene") scenes.push_back({{"frames", e.value("frames", Json::array())}});
+        story.push_back(std::move(e));
+    }
+    out["story"] = story;
+    out["lines"] = lines;
+    out["scenes"] = scenes;
 }
 
 Json AdventureBridge::snapshot() const {
@@ -115,6 +136,9 @@ Json AdventureBridge::snapshot() const {
             offers.push_back({{"id", o->id}, {"label", o->label}});
     Json items = Json::array();
     for (const auto& id : session_.items()) items.push_back(id);
+    Json keepsakes = Json::array();      // read, never worn: the inventory's keepsake shelf
+    for (const WondrousItem* k : session_.keepsakes())
+        keepsakes.push_back({{"id", k->id}, {"name", k->name}, {"text", k->text}});
     Json lore = Json::array();
     for (const auto& l : session_.scenario().lore()) lore.push_back({{"title", l.title}, {"text", l.text}});
     auto path_json = [&](const AdventureSession::TreePath& p) {
@@ -149,10 +173,14 @@ Json AdventureBridge::snapshot() const {
                             {"level", sc.level}, {"xp", sc.xp}, {"morale", session_.scenario().morale(sc.id)},
                             {"next", AdventureSession::companionXpForLevel(sc.id, sc.level + 1)},
                             {"stationed", sc.stationed ? cell(*sc.stationed) : Json(nullptr)},
-                            {"unpaid", sc.unpaidDays}, {"upkeep", AdventureSession::upkeepFor(sc.level)},
+                            {"unpaid", sc.unpaidDays}, {"upkeep", session_.upkeepOf(sc)},
                             {"wounded_until", sc.woundedUntil}, {"wounded", session_.isWounded(sc)},
                             {"abilities", abilities}});
     }
+    Json departed = Json::array();       // companions gone for now: waiting (stayed behind) or left
+    for (const auto& sc : session_.departedSpecials())
+        departed.push_back({{"id", sc.id}, {"name", sc.name}, {"title", sc.title}, {"level", sc.level},
+                            {"waiting", sc.waiting}});
     Json battle_companions = Json::array();
     for (const auto& c : session_.battleCompanions())
         battle_companions.push_back({{"id", c.id}, {"count", 1}, {"level", c.level}, {"companion", true},
@@ -208,6 +236,7 @@ Json AdventureBridge::snapshot() const {
                    {"guards", enc ? Json::parse(enc->guardsJson) : Json::array()},
                    {"reward", enc ? pool(enc->reward) : Json::object()},
                    {"item", enc ? enc->item : ""},
+                   {"items", enc ? Json(enc->items) : Json::array()},
                    {"xp", session_.encounterXp(*at)}};
     }
     return {
@@ -228,16 +257,22 @@ Json AdventureBridge::snapshot() const {
         {"fieldwork_stock", session_.fieldworkStock()}, {"fieldwork_capacity", session_.fieldworkCapacity()},
         {"tree", tree}, {"tactics_rank", session_.tacticsRank()},
         {"encounter", pending},
+        // The story choice raised at this fight's engage is still open: answer it
+        // first; resolve_encounter refuses until then.
+        {"encounter_awaits_choice", session_.encounterAwaitsChoice()},
+        // Pass to CombatSession.start as encounter "tips": the campaign map ("" = no
+        // tips) and the tips already shown this campaign.
+        {"tip_context", {{"map", session_.campaignMap()},
+                         {"shown", Json(std::vector<std::string>(session_.shownTips().begin(), session_.shownTips().end()))}}},
         {"sites", sites},
         {"chest", chest},
         {"won", session_.won()},
         {"story_choice", [&] {
-            Json choice = session_.scenario().choice();
+            Json choice = session_.scenario().offeredChoice(session_);   // "if" / requires_item: shown only while it holds
             if (!choice.empty()) choice["route_ready"] = !session_.departureRoute().empty();
             if (choice.contains("options") && choice["options"].is_array())
-                for (auto& option : choice["options"])       // requires_flag not met yet
-                    option["locked"] = option.contains("requires_flag")
-                        && !Scenario::flagsMatch(session_.flags(), option["requires_flag"]);
+                for (auto& option : choice["options"])       // "requires" / requires_flag not met yet
+                    option["locked"] = Scenario::locked(session_, option).has_value();
             return choice;
         }()},
         {"departure_route", session_.departureRoute()},
@@ -267,11 +302,15 @@ Json AdventureBridge::snapshot() const {
         {"quests", quests},
         {"offers", offers},
         {"items", items},
+        {"keepsakes", keepsakes},
         {"lore", lore},
         {"ruled_out", cells(session_.ruledOut())},
         {"rivals", rivals},
         {"garrisons", garrisons},
         {"specials", specials},
+        {"departed", departed},
+        {"max_riding", AdventureSession::MAX_RIDING},
+        {"max_stacks", Hero::ARMY_SLOTS},
         {"battle_companions", battle_companions},
         {"upkeep", session_.upkeepPerDay()},
         {"rival_moves", moves},
@@ -296,7 +335,7 @@ Json AdventureBridge::travel(int q, int r) {
     return with_lines(out);
 }
 
-Json AdventureBridge::resolve_encounter(bool victory, const Json& enemy_survivors) {
+Json AdventureBridge::resolve_encounter(bool victory, const Json& enemy_survivors, const Json& battle) {
     static const char* kFinds[] = {"none", "passage", "loot", "collapse"};
     std::optional<std::vector<AdventureSession::Stack>> survivors;
     if (!enemy_survivors.is_null()) {
@@ -313,9 +352,34 @@ Json AdventureBridge::resolve_encounter(bool victory, const Json& enemy_survivor
             survivors->push_back({stack["id"], stack["count"]});
         }
     }
+    if (session_.encounterAwaitsChoice()) {
+        Json out = snapshot();
+        out["ok"] = false;
+        out["error"] = "Answer the story choice before the battle.";
+        return out;
+    }
+    Json record = battle.is_object() ? battle : Json::object();
+    for (const auto& id : record.value("tips", Json::array()))   // tips the battle showed: once per campaign
+        if (id.is_string()) session_.markTipShown(id.get<std::string>());
     auto find = session_.resolveEncounter(victory, survivors);
     Json out = snapshot();
     out["find"] = kFinds[static_cast<int>(find)];
+    // The result screens: the combat's own record, plus what the map pays for it.
+    record["result"] = victory ? "victory" : record.value("result", "") == "retreat" ? "retreat" : "defeat";
+    record["xp"] = session_.lastSpoils().xp;   // granted, after the level cap
+    if (!record.contains("losses")) record["losses"] = {{"player", Json::array()}, {"enemy", Json::array()}};
+    if (!record.contains("total_damage")) record["total_damage"] = {{"player", 0}, {"enemy", 0}};
+    if (!record.contains("max_hit")) record["max_hit"] = {{"amount", 0}, {"unit", ""}, {"name", ""}, {"key", ""}, {"side", ""}};
+    if (!record.contains("per_stack")) record["per_stack"] = Json::array();
+    out["battle"] = record;
+    const auto& spoils = session_.lastSpoils();
+    Json resources = Json::object();
+    for (int i = 0; i < RESOURCE_COUNT; ++i)
+        if (spoils.resources.amounts[i] != 0)
+            resources[std::string(resourceName(static_cast<Resource>(i)))] = spoils.resources.amounts[i];
+    Json found = Json::array();
+    for (const auto& id : spoils.items) found.push_back(itemJson(session_.resources(), id));
+    out["spoils"] = {{"resources", resources}, {"items", found}};
     return with_lines(out);
 }
 
@@ -444,12 +508,18 @@ Json AdventureBridge::load(const std::string& path) {
     if (auto err = session_.loadState(state)) return {{"ok", false}, {"error", *err}};
     Json out = snapshot();
     out["extra"] = state.value("extra", Json::object());
+    attach_story(out);                   // story still pending when the game was saved
     return out;
 }
 
 Json AdventureBridge::add_item(const std::string& id) {
     session_.addItem(id);
     return with_lines(snapshot());
+}
+
+Json AdventureBridge::tip_shown(const std::string& id) {
+    session_.markTipShown(id);
+    return snapshot();
 }
 
 Json AdventureBridge::join_special(const std::string& id) {

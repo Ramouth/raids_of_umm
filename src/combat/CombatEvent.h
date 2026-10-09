@@ -42,8 +42,47 @@ struct SurvivorStack {
     int             count = 0;
 };
 
+/*
+ * BattleStats — what each stack did in one battle, for the result screen.
+ *
+ * Damage is hit points actually taken (overkill on the last creature does not
+ * count), so a side's total equals the hit points the other side lost. Every
+ * blow counts: strikes, shots, retaliation, reaction fire and opportunity
+ * strikes. A hit is one blow, bodyguard share included. A mad stack's blows on
+ * its own side are not counted. The per-stack vectors run parallel to each
+ * army's stacks; startCount is the stack's size when the battle began.
+ */
+struct StackStats {
+    int startCount = 0;
+    int damage     = 0;
+    int kills      = 0;   // creatures it slew
+    int biggestHit = 0;
+};
+
+struct BattleHit {
+    int  amount     = 0;
+    bool isPlayer   = false;   // side of the stack that dealt it
+    int  stackIndex = -1;      // -1 = nobody has landed a blow
+};
+
+struct BattleStats {
+    std::vector<StackStats> player, enemy;
+    int       playerDamage = 0;   // dealt by the player's side
+    int       enemyDamage  = 0;
+    BattleHit maxHit;             // the biggest single hit (first one on a tie)
+};
+
+// Creatures one side lost, per unit id (a companion who fell counts as one).
+struct BattleLoss {
+    std::string unitId;
+    int         count     = 0;
+    bool        companion = false;
+};
+
 struct CombatOutcome {
     CombatResult               result    = CombatResult::Ongoing;
+    BattleStats                stats;                  // damage, kills, the biggest hit
+    std::vector<BattleLoss>    playerLosses, enemyLosses;
     std::vector<SurvivorStack> survivors;          // living player stacks after battle
     std::vector<std::string>   itemsFound;         // item IDs awarded on PlayerWon
     std::vector<SpecialCharacter> scFound;         // SCs who join hero on PlayerWon

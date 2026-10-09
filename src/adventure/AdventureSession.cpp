@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <queue>
 #include <random>
 
@@ -118,6 +119,7 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
     m_won = false;
     m_ruledOut.clear();
     m_items.clear();
+    m_spoils = {};
     m_bitten.clear();
     m_tendedIn.clear();
     m_opened.clear();
@@ -128,6 +130,8 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
     m_specials.clear();
     m_fieldworkStock.clear();
     m_departedSpecials.clear();
+    m_shownTips.clear();
+    m_campaignMap.clear();
     m_heroProgress = HeroProgress{};
     m_levelCap = MAX_HERO_LEVEL;
     m_capReachedDay = -1;
@@ -230,22 +234,32 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
 void AdventureSession::applyCarry(const CampaignState& carry) {
     m_flags = carry.flags.is_object() ? carry.flags : Scenario::Json::object();
     m_levelCap = std::clamp(carry.levelCap, 1, MAX_HERO_LEVEL);
+    m_shownTips = {carry.shownTips.begin(), carry.shownTips.end()};
+    m_campaignMap = carry.map;
     if (carry.carried) {
         m_heroProgress = {carry.level, carry.xp};
         m_path = carry.path;
         m_learned = carry.learned;
         std::vector<Stack> stacks;
         for (const auto& st : carry.army) stacks.push_back({st.id, st.count, st.bitten});
-        setArmy(stacks);
+        setArmy(stacks);   // an older campaign save with six or seven stacks keeps the first five kinds
         m_items = {carry.items.begin(), carry.items.end()};
         m_equipped = carry.equipped;
         m_turns.playerFaction().treasury = carry.treasury;
         for (const auto& c : carry.companions) {
-            m_specials.push_back({c.id, c.name, c.title, c.level, c.xp, std::nullopt, 0});
+            Special sc{c.id, c.name, c.title, c.level, c.xp, std::nullopt, 0};
+            if ((int)m_specials.size() < MAX_RIDING) {
+                m_specials.push_back(sc);
+            } else {                          // an older save with three riding: the last one waits
+                std::cerr << "[AdventureSession] " << MAX_RIDING << " companions ride at most: " << c.id << " waits\n";
+                sc.waiting = true;
+                m_departedSpecials.push_back(sc);
+            }
             m_scenario.setMorale(c.id, c.morale);
         }
         for (const auto& c : carry.departed) {
             m_departedSpecials.push_back({c.id, c.name, c.title, c.level, c.xp, std::nullopt, 0});
+            m_departedSpecials.back().waiting = c.waiting;
             m_scenario.setMorale(c.id, c.morale);
         }
     }
@@ -264,10 +278,21 @@ CampaignState AdventureSession::carryOut() const {
     std::sort(out.items.begin(), out.items.end());
     out.equipped = m_equipped;
     out.treasury = treasury();
-    for (const auto& sc : m_specials)   // governors ride on with the company
-        out.companions.push_back({sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)});
-    for (const auto& sc : m_departedSpecials)
+    // Riders go on with the company; governors too while there is room (two
+    // ride at most), else they wait for the story to send for them.
+    for (const auto& sc : m_specials)
+        if (!sc.stationed) out.companions.push_back({sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)});
+    for (const auto& sc : m_specials) {
+        if (!sc.stationed) continue;
+        CampaignState::Companion c{sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)};
+        if ((int)out.companions.size() < MAX_RIDING) out.companions.push_back(c);
+        else { c.waiting = true; out.departed.push_back(c); }
+    }
+    for (const auto& sc : m_departedSpecials) {
         out.departed.push_back({sc.id, sc.name, sc.title, sc.level, sc.xp, m_scenario.morale(sc.id)});
+        out.departed.back().waiting = sc.waiting;
+    }
+    out.shownTips = {m_shownTips.begin(), m_shownTips.end()};
     out.flags = m_flags;
     out.levelCap = m_levelCap;
     out.lastMap = {{"level_cap", m_levelCap}, {"cap_reached_day", m_capReachedDay},
@@ -276,7 +301,7 @@ CampaignState AdventureSession::carryOut() const {
 }
 
 // Format: { "defaults": { "guard": E, "old_mine": E }, "objects": { "<name>": E } }
-// E = { "guards": [{"id","count"}...], "reward": {"Gold": 500, ...}, "item": "id" }
+// E = { "guards": [{"id","count"}...], "reward": {"Gold": 500, ..., "items": ["id", ...]}, "item": "id" }
 std::optional<std::string> AdventureSession::loadEncounters(const std::string& path) {
     using json = nlohmann::json;
     try {
@@ -292,6 +317,7 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
                     if (key == resourceName(static_cast<Resource>(i)))
                         out.reward.amounts[i] = amount.get<int>();
             out.item = e.value("item", "");
+            for (const auto& id : reward.value("items", json::array())) out.items.push_back(id.get<std::string>());
             return out;
         };
         const json defaults = root.value("defaults", json::object());
@@ -595,6 +621,12 @@ std::optional<HexCoord> AdventureSession::guardZoneAt(const HexCoord& c) const {
     return std::nullopt;
 }
 
+bool AdventureSession::encounterAwaitsChoice() const {
+    if (!m_pending || !m_scenario.awaitingChoice()) return false;
+    const MapObjectDef* obj = m_map.objectAt(*m_pending);
+    return obj && m_scenario.engagedAt(m_scenario.choiceTrigger()) == obj->name;
+}
+
 bool AdventureSession::removeEncounter(const std::string& objectName) {
     for (const auto& obj : m_map.objects()) {
         if (obj.name != objectName || !m_encounters.count(obj.pos)) continue;
@@ -627,8 +659,10 @@ const AdventureSession::Encounter* AdventureSession::encounterAt(const HexCoord&
 }
 
 AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory, const std::optional<std::vector<Stack>>& enemySurvivors) {
-    if (!m_pending) return MineFind::None;
+    m_spoils = {};
+    if (!m_pending || encounterAwaitsChoice()) return MineFind::None;   // answer the engage choice first
     HexCoord cell = *m_pending;
+    const int xpBefore = m_heroProgress.xp;   // what the victory gives, after the level cap
     // Count-only persistence matches player armies. Bound every surviving stack
     // by its pre-battle count, then divide combined castle survivors between the
     // field army and garrison in their original proportions.
@@ -671,6 +705,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory, cons
             [&](const Rival& r) { return r.alive && r.pos == cell; }); it != m_rivals.end()) {
         if (victory) {
             grantXp(encounterXp(cell));
+            m_spoils.xp = m_heroProgress.xp - xpBefore;
             it->alive = false;
             m_garrisons.erase(cell);
             m_scenario.fire(*this, "rival_beaten", {{"name", it->name}});
@@ -694,10 +729,17 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory, cons
     ResourcePool reward = m_encounters[cell].reward;
     if (hasAbility("Warlord")) reward[Resource::Gold] += reward[Resource::Gold] / 2;
     m_turns.playerFaction().treasury += reward;
+    m_spoils.resources = reward;
     grantXp(victoryXp);
-    std::string item = m_encounters[cell].item;
+    m_spoils.xp = m_heroProgress.xp - xpBefore;   // story xp from encounter_won is not the battle's
+    std::vector<std::string> found = m_encounters[cell].items;
+    if (!m_encounters[cell].item.empty()) found.insert(found.begin(), m_encounters[cell].item);
     m_encounters.erase(cell);
-    if (!item.empty()) addItem(item);
+    for (const auto& id : found)
+        if (!id.empty() && !hasItem(id)) {
+            m_spoils.items.push_back(id);
+            addItem(id);
+        }
     if (const MapObjectDef* obj = m_map.objectAt(cell)) {
         m_scenario.fire(*this, "encounter_won", {{"name", obj->name}});
         m_scenario.fire(*this, "cleared");
@@ -720,6 +762,7 @@ AdventureSession::MineFind AdventureSession::resolveEncounter(bool victory, cons
         loot[Resource::Obsidian] = 2;
         loot[Resource::Crystal]  = 2;
         m_turns.playerFaction().treasury += loot;
+        m_spoils.resources += loot;
     }
     if (result == MineFind::Passage) {
         if (m_scenario.passageEndsScenario()) m_won = true;
@@ -766,7 +809,29 @@ std::optional<std::string> AdventureSession::giveClue() {
 
 void AdventureSession::addItem(const std::string& id) {
     if (id.empty() || !m_items.insert(id).second) return;
+    // Story queue: the item in the order it came (a keepsake shows what it reads).
+    const WondrousItem* item = m_resources->item(id);
+    m_scenario.pushStory({{"kind", "item"}, {"id", id}, {"name", item && !item->name.empty() ? item->name : id},
+                          {"item_kind", item ? (item->isKeepsake() ? "keepsake" : "commander") : ""},
+                          {"text", item ? (item->isKeepsake() ? item->text : item->description) : ""}});
     m_scenario.fire(*this, "item", {{"item", id}});
+}
+
+bool AdventureSession::takeItem(const std::string& id) {
+    if (!m_items.erase(id)) return false;
+    for (auto it = m_equipped.begin(); it != m_equipped.end();)
+        it = it->second == id ? m_equipped.erase(it) : std::next(it);
+    const WondrousItem* item = m_resources->item(id);
+    m_scenario.pushStory({{"kind", "item_lost"}, {"id", id}, {"name", item && !item->name.empty() ? item->name : id}});
+    return true;
+}
+
+std::vector<const WondrousItem*> AdventureSession::keepsakes() const {
+    std::vector<const WondrousItem*> out;
+    for (const auto& id : m_items)
+        if (const WondrousItem* item = m_resources->item(id); item && item->isKeepsake()) out.push_back(item);
+    std::sort(out.begin(), out.end(), [](const WondrousItem* a, const WondrousItem* b) { return a->id < b->id; });
+    return out;
 }
 
 void AdventureSession::completeChapter(const std::string& returnTo) {
@@ -847,12 +912,29 @@ std::vector<AdventureSession::Stack> AdventureSession::army() const {
     return out;
 }
 
-void AdventureSession::setArmy(const std::vector<Stack>& stacks) {
+std::vector<AdventureSession::Stack> AdventureSession::setArmy(const std::vector<Stack>& stacks) {
     m_hero.army = {};
     m_bitten.clear();   // a stack that died out (or left) loses its mark
-    for (const auto& s : stacks)
-        if (const UnitType* u = m_resources->unit(s.id); u && s.count > 0 && m_hero.addUnit(u, s.count) && s.bitten)
-            m_bitten.insert(s.id);
+    std::vector<Stack> left;
+    for (const auto& s : stacks) {
+        const UnitType* u = m_resources->unit(s.id);
+        if (!u || s.count <= 0) continue;
+        if (!m_hero.addUnit(u, s.count)) {   // a sixth kind of soldier: no room in the column
+            auto it = std::find_if(left.begin(), left.end(), [&](const Stack& l) { return l.id == s.id; });
+            if (it == left.end()) left.push_back(s); else it->count += s.count;
+            continue;
+        }
+        if (s.bitten) m_bitten.insert(s.id);
+    }
+    for (const auto& s : left)
+        std::cerr << "[AdventureSession] the army holds " << Hero::ARMY_SLOTS << " stacks at most: "
+                  << s.count << " " << s.id << " left out\n";
+    return left;
+}
+
+std::string AdventureSession::unitName(const std::string& unitId) const {
+    const UnitType* u = m_resources ? m_resources->unit(unitId) : nullptr;
+    return u && !u->name.empty() ? u->name : unitId;
 }
 
 // ── Garrisons ─────────────────────────────────────────────────────────────────
@@ -1002,6 +1084,7 @@ const std::vector<std::string>& AdventureSession::equipSlots() {
 std::vector<std::string> AdventureSession::backpack() const {
     std::vector<std::string> out;
     for (const auto& id : m_items) {
+        if (const WondrousItem* item = m_resources->item(id); item && item->isKeepsake()) continue;
         bool worn = false;
         for (const auto& [slot, w] : m_equipped) worn |= w == id;
         if (!worn) out.push_back(id);
@@ -1015,6 +1098,7 @@ std::optional<std::string> AdventureSession::equip(const std::string& itemId) {
     for (const auto& [slot, w] : m_equipped) if (w == itemId) return "Already worn.";
     const WondrousItem* item = m_resources->item(itemId);
     if (!item) return "Unknown item.";
+    if (item->isKeepsake()) return item->name + " is a keepsake: it is kept, not worn.";
     std::vector<std::string> fits;
     if (item->slot == "trinket") fits = {"trinket1", "trinket2"};
     else fits = {item->slot};

@@ -1,5 +1,7 @@
 # Demo flow and player understanding
 
+> **Archived (2026-10-09).** This describes the old "Old Passage" demo (wolves, the hooded druid, Corvin, Kaldur). It is kept for its method and history. The current story is Chapter 1 "The Marches": its single source is the header of `scripts/chapter1_story.py`, published as the "Chapter 1 — The Marches" tab of the story doc. Factions: `Factions.md`.
+
 At every step ask: **Does the player understand enough context and plot to act?**
 The required information must appear in dialogue, objectives or the map before it is needed. Author notes do not count as player knowledge. Mystery may conceal Aldren's fate; it must not conceal the next actionable objective.
 

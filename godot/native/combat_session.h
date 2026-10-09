@@ -1,5 +1,7 @@
 #pragma once
 #include "combat/CombatEngine.h"
+#include "combat/CombatTips.h"
+#include "hero/Hero.h"
 #include "core/ResourceManager.h"
 #include <nlohmann/json.hpp>
 #include <memory>
@@ -9,6 +11,11 @@
 class CombatSession {
 public:
     using Json = nlohmann::json;
+    // army: up to five troop stacks and two companions. encounter: {guards, seed?,
+    // reward?, fieldworks?, tactics?, tips?}; tips = the adventure snapshot's
+    // "tip_context" {map, shown}. The snapshot's "tip" is {id, speaker, text} in the
+    // reply of the action that made a companion tip due (null otherwise; decided by
+    // CombatTipWatch, never twice), and "battle"."tips" lists the ids shown so far.
     Json start(const std::string& data_dir, const Json& army, const Json& encounter);
     // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
     // the enemy on (q, r) after walking to the standing hex (fq, fr).
@@ -27,6 +34,8 @@ private:
     CombatArmy make_army(const Json& input, bool player) const;
     std::vector<HexCoord> legal_targets() const;
     Json next_round() const;
+    // {result, losses: {player, enemy}, total_damage: {player, enemy}, max_hit, per_stack}
+    Json battle() const;
     Json previews() const;
     Json reactions(HexCoord to) const;   // enemy shooters that would fire as the active stack walks to `to`
     Json movement_path(HexCoord from, HexCoord to, bool player, int index) const;
@@ -40,4 +49,6 @@ private:
     int barricades_ = 0, stakes_ = 0;
     int opening_ = 0;   // Tactics rank: stacks the player may order first, until the orders are given
     int64_t ticket_ = 0;
+    CombatTipWatch tips_;
+    Json tip_ = nullptr;   // the tip due after the last action
 };

@@ -61,6 +61,17 @@ var _fieldwork_kind := "barricade"
 var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
 ## The stack taken by madness this turn: its blows are logged as madness, not orders.
 var _mad_key := ""
+## Companion tips: the engine decides (CombatSession, from the encounter's
+## "tips" = the adventure's tip_context) and puts the one now due in the reply's
+## state.tip ({id, speaker, text}); this screen only shows it.
+## The speech panel over the log: a companion's portrait and one line.
+var tip_panel: Panel
+var tip_portrait: TextureRect
+var tip_speaker: Label
+var tip_text: Label
+## The tip shown in this battle, by id ("" when none yet).
+var tip_shown := ""
+var _tip_serial := 0           # stale auto-hide timers check this
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -183,6 +194,7 @@ func _ready() -> void:
     skip_orders_button.position = Vector2(240, 684)
     skip_orders_button.size = Vector2(380, 48)
     _marshal_panel.hide()
+    _build_tip_panel()
     get_viewport().size_changed.connect(_resize)
     _resize()
 
@@ -345,7 +357,9 @@ func _consume(reply: Dictionary) -> void:
         auto_battle = false
         auto_button.set_pressed_no_signal(false)
         _show_result()
+        _show_due_tip()
     else:
+        _show_due_tip()
         _schedule_ai()
 
 func _log_damage(event: Dictionary, strike: Dictionary) -> void:
@@ -1190,7 +1204,7 @@ func _show_result() -> void:
     if not fallen.is_empty():
         var names: Array[String] = []
         for id in fallen: names.append(str(id).capitalize())
-        var fate := "lost with the battle" if state.result == "defeat" else "carried from the field, wounded: out of battle for 3 days"
+        var fate := "lost with the battle" if state.result == "defeat" else "carried from the field, wounded (they sit out battles until healed)"
         text += "[b][color=#%s]FALLEN[/color][/b]\n%s — %s\n\n" % [FOE.to_html(false), ", ".join(names), fate]
     text += "[b]LOOT[/b]\n"
     if state.rewards.is_empty(): text += "None"
@@ -1212,3 +1226,76 @@ func _log(message: String, colour := TEXT, actor := "") -> void:
     if not actor.is_empty() and units.has(actor):
         colour = FRIEND if units[actor].player else FOE
     log_view.append_text("[color=#%s]%s[/color]\n" % [colour.to_html(false), message.replace("[", "[lb]")])
+
+# ── Companion tips ────────────────────────────────────────────────────────────
+
+func _build_tip_panel() -> void:
+    # Over the log strip, never over the board: the stack acting stays in view.
+    tip_panel = Panel.new()
+    tip_panel.name = "CompanionTip"
+    tip_panel.position = Vector2(24, 670)
+    tip_panel.size = Vector2(1232, 120)
+    tip_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    tip_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+    var style := StyleBoxFlat.new()
+    style.bg_color = Color("2a2218")
+    style.border_color = GOLD.darkened(0.25)
+    style.set_border_width_all(2)
+    tip_panel.add_theme_stylebox_override("panel", style)
+    tip_panel.gui_input.connect(func(event: InputEvent):
+        if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+            dismiss_tip()
+            tip_panel.accept_event())
+    add_child(tip_panel)
+    var frame := Panel.new()
+    frame.position = Vector2(10, 8)
+    frame.size = Vector2(104, 104)
+    frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    var frame_style := StyleBoxFlat.new()
+    frame_style.bg_color = Color("191610")
+    frame_style.border_color = Color("806037")
+    frame_style.set_border_width_all(1)
+    frame.add_theme_stylebox_override("panel", frame_style)
+    tip_panel.add_child(frame)
+    tip_portrait = TextureRect.new()
+    tip_portrait.position = Vector2(2, 2)
+    tip_portrait.size = Vector2(100, 100)
+    tip_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    tip_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    tip_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+    tip_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    frame.add_child(tip_portrait)
+    tip_speaker = _label(Vector2(130, 10), Vector2(900, 26), 18)
+    tip_speaker.add_theme_color_override("font_color", GOLD)
+    tip_speaker.reparent(tip_panel, false)
+    var hint := _label(Vector2(930, 12), Vector2(290, 20), 12)
+    hint.text = "click to close · the battle goes on"
+    hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+    hint.add_theme_color_override("font_color", DIM)
+    hint.reparent(tip_panel, false)
+    tip_text = _label(Vector2(130, 38), Vector2(1086, 76), 19)
+    tip_text.reparent(tip_panel, false)
+    tip_panel.hide()
+
+## The tip the engine made due with this reply (state.tip), if any.
+func _show_due_tip() -> void:
+    if state.get("tip") is Dictionary and not state.tip.is_empty(): show_tip(state.tip)
+
+func show_tip(tip: Dictionary) -> void:
+    var speaker := str(tip.get("speaker", ""))
+    tip_shown = str(tip.get("id", ""))
+    var portrait := "portrait." + speaker.to_lower().replace(" ", "_")
+    tip_portrait.texture = Art.texture(portrait if Art.has_art(portrait) else "portrait.default")
+    tip_speaker.text = speaker.to_upper()
+    tip_text.text = "“%s”" % str(tip.get("text", ""))
+    tip_panel.show()
+    _log("%s: “%s”" % [speaker, str(tip.get("text", ""))], GOLD)
+    _tip_serial += 1
+    var serial := _tip_serial
+    var words := str(tip.get("text", "")).split(" ", false).size()
+    await get_tree().create_timer(clampf(4.0 + words * 0.35, 7.0, 14.0)).timeout
+    if serial == _tip_serial: dismiss_tip()
+
+func dismiss_tip() -> void:
+    _tip_serial += 1
+    tip_panel.hide()

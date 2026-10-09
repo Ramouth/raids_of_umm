@@ -2,7 +2,8 @@ extends Control
 ## Hero (H): the commander's paper doll (HoMM3). Seven slots around the
 ## commander; what is worn helps every troop stack in the army. Unworn items
 ## wait in the backpack. Click a backpack item to wear it, a worn one to take
-## it off; cursed items will not come off.
+## it off; cursed items will not come off. Keepsakes (a dog tag, a letter)
+## are kept to be read, never worn: click one to read it.
 
 signal finished(result: Dictionary)
 
@@ -26,6 +27,8 @@ var _pack: VBoxContainer
 var _bonus: Label
 var _message: Label
 var _detail: RichTextLabel
+var _keepsakes: VBoxContainer
+var _detail_picture: TextureRect
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -35,7 +38,11 @@ func _ready() -> void:
     heading.position = Vector2(90, 58)
     add_child(heading)
     var progress: Dictionary = host.state.get("hero_progress", {})
-    var sub := _label("Level %d  ·  %d XP  ·  what the commander wears, the whole army feels" % [int(progress.get("level", 1)), int(progress.get("xp", 0))], 14, Color("c8b08a"))
+    var riding: int = host.state.get("specials", []).filter(func(sc): return sc.get("stationed") == null).size()
+    var sub := _label("Level %d  ·  %d XP  ·  Companions %d/%d  ·  Stacks %d/%d  ·  what the commander wears, the whole army feels" % [
+        int(progress.get("level", 1)), int(progress.get("xp", 0)), riding, int(host.state.get("max_riding", 2)),
+        host.state.get("army", []).size(), int(host.state.get("max_stacks", 5))], 14, Color("c8b08a"))
+    sub.name = "Sub"
     sub.position = Vector2(90, 96)
     add_child(sub)
 
@@ -62,16 +69,38 @@ func _ready() -> void:
     add_child(pack_title)
     var scroll := ScrollContainer.new()
     scroll.position = Vector2(730, 164)
-    scroll.size = Vector2(460, 300)
+    scroll.size = Vector2(460, 168)
     scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     add_child(scroll)
     _pack = VBoxContainer.new()
     _pack.add_theme_constant_override("separation", 6)
     scroll.add_child(_pack)
+    var keep_title := _label("KEEPSAKES  ·  kept to be read, never worn", 13, Color("ad854a"))
+    keep_title.position = Vector2(730, 344)
+    add_child(keep_title)
+    var keep_scroll := ScrollContainer.new()
+    keep_scroll.position = Vector2(730, 368)
+    keep_scroll.size = Vector2(460, 92)
+    keep_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    add_child(keep_scroll)
+    _keepsakes = VBoxContainer.new()
+    _keepsakes.name = "Keepsakes"
+    _keepsakes.add_theme_constant_override("separation", 4)
+    keep_scroll.add_child(_keepsakes)
+    _detail_picture = TextureRect.new()
+    _detail_picture.name = "DetailPicture"
+    _detail_picture.position = Vector2(730, 476)
+    _detail_picture.size = Vector2(120, 88)
+    _detail_picture.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+    _detail_picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    _detail_picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    _detail_picture.hide()
+    add_child(_detail_picture)
     _detail = RichTextLabel.new()
+    _detail.name = "Detail"
     _detail.bbcode_enabled = true
     _detail.position = Vector2(730, 476)
-    _detail.size = Vector2(460, 150)
+    _detail.size = Vector2(460, 206)
     _detail.add_theme_font_size_override("normal_font_size", 14)
     _detail.add_theme_color_override("default_color", TEXT)
     add_child(_detail)
@@ -135,6 +164,16 @@ func refresh() -> void:
         wear.mouse_entered.connect(_describe.bind(str(id)))
         row.add_child(wear)
         _pack.add_child(row)
+    for child in _keepsakes.get_children(): child.queue_free()
+    var keepsakes: Array = state.get("keepsakes", [])
+    if keepsakes.is_empty(): _keepsakes.add_child(_label("Nothing yet. Things worth keeping turn up after battles and on the road.", 14, DIM))
+    for keepsake in keepsakes:
+        var read := Button.new()
+        read.name = "Keepsake_" + str(keepsake.id)
+        read.text = "%s  ·  read" % str(keepsake.name)
+        read.alignment = HORIZONTAL_ALIGNMENT_LEFT
+        read.pressed.connect(read_keepsake.bind(str(keepsake.id)))
+        _keepsakes.add_child(read)
     var bonus: Dictionary = state.get("army_bonus", {})
     _bonus.text = "Every troop stack:  %+d attack   %+d defence   %+d speed" % [int(bonus.get("attack", 0)), int(bonus.get("defense", 0)), int(bonus.get("speed", 0))]
 
@@ -150,10 +189,29 @@ func _effects(item: Dictionary) -> String:
 func _describe(id: String) -> void:
     var item: Dictionary = host.item_defs.get(id, {})
     if item.is_empty(): return
+    _show_text_only()
     var curse := "\n[color=#%s]Cursed: once worn, it will not come off.[/color]" % CURSED.to_html(false) if item.get("cursed", false) else ""
     _detail.text = "[b][color=#%s]%s[/color][/b]  (%s)\n%s\n[color=#%s]For every troop stack: %s[/color]%s" % [
         GOLD.to_html(false), item.name, _slot_name(str(item.get("slot", ""))), item.get("description", ""),
         GOLD.to_html(false), _effects(item), curse]
+
+## Shows a keepsake's picture, name and full text in the detail area.
+func read_keepsake(id: String) -> bool:
+    for keepsake in host.state.get("keepsakes", []):
+        if str(keepsake.id) != id: continue
+        _detail_picture.texture = Art.texture("item." + id)
+        _detail_picture.show()
+        _detail.position = Vector2(864, 476)
+        _detail.size = Vector2(326, 206)
+        _detail.text = "[b][color=#%s]%s[/color][/b]\n[color=#%s]Keepsake: kept to be read, never worn.[/color]\n\n%s" % [
+            GOLD.to_html(false), str(keepsake.name), DIM.to_html(false), str(keepsake.text)]
+        return true
+    return false
+
+func _show_text_only() -> void:
+    _detail_picture.hide()
+    _detail.position = Vector2(730, 476)
+    _detail.size = Vector2(460, 206)
 
 func put_on(id: String) -> bool:
     var reply: Dictionary = host.equip(id)

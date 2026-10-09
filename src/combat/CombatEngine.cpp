@@ -23,6 +23,8 @@ CombatEngine::CombatEngine(CombatArmy player, CombatArmy enemy, int initiativeDi
                 if (!unit.isDead()) unit.initiativeRoll = roll(initiativeRng);
     }
     placeArmies();
+    for (const auto& unit : m_player.stacks) m_stats.player.push_back({unit.count});
+    for (const auto& unit : m_enemy.stacks)  m_stats.enemy.push_back({unit.count});
     refreshAuras();
     buildQueue();
     std::cout << "[CombatEngine] Round 1 start — "
@@ -956,21 +958,62 @@ bool CombatEngine::hitStack(bool targetIsPlayer, int targetIndex, int damage, bo
     };
     // A companion's bodyguard steps into half of any melee blow.
     const int guard = melee ? bodyguardFor(stacks, targetIndex) : -1;
+    int hpLost = 0, kills = 0;
     if (guard >= 0) {
         const int share = damage / 2;
         damage -= share;
-        const int before = stacks[guard].count;
+        const int before = stacks[guard].count, hpBefore = stacks[guard].totalHp();
         applyDamage(stacks[guard], share);
+        hpLost += hpBefore - stacks[guard].totalHp();
+        kills  += before - stacks[guard].count;
         emitDamage(guard, share, before, true);
         maybeBite(striker, targetIsPlayer, guard);
     }
-    const int before = target.count;
+    const int before = target.count, hpBefore = target.totalHp();
     applyDamage(target, damage);
+    hpLost += hpBefore - target.totalHp();
+    kills  += before - target.count;
+    recordHit(striker, targetIsPlayer, hpLost, kills);
     emitDamage(targetIndex, damage, before, false);
     maybeBite(striker, targetIsPlayer, targetIndex);
     if (guard >= 0 && stacks[guard].isDead()) refreshAuras();
     if (target.isDead()) refreshAuras();
     return target.isDead();
+}
+
+void CombatEngine::recordHit(const CombatUnit* striker, bool targetIsPlayer, int hpLost, int kills) {
+    if (!striker) return;
+    auto& own = targetIsPlayer ? m_enemy.stacks : m_player.stacks;   // the striker's side
+    auto& rows = targetIsPlayer ? m_stats.enemy : m_stats.player;
+    // Find the striker by address (equality is defined across arrays; subtracting
+    // pointers into different vectors is not). Not found = a mad stack striking
+    // its own side, which is not credited.
+    int index = -1;
+    for (int i = 0; i < static_cast<int>(own.size()); ++i)
+        if (&own[i] == striker) { index = i; break; }
+    if (index < 0) return;
+    if (index >= static_cast<int>(rows.size())) rows.resize(own.size());
+    StackStats& row = rows[index];
+    row.damage += hpLost;
+    row.kills  += kills;
+    row.biggestHit = std::max(row.biggestHit, hpLost);
+    (targetIsPlayer ? m_stats.enemyDamage : m_stats.playerDamage) += hpLost;
+    if (hpLost > m_stats.maxHit.amount) m_stats.maxHit = {hpLost, !targetIsPlayer, index};
+}
+
+std::vector<BattleLoss> CombatEngine::losses(bool isPlayer) const {
+    const auto& stacks = isPlayer ? m_player.stacks : m_enemy.stacks;
+    const auto& rows = isPlayer ? m_stats.player : m_stats.enemy;
+    std::vector<BattleLoss> out;
+    for (int i = 0; i < static_cast<int>(stacks.size()) && i < static_cast<int>(rows.size()); ++i) {
+        const int lost = rows[i].startCount - std::max(0, stacks[i].count);
+        if (lost <= 0) continue;
+        auto it = std::find_if(out.begin(), out.end(),
+                               [&](const BattleLoss& l) { return l.unitId == stacks[i].type->id; });
+        if (it == out.end()) out.push_back({stacks[i].type->id, lost, stacks[i].isSpecialCharacter});
+        else it->count += lost;
+    }
+    return out;
 }
 
 bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {

@@ -205,11 +205,17 @@
     },
     {
       "id": "hermits_seed",
-      "name": "The Hermit's Seed",
+      "name": "A Warm Seed",
       "slot": "trinket",
       "cursed": false,
-      "description": "It was warm when he dropped it. It is still warm.",
+      "description": "It was warm when he gave it to you. It is still warm.",
       "passiveEffects": []
+    },
+    {
+      "id": "dog_tag",
+      "name": "Dog Tag",
+      "kind": "keepsake",
+      "text": "Beaten tin on a studded collar, cut with marks no one at Varenhold can read."
     }
   ]
 }

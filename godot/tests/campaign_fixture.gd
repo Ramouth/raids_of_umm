@@ -63,6 +63,28 @@ static func write_old_passage(dir: String) -> String:
          "encounters": "maps/old_passage.encounters.json", "triggers": "maps/old_passage.triggers.json"}]}]})
     return path
 
+## A one-map campaign whose map has the id `map_id` (combat tips key on it):
+## a town, and guard camps east of it named in `guards` ({name: [stacks]}).
+## `companions` ride from the start; `triggers` are the map's triggers.
+static func write_guard_map(dir: String, map_id: String, companions: Array, guards: Dictionary, triggers: Array) -> String:
+    DirAccess.make_dir_recursive_absolute(dir)
+    var objects: Array = [{"q": -2, "r": 0, "type": "town", "name": "Holdfast", "factionId": 1}]
+    var spots := [Vector2i(2, 0), Vector2i(2, -2), Vector2i(0, 2)]
+    var encounters := {}
+    var i := 0
+    for name in guards:
+        objects.append({"q": spots[i].x, "r": spots[i].y, "type": "guard", "name": name})
+        encounters[name] = {"guards": guards[name], "reward": {}}
+        i += 1
+    _write(dir.path_join("guards.json"), _map("The Guarded Vale", _blob([Vector2i(0, 0)], 3), objects))
+    _write(dir.path_join("guards.encounters.json"), {"objects": encounters})
+    _write(dir.path_join("guards.triggers.json"), {"start_companions": companions, "triggers": triggers})
+    var path := dir.path_join("campaign.json")
+    _write(path, {"chapters": [{"id": "one", "title": "The Vale", "maps": [
+        {"id": map_id, "title": "The Guarded Vale", "map": "guards.json", "encounters": "guards.encounters.json",
+         "triggers": "guards.triggers.json", "max_level": 3}]}]})
+    return path
+
 ## Removes the saves a previous run left in `dir`.
 static func clear_saves(dir: String) -> void:
     for file in ["campaign.save.json", "campaign_map.save.json", "campaign.resolved.json"]:

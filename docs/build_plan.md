@@ -59,7 +59,7 @@ MVP graphics now and real art swapped in later without code changes.
 
 ### C. Chapter 1 content (umm-story)
 
-- Maps 1.0 The last hunt, 1.1 Varenhold, 1.2 The camps, 1.3 The east road, built from small
+- Maps 1.0 The Last Hunt, 1.1 Varenhold, 1.2 The Camps, 1.3 The East Road, built from small
   generator specs (one script per chapter, like gen_north_map.py) to the Map design tab:
   resources, encounter density and shape tell the story.
 - **Organic outlines, no frame.** Today `gen_north_map.py` cuts every map to a hexagon (`RADIUS`,

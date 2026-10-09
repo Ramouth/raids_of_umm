@@ -6,7 +6,7 @@
       "maps": [
         {
           "id": "1.0",
-          "title": "The last hunt",
+          "title": "The Last Hunt",
           "map": "maps/ch1_1_0_hunt.json",
           "encounters": "maps/ch1_1_0_hunt.encounters.json",
           "triggers": "maps/ch1_1_0_hunt.triggers.json",
@@ -22,7 +22,7 @@
         },
         {
           "id": "1.2",
-          "title": "The camps",
+          "title": "The Camps",
           "map": "maps/ch1_1_2_camps.json",
           "encounters": "maps/ch1_1_2_camps.encounters.json",
           "triggers": "maps/ch1_1_2_camps.triggers.json",
@@ -30,7 +30,7 @@
         },
         {
           "id": "1.3",
-          "title": "The east road",
+          "title": "The East Road",
           "map": "maps/ch1_1_3_east_road.json",
           "encounters": "maps/ch1_1_3_east_road.encounters.json",
           "triggers": "maps/ch1_1_3_east_road.triggers.json",

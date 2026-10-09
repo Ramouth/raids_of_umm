@@ -1,6 +1,7 @@
 #pragma once
 #include "world/Resources.h"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /*
@@ -56,7 +57,15 @@ struct UnitType {
     // Aura: living friendly stacks within auraRadius hexes (not the source)
     // gain auraDefense.  levelGrowth: gained per companion level above 1.
     // title: the epithet shown under the name ("Keeper of the old ways").
+    // upkeep: the wage at level 1 in gold per day (100 = the standard table,
+    // AdventureSession::upkeepFor; it scales with level the same way). 0 = family
+    // or household: no wage, never sulks, never leaves for want of pay.
+    // lines: what the companion says, by moment: "join" (riding in beside
+    // others; none = silent), "unpaid", "paid", "leaves" (unpaid a week),
+    // "wounded". A missing moment gets AdventureSession's neutral default.
     std::string title;
+    int upkeep = 100;
+    std::unordered_map<std::string, std::string> lines;
     int auraRadius  = 0;
     int auraDefense = 0;
     struct LevelGrowth { int hitPoints = 0, attack = 0, defense = 0, damage = 0; };

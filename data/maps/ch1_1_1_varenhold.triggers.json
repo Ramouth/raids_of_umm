@@ -1,10 +1,12 @@
 {
-  "start_companions": [],
+  "start_companions": [
+    "drest"
+  ],
   "quests": [
     {
       "id": "aldren",
       "title": "Where did Aldren go?",
-      "text": "Aldren rode out at dawn and left you his sword. The only road out of the vale runs east, over the bridge.",
+      "text": "Aldren rode out at first light and left you his sword. The only road out of the vale runs east, over the bridge.",
       "main": true
     },
     {
@@ -32,6 +34,14 @@
             2,
             0,
             13
+          ]
+        },
+        {
+          "say": [
+            [
+              "Drest",
+              "He never waited for anyone. Not even me."
+            ]
           ]
         }
       ]
@@ -96,8 +106,8 @@
         {
           "say": [
             [
-              "Scout",
-              "He is gone. Only roots, pushed up through frozen ground."
+              "Drest",
+              "He's gone. Only roots, pushed up through frozen ground. I've never seen that."
             ]
           ]
         }
@@ -113,7 +123,7 @@
         {
           "lore": [
             "A rubbing of the rune stone",
-            "Charcoal on cloth. No one at Varenhold can read it."
+            "Charcoal on cloth. No one at Varenhold can read it. The marks are like the ones on the dog's tag."
           ]
         }
       ]
@@ -128,8 +138,8 @@
         {
           "say": [
             [
-              "Scout",
-              "The door will not open."
+              "Drest",
+              "A red hand is cut into the door. Like the one on your sword."
             ]
           ]
         }
@@ -257,10 +267,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 15,
-        "after": "leave_vale_1",
-        "flag": {
-          "choice.leave_vale": "not_yet"
-        }
+        "after": "leave_vale_1"
+      },
+      "if": {
+        "flag": "choice.leave_vale",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -304,10 +315,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 15,
-        "after": "leave_vale_2",
-        "flag": {
-          "choice.leave_vale": "not_yet"
-        }
+        "after": "leave_vale_2"
+      },
+      "if": {
+        "flag": "choice.leave_vale",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -351,10 +363,11 @@
       "when": {
         "event": "enter_q",
         "q_min": 15,
-        "after": "leave_vale_3",
-        "flag": {
-          "choice.leave_vale": "not_yet"
-        }
+        "after": "leave_vale_3"
+      },
+      "if": {
+        "flag": "choice.leave_vale",
+        "is": "not_yet"
       },
       "do": [
         {
@@ -393,5 +406,8 @@
         }
       ]
     }
+  ],
+  "essential_companions": [
+    "drest"
   ]
 }

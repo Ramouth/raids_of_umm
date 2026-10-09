@@ -1,7 +1,9 @@
 #include "Scenario.h"
 #include <algorithm>
 #include "AdventureSession.h"
+#include "Condition.h"
 #include <fstream>
+#include <stdexcept>
 
 namespace {
 
@@ -23,6 +25,7 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         if (!f.is_open()) return "Cannot open triggers: " + path;
         Json root = Json::parse(f);
         m_triggers = root.value("triggers", Json::array());
+        m_loaded = false;
         m_rivalLord = root.value("rival_lord", Json::object());
         m_surveySite = root.value("survey_site", "");
         m_passageEndsScenario = root.value("passage_ends_scenario", true);
@@ -58,11 +61,13 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         m_fired.clear();
         m_quests.clear();
         m_offers.clear();
-        m_lines.clear();
+        m_story.clear();
+        m_queuedChoices.clear();
         m_won.clear();
         m_vanished.clear();
         m_waiting.clear();
         m_firedOn.clear();
+        if (auto err = compile()) return "Triggers " + path + ": " + *err;
         m_loaded = true;
         return std::nullopt;
     } catch (const std::exception& e) {
@@ -92,18 +97,14 @@ bool Scenario::matches(const Json& when, const std::string& event, const Json& d
 void Scenario::fire(AdventureSession& s, const std::string& event, const Json& detail) {
     if (!m_loaded) return;
     if (event == "encounter_won") m_won.insert(detail.value("name", ""));
-    for (const auto& trigger : m_triggers) {
+    for (size_t i = 0; i < m_triggers.size(); ++i) {
+        const Json& trigger = m_triggers[i];
         std::string id = trigger.value("id", "");
         if (m_fired.count(id) || !matches(trigger.value("when", Json::object()), event, detail)) continue;
-        std::string after = trigger.value("when", Json::object()).value("after", "");
-        if (!after.empty() && !m_fired.count(after)) continue;   // story order
-        int delay = trigger.value("when", Json::object()).value("delay", 0);
-        if (delay > 0 && (after.empty() || s.day() < m_firedOn[after] + delay)) continue;   // days after it
-        std::string unless = trigger.value("when", Json::object()).value("unless", "");
-        if (!unless.empty() && m_fired.count(unless)) { m_fired.insert(id); continue; }  // overtaken by events
-        const Json when = trigger.value("when", Json::object());
-        if (when.contains("flag") && !flagsMatch(s.flags(), when["flag"])) continue;              // not yet
-        if (when.contains("unless_flag") && flagsMatch(s.flags(), when["unless_flag"])) continue; // not now
+        const Gate& gate = m_gates[i];
+        if (!Condition::eval(gate.order, s)) continue;                                     // story order
+        if (Condition::eval(gate.overtaken, s)) { m_fired.insert(id); continue; }         // overtaken by events
+        if (!Condition::eval(gate.when, s)) continue;                                      // not yet / not now
         std::string wait = trigger.value("when", Json::object()).value("wait", "");
         if (!wait.empty() && !m_fired.count(wait)) {                // held until that beat
             m_fired.insert(id);
@@ -112,6 +113,103 @@ void Scenario::fire(AdventureSession& s, const std::string& event, const Json& d
         }
         fireTrigger(s, trigger);
     }
+}
+
+bool Scenario::armed(const AdventureSession& s, size_t trigger) const {
+    return trigger < m_gates.size() && Condition::eval(m_gates[trigger].order, s) && Condition::eval(m_gates[trigger].when, s);
+}
+
+bool Scenario::overtaken(const AdventureSession& s, size_t trigger) const {
+    return trigger < m_gates.size() && Condition::eval(m_gates[trigger].overtaken, s);
+}
+
+namespace {
+
+// Walks an action list, checking every condition in it (if-actions, choice options).
+std::optional<std::string> checkActions(const Scenario::Json& actions, const std::string& where) {
+    using Json = Scenario::Json;
+    if (!actions.is_array()) return std::nullopt;
+    for (size_t k = 0; k < actions.size(); ++k) {
+        const Json& a = actions[k];
+        const std::string at = where + "[" + std::to_string(k) + "]";
+        if (!a.is_object()) continue;
+        if (a.contains("if")) {
+            for (const auto& [key, value] : a.items())
+                if (key != "if" && key != "then" && key != "else")
+                    return at + ": an if-action holds only if / then / else, not '" + key + "'";
+            if (auto err = Condition::validate(a["if"], at + ".if")) return err;
+            for (const char* branch : {"then", "else"})
+                if (a.contains(branch)) {
+                    if (!a[branch].is_array()) return at + "." + branch + ": wants a list of actions";
+                    if (auto err = checkActions(a[branch], at + "." + branch)) return err;
+                }
+        }
+        if (a.contains("choice")) {
+            const Json options = a["choice"].value("options", Json::array());
+            // A choice that holds the map still must always offer something: if every
+            // option can be hidden ("if" / requires_item), the player could face none.
+            if (!a["choice"].value("allow_exploration", false) && !options.empty()
+                && std::all_of(options.begin(), options.end(), [](const Json& o) {
+                       return o.is_object() && (o.contains("if") || o.contains("requires_item"));
+                   }))
+                return at + ".choice '" + a["choice"].value("id", "") + "': every option is conditional "
+                       "(if / requires_item); a blocking choice needs at least one option without a condition";
+            for (size_t i = 0; i < options.size(); ++i) {
+                const std::string o = at + ".choice.options[" + std::to_string(i) + "]";
+                if (auto err = Condition::validate(Scenario::shownWhen(options[i]), o + ".if")) return err;
+                if (auto err = Condition::validate(Scenario::lockedUnless(options[i]), o + ".requires")) return err;
+                if (auto err = checkActions(options[i].value("then", Json::array()), o + ".then")) return err;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+// Every condition in the file becomes a tree, checked here: legacy fields
+// (when.after / delay / unless / flag / unless_flag, requires_*) are translated,
+// so play has one code path (Condition::eval).
+std::optional<std::string> Scenario::compile() {
+    m_gates.clear();
+    try {
+        for (size_t i = 0; i < m_triggers.size(); ++i) {
+            const Json& t = m_triggers[i];
+            const Json when = t.value("when", Json::object());
+            const std::string where = "triggers[" + std::to_string(i) + "] '" + t.value("id", "") + "'";
+            Gate gate;
+            const std::string after = when.value("after", "");
+            const int delay = when.value("delay", 0);
+            Json order = Json::array();
+            if (!after.empty()) {
+                Json fired = {{"trigger_fired", after}};
+                if (delay > 0) fired["days"] = {{">=", delay}};
+                order.push_back(fired);
+            } else if (delay > 0) {
+                order.push_back(false);                    // a delay counts from "after"; without one it never comes
+            }
+            gate.order = Condition::allOf(order);
+            const std::string unless = when.value("unless", "");
+            gate.overtaken = unless.empty() ? Json(false) : Json{{"trigger_fired", unless}};
+            Json parts = Json::array();
+            if (when.contains("flag")) parts.push_back(Condition::fromFlags(when["flag"]));
+            if (when.contains("unless_flag")) parts.push_back({{"not", Condition::fromFlags(when["unless_flag"])}});
+            if (t.contains("if")) {
+                if (auto err = Condition::validate(t["if"], where + ".if")) return err;
+                parts.push_back(t["if"]);
+            }
+            gate.when = Condition::allOf(parts);
+            for (const Json* tree : {&gate.order, &gate.overtaken, &gate.when})
+                if (auto err = Condition::validate(*tree, where + ".when")) return err;
+            if (auto err = checkActions(t.value("do", Json::array()), where + ".do")) return err;
+            m_gates.push_back(std::move(gate));
+        }
+        for (size_t i = 0; i < m_offerDefs.size(); ++i)
+            if (auto err = checkActions(m_offerDefs[i].then, "offers[" + std::to_string(i) + "].then")) return err;
+    } catch (const std::invalid_argument& e) {
+        return std::string(e.what());
+    }
+    return std::nullopt;
 }
 
 void Scenario::fireTrigger(AdventureSession& s, const Json& trigger) {
@@ -138,9 +236,13 @@ void Scenario::fireTrigger(AdventureSession& s, const Json& trigger) {
 
 void Scenario::run(AdventureSession& s, const Json& actions) {
     for (const auto& a : actions) {
+        if (a.contains("if")) {                      // a branch: one of its lists runs, nothing else here
+            run(s, Condition::eval(a["if"], s) ? a.value("then", Json::array()) : a.value("else", Json::array()));
+            continue;
+        }
         if (a.contains("say"))
             for (const auto& line : a["say"])
-                m_lines.push_back({line.at(0).get<std::string>(), line.at(1).get<std::string>()});
+                say(line.at(0).get<std::string>(), line.at(1).get<std::string>());
         if (a.contains("quest"))
             for (const auto& def : m_questDefs)
                 if (def.id == a["quest"] && !quest(def.id)) m_quests.push_back(def);
@@ -157,13 +259,14 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         if (a.contains("morale"))
             m_morale[a["morale"].at("id").get<std::string>()] = std::clamp(a["morale"].at("value").get<int>(), -2, 2);
         if (a.contains("leave")) s.leaveSpecial(a["leave"].get<std::string>());
+        if (a.contains("stay_behind")) s.stayBehind(a["stay_behind"].get<std::string>());
         if (a.contains("choice") && m_outcome.empty()) {
-            m_choice = a["choice"];
-            m_choiceTrigger = m_firing;
-            if (m_choice.value("id", "") == "passage_gate" && s.passageMine()) {
+            Json choice = a["choice"];
+            if (choice.value("id", "") == "passage_gate" && s.passageMine()) {
                 auto at = *s.passageMine();
-                m_choice["at"] = {at.q, at.r};
+                choice["at"] = {at.q, at.r};
             }
+            raiseChoice(choice, m_firing);
         }
         if (a.contains("ending")) {
             m_outcome = a["ending"];
@@ -180,6 +283,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             }
             m_choice = Json::object();
             m_choiceTrigger.clear();
+            m_queuedChoices.clear();
             s.completeChapter(m_outcome.value("return_to", ""));
         }
         if (a.contains("quest_text"))
@@ -193,16 +297,23 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             auto name = s.giveClue();
             if (!a.value("silent", false)) {
                 if (name)
-                    m_lines.push_back({"Kharim", "The " + *name + " is a dead end. I would stake my maps on it."});
+                    say("Kharim", "The " + *name + " is a dead end. I would stake my maps on it.");
                 else
-                    m_lines.push_back({"Kharim", "You have already ruled out every false mine. Trust the one that remains."});
+                    say("Kharim", "You have already ruled out every false mine. Trust the one that remains.");
             }
         }
         if (a.contains("item")) s.addItem(a["item"].get<std::string>());
+        if (a.contains("take_item")) s.takeItem(a["take_item"].get<std::string>());   // handed over (none = nothing)
         if (a.contains("lore")) {
             Lore entry{a["lore"].at(0).get<std::string>(), a["lore"].at(1).get<std::string>()};
-            if (std::none_of(m_lore.begin(), m_lore.end(), [&](const Lore& l) { return l.title == entry.title; }))
+            if (std::none_of(m_lore.begin(), m_lore.end(), [&](const Lore& l) { return l.title == entry.title; })) {
                 m_lore.push_back(entry);
+                m_story.push_back({{"kind", "lore"}, {"title", entry.title}, {"text", entry.text}});
+            }
+        }
+        if (a.contains("scene")) {                   // a full-screen moment; the map goes on
+            Json frames = a["scene"].value("frames", Json::array());
+            if (frames.is_array() && !frames.empty()) m_story.push_back({{"kind", "scene"}, {"frames", frames}});
         }
         if (a.contains("troops")) {                  // allies send soldiers to the hero
             auto army = s.army();
@@ -213,15 +324,17 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
                 if (it != army.end()) it->count += n;
                 else army.push_back({id, n});
             }
-            s.setArmy(army);
+            for (const auto& left : s.setArmy(army))   // five stacks at most: the rest cannot join the column
+                say("", "There is no room in the column for " + std::to_string(left.count) + " "
+                        + s.unitName(left.id) + "; they stay behind.");
         }
         if (a.contains("ambush_from")) {
             const auto& b = a["ambush_from"];
             if (s.ambushFrom(b.at("at"), b.at("band"))) {
                 for (const auto& line : b.value("say", Json::array()))
-                    m_lines.push_back({line.at(0), line.at(1)});
+                    say(line.at(0).get<std::string>(), line.at(1).get<std::string>());
             } else {
-                m_lines.push_back({"Scout", "No escort comes. We will have to make our own way."});
+                say("Scout", "No escort comes. We will have to make our own way.");
             }
         }
         if (a.contains("betray")) {
@@ -235,7 +348,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             const auto& t = a["turncoats"];
             if (s.turncoats(t.value("unit", ""), t.value("band", "turncoats")) > 0)
                 for (const auto& line : t.value("say", Json::array()))
-                    m_lines.push_back({line.at(0).get<std::string>(), line.at(1).get<std::string>()});
+                    say(line.at(0).get<std::string>(), line.at(1).get<std::string>());
         }
         if (a.contains("event")) fire(s, a["event"].get<std::string>());
         if (a.contains("xp")) s.grantXp(a["xp"].get<int>());   // a story reward
@@ -254,21 +367,11 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
 }
 
 bool Scenario::flagsMatch(const Json& flags, const Json& condition) {
-    auto truthy = [&](const std::string& name) {
-        if (!flags.is_object() || !flags.contains(name)) return false;
-        const Json& v = flags[name];
-        return !(v.is_null() || v == false || v == 0 || v == "");
-    };
-    if (condition.is_string()) return truthy(condition.get<std::string>());
-    if (condition.is_array())
-        return std::all_of(condition.begin(), condition.end(),
-                           [&](const Json& n) { return n.is_string() && truthy(n.get<std::string>()); });
-    if (condition.is_object()) {
-        for (const auto& [name, value] : condition.items())
-            if (!flags.is_object() || !flags.contains(name) || flags[name] != value) return false;
-        return true;
+    try {
+        return Condition::evalFlags(Condition::fromFlags(condition), flags);
+    } catch (const std::invalid_argument&) {
+        return false;                                // malformed: never holds (load rejects it in a file)
     }
-    return false;
 }
 
 std::optional<std::string> Scenario::choose(AdventureSession& s, const std::string& id) {
@@ -281,14 +384,15 @@ std::optional<std::string> Scenario::choose(AdventureSession& s, const std::stri
     }
     for (const auto& option : m_choice.value("options", Json::array())) {
         if (option.value("id", "") != id) continue;
-        for (const auto& title : option.value("requires_lore", Json::array())) {
-            if (std::none_of(m_lore.begin(), m_lore.end(), [&](const Lore& l) { return l.title == title; }))
-                return "Read the inscriptions at Varenhold, Coldwater bridge and the assembly court with Ushari first.";
-        }
-        if (option.value("requires_route", false) && s.departureRoute().empty())
+        // Legacy checks of the old northern demo, refused with their own words (not shown locked).
+        Json lore = Json::array();
+        for (const auto& title : option.value("requires_lore", Json::array())) lore.push_back({{"lore", title}});
+        if (!Condition::eval(Condition::allOf(lore), s))
+            return "Read the inscriptions at Varenhold, Coldwater bridge and the assembly court with Ushari first.";
+        if (option.value("requires_route", false) && !Condition::eval(Json{{"route", true}}, s))
             return "Secure a way onward: hold Rookwatch, clear the southern Troll Gate, or recover the escort's patrol orders.";
-        if (option.contains("requires_flag") && !flagsMatch(s.flags(), option["requires_flag"]))
-            return option.value("locked_text", std::string("That path is not open to you."));
+        if (!offered(s, option)) return "That is not one of the available choices.";
+        if (auto why = locked(s, option)) return why;
         Json actions = option.value("then", Json::array());
         s.setFlag("choice." + m_choice.value("id", ""), id);   // heavy decisions are remembered
         if (option.value("again", false) && !m_choiceTrigger.empty()) {
@@ -302,9 +406,61 @@ std::optional<std::string> Scenario::choose(AdventureSession& s, const std::stri
         m_choice = Json::object();  // commit before executing; a second click cannot take the other path
         m_choiceTrigger.clear();
         run(s, actions);
+        if (!awaitingChoice() && !m_queuedChoices.empty() && m_outcome.empty()) {   // the one waiting behind it
+            m_choice = m_queuedChoices.front().value("choice", Json::object());
+            m_choiceTrigger = m_queuedChoices.front().value("trigger", "");
+            m_queuedChoices.erase(m_queuedChoices.begin());
+        }
         return std::nullopt;
     }
     return "That is not one of the available choices.";
+}
+
+void Scenario::raiseChoice(const Json& choice, const std::string& trigger) {
+    if (!m_outcome.empty()) return;
+    // The party choice ("Who stays behind?") and a story choice never overwrite
+    // each other: the later one waits until the open one is answered. Two story
+    // choices behave as before (the later replaces the earlier).
+    const bool party = choice.value("kind", "") == "party";
+    if (awaitingChoice() && (party || m_choice.value("kind", "") == "party")) {
+        m_queuedChoices.push_back({{"choice", choice}, {"trigger", trigger}});
+        return;
+    }
+    m_choice = choice;
+    m_choiceTrigger = trigger;
+}
+
+Scenario::Json Scenario::shownWhen(const Json& option) {
+    Json parts = Json::array();
+    if (option.contains("requires_item")) parts.push_back({{"item", option["requires_item"]}});
+    if (option.contains("if")) parts.push_back(option["if"]);
+    return Condition::allOf(parts);
+}
+
+Scenario::Json Scenario::lockedUnless(const Json& option) {
+    Json parts = Json::array();
+    if (option.contains("requires_flag")) parts.push_back(Condition::fromFlags(option["requires_flag"]));
+    if (option.contains("requires")) parts.push_back(option["requires"]);
+    return Condition::allOf(parts);
+}
+
+bool Scenario::offered(const AdventureSession& s, const Json& option) {
+    return Condition::eval(shownWhen(option), s);
+}
+
+std::optional<std::string> Scenario::locked(const AdventureSession& s, const Json& option) {
+    if (Condition::eval(lockedUnless(option), s)) return std::nullopt;
+    return option.value("locked_text", std::string("That path is not open to you."));
+}
+
+Scenario::Json Scenario::offeredChoice(const AdventureSession& s) const {
+    Json out = m_choice;
+    if (out.contains("options") && out["options"].is_array()) {
+        Json kept = Json::array();
+        for (const auto& option : out["options"]) if (offered(s, option)) kept.push_back(option);
+        out["options"] = kept;
+    }
+    return out;
 }
 
 Scenario::Json Scenario::saveState() const {
@@ -319,7 +475,8 @@ Scenario::Json Scenario::saveState() const {
             {"won", Json(std::vector<std::string>(m_won.begin(), m_won.end()))},
             {"vanished", Json(std::vector<std::string>(m_vanished.begin(), m_vanished.end()))},
             {"waiting", Json(m_waiting)}, {"fired_on", Json(m_firedOn)},
-            {"choice", m_choice}, {"choice_trigger", m_choiceTrigger}, {"outcome", m_outcome}, {"morale", m_morale}};
+            {"choice", m_choice}, {"choice_trigger", m_choiceTrigger}, {"outcome", m_outcome}, {"morale", m_morale},
+            {"queued_choices", Json(m_queuedChoices)}, {"story", Json(m_story)}};
 }
 
 void Scenario::loadState(const Json& state) {
@@ -355,12 +512,38 @@ void Scenario::loadState(const Json& state) {
     m_lore.clear();
     for (const auto& l : state.value("lore", Json::array()))
         m_lore.push_back({l.at(0).get<std::string>(), l.at(1).get<std::string>()});
-    m_lines.clear();
+    m_queuedChoices = state.value("queued_choices", std::vector<Json>{});
+    m_story.clear();
+    if (state.contains("story")) {
+        m_story = state.value("story", std::vector<Json>{});
+    } else {                                     // older saves kept only the undrained scenes
+        for (const auto& scene : state.value("scenes", Json::array()))
+            m_story.push_back({{"kind", "scene"}, {"frames", scene.value("frames", Json::array())}});
+    }
+}
+
+std::vector<Scenario::Json> Scenario::drainStory() {
+    std::vector<Json> out;
+    out.swap(m_story);
+    return out;
+}
+
+std::vector<Scenario::Json> Scenario::drainKind(const std::string& kind) {
+    std::vector<Json> out, rest;
+    for (auto& e : m_story) (e.value("kind", "") == kind ? out : rest).push_back(std::move(e));
+    m_story.swap(rest);
+    return out;
 }
 
 std::vector<Scenario::Line> Scenario::drainLines() {
     std::vector<Line> out;
-    out.swap(m_lines);
+    for (const auto& e : drainKind("line")) out.push_back({e.value("speaker", ""), e.value("text", "")});
+    return out;
+}
+
+std::vector<Scenario::Json> Scenario::drainScenes() {
+    std::vector<Json> out;
+    for (auto& e : drainKind("scene")) out.push_back({{"frames", e.value("frames", Json::array())}});
     return out;
 }
 

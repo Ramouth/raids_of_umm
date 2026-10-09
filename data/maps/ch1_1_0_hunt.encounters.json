@@ -28,7 +28,11 @@
           "count": 8
         }
       ],
-      "reward": {}
+      "reward": {
+        "items": [
+          "dog_tag"
+        ]
+      }
     }
   },
   "pickups": {}

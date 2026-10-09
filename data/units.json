@@ -809,6 +809,33 @@
       "textureId": "forest_troll"
     },
     {
+      "id": "northern_warrior",
+      "name": "Northern Warrior",
+      "description": "Big men in white furs, from somewhere past the snow. They do not chase you. They plant their feet and let you come.",
+      "tier": 3,
+      "faction": "ice",
+      "attack": 8,
+      "defense": 11,
+      "minDamage": 3,
+      "maxDamage": 6,
+      "hitPoints": 30,
+      "speed": 4,
+      "moveRange": 3,
+      "shots": 0,
+      "weeklyGrowth": 4,
+      "cost": {
+        "Gold": 300,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "attackType": "physical",
+      "abilities": [],
+      "meshId": "northern_warrior",
+      "textureId": "northern_warrior"
+    },
+    {
       "id": "ancient_treant",
       "name": "Ancient Treant",
       "description": "An oak older than the families' oldest oath. It remembers who cut its kin.",
@@ -839,6 +866,15 @@
     {
       "id": "ushari",
       "name": "Ushari",
+      "title": "Witch of the old south",
+      "upkeep": 100,
+      "lines": {
+        "join": "",
+        "unpaid": "You have stopped paying me. I have stopped hurrying. We will see who minds first.",
+        "paid": "There. Was that so hard? Lead on.",
+        "leaves": "I came for your brother, not for promises. I will find him without you.",
+        "wounded": "Do not fuss. My grandmother bled worse in a morning. Give me three days."
+      },
       "description": "A witch of the realm's last witch tribe. Binding Thread weakens an enemy within four hexes on a d6 roll of 3 or more. At level 3 it also slows. Nearby enemies prevent casting; she fights with a knife instead.",
       "attack": 12,
       "defense": 3,
@@ -880,6 +916,15 @@
     {
       "id": "kharim",
       "name": "Kharim",
+      "title": "Scholar of Pha'raxh",
+      "upkeep": 100,
+      "lines": {
+        "join": "Your road passes places I have only read about. I will come, and I will cost you less than ignorance would.",
+        "unpaid": "A scholar who is not paid starts to wonder what else he could be reading. I am wondering.",
+        "paid": "Thank you. My attention is yours again.",
+        "leaves": "I cannot eat old words, my lord. I go where someone pays for them.",
+        "wounded": "I will mend. Keep me out of the front of things for a few days, and let me read."
+      },
       "description": "Scholar of Pha'raxh. He throws words the old kings used, and armour does not stop them. Keep something between him and the enemy.",
       "attack": 7,
       "defense": 4,
@@ -915,6 +960,15 @@
     {
       "id": "maerwen",
       "name": "Maerwen Hale",
+      "title": "Shield-captain of the heron",
+      "upkeep": 100,
+      "lines": {
+        "join": "I will hold your line. Pay my wage and I will hold it until it breaks or they do.",
+        "unpaid": "The heron does not fight for free. Neither do I. Pay me, and my shield comes up again.",
+        "paid": "Good. We stand together again.",
+        "leaves": "A captain who goes unpaid is no captain. I am going home.",
+        "wounded": "Bad cut, not a deep one. Three days, and I take the front rank again."
+      },
       "description": "Corvin's sister, a Hale shield-captain. She does not chase; she waits. Any enemy that steps out of her reach takes a blow on the way (once per round).",
       "attack": 9,
       "defense": 13,
@@ -951,6 +1005,12 @@
     {
       "id": "aldren",
       "name": "Aldren",
+      "title": "Heir of Varen",
+      "upkeep": 0,
+      "lines": {
+        "join": "",
+        "wounded": "It is nothing. Ride on; I will catch you up when I can sit a horse."
+      },
       "description": "The heir of Varen. He rides in front and never looks back to see who follows.",
       "attack": 14,
       "defense": 10,
@@ -969,6 +1029,51 @@
       },
       "meshId": "aldren",
       "textureId": "aldren",
+      "tier": 0,
+      "faction": "companion",
+      "weeklyGrowth": 0,
+      "cost": {
+        "Gold": 0,
+        "Wood": 0,
+        "Stone": 0,
+        "Obsidian": 0,
+        "Crystal": 0
+      },
+      "abilities": [
+        "companion"
+      ]
+    },
+    {
+      "id": "drest",
+      "name": "Drest",
+      "title": "Master-at-arms",
+      "upkeep": 0,
+      "lines": {
+        "join": "",
+        "wounded": "Old bones, boy. They knit slow. Give me three days before I stand in a line again."
+      },
+      "description": "Varenhold's master-at-arms. Too old for the front rank; no one reads a fight better. Men beside him keep their guard up.",
+      "attack": 6,
+      "defense": 9,
+      "minDamage": 8,
+      "maxDamage": 12,
+      "hitPoints": 40,
+      "speed": 5,
+      "moveRange": 3,
+      "shots": 0,
+      "attackType": "physical",
+      "aura": {
+        "radius": 1,
+        "defense": 2
+      },
+      "levelGrowth": {
+        "hitPoints": 4,
+        "attack": 0,
+        "defense": 1,
+        "damage": 1
+      },
+      "meshId": "drest",
+      "textureId": "drest",
       "tier": 0,
       "faction": "companion",
       "weeklyGrowth": 0,

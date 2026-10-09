@@ -8,9 +8,11 @@ namespace {
 
 Json companionsJson(const std::vector<CampaignState::Companion>& list) {
     Json out = Json::array();
-    for (const auto& c : list)
+    for (const auto& c : list) {
         out.push_back({{"id", c.id}, {"name", c.name}, {"title", c.title},
                        {"level", c.level}, {"xp", c.xp}, {"morale", c.morale}});
+        if (c.waiting) out.back()["waiting"] = true;   // omitted when false
+    }
     return out;
 }
 
@@ -18,7 +20,7 @@ std::vector<CampaignState::Companion> companionsFrom(const Json& j) {
     std::vector<CampaignState::Companion> out;
     for (const auto& c : j)
         out.push_back({c.value("id", ""), c.value("name", ""), c.value("title", ""),
-                       c.value("level", 1), c.value("xp", 0), c.value("morale", 0)});
+                       c.value("level", 1), c.value("xp", 0), c.value("morale", 0), c.value("waiting", false)});
     return out;
 }
 
@@ -35,7 +37,7 @@ Json CampaignState::toJson() const {
             {"army", stacks}, {"items", items}, {"equipped", equipped},
             {"companions", companionsJson(companions)}, {"departed", companionsJson(departed)},
             {"treasury", std::vector<int>(treasury.amounts.begin(), treasury.amounts.end())},
-            {"flags", flags}, {"level_cap", levelCap}, {"last_map", lastMap}, {"history", history}};
+            {"flags", flags}, {"shown_tips", shownTips}, {"level_cap", levelCap}, {"last_map", lastMap}, {"history", history}};
 }
 
 CampaignState CampaignState::fromJson(const Json& j) {
@@ -56,6 +58,7 @@ CampaignState CampaignState::fromJson(const Json& j) {
     const Json t = j.value("treasury", Json::array());
     for (int i = 0; i < RESOURCE_COUNT && i < (int)t.size(); ++i) s.treasury.amounts[i] = t.at(i).get<int>();
     s.flags    = j.value("flags", Json::object());
+    s.shownTips = j.value("shown_tips", std::vector<std::string>{});
     s.levelCap = j.value("level_cap", 10);
     s.lastMap  = j.value("last_map", Json::object());
     s.history  = j.value("history", Json::array());

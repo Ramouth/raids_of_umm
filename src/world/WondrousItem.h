@@ -32,6 +32,12 @@ struct WondrousItem {
     std::string description;
     std::string slot;          // "amulet", "weapon", "armor", "trinket"
     bool        cursed = false;
+    // "" = a commander item. "keepsake" = something found and kept to read:
+    // no slot, no effects, never worn; `text` is what the player reads.
+    std::string kind;
+    std::string text;
+
+    bool isKeepsake() const { return kind == "keepsake"; }
 
     std::vector<ItemEffect> passiveEffects;
 };

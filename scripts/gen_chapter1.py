@@ -2,10 +2,10 @@
 """
 gen_chapter1.py — the four maps of chapter 1, "The Marches".
 
-    1.0 The last hunt   a small glade between woods and a stream; two packs of mad dogs
+    1.0 The Last Hunt   a small glade between woods and a stream; two packs of mad dogs
     1.1 Varenhold       a closed bowl of hills; one way out, east, over a bridge the keeper shuts
-    1.2 The camps       wide river fields; one bridge over the burn
-    1.3 The east road   a long ribbon climbing into the foothills; the Greyfangs at its end
+    1.2 The Camps       wide river fields; one bridge over the burn
+    1.3 The East Road   a long ribbon climbing into the foothills; the Greyfangs at its end
 
 Each map takes the land's own outline (no hexagon cut, no mountain frame). The edge
 is whatever stops a traveller there: thick forest, a wide river, a tarn, crags;
@@ -281,7 +281,7 @@ def capsule(x, y, a, b, rad):
     return math.hypot(x - ax - t * (bx - ax), y - ay - t * (by - ay)) / rad
 
 
-# ── 1.0 The last hunt ────────────────────────────────────────────────────────
+# ── 1.0 The Last Hunt ────────────────────────────────────────────────────────
 def hunt():
     """A glade a day across: woods to the north, a stream to the south, a pool to the west."""
     L = Land("The Last Hunt", "ch1_1_0_hunt", 101, (-9, 9), (-7, 6))
@@ -371,7 +371,7 @@ def varenhold():
     return L
 
 
-# ── 1.2 The camps ────────────────────────────────────────────────────────────
+# ── 1.2 The Camps ────────────────────────────────────────────────────────────
 def camps():
     """River fields between the north woods and the wide river; the burn cuts them at one bridge."""
     L = Land("The Camps", "ch1_1_2_camps", 121, (-19, 19), (-11, 11))
@@ -427,13 +427,16 @@ def camps():
     L.place("pickup", "Brigand Purse", at(12, 3.5), 0, "gold")
     L.place("pickup", "Drover's Cart", at(9, -4), 0, "wood")
     L.place("quest_giver", "Empty Camp", (4, -6), exact=True)  # where the dogs came from: the foot of the snow, by the burn
+    # The dogs' owner, come down the burn between the ridges to look for them. Two cells
+    # above the Empty Camp, on the snow, so his zone does not cover the camp or the road.
+    L.place("guard", "Northern Warrior", (4, -8), exact=True)
     L.finish(start, road=[start, at(-6, 0), at(-2, 0.5), bridge, camp, at(12, 0), at(18, 0)])
     L.exit_q = 16
     L.chokes = {"Red Banner Camp": "exit"}
     return L
 
 
-# ── 1.3 The east road ────────────────────────────────────────────────────────
+# ── 1.3 The East Road ────────────────────────────────────────────────────────
 def east_road():
     """A ribbon up a gorge into the foothills; the Greyfangs close it at the mine."""
     L = Land("The East Road", "ch1_1_3_east_road", 131, (-24, 24), (-14, 14))

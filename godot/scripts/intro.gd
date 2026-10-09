@@ -6,28 +6,18 @@ extends Control
 signal finished
 
 const SLIDES := [
-    {"image": "slide.01_word", "lines": [
-        "The word is spreading.",
-        "Along the salt roads, into the northern halls, from one fire to the next."]},
-    {"image": "slide.02_walls", "lines": [
-        "Umm'Natur, the walled nation, has fallen.",
-        "For a thousand years its gates stood shut. Now no one keeps the walls."]},
-    {"image": "slide.03_tomb", "lines": [
-        "Its last emperor, Sethurakh the Red, Lord of Blood and Sand, died in his own tomb.",
-        "He had himself walled in alive, trusting no hand but his own, whispering the old rites to keep death out.",
-        "They did not."]},
-    {"image": "slide.04_throne", "lines": [
-        "He left no heir. No regent.",
-        "The mightiest throne in the world stands empty, and the sand is already climbing its steps."]},
-    {"image": "slide.05_hunt", "pace": 0.7, "lines": [
-        "So the hunt begins.",
-        "Who will take the throne? Who will reach the capital first? Who will carry off its relics?"]},
-    {"image": "slide.06_passage", "lines": [
-        "But your people remember what the others have forgotten:",
-        "an old passage under the Greyfang mountains. A way in, ahead of every king standing in line."]},
-    {"image": "", "lines": [
-        "Your brother Aldren rode east to find it.",
-        "He has not written since."]},
+    {"image": "slide.07_howls", "lines": [
+        "The Marches: hill country at the edge of the north, where the roads run out and winter comes early.",
+        "The Cruths live here, painted warbands, each led by an old noble house."]},
+    {"image": "slide.10_hall", "lines": [
+        "House Varen holds this valley from Varenhold.",
+        "Your father rules there. He is getting old."]},
+    {"image": "slide.11_brothers", "lines": [
+        "Your brother Aldren is the heir.",
+        "You are the younger son."]},
+    {"image": "slide.09_fold", "lines": [
+        "This autumn, something is wrong with the dogs in the hills.",
+        "The herdsmen have started barring their folds at night."]},
 ]
 const TITLE := "RAIDS OF UMM'NATUR"
 const FADE := 1.4        # seconds for a slide to fade in or out

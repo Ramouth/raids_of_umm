@@ -2,22 +2,43 @@
 //
 // SCs travel with the hero (earning XP from victories and granting their
 // unlocked abilities) or govern an owned town (+100 gold per level per day,
-// no XP). Upkeep rises with level; unpaid SCs sulk, then leave.
+// no XP). Upkeep rises with level; unpaid SCs sulk, then leave. Who they are
+// (name, title, wage, what they say) comes from units.json; at most two ride.
 #include "AdventureSession.h"
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <nlohmann/json.hpp>
 
 namespace {
 
-struct SpecialDef { const char* id; const char* name; const char* title; };
-constexpr SpecialDef kSpecials[] = {
-    {"ushari", "Ushari", "Keeper of the old ways"},
-    {"kharim", "Kharim", "Scholar of Pha'raxh"},
-    {"maerwen", "Maerwen Hale", "Shield-captain of the heron"},
-};
+// What a companion says when units.json gives no line for the moment ("join": silent).
+const char* defaultLine(const std::string& moment) {
+    if (moment == "unpaid")  return "Three days without pay. Do not expect my best until the treasury remembers me.";
+    if (moment == "paid")    return "Paid at last. Very well, I am with you again.";
+    if (moment == "leaves")  return "A week unpaid. I have served better paymasters. Farewell.";
+    if (moment == "wounded") return "I will live. Give me three days before you ask me to hold a line again.";
+    return "";
+}
 
 } // namespace
+
+std::string AdventureSession::companionLine(const std::string& id, const std::string& moment) const {
+    if (const UnitType* u = m_resources ? m_resources->unit(id) : nullptr)
+        if (auto it = u->lines.find(moment); it != u->lines.end()) return it->second;
+    return defaultLine(moment);
+}
+
+int AdventureSession::upkeepOf(const Special& sc) const {
+    const UnitType* u = m_resources ? m_resources->unit(sc.id) : nullptr;
+    const int base = u ? u->upkeep : 100;
+    return upkeepFor(sc.level) * base / 100;
+}
+
+int AdventureSession::ridingCount() const {
+    return static_cast<int>(std::count_if(m_specials.begin(), m_specials.end(),
+                                          [](const Special& sc) { return !sc.stationed; }));
+}
 
 std::vector<AdventureSession::Ability> AdventureSession::abilitiesOf(const std::string& id) {
     if (id == "ushari") return {
@@ -58,27 +79,93 @@ int AdventureSession::upkeepFor(int level) {
     return 100;
 }
 
-void AdventureSession::joinSpecial(const std::string& id) {
-    for (const auto& sc : m_specials) if (sc.id == id) return;
+AdventureSession::Special* AdventureSession::addSpecial(const std::string& id) {
+    for (const auto& sc : m_specials) if (sc.id == id) return nullptr;
     auto returning = std::find_if(m_departedSpecials.begin(), m_departedSpecials.end(),
                                  [&](const Special& sc) { return sc.id == id; });
     if (returning != m_departedSpecials.end()) {
         m_specials.push_back(*returning);
         m_specials.back().stationed.reset();
+        m_specials.back().waiting = false;
         m_departedSpecials.erase(returning);
-        return;
+        return &m_specials.back();
     }
-    for (const auto& def : kSpecials) {
-        if (id != def.id) continue;
-        m_specials.push_back({def.id, def.name, def.title, 1, 0, std::nullopt, 0});
-        if (m_specials.size() > 1)
-            report(def.name, std::string("I will ride with the Compact. My upkeep is modest, for now."));
-        return;
-    }
-    // Any other companion comes from data: a unit of faction "companion" (name, title).
+    // A companion is a unit of faction "companion" (name, title, upkeep, lines).
     const UnitType* unit = m_resources ? m_resources->unit(id) : nullptr;
-    if (unit && unit->isCompanion())
-        m_specials.push_back({unit->id, unit->name, unit->title, 1, 0, std::nullopt, 0});
+    if (!unit || !unit->isCompanion()) return nullptr;
+    m_specials.push_back({unit->id, unit->name, unit->title, 1, 0, std::nullopt, 0});
+    return &m_specials.back();
+}
+
+void AdventureSession::joinSpecial(const std::string& id) {
+    const bool others = !m_specials.empty();
+    Special* sc = addSpecial(id);
+    if (!sc) return;
+    const std::string name = sc->name;
+    if (others)
+        if (std::string line = companionLine(id, "join"); !line.empty()) report(name, line);
+    if (ridingCount() > MAX_RIDING) askWhoStaysBehind(id);
+    recomputeVisibility();
+}
+
+void AdventureSession::askWhoStaysBehind(const std::string& newcomer) {
+    // The nearest town the player holds is where the one left behind will govern.
+    std::string town;
+    int best = 1 << 30;
+    for (const auto& obj : m_map.objects())
+        if (obj.type == ObjType::Town && owner(obj.pos) == Faction::Player && obj.pos.distanceTo(m_hero.pos) < best) {
+            best = obj.pos.distanceTo(m_hero.pos);
+            town = obj.name;
+        }
+    Scenario::Json options = Scenario::Json::array();
+    std::vector<const Special*> riders;
+    for (const auto& sc : m_specials) if (!sc.stationed && sc.id != newcomer) riders.push_back(&sc);
+    for (const auto& sc : m_specials) if (sc.id == newcomer) riders.push_back(&sc);   // the newcomer last
+    for (const Special* sc : riders) {
+        if (m_scenario.essential(sc->id)) continue;   // the story needs them with the hero
+        options.push_back({{"id", sc->id}, {"label", sc->name + " stays behind"},
+                           {"detail", town.empty() ? sc->name + " waits until you send word."
+                                                   : sc->name + " goes to govern " + town + "."},
+                           {"then", Scenario::Json::array({{{"stay_behind", sc->id}}})}});
+    }
+    if (options.empty()) {   // everyone is essential: nobody can be asked to stay
+        std::cerr << "[AdventureSession] " << ridingCount() << " companions ride, all essential; none stays behind\n";
+        return;
+    }
+    const std::string newName = m_specials.back().id == newcomer ? m_specials.back().name : newcomer;
+    m_scenario.raiseChoice({{"id", "stay_behind"}, {"kind", "party"}, {"newcomer", newcomer},
+                            {"title", "Who stays behind?"},
+                            {"text", "Only " + std::to_string(MAX_RIDING) + " companions can ride with you. With "
+                                     + newName + " there are " + std::to_string(ridingCount()) + ". One stays behind"
+                                     + (town.empty() ? "." : ", in " + town + ".")},
+                            {"options", options}});
+}
+
+bool AdventureSession::stayBehind(const std::string& id) {
+    auto it = std::find_if(m_specials.begin(), m_specials.end(),
+                           [&](const Special& sc) { return sc.id == id && !sc.stationed; });
+    if (it == m_specials.end()) return false;
+    const MapObjectDef* town = nullptr;
+    for (const auto& obj : m_map.objects())
+        if (obj.type == ObjType::Town && owner(obj.pos) == Faction::Player
+            && (!town || obj.pos.distanceTo(m_hero.pos) < town->pos.distanceTo(m_hero.pos)))
+            town = &obj;
+    const std::string name = it->name;
+    std::string text;
+    if (town) {
+        it->stationed = town->pos;
+        text = name + " stays behind to govern " + town->name + ".";
+    } else {
+        m_departedSpecials.push_back(*it);
+        m_departedSpecials.back().stationed.reset();
+        m_departedSpecials.back().waiting = true;
+        m_specials.erase(it);
+        text = name + " stays behind and will wait for word from you.";
+    }
+    m_scenario.pushStory({{"kind", "party"}, {"id", id}, {"name", name},
+                          {"where", town ? town->name : std::string{}}, {"text", text}});
+    recomputeVisibility();
+    return true;
 }
 
 void AdventureSession::leaveSpecial(const std::string& id) {
@@ -93,7 +180,8 @@ void AdventureSession::leaveSpecial(const std::string& id) {
 std::vector<AdventureSession::Companion> AdventureSession::battleCompanions() const {
     std::vector<Companion> out;
     for (const auto& sc : m_specials)
-        if (!sc.stationed && !isWounded(sc) && sc.unpaidDays < SULK_DAYS && m_resources->unit(sc.id))
+        if (!sc.stationed && !isWounded(sc) && sc.unpaidDays < SULK_DAYS && m_resources->unit(sc.id)
+            && (int)out.size() < MAX_RIDING)
             out.push_back({sc.id, sc.level});
     return out;
 }
@@ -108,7 +196,7 @@ void AdventureSession::companionsFell(const std::vector<std::string>& fallen, bo
             m_specials.erase(sc);
         } else {
             sc->woundedUntil = day() + WOUND_DAYS;
-            report(sc->name, "I will live. Give me three days before you ask me to hold a line again.");
+            report(sc->name, companionLine(sc->id, "wounded"));
         }
     }
     recomputeVisibility();
@@ -169,7 +257,7 @@ void AdventureSession::grantXp(int xp) {
             std::string line = sc.name + " reaches level " + std::to_string(sc.level) + ".";
             for (const auto& a : abilitiesOf(sc.id))
                 if (a.level == sc.level) line += " New ability: " + a.name + " — " + a.text;
-            report(sc.name, line);
+            report("", line);   // the narrator says it; the companion does not announce herself
         }
     }
     recomputeVisibility();
@@ -187,27 +275,28 @@ void AdventureSession::capXp() {
 
 int AdventureSession::upkeepPerDay() const {
     int total = 0;
-    for (const auto& sc : m_specials) total += upkeepFor(sc.level);
+    for (const auto& sc : m_specials) total += upkeepOf(sc);
     return total;
 }
 
 void AdventureSession::payUpkeep() {
     ResourcePool& treasury = m_turns.playerFaction().treasury;
     for (auto it = m_specials.begin(); it != m_specials.end();) {
-        int cost = upkeepFor(it->level);
+        int cost = upkeepOf(*it);
+        if (cost == 0) { it->unpaidDays = 0; ++it; continue; }   // household: no wage, no sulk
         bool crystal = it->level >= 8 && dayOfWeek() == 7;  // legends also want a crystal a week
         bool paid = treasury[Resource::Gold] >= cost && (!crystal || treasury[Resource::Crystal] >= 1);
         if (paid) {
             treasury[Resource::Gold] -= cost;
             if (crystal) treasury[Resource::Crystal] -= 1;
-            if (it->unpaidDays >= SULK_DAYS) report(it->name, "Paid at last. Very well, I am with you again.");
+            if (it->unpaidDays >= SULK_DAYS) report(it->name, companionLine(it->id, "paid"));
             it->unpaidDays = 0;
         } else {
             ++it->unpaidDays;
             if (it->unpaidDays == SULK_DAYS)
-                report(it->name, "Three days without pay. Do not expect my best until the treasury remembers me.");
+                report(it->name, companionLine(it->id, "unpaid"));
             if (it->unpaidDays >= LEAVE_DAYS && !m_scenario.essential(it->id)) {
-                report(it->name, "A week unpaid. I have served better paymasters. Farewell.");
+                report(it->name, companionLine(it->id, "leaves"));
                 it = m_specials.erase(it);
                 continue;
             }
@@ -228,6 +317,8 @@ std::optional<std::string> AdventureSession::station(const std::string& id, bool
     } else {
         if (!sc->stationed) return "Already travelling with you.";
         if (m_hero.pos != *sc->stationed) return "Go to the town where they govern to recall them.";
+        if (ridingCount() >= MAX_RIDING)
+            return "Two companions already ride with you. Leave one here before " + sc->name + " can come.";
         sc->stationed.reset();
     }
     recomputeVisibility();

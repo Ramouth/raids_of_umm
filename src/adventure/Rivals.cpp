@@ -67,7 +67,8 @@ double AdventureSession::power(const std::vector<Stack>& army) const {
 AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stack>& attacker,
                                                           const std::vector<Stack>& defender,
                                                           const std::vector<Companion>& companions,
-                                                          ArmyBonus attackerBonus) const {
+                                                          ArmyBonus attackerBonus,
+                                                          const std::function<void(const CombatEngine&)>& watch) const {
     auto build = [&](const std::vector<Stack>& stacks, bool player) {
         CombatArmy army;
         army.isPlayer = player;
@@ -89,15 +90,23 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
         s.speedBonus   = attackerBonus.speed;
         s.readiedShot  = attackerBonus.readiedShot;
     }
-    if (!a.stacks.empty())
+    if (!a.stacks.empty()) {
+        int fielded = 0;
         for (const auto& c : companions)
-            if (const UnitType* u = m_resources->unit(c.id))
+            if (const UnitType* u = m_resources->unit(c.id); u && fielded < MAX_RIDING) {
                 a.stacks.push_back(CombatUnit::companion(u, c.level, true));
+                ++fielded;
+            }
+    }
     CombatArmy d = build(defender, false);
     if (a.stacks.empty()) { out.defender = defender; return out; }
     if (d.stacks.empty()) { out.attackerWon = true; out.attacker = attacker; return out; }
     CombatEngine engine(std::move(a), std::move(d));
-    for (int n = 0; n < 4000 && !engine.isOver(); ++n) CombatAI::takeTurn(engine);
+    if (watch) watch(engine);
+    for (int n = 0; n < 4000 && !engine.isOver(); ++n) {
+        CombatAI::takeTurn(engine);
+        if (watch) watch(engine);
+    }
     out.attackerWon = engine.result() == CombatResult::PlayerWon;
     for (const auto& u : engine.playerArmy().stacks) {
         if (u.isSpecialCharacter) { if (u.isDead()) out.fallen.push_back(u.scId); }

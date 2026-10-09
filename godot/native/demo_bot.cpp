@@ -9,6 +9,7 @@
 // choices, visits, battles), as plain lines; debug output moves to stderr.
 #include "adventure/AdventureSession.h"
 #include "adventure/StoryObjectives.h"
+#include "combat/CombatTips.h"
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
@@ -51,10 +52,30 @@ struct Transcript {
         return it && !it->name.empty()?it->name:id;
     }
     void sync(AdventureSession& s) {
-        if(!out) { s.scenario().drainLines(); return; }
+        if(!out) { s.scenario().drainStory(); return; }
         auto& sc=s.scenario();
         if(s.day()!=day) { day=s.day(); line("DAY "+std::to_string(day)); }
-        for(const auto& l:sc.drainLines()) line("SAY "+l.speaker+": "+l.text);
+        // The story queue, in the order the game shows it (Scenario::drainStory).
+        for(const auto& e:sc.drainStory()) {
+            const std::string kind=e.value("kind",std::string{});
+            if(kind=="line") {
+                const std::string who=e.value("speaker",std::string{});
+                line("SAY "+(who.empty()?"":who+": ")+e.value("text",std::string{}));
+            } else if(kind=="scene") {   // a full-screen moment: its words are what the player reads
+                for(const auto& f:e.value("frames",Scenario::Json::array())) line("SCENE "+f.value("text",std::string{}));
+            } else if(kind=="lore") {
+                line("LORE "+e.value("title",std::string{})+": "+e.value("text",std::string{}));
+                ++lore;
+            } else if(kind=="item") {
+                items.insert(e.value("id",std::string{}));
+                line(titled("ITEM "+e.value("name",std::string{}),e.value("text",std::string{})));
+            } else if(kind=="item_lost") {
+                items.erase(e.value("id",std::string{}));
+                line("GIVES "+e.value("name",std::string{}));
+            } else if(kind=="party") {
+                line("PARTY "+e.value("text",std::string{}));
+            }
+        }
         for(const auto& u:s.drainLevelUps()) line("LEVEL "+std::to_string(u.level)+(u.skill.empty()?"":" "+u.skill)+(u.text.empty()?"":" — "+u.text));
         for(const auto& q:sc.quests()) {
             auto it=quests.find(q.title);
@@ -67,7 +88,6 @@ struct Transcript {
             }
             if(q.done && !it->second.second) { line("QUEST✓ "+q.title); it->second.second=true; }
         }
-        for(;lore<sc.lore().size();++lore) line("LORE "+sc.lore()[lore].title+": "+sc.lore()[lore].text);
         std::set<std::string> now;
         for(const auto& sp:s.specials()) {
             now.insert(sp.name);
@@ -75,7 +95,6 @@ struct Transcript {
         }
         for(const auto& n:companions) if(!now.count(n)) line("LEAVES "+n);
         companions=now;
-        for(const auto& id:s.items()) if(items.insert(id).second) line("ITEM "+itemName(s,id));
         if(sc.awaitingChoice()) {
             auto key=sc.choice().dump();
             if(key!=choice) {
@@ -83,7 +102,7 @@ struct Transcript {
                 for(const auto& l:sc.choice().value("lines",Scenario::Json::array()))   // a conversation leading to the choice
                     if(l.is_array() && l.size()>=2) line("SAY "+l[0].get<std::string>()+": "+l[1].get<std::string>());
                 line(titled("CHOICE "+sc.choice().value("title",""),sc.choice().value("text","")));
-                for(const auto& o:sc.choice().value("options",Scenario::Json::array())) {
+                for(const auto& o:sc.offeredChoice(s).value("options",Scenario::Json::array())) {
                     std::string detail=o.value("detail","");
                     line("  OPTION "+o.value("label","")+(detail.empty()?"":" — "+detail));
                 }
@@ -141,11 +160,27 @@ static void fight(AdventureSession& s) {
     tx.sync(s);
     std::cout<<"BATTLE day="<<s.day()<<" at="<<(obj?obj->name:"field army")<<" power="<<int(s.power(s.army()))<<" enemy="<<int(s.power(enemy))<<"\n";
     for (const auto& id:s.backpack()) s.equip(id);
-    auto r=s.autoBattle(s.army(),enemy,s.battleCompanions(),s.armyBonus());
+    // Companion tips, decided by the engine as the game decides them (CombatTipWatch).
+    std::optional<CombatTipWatch> tips;
+    std::vector<std::string> said;
+    auto r=s.autoBattle(s.army(),enemy,s.battleCompanions(),s.armyBonus(),[&](const CombatEngine& e) {
+        if(!tips) tips.emplace(&s.resources().combatTips(),s.campaignMap(),s.shownTips(),e);
+        if(const CombatTip* t=tips->check(e)) said.push_back(t->speaker+": "+t->text);
+    });
+    if(tips) for(const auto& id:tips->shownHere()) s.markTipShown(id);
     s.setArmy(r.attacker);
     s.companionsFell(r.fallen,!r.attackerWon);
     s.resolveEncounter(r.attackerWon,r.defender);
+    for(const auto& t:said) tx.line("TIP "+t);
     tx.line("BATTLE "+foe+" -> "+(r.attackerWon?"victory":"defeat"));
+    {   // the spoils screen: what the map paid for it
+        const auto& sp=s.lastSpoils();
+        std::string paid;
+        for(int i=0;i<RESOURCE_COUNT;++i)
+            if(sp.resources.amounts[i]>0) paid+=(paid.empty()?"":", ")+std::string("+")+std::to_string(sp.resources.amounts[i])+" "+std::string(resourceName(static_cast<Resource>(i)));
+        for(const auto& id:sp.items) paid+=(paid.empty()?"":", ")+tx.itemName(s,id);
+        if(!paid.empty()) tx.line("SPOILS "+paid);
+    }
     tx.sync(s);
     std::cout<<"RESULT "<<(r.attackerWon?"victory":"defeat")<<" remaining="<<int(s.power(s.army()))<<"\n";
 }
@@ -173,7 +208,8 @@ static bool openTranscript(int argc,char** argv) {
 //   hasty     only story objectives; offers are skipped
 //   thorough  first every reachable pickup, mine, site, winnable guard and
 //             affordable offer, then the story objectives
-// Choices take the first option the story accepts unless --choose names one.
+// Choices take the first option the story accepts unless --choose names one; a
+// choice open when a fight is pending is answered before the fight.
 namespace campaign {
 
 constexpr double MARGIN         = 1.5;   // attack only with this much more power than the enemy
@@ -221,9 +257,30 @@ static bool hasOffer(const AdventureSession& s,const std::string& at) {
     for(const auto* o:s.scenario().offersAt(at)) if(!o->taken && affordable(s,o->cost)) return true;
     return false;
 }
-// What a thorough route also wants there; "" = nothing.
-static std::string sideReason(const AdventureSession& s,const MapObjectDef& o) {
+// A trigger still unfired waits for this event at this object (a visit, an engage).
+// perishable: every such trigger carries a condition ("if", when.unless /
+// unless_flag) that a later beat can close (nothing there waits unconditionally),
+// so a thorough route goes there first.
+static bool storyWaits(const AdventureSession& s,const std::string& event,const std::string& name,bool* perishable=nullptr) {
+    bool waits=false, lasting=false;
+    for(const auto& t:s.scenario().triggers()) {
+        const auto when=t.value("when",Scenario::Json::object());
+        if(when.value("event","")!=event || when.value("name","")!=name || s.scenario().fired(t.value("id",""))) continue;
+        waits=true;
+        lasting|=!(t.contains("if") || when.contains("unless") || when.contains("unless_flag"));
+    }
+    if(perishable) *perishable=waits && !lasting;
+    return waits;
+}
+// What a thorough route also wants there; "" = nothing. Optional story sites count:
+// a quest site or dungeon the story says something about at a visit ("quest", once),
+// and a guard the story talks to at its engage ("talk"), even one the army cannot
+// beat: its choice is heard, and a fight it cannot win is not fought (see play()).
+static std::string sideReason(const AdventureSession& s,const MapObjectDef& o,const std::set<std::string>& been) {
     if(hasOffer(s,o.name)) return "offer";
+    if((o.type==ObjType::QuestGiver || o.type==ObjType::Dungeon) && !been.count(o.name) && storyWaits(s,"visit",o.name))
+        return "quest";
+    if(o.type==ObjType::Guard && s.isEncounter(o.pos) && storyWaits(s,"engage",o.name)) return "talk";
     switch(o.type) {
         case ObjType::Pickup: case ObjType::Artifact:
             return s.pickupAt(o.pos)?"pickup":"";
@@ -249,6 +306,7 @@ struct Run {
     bool restock=false;
     double wanted=0;
     std::string refused;                     // storySignature() when the open choice refused every option
+    std::optional<HexCoord> talking;         // a guard approached to hear its engage choice (thorough)
 
     // Changes whenever the story moves (a trigger fires, lore, flags, items, companions).
     std::string storySignature() const {
@@ -311,14 +369,18 @@ struct Run {
         double bestCost=1e18;
         for(const auto& o:s.map().objects()) {
             if(sideDone.count(o.pos) || s.scenario().vanished().count(o.name)) continue;
-            std::string why=sideReason(s,o);
+            std::string why=sideReason(s,o,been);
             if(why.empty()) continue;
             if(o.pos==s.heroPos()) { sideDone.insert(o.pos); continue; }
             auto p=way(s,o.pos);
             if(p.empty()) continue;
             if(auto e=firstEnemy(s,p); e && *e!=o.pos && !winnable(s,*e)) continue;   // not reachable yet
             double c=cost(s,o.pos);
-            if(c>=0 && c<bestCost) { bestCost=c; best=Target{o.pos,o.name,why,true,false}; }
+            if(c<0) continue;                        // unreachable
+            bool perishable=false;                  // a site a later beat can close comes first
+            if(why=="quest") storyWaits(s,"visit",o.name,&perishable);
+            if(perishable) c-=1000;
+            if(c<bestCost) { bestCost=c; best=Target{o.pos,o.name,why,true,false}; }
         }
         return best;
     }
@@ -372,6 +434,28 @@ struct Run {
             if(s.lost()) return End::Lost;
             if(s.day()>MAP_DAY_LIMIT) return End::Incomplete;
             if(s.pendingEncounter()) {
+                // Hear them out first: an answer at the engage may call the fight off.
+                if(s.scenario().awaitingChoice() && refused!=storySignature()) {
+                    const auto c=s.scenario().choice();
+                    if(!c.contains("at") || HexCoord(c["at"][0].get<int>(),c["at"][1].get<int>())==s.heroPos()) {
+                        if(decide()) continue;
+                        refused=storySignature();
+                    }
+                }
+                if(s.encounterAwaitsChoice()) { std::cout<<"STUCK choice="<<s.scenario().choice().value("id","")<<" no option accepted\n"; return End::Incomplete; }
+                if(s.pendingEncounter() && talking && *s.pendingEncounter()==*talking && !winnable(s,*talking)) {
+                    // Came to hear a guard out; the answer left a fight it cannot win: fall back at once.
+                    const auto* obj=s.map().objectAt(*talking);
+                    tx.sync(s);
+                    s.resolveEncounter(false,guards(s,*talking));
+                    tx.line("BATTLE "+std::string(obj?obj->name:"guards")+" -> retreat");
+                    std::cout<<"RETREAT day="<<s.day()<<" from="<<(obj?obj->name:"guards")<<"\n";
+                    sideDone.insert(*talking);
+                    talking.reset();
+                    tx.sync(s);
+                    continue;
+                }
+                talking.reset();
                 const bool armed=!s.army().empty();
                 fight(s);
                 arrived();
@@ -421,7 +505,10 @@ struct Run {
             }
             auto target=nextStop(s,goal->at);
             // Resupply needs a town to recruit in; with none, go as we are.
-            if(!restock && townTarget()) if(auto enemy=firstEnemy(s,way(s,target)); enemy && !winnable(s,*enemy)) {
+            talking.reset();
+            if(goal->why=="talk") talking=goal->at;   // the guard itself may be too strong: we only come to talk
+            if(!restock && townTarget()) if(auto enemy=firstEnemy(s,way(s,target)); enemy && !winnable(s,*enemy)
+                                                && !(talking && *enemy==*talking)) {
                 if(goal->extra) { sideDone.insert(goal->at); continue; }
                 restock=true; wanted=need(s,*enemy);
                 const auto* blocker=s.map().objectAt(*enemy);

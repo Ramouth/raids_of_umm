@@ -1,7 +1,13 @@
 extends Control
 ## A committed story choice followed by a short, illustrated night sequence.
 ## The silhouettes are drawn locally, so the scene works without new raster assets.
+## Also plays mid-map story scenes (desert.gd): `outcome = {frames}`, a `heading`.
 signal finished(result: Dictionary)
+
+const SceneStills = preload("res://scripts/scene_stills.gd")
+## Scene ids this file knows how to draw; any other id gets a neutral backdrop.
+const NIGHT_SCENES := ["home", "horse", "blood", "road", "road_alone", "road_together"]
+const PASSAGE_SCENES := ["passage", "alone", "together", "tunnel"]
 
 var choice: Dictionary = {}
 var outcome: Dictionary = {}
@@ -16,8 +22,13 @@ var _fade: Tween
 var _conversation_index := -1
 var _speaker: Label
 var _portrait: TextureRect
-var _commander: Label
+## The commander (the player): their portrait, captioned, lit while they speak.
+var _commander: Control
 var _next_line: Button
+## Frame mode: the line above the picture, and the last frame's button.
+var heading := ""
+var close_label := "Continue"
+var _continue: Button
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -28,14 +39,17 @@ func _ready() -> void:
     margin.add_theme_constant_override("margin_right", 100)
     margin.add_theme_constant_override("margin_top", 36)
     margin.add_theme_constant_override("margin_bottom", 34)
+    margin.mouse_filter = Control.MOUSE_FILTER_IGNORE   # clicks reach the scene (next frame)
     add_child(margin)
     var column := VBoxContainer.new()
     column.add_theme_constant_override("separation", 14)
+    column.mouse_filter = Control.MOUSE_FILTER_IGNORE
     margin.add_child(column)
     _heading = _label("", 18, Color("c5ac79"))
     column.add_child(_heading)
     var space := Control.new()
     space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    space.mouse_filter = Control.MOUSE_FILTER_IGNORE
     column.add_child(space)
     _words = _label("", 25, Color("eee4d2"))
     _words.custom_minimum_size.y = 92
@@ -53,17 +67,30 @@ func _ready() -> void:
             portraits.add_theme_constant_override("separation", 260)
             column.add_child(portraits)
             column.move_child(portraits, 1)
-            for art_id in ["portrait.ushari"]:
-                var portrait := TextureRect.new()
-                portrait.custom_minimum_size = Vector2(180, 180)
-                portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-                portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-                portrait.texture = Art.texture(art_id)
-                portraits.add_child(portrait)
-                if _portrait == null: _portrait = portrait
-            _commander = _label("COMMANDER\nHOUSE VAREN", 20, Color("a9ccb7"))
-            _commander.custom_minimum_size = Vector2(180, 180)
-            _commander.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+            # The one you are talking to: their portrait, or a plain silhouette
+            # when they have none (never someone who is not there).
+            _portrait = TextureRect.new()
+            _portrait.name = "Portrait"
+            _portrait.custom_minimum_size = Vector2(180, 180)
+            _portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+            _portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+            _portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+            _portrait.texture = portrait_for(_first_speaker())
+            _portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN   # level with the commander's face
+            portraits.add_child(_portrait)
+            _commander = VBoxContainer.new()
+            _commander.name = "Commander"
+            _commander.add_theme_constant_override("separation", 4)
+            var face := TextureRect.new()
+            face.name = "Face"
+            face.custom_minimum_size = Vector2(180, 180)
+            face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+            face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+            face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+            face.texture = Art.texture("hero.portrait")
+            _commander.add_child(face)
+            var caption := _label("YOU  ·  HOUSE VAREN", 16, Color("a9ccb7"))
+            _commander.add_child(caption)
             portraits.add_child(_commander)
             _speaker = _label("", 18, Color("a9ccb7"))
             column.add_child(_speaker)
@@ -73,7 +100,10 @@ func _ready() -> void:
             _next_line.custom_minimum_size.y = 44
             _next_line.pressed.connect(_advance_conversation)
             _buttons.add_child(_next_line)
+        if choice.get("kind", "") == "party":
+            _party_cards(column)
         for option in choice.options:
+            if choice.get("kind", "") == "party": break   # each companion's card holds its own button
             var button := Button.new()
             button.text = str(option.label)
             if not str(option.get("detail", "")).is_empty(): button.text += "\n" + str(option.detail)
@@ -86,8 +116,12 @@ func _ready() -> void:
             button.pressed.connect(select.bind(str(option.id)))
             _buttons.add_child(button)
     else:
-        _heading.text = "THE OLD PASSAGE  ·  THAT NIGHT"
+        _heading.text = heading if not heading.is_empty() else "THE OLD PASSAGE  ·  THAT NIGHT"
         var button := Button.new()
+        _continue = button
+        # Keys turn frames in _unhandled_key_input; a focused button would turn
+        # the same Space / Enter a second time on release.
+        button.focus_mode = Control.FOCUS_NONE
         button.name = "Continue"
         button.text = "Continue"
         button.custom_minimum_size.y = 44
@@ -97,10 +131,50 @@ func _ready() -> void:
         if outcome.get("frames", []).is_empty(): advance.call_deferred()
         else: advance()
     if _next_line != null: _advance_conversation()
-    for button in _buttons.get_children():
-        if not button.disabled:
+    for button in _buttons.get_children() + find_children("Choose", "Button", true, false):
+        if not button.disabled and button.focus_mode != Control.FOCUS_NONE:
             button.grab_focus()
             break
+
+## The party choice ("Who stays behind?"): a card per companion who may stay,
+## with their portrait, and the button that leaves them behind.
+func _party_cards(column: VBoxContainer) -> void:
+    _scene = "party"
+    var row := HBoxContainer.new()
+    row.name = "Companions"
+    row.alignment = BoxContainer.ALIGNMENT_CENTER
+    row.add_theme_constant_override("separation", 36)
+    column.add_child(row)
+    column.move_child(row, 1)
+    var newcomer := str(choice.get("newcomer", ""))
+    for option in choice.options:
+        var id := str(option.id)
+        var card := VBoxContainer.new()
+        card.name = "Card_" + id
+        card.add_theme_constant_override("separation", 6)
+        card.custom_minimum_size.x = 300
+        var face := TextureRect.new()
+        face.name = "Portrait"
+        face.custom_minimum_size = Vector2(150, 150)
+        face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+        var name := str(option.label).trim_suffix(" stays behind")
+        face.texture = Art.texture("portrait.companion." + id) if Art.has_art("portrait.companion." + id) else portrait_for(name)
+        card.add_child(face)
+        var caption := _label(name.to_upper() + ("  ·  JUST JOINED" if id == newcomer else ""), 16, Color("f0c870"))
+        caption.name = "Name"
+        card.add_child(caption)
+        var button := Button.new()
+        button.name = "Choose"
+        button.text = str(option.label)
+        if not str(option.get("detail", "")).is_empty(): button.text += "\n" + str(option.detail)
+        button.custom_minimum_size = Vector2(300, 88)   # equal cards, even when a name wraps the detail
+        button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        button.disabled = bool(option.get("locked", false))
+        button.pressed.connect(select.bind(id))
+        card.add_child(button)
+        row.add_child(card)
 
 func _advance_conversation() -> void:
     _conversation_index += 1
@@ -109,7 +183,9 @@ func _advance_conversation() -> void:
         var line: Array = lines[_conversation_index]
         _speaker.text = str(line[0]).to_upper()
         _words.text = str(line[1])
-        _portrait.modulate = Color.WHITE if line[0] == "Ushari" else Color(0.45, 0.55, 0.5)
+        var speaking := str(line[0]) != "Commander"
+        if speaking: _portrait.texture = portrait_for(str(line[0]))
+        _portrait.modulate = Color.WHITE if speaking else Color(0.45, 0.55, 0.5)
         _commander.modulate.a = 1.0 if line[0] == "Commander" else 0.45
         return
     _speaker.text = "YOUR RESPONSE"
@@ -121,6 +197,38 @@ func _advance_conversation() -> void:
         if button != _next_line and not button.disabled:
             button.grab_focus()
             break
+
+## The first speaker in the conversation who is not the commander ("" if none).
+func _first_speaker() -> String:
+    for line in choice.get("lines", []):
+        if str(line[0]) != "Commander": return str(line[0])
+    return ""
+
+## portrait.<speaker> ("Northern Warrior" -> portrait.northern_warrior) when the
+## art registry has one; otherwise a neutral silhouette.
+static func portrait_for(speaker: String) -> Texture2D:
+    var id := "portrait." + speaker.to_lower().replace(" ", "_")
+    if not speaker.is_empty() and Art.has_art(id): return Art.texture(id)
+    return silhouette()
+
+static var _silhouette: Texture2D
+## A hooded head and shoulders in slate, pixel-drawn: someone, not anyone.
+static func silhouette() -> Texture2D:
+    if _silhouette != null: return _silhouette
+    var image := Image.create_empty(48, 48, false, Image.FORMAT_RGBA8)
+    var ink := Color("3a4656")
+    var rim := Color("5a6a7c")
+    for y in 48:
+        for x in 48:
+            var head := Vector2(x - 23.5, (y - 17.5) * 0.9).length() <= 9.0
+            var half := 6.0 + (y - 27) * 0.9
+            var body := y >= 27 and y < 46 and absf(x - 23.5) <= half
+            if head or body: image.set_pixel(x, y, ink)
+    for y in 48:   # a 1px rim on the lit (left) edge
+        for x in range(1, 48):
+            if image.get_pixel(x, y).a > 0 and image.get_pixel(x - 1, y).a == 0: image.set_pixel(x, y, rim)
+    _silhouette = ImageTexture.create_from_image(image)
+    return _silhouette
 
 func _label(text: String, font_size: int, colour: Color) -> Label:
     var label := Label.new()
@@ -146,14 +254,22 @@ func advance() -> void:
         _closed = true
         finished.emit({})
         return
-    _scene = str(frames[frame].scene)
-    _words.text = str(frames[frame].text)
+    _scene = str(frames[frame].get("scene", ""))
+    _words.text = str(frames[frame].get("text", ""))
+    _continue.text = close_label if frame == frames.size() - 1 else "Continue"
     _words.modulate.a = 0.0
     if _fade != null: _fade.kill()
     _fade = create_tween()
     _fade.tween_property(_words, "modulate:a", 1.0, 0.6)
     _elapsed = 0.0
     queue_redraw()
+
+## A click anywhere on the picture turns to the next frame, like the button.
+func _gui_input(event: InputEvent) -> void:
+    if not choice.is_empty(): return
+    if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+        advance()
+        accept_event()
 
 func _unhandled_key_input(event: InputEvent) -> void:
     if not choice.is_empty(): return
@@ -162,7 +278,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
             if not _closed:
                 _closed = true
                 finished.emit({})
-        elif event.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]: advance()
+        elif event.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
+            advance()
         else: return
         get_viewport().set_input_as_handled()
 
@@ -173,6 +290,19 @@ func _process(delta: float) -> void:
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, size), Color("070b13"))
     draw_set_transform(Vector2.ZERO, 0.0, size / Vector2(1280, 720))
+    var still := SceneStills.texture(_scene)
+    if still != null:
+        draw_texture_rect(still, Rect2(0, 0, 1280, 464), false)
+        draw_rect(Rect2(0, 465, 1280, 255), Color("070b13"))
+        draw_set_transform(Vector2.ZERO)
+        return
+    if not (_scene in NIGHT_SCENES or _scene in PASSAGE_SCENES or _scene == "conversation"):
+        # An unknown scene: a plain dark frame, so the words still carry the moment.
+        draw_rect(Rect2(100, 60, 1080, 380), Color("0d121b"))
+        draw_rect(Rect2(100, 60, 1080, 380), Color("2a3442"), false, 2.0)
+        draw_rect(Rect2(0, 465, 1280, 255), Color("070b13"))
+        draw_set_transform(Vector2.ZERO)
+        return
     for i in 55:
         var star := Vector2(70 + (i * 173) % 1140, 60 + (i * 67) % 275)
         draw_circle(star, 0.8, Color("798597"))

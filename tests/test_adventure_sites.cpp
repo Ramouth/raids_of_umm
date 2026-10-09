@@ -196,6 +196,44 @@ SUITE("Scenario — allies send troops and gifts, then a cousin betrays") {
     CHECK(band);
 }
 
+SUITE("Scenario — a scene action plays full-screen mid-map, once, and the map goes on") {
+    const std::string path = "/tmp/raids_test_scene.json";
+    { std::ofstream f(path); f << R"({"triggers":[
+        {"id":"tag","when":{"event":"day","day":2},"do":[{"scene":{"frames":[
+            {"scene":"dog_tag","text":"A tag of beaten bronze."},
+            {"scene":"dog_tag","text":"Letters no one here can read."}]}}]}]})"; }
+    auto s = started(sitesMap(), path);
+    CHECK(s.scenario().drainScenes().empty());          // nothing before the trigger
+    const HexCoord pos = s.heroPos();
+    s.endDay();
+    auto scenes = s.scenario().drainScenes();
+    CHECK_EQ((int)scenes.size(), 1);
+    CHECK_EQ((int)scenes[0]["frames"].size(), 2);
+    CHECK_EQ(scenes[0]["frames"][0]["scene"].get<std::string>(), std::string("dog_tag"));
+    CHECK_EQ(scenes[0]["frames"][1]["text"].get<std::string>(), std::string("Letters no one here can read."));
+    CHECK(s.scenario().drainScenes().empty());          // drained exactly once
+    CHECK(!s.won() && !s.lost());                       // not an ending
+    CHECK(s.scenario().outcome().empty());
+    CHECK(!s.scenario().awaitingChoice());
+    CHECK(s.heroPos() == pos);
+    CHECK(!s.pendingEncounter());
+    s.endDay();
+    CHECK(s.scenario().drainScenes().empty());          // the trigger fired once
+
+    // A scene still pending when the game is saved plays after loading.
+    const std::string mapPath = "/tmp/raids_test_scene_map.json";
+    CHECK(!sitesMap().saveJson(mapPath));
+    AdventureSession p;
+    CHECK(!p.start(mapPath, "data", "", 0, path));
+    p.endDay();
+    AdventureSession loaded;
+    CHECK(!loaded.loadState(Scenario::Json::parse(p.saveState().dump())));
+    auto restored = loaded.scenario().drainScenes();
+    CHECK_EQ((int)restored.size(), 1);
+    CHECK_EQ((int)restored[0]["frames"].size(), 2);
+    CHECK(loaded.scenario().drainScenes().empty());
+}
+
 SUITE("Demo map — the northern stage loads with all its sites") {
     AdventureSession s;
     CHECK(!s.start("data/maps/old_passage.json", "data", "data/maps/old_passage.encounters.json", 3,

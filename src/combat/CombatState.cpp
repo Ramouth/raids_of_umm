@@ -80,6 +80,9 @@ void CombatState::onExit() {
     // Write result + surviving player stacks so the caller can update the hero.
     if (m_outcome) {
         m_outcome->result = m_engine.result();
+        m_outcome->stats  = m_engine.stats();
+        m_outcome->playerLosses = m_engine.losses(true);
+        m_outcome->enemyLosses  = m_engine.losses(false);
         m_outcome->survivors.clear();
         for (const auto& unit : m_engine.playerArmy().stacks) {
             if (!unit.isDead())

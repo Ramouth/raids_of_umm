@@ -82,12 +82,12 @@ func _start_new_expedition() -> void:
     add_child(layer)
     var cutscene: Control = Intro.new()
     cutscene.slides = [
-        {"image": "slide.07_howls", "lines": [
-            "Howls… howls in the night. Varenhold, your home and birthplace, is suddenly filled with wolves.",
-            "Your father reigns here. Your brother stands to inherit."]},
-        {"image": "slide.08_call", "lines": [
-            "Some howls make your blood run cold. Others seem to call you out into the night.",
-            "If no one can travel the roads, the wolves will ravage House Varen's domain."]}
+        {"image": "slide.09_fold", "lines": [
+            "Sheep are dying in the folds at night, killed by dogs gone wrong.",
+            "They foam at the mouth, and they no longer run from people."]},
+        {"image": "slide.11_brothers", "lines": [
+            "Your father sends his sons to hunt them down: Aldren, the heir, and you.",
+            "At first light you ride out to the herdsman's fold."]}
     ]
     cutscene.show_title = false
     layer.add_child(cutscene)

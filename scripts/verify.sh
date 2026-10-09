@@ -53,7 +53,7 @@ godot() {
     godot_prepare
     local t
     for t in art_smoke smoke campaign_smoke combat_smoke demo_smoke expanded_demo_smoke fieldworks_smoke \
-             north_theme_smoke rabies_smoke rookwatch_smoke story_effects_smoke tactics_smoke; do
+             north_theme_smoke rabies_smoke rookwatch_smoke story_effects_smoke tactics_smoke battle_report_smoke combat_tips_smoke engage_choice_smoke; do
         step "godot_$t" timeout 600 "$godot_bin" --headless --audio-driver Dummy --path godot --script "res://tests/$t.gd"
     done
 }

@@ -24,12 +24,14 @@ std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_unitsByTier.clear();
     m_allSpells.clear();
     m_allItems.clear();
+    m_combatTips.clear();
     m_loaded = false;
 
     if (auto err = loadUnits    (dataDir + "/units.json"))     return err;
     if (auto err = loadSpells   (dataDir + "/spells.json"))    return err;
     if (auto err = loadBuildings(dataDir + "/buildings.json")) return err;
     if (auto err = loadItems    (dataDir + "/items.json"))     return err;
+    if (auto err = loadCombatTips(dataDir + "/combat_tips.json")) return err;
 
     rebuildViews();
     m_loaded = true;
@@ -74,6 +76,36 @@ const WondrousItem* ResourceManager::item(const std::string& id) const {
 
 // ── Private ───────────────────────────────────────────────────────────────────
 
+// Optional: a data dir without combat_tips.json has no tips. Every tip's "when"
+// (and every key the file's when_keys documents) must be one the engine evaluates.
+std::optional<std::string> ResourceManager::loadCombatTips(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open()) return std::nullopt;
+    json root;
+    try { root = json::parse(f); }
+    catch (const json::exception& e) {
+        return std::string("ResourceManager: JSON parse error in ") + path + ": " + e.what();
+    }
+    const auto& keys = combatTipWhenKeys();
+    auto known = [&](const std::string& k) { return std::find(keys.begin(), keys.end(), k) != keys.end(); };
+    const json documented = root.value("when_keys", json::object());
+    for (const auto& [key, about] : documented.items())
+        if (!known(key)) return path + ": when key '" + key + "' has no evaluator in the engine";
+    const json tips = root.value("tips", json::array());
+    for (const auto& j : tips) {
+        CombatTip tip;
+        tip.id      = j.value("id", "");
+        tip.when    = j.value("when", "");
+        tip.speaker = j.value("speaker", "");
+        tip.text    = j.value("text", "");
+        tip.maps    = j.value("maps", std::vector<std::string>{});
+        if (tip.id.empty()) return path + ": a tip has no id";
+        if (!known(tip.when)) return path + ": tip '" + tip.id + "' waits for unknown when '" + tip.when + "'";
+        m_combatTips.push_back(std::move(tip));
+    }
+    return std::nullopt;
+}
+
 std::optional<std::string> ResourceManager::loadItems(const std::string& path) {
     std::ifstream f(path);
     if (!f.is_open())
@@ -92,6 +124,8 @@ std::optional<std::string> ResourceManager::loadItems(const std::string& path) {
         it.description = j.value("description", "");
         it.slot        = j.value("slot",        "");
         it.cursed      = j.value("cursed",      false);
+        it.kind        = j.value("kind",        "");
+        it.text        = j.value("text",        "");
 
         if (j.contains("passiveEffects") && j["passiveEffects"].is_array()) {
             for (const auto& ej : j["passiveEffects"]) {
@@ -101,6 +135,8 @@ std::optional<std::string> ResourceManager::loadItems(const std::string& path) {
                 it.passiveEffects.push_back(std::move(e));
             }
         }
+
+        if (it.isKeepsake()) { it.slot.clear(); it.passiveEffects.clear(); }   // read, never worn
 
         if (!it.id.empty())
             m_items.emplace(it.id, std::move(it));
@@ -127,6 +163,10 @@ std::optional<std::string> ResourceManager::loadUnits(const std::string& path) {
         u.tier        = j.value("tier",        1);
         u.faction     = j.value("faction",     "");
         u.title       = j.value("title",       "");
+        u.upkeep      = std::max(0, j.value("upkeep", 100));
+        if (j.contains("lines") && j["lines"].is_object())
+            for (const auto& [moment, text] : j["lines"].items())
+                if (text.is_string()) u.lines[moment] = text.get<std::string>();
         u.attack      = j.value("attack",      1);
         u.defense     = j.value("defense",     1);
         u.minDamage   = j.value("minDamage",   1);

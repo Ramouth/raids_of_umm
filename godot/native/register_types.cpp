@@ -68,8 +68,9 @@ protected:
         ClassDB::bind_method(D_METHOD("buy_fieldwork", "kind"), &UmmAdventure::buy_fieldwork);
         ClassDB::bind_method(D_METHOD("choose_path", "id"), &UmmAdventure::choose_path);
         ClassDB::bind_method(D_METHOD("join_special", "id"), &UmmAdventure::join_special);
+        ClassDB::bind_method(D_METHOD("tip_shown", "id"), &UmmAdventure::tip_shown);
         ClassDB::bind_method(D_METHOD("claim_chest", "gold"), &UmmAdventure::claim_chest);
-        ClassDB::bind_method(D_METHOD("resolve_encounter", "victory", "enemy_survivors"), &UmmAdventure::resolve_encounter, DEFVAL("null"));
+        ClassDB::bind_method(D_METHOD("resolve_encounter", "victory", "enemy_survivors", "battle_json"), &UmmAdventure::resolve_encounter, DEFVAL("null"), DEFVAL("null"));
         ClassDB::bind_method(D_METHOD("set_army", "stacks_json"), &UmmAdventure::set_army);
         ClassDB::bind_method(D_METHOD("build", "q", "r", "id"), &UmmAdventure::build);
         ClassDB::bind_method(D_METHOD("equip", "id"), &UmmAdventure::equip);
@@ -110,8 +111,12 @@ public:
     String buy_fieldwork(const String& kind) { return guarded([&] { return bridge_.buy_fieldwork(kind.utf8().get_data()); }); }
     String choose_path(const String& id) { return guarded([&] { return bridge_.choose_path(id.utf8().get_data()); }); }
     String join_special(const String& id) { return guarded([&] { return bridge_.join_special(id.utf8().get_data()); }); }
+    String tip_shown(const String& id) { return guarded([&] { return bridge_.tip_shown(id.utf8().get_data()); }); }
     String claim_chest(bool gold) { return guarded([&] { return bridge_.claim_chest(gold); }); }
-    String resolve_encounter(bool victory, const String& survivors) { return guarded([&] { return bridge_.resolve_encounter(victory, AdventureBridge::Json::parse(survivors.utf8().get_data())); }); }
+    String resolve_encounter(bool victory, const String& survivors, const String& battle) {
+        return guarded([&] { return bridge_.resolve_encounter(victory, AdventureBridge::Json::parse(survivors.utf8().get_data()),
+                                                              AdventureBridge::Json::parse(battle.utf8().get_data())); });
+    }
     String equip(const String& id) { return guarded([&] { return bridge_.equip(id.utf8().get_data()); }); }
     String unequip(const String& slot) { return guarded([&] { return bridge_.unequip(slot.utf8().get_data()); }); }
     String build(int q, int r, const String& id) { return guarded([&] { return bridge_.build(q, r, id.utf8().get_data()); }); }

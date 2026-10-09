@@ -18,6 +18,12 @@ func _idle(battle: Control) -> void:
     while battle.busy or (battle.state.result == "ongoing" and not battle.state.player_turn):
         await process_frame
 
+## Closes the result and spoils screens after a battle, as Continue would.
+func _close_reports() -> void:
+    while scene.screens.top() != null and scene.screens.top().get_script() == load("res://scripts/battle_report.gd"):
+        scene.screens.top().continue_button.pressed.emit()
+        await process_frame
+
 func _click(control: Control, local: Vector2, ctrl := false) -> void:
     var event := InputEventMouseButton.new()
     event.ctrl_pressed = ctrl
@@ -135,10 +141,11 @@ func _run() -> void:
     check(battle.state.result == "retreat", "Retreat reaches its result screen")
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     check(scene.army == survivors, "Returning preserves exact surviving stack counts")
     scene.encounter.guards = tuned_guards
     scene.encounter.erase("seed")
-    check(scene.inventory.is_empty() and scene.cleared_dungeons.is_empty(), "Retreat grants no loot and leaves dungeon guarded")
+    check(scene.loot().is_empty() and scene.cleared_dungeons.is_empty(), "Retreat grants no loot and leaves dungeon guarded")
     check(scene.is_processing() and scene.hero.cell == dungeon, "Map resumes at the same dungeon")
     print("Combat integration: manual attack, enemy AI, defend, retreat PASS")
 
@@ -157,8 +164,16 @@ func _run() -> void:
     # Duplicate callbacks must not pay out twice.
     battle.return_button.pressed.emit()
     await process_frame
+    var report: Control = scene.screens.top()
+    check(report != null and report.get_script() == load("res://scripts/battle_report.gd") and report.kind == "result", "A dungeon victory opens the result screen")
+    if report != null and report.has_method("close"): report.close()
+    await process_frame
+    report = scene.screens.top()
+    check(report != null and report.get("kind") == "spoils" and report.find_child("Item_scarab_amulet", true, false) != null, "The dungeon's artifact is on the spoils screen")
+    await _close_reports()
+    await _close_reports()
     check(scene.army == survivors, "Victory survivors reach the expedition")
-    check(scene.inventory.size() == 1 and scene.inventory[0].id == "scarab_amulet", "Victory awards exactly one configured artifact")
+    check(scene.loot().size() == 1 and scene.loot()[0].id == "scarab_amulet", "Victory awards exactly one configured artifact")
     check(scene.cleared_dungeons.has(dungeon) and not scene.enter_dungeon(), "Cleared dungeon cannot be farmed for duplicate loot")
     print("Combat integration: victory, survivors, one-time loot PASS")
 
@@ -166,6 +181,9 @@ func _run() -> void:
     scene.cleared_dungeons.clear()
     scene.army = [{"id": "rider_knight", "count": 6}, {"id": "armoured_warrior", "count": 4}]
     scene.encounter.guards = [{"id": "skeleton_warrior", "count": 20}, {"id": "sand_scorpion", "count": 5}]
+    # A fixed seed: unseeded, the dice sometimes kept every guard out of move + strike
+    # reach for all eight held turns (about 1 run in 7), failing the check below.
+    scene.encounter.seed = 1
     scene.state.battle_companions = []
     check(scene.enter_dungeon(), "Move-and-attack fixture starts")
     battle = scene.battle
@@ -224,6 +242,8 @@ func _run() -> void:
     await _idle(battle)
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
+    scene.encounter.erase("seed")
     print("Combat integration: move-and-attack side choice PASS")
 
     # Flanking: once a pin is on offer, the board marks it and draws the pincer.
@@ -262,6 +282,7 @@ func _run() -> void:
     await _idle(battle)
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     print("Combat integration: flanking visuals PASS")
 
     # Reaction fire: walking toward their archers draws a volley, and says so first.
@@ -299,6 +320,7 @@ func _run() -> void:
     await _idle(battle)
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     print("Combat integration: reaction fire PASS")
 
     # Line of sight: a shot through a stack is shown, forecast and dealt at half.
@@ -354,6 +376,7 @@ func _run() -> void:
     await _idle(battle)
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     scene.encounter.erase("seed")
     print("Combat integration: line of sight PASS")
 
@@ -399,6 +422,7 @@ func _run() -> void:
     await _idle(battle)
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     print("Combat integration: waypoint routes PASS")
 
     # Companions: gold-ringed single figures with an aura and a bodyguard.
@@ -460,6 +484,7 @@ func _run() -> void:
     check(not battle.state.survivors.any(func(s): return s.id == "ushari"), "Companions never come back as troops")
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     print("Combat integration: companions, aura, bodyguard, line of sight PASS")
 
     scene.cleared_dungeons.clear()
@@ -477,10 +502,11 @@ func _run() -> void:
     check("FALLEN" in battle.inspection.get_parsed_text(), "The result screen names the fallen")
     battle.return_button.pressed.emit()
     await process_frame
+    await _close_reports()
     check(not scene.state.specials.any(func(sc): return sc.id == "ushari"), "Lost with the battle: Ushari is gone")
     check(scene.army.is_empty() and not scene.enter_dungeon(), "Defeated army is not silently replenished")
     scene.new_expedition()
-    check(scene.army == scene.STARTING_ARMY and scene.inventory.is_empty() and scene.hero.cell == scene.data.spawn, "Explicit new expedition resets session state")
+    check(scene.army == scene.STARTING_ARMY and scene.loot().is_empty() and scene.hero.cell == scene.data.spawn, "Explicit new expedition resets session state")
     scene.queue_free()
     await process_frame
     print("Godot combat integration: %s" % ("PASS" if failures == 0 else "%d failures" % failures))

@@ -1,6 +1,7 @@
 {
   "start_companions": [
-    "aldren"
+    "aldren",
+    "drest"
   ],
   "quests": [
     {
@@ -42,6 +43,10 @@
             [
               "Aldren",
               "Two packs before dark. Keep up, little brother."
+            ],
+            [
+              "Drest",
+              "I taught you both the same lessons. Only one of you waits for the old man."
             ]
           ]
         }
@@ -68,6 +73,10 @@
             [
               "Aldren",
               "Dogs don't fight like that. Something is wrong with them."
+            ],
+            [
+              "Drest",
+              "Burn the carcasses. Don't let the herdsmen touch them."
             ]
           ]
         }
@@ -145,11 +154,11 @@
             "id": "gone_at_dawn",
             "heading": "Gone at Dawn",
             "next": "1.1",
-            "body": "Aldren rode out before first light. His sword is yours now.",
+            "body": "Aldren rode out at first light. His sword is yours now.",
             "frames": [
               {
                 "scene": "home",
-                "text": "Dawn. Aldren's horse is gone from the stable."
+                "text": "First light. Aldren's horse is gone from the stable."
               },
               {
                 "scene": "home",
@@ -160,6 +169,9 @@
         }
       ]
     }
+  ],
+  "essential_companions": [
+    "drest"
   ],
   "_comment": "start_army is not read by the engine yet; see the chapter 1 report.",
   "start_army": [

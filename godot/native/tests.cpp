@@ -26,7 +26,9 @@ int main(int argc, char** argv) {
             std::ofstream(dir + "/a.triggers.json") << R"({"triggers": [
                 {"id": "oath", "when": {"event": "start"}, "do": [{"choice": {"id": "oath", "title": "Oath", "options": [
                     {"id": "spare", "label": "Spare", "then": [{"flag": {"mercy": true}}, {"ending": {"id": "e", "next": "2.0"}}]},
-                    {"id": "burn", "label": "Burn", "requires_flag": "torch", "then": []}]}}]}]})";
+                    {"id": "burn", "label": "Burn", "requires_flag": "torch", "then": []},
+                    {"id": "secret", "label": "Secret", "if": {"flag": "never"}, "then": []},
+                    {"id": "pay", "label": "Pay", "requires": {"resource": "Gold", ">=": 999999}, "then": []}]}}]}]})";
             std::ofstream(dir + "/b.triggers.json") << R"({"triggers": [
                 {"id": "remember", "when": {"event": "start", "flag": {"choice.oath": "spare"}},
                  "do": [{"say": [["Ushari", "You spared them."]]}]}]})";
@@ -44,6 +46,10 @@ int main(int argc, char** argv) {
             auto map = camp.campaign_start_map(1);
             check(map.at("ok") && map["level_cap"] == 2 && map["hero_progress"]["cap"] == 2, "Map starts with its level cap");
             check(map["story_choice"]["options"][1]["locked"] == true, "requires_flag option is shown locked");
+            check(map["story_choice"]["options"].size() == 3 && map["story_choice"]["options"][2]["id"] == "pay"
+                  && map["story_choice"]["options"][2]["locked"] == true && map["story_choice"]["options"][0]["locked"] == false,
+                  "An option whose if fails is left out; one whose requires fails is shown locked");
+            check(!camp.choose_story("secret").at("ok") && !camp.choose_story("pay").at("ok"), "Hidden and locked options refused");
             check(!camp.campaign_advance().at("ok"), "Cannot advance before the map ends");
             check(!camp.choose_story("burn").at("ok"), "Locked option refused");
             auto chosen = camp.choose_story("spare");
@@ -94,6 +100,329 @@ int main(int argc, char** argv) {
             check(met["encounter"].is_object() && met["story_choice"]["id"] == "pack", "Engage raises the choice with the fight pending");
             auto spared = camp.choose_story("spare");
             check(spared.at("ok") && spared["encounter"].is_null(), "Withdraw calls the pending fight off");
+        }
+        {   // A scene action mid-map: the reply that clears the pack carries its frames once; the map goes on.
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_scene").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::Guard, "Rabid Dogs", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Scene fixture map written");
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": [],
+                "start_army": [{"id": "woad_runner", "count": 10}],
+                "triggers": [{"id": "tag", "when": {"event": "cleared", "names": ["Rabid Dogs"]},
+                  "do": [{"scene": {"frames": [{"scene": "dog_tag", "text": "A tag in a northern script."}]}}]}]})";
+            AdventureBridge adv;
+            check(adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json").at("ok"), "Scene fixture starts");
+            auto met = adv.travel(2, 0);
+            check(met["scenes"].is_array() && met["scenes"].empty(), "No scene before the pack is beaten");
+            auto won = adv.resolve_encounter(true);
+            check(won["scenes"].size() == 1 && won["scenes"][0]["frames"][0]["scene"] == "dog_tag"
+                  && won["scenes"][0]["frames"][0]["text"] == "A tag in a northern script.", "The scene's frames reach the client");
+            check(won["won"] == false && won["lost"] == false, "A scene does not end the map");
+            auto next = adv.end_day();
+            check(next["scenes"].empty(), "The scene is delivered once");
+        }
+        {   // Result screens: the combat's battle record and the encounter's spoils reach the
+            // client; keepsakes are listed and never worn; a requires_item option appears only
+            // while the item is carried, and handing it over ends the encounter without a fight.
+            namespace fs = std::filesystem;
+            const fs::path dir = fs::temp_directory_path() / "umm_bridge_spoils";
+            fs::create_directories(dir / "data");
+            for (const auto& entry : fs::directory_iterator(data))
+                if (entry.is_regular_file())
+                    fs::copy_file(entry.path(), dir / "data" / entry.path().filename(), fs::copy_options::overwrite_existing);
+            Json items = Json::parse(std::ifstream(data + "/items.json"));
+            items["items"].push_back({{"id", "test_dog_tag"}, {"name", "Dog Tag"}, {"kind", "keepsake"},
+                                      {"text", "Bran. A good boy."}});
+            std::ofstream(dir / "data" / "items.json") << items.dump();
+            const std::string fixtureData = (dir / "data").string();
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::Guard, "Hill Dogs", 0});
+            field.placeObject({{0, 3}, ObjType::Guard, "Northern Warrior", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson((dir / "field.json").string()), "Spoils fixture map written");
+            std::ofstream(dir / "field.encounters.json") << R"({"objects": {
+                "Hill Dogs": {"guards": [{"id": "grey_wolf", "count": 2}], "reward": {"Gold": 150, "items": ["test_dog_tag"]}},
+                "Northern Warrior": {"guards": [{"id": "grey_wolf", "count": 6}], "reward": {"Gold": 400}}}})";
+            std::ofstream(dir / "field.triggers.json") << R"({"start_companions": [],
+                "start_army": [{"id": "woad_runner", "count": 12}],
+                "triggers": [{"id": "warrior", "when": {"event": "engage", "name": "Northern Warrior"},
+                  "do": [{"choice": {"id": "warrior", "presentation": "conversation", "options": [
+                    {"id": "fight", "label": "Fight", "then": []},
+                    {"id": "give_tag", "label": "Hand him the dog tag", "requires_item": "test_dog_tag",
+                     "then": [{"take_item": "test_dog_tag"}, {"withdraw": "Northern Warrior"}]}]}}]}]})";
+            auto begin = [&](AdventureBridge& adv) {
+                return adv.start((dir / "field.json").string(), fixtureData, (dir / "field.encounters.json").string(), 1,
+                                 (dir / "field.triggers.json").string());
+            };
+            // Plays the pending fight with the AI on both sides ("retreat": the player runs at once).
+            auto fight = [&](const Json& snap, bool retreat) {
+                CombatSession combat;
+                auto reply = combat.start(fixtureData, snap["army"], {{"guards", snap["encounter"]["guards"]}, {"seed", 5}});
+                check(reply.at("ok"), "Spoils fixture battle starts");
+                int hp[2] = {0, 0};
+                for (const auto& u : reply["state"]["units"]) hp[u["player"].get<bool>() ? 0 : 1] += u["hp"].get<int>();
+                for (int turn = 0; turn < 300 && reply["state"]["result"] == "ongoing"; ++turn) {
+                    combat.acknowledge(reply["ticket"]);
+                    reply = combat.command(retreat ? "retreat" : "ai");
+                    check(reply.at("ok"), "Spoils fixture battle command accepted");
+                }
+                const Json state = reply["state"];
+                int left[2] = {0, 0};
+                for (const auto& u : state["units"]) left[u["player"].get<bool>() ? 0 : 1] += u["hp"].get<int>();
+                const Json& b = state["battle"];
+                check(b["total_damage"]["player"] == hp[1] - left[1] && b["total_damage"]["enemy"] == hp[0] - left[0],
+                      "Battle totals match the hit points each side lost");
+                int biggest = 0;
+                for (const auto& row : b["per_stack"]) biggest = std::max(biggest, row["biggest_hit"].get<int>());
+                check(b["max_hit"]["amount"] == biggest, "The max hit is the biggest blow any stack landed");
+                return state;
+            };
+
+            AdventureBridge adv;
+            check(begin(adv).at("ok"), "Spoils fixture starts");
+            auto met = adv.travel(2, 0);
+            check(met["encounter"].is_object() && met["encounter"]["items"] == Json::array({"test_dog_tag"}),
+                  "The pending encounter lists its reward items");
+            const int xp = met["encounter"]["xp"];
+            const Json state = fight(met, false);
+            check(state["result"] == "victory" && state["battle"]["max_hit"]["side"] == "player"
+                  && state["battle"]["max_hit"]["unit"] == "woad_runner", "The expedition wins and lands the biggest blow");
+            auto won = adv.resolve_encounter(true, state["enemy_survivors"], state["battle"]);
+            check(won["battle"]["result"] == "victory" && won["battle"]["xp"] == xp
+                  && won["battle"]["total_damage"] == state["battle"]["total_damage"]
+                  && won["battle"]["losses"]["enemy"][0]["id"] == "grey_wolf" && won["battle"]["losses"]["enemy"][0]["count"] == 2,
+                  "The reply carries the battle record, its XP and the losses");
+            check(won["spoils"]["resources"] == Json{{"Gold", 150}} && won["spoils"]["items"].size() == 1
+                  && won["spoils"]["items"][0] == Json{{"id", "test_dog_tag"}, {"name", "Dog Tag"}, {"kind", "keepsake"},
+                                                       {"text", "Bran. A good boy."}}, "Spoils list the gold and the keepsake");
+            check(won["keepsakes"] == Json::array({Json{{"id", "test_dog_tag"}, {"name", "Dog Tag"}, {"text", "Bran. A good boy."}}})
+                  && won["backpack"].empty() && !adv.equip("test_dog_tag").at("ok"), "A keepsake is listed, never worn");
+            auto warrior = adv.travel(1, 2);
+            check(warrior["story_choice"]["options"].size() == 2, "Carrying the tag offers it");
+            auto spared = adv.choose_story("give_tag");
+            check(spared.at("ok") && spared["encounter"].is_null() && spared["keepsakes"].empty()
+                  && spared["hero_progress"]["xp"] == won["hero_progress"]["xp"], "Handing it over: no fight, no XP, the tag is gone");
+
+            AdventureBridge ran;
+            check(begin(ran).at("ok"), "Spoils fixture restarts");
+            auto toWarrior = ran.travel(1, 2);
+            check(toWarrior["story_choice"]["options"].size() == 1, "Without the tag the option is not offered");
+            check(!ran.choose_story("give_tag").at("ok"), "The hidden option is refused");
+            auto fought = ran.choose_story("fight");
+            check(fought["encounter"].is_object(), "Fight keeps the battle pending");
+            const Json fled = fight(fought, true);
+            check(fled["result"] == "retreat", "The expedition retreats");
+            auto back = ran.resolve_encounter(false, fled["enemy_survivors"], fled["battle"]);
+            check(back["battle"]["result"] == "retreat" && back["battle"]["xp"] == 0
+                  && back["battle"]["losses"] == fled["battle"]["losses"]
+                  && back["spoils"]["resources"].empty() && back["spoils"]["items"].empty(),
+                  "A retreat carries its losses and no spoils");
+            // A real defeat: the hero walks back to the warrior (a fight pending, its choice
+            // answered), loses with no record passed; nothing is paid and the camp stands.
+            auto again = ran.travel(0, 3);
+            if (again["story_choice"].is_object() && !again["story_choice"].empty()) again = ran.choose_story("fight");
+            check(again["encounter"].is_object() && again["encounter"]["name"] == "Northern Warrior"
+                  && again["encounter_awaits_choice"] == false, "The warrior's fight is pending again");
+            const Json goldBefore = again["treasury"]["Gold"];
+            auto defeat = ran.resolve_encounter(false);   // no record passed: a bare defeat
+            check(defeat.at("ok") && defeat["battle"]["result"] == "defeat" && defeat["battle"]["xp"] == 0
+                  && defeat["spoils"]["resources"].empty() && defeat["spoils"]["items"].empty()
+                  && defeat["treasury"]["Gold"] == goldBefore, "A defeat pays nothing");
+            check(defeat["encounter"].is_null() && defeat["guarded"].size() == again["guarded"].size(),
+                  "After a defeat the camp still stands");
+
+            // The engage choice holds its fight: the bridge refuses to resolve it until answered.
+            AdventureBridge held;
+            check(begin(held).at("ok"), "Spoils fixture restarts for the held fight");
+            auto asked = held.travel(1, 2);
+            check(asked["encounter"].is_object() && asked["encounter_awaits_choice"] == true,
+                  "The snapshot says the pending fight awaits the story choice");
+            auto early = held.resolve_encounter(true);
+            check(!early.at("ok") && early["encounter"].is_object() && early["guarded"].size() == asked["guarded"].size(),
+                  "resolve_encounter refuses while the engage choice is open");
+            auto answered = held.choose_story("fight");
+            check(answered["encounter_awaits_choice"] == false, "Answered: the fight may be fought");
+        }
+        {   // take_item on a commander item: the snapshot's items, backpack and paper doll all lose it.
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_take").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::QuestGiver, "Smith", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Take fixture map written");
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": [],
+                "start_army": [{"id": "woad_runner", "count": 10}],
+                "triggers": [{"id": "smith", "when": {"event": "visit", "name": "Smith"},
+                  "do": [{"take_item": "red_hand_sword"}, {"take_item": "hermits_seed"}]}]})";
+            AdventureBridge adv;
+            check(adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json").at("ok"), "Take fixture starts");
+            adv.add_item("red_hand_sword");
+            auto gained = adv.add_item("hermits_seed");
+            bool listed = false;
+            for (const auto& e : gained["story"]) listed |= e["kind"] == "item" && e["id"] == "hermits_seed";
+            check(listed, "An item gained is a story event");
+            auto worn = adv.equip("red_hand_sword");
+            check(worn.at("ok"), "The sword is worn");
+            auto taken = adv.travel(2, 0);
+            bool slotEmpty = true;
+            for (const auto& [slot, id] : taken["equipped"].items()) slotEmpty &= id != "red_hand_sword";
+            bool inItems = false;
+            for (const auto& id : taken["items"]) inItems |= id == "red_hand_sword" || id == "hermits_seed";
+            bool inPack = false;
+            for (const auto& id : taken["backpack"]) inPack |= id == "red_hand_sword" || id == "hermits_seed";
+            int lost = 0;
+            for (const auto& e : taken["story"]) lost += e["kind"] == "item_lost";
+            check(slotEmpty && !inItems && !inPack && lost == 2, "Handed over: gone from items, backpack and the paper doll");
+            check(!adv.equip("red_hand_sword").at("ok"), "A handed-over item cannot be worn again");
+        }
+        {   // One ordered story queue: a trigger that says, then shows a scene, then says again
+            // reaches the client in that order; lines and scenes stay for older callers; a
+            // pending queue survives a save.
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_story").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::QuestGiver, "Cairn", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Story fixture map written");
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": [],
+                "start_army": [{"id": "woad_runner", "count": 10}],
+                "triggers": [{"id": "cairn", "when": {"event": "visit", "name": "Cairn"}, "do": [
+                  {"say": [["Drest", "Read it."]]},
+                  {"scene": {"frames": [{"scene": "cairn", "text": "Names cut in the stone."}]}},
+                  {"say": [["Drest", "Your grandfather's."]]},
+                  {"lore": ["The cairn", "Names of the fallen."]}]}]})";
+            AdventureBridge adv;
+            check(adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json").at("ok"), "Story fixture starts");
+            auto at = adv.travel(2, 0);
+            std::vector<std::string> kinds;
+            for (const auto& e : at["story"]) kinds.push_back(e["kind"]);
+            check(kinds == std::vector<std::string>{"line", "scene", "line", "lore"}, "Story events arrive in action order");
+            check(at["story"][0]["text"] == "Read it." && at["story"][1]["frames"][0]["text"] == "Names cut in the stone."
+                  && at["story"][2]["speaker"] == "Drest", "Each story event carries its own words");
+            check(at["lines"].size() == 2 && at["scenes"].size() == 1, "lines and scenes are the same events, filtered");
+            check(adv.end_day()["story"].empty(), "The queue is delivered once");
+
+            AdventureSession raw;                 // a save taken before the client drained it keeps it
+            check(!raw.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json"), "Raw story session starts");
+            raw.travel({2, 0});
+            const std::string save = dir + "/pending.json";
+            std::ofstream(save) << raw.saveState().dump();
+            AdventureBridge resumed;
+            auto back = resumed.load(save);
+            check(back.at("ok") && back["story"].size() == 4 && back["story"][1]["kind"] == "scene",
+                  "A pending story queue survives save and load, in order");
+        }
+        {   // Party limits through the bridge: two ride, a third raises "Who stays behind?".
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_party").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Party fixture map written");
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": ["drest", "aldren"],
+                "essential_companions": ["drest"], "start_army": [{"id": "woad_runner", "count": 10}], "triggers": []})";
+            AdventureBridge adv;
+            auto first = adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json");
+            check(first.at("ok") && first["max_riding"] == 2 && first["max_stacks"] == 5, "The snapshot names the limits");
+            auto joined = adv.join_special("kharim");
+            const Json& choice = joined["story_choice"];
+            check(choice["id"] == "stay_behind" && choice["kind"] == "party" && choice["options"].size() == 2
+                  && choice["options"][0]["id"] == "aldren" && choice["options"][1]["id"] == "kharim",
+                  "A third companion raises Who stays behind? without the essential one");
+            check(joined["battle_companions"].size() == 2, "Battles field two companions");
+            auto stayed = adv.choose_story("aldren");
+            bool told = false;
+            for (const auto& e : stayed["story"])
+                told |= e["kind"] == "party" && e["id"] == "aldren" && e["where"] == "Home";
+            check(stayed.at("ok") && told && stayed["story_choice"].empty(), "The one who stays behind is a party story event");
+            CombatSession combat;
+            Json three = Json::array({{{"id", "woad_runner"}, {"count", 5}},
+                                      {{"id", "drest"}, {"level", 1}, {"companion", true}},
+                                      {{"id", "aldren"}, {"level", 1}, {"companion", true}},
+                                      {{"id", "kharim"}, {"level", 1}, {"companion", true}}});
+            check(!combat.start(data, three, {{"guards", {{{"id", "grey_wolf"}, {"count", 2}}}}}).at("ok"),
+                  "A battle refuses a third companion");
+        }
+        {   // Combat tips are decided in C++: the snapshot carries the due tip once; a battle
+            // without the speaker (wounded, absent) says nothing; resolve_encounter remembers
+            // the shown ids for the campaign (tip_context.shown).
+            Json army = Json::array({{{"id", "woad_runner"}, {"count", 30}}, {{"id", "drest"}, {"level", 1}, {"companion", true}}});
+            Json guards = Json::array({{{"id", "grey_wolf"}, {"count", 2}}});
+            auto play = [&](const Json& side, const Json& tips) {
+                CombatSession combat;
+                auto reply = combat.start(data, side, {{"guards", guards}, {"seed", 4}, {"tips", tips}});
+                check(reply.at("ok"), "Tip battle starts");
+                std::vector<std::string> seen;
+                for (int turn = 0; turn < 300; ++turn) {
+                    if (reply["state"]["tip"].is_object()) seen.push_back(reply["state"]["tip"]["id"]);
+                    if (reply["state"]["result"] != "ongoing") break;
+                    combat.acknowledge(reply["ticket"]);
+                    reply = combat.command("ai");
+                }
+                return std::make_pair(seen, reply["state"]);
+            };
+            auto [heard, end] = play(army, {{"map", "1.0"}, {"shown", Json::array()}});
+            check(!heard.empty() && heard[0] == "drest_battle_start", "Drest's first tip opens the battle");
+            check(end["battle"]["tips"] == Json(heard), "The battle record lists the tips shown");
+            std::set<std::string> unique(heard.begin(), heard.end());
+            check(unique.size() == heard.size(), "No tip twice");
+            Json alone = Json::array({{{"id", "woad_runner"}, {"count", 30}}});
+            check(play(alone, {{"map", "1.0"}, {"shown", Json::array()}}).first.empty(),
+                  "A companion who is not in the battle (wounded, absent) never speaks");
+            check(play(army, {{"map", "1.0"}, {"shown", Json::array({"drest_battle_start"})}}).first.front() != "drest_battle_start",
+                  "A tip shown before in the campaign is not shown again");
+            check(play(army, Json::object()).first.empty(), "No tip_context: no tips");
+
+            const std::string dir = (std::filesystem::temp_directory_path() / "umm_bridge_tips").string();
+            std::filesystem::create_directories(dir);
+            WorldMap field;
+            field.clear(4);
+            field.placeObject({{-3, 0}, ObjType::Town, "Home", 1});
+            field.placeObject({{2, 0}, ObjType::Guard, "Ford Dogs", 0});
+            field.setStart(HexCoord{0, 0});
+            check(!field.saveJson(dir + "/field.json"), "Tips fixture map written");
+            std::ofstream(dir + "/field.encounters.json") << R"({"objects": {"Ford Dogs": {"guards": [{"id": "grey_wolf", "count": 2}]}}})";
+            std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": ["drest"],
+                "start_army": [{"id": "woad_runner", "count": 30}], "triggers": []})";
+            std::ofstream(dir + "/campaign.json") << Json{{"chapters", {{{"id", "one"}, {"title", "One"}, {"maps", {
+                {{"id", "1.0"}, {"title", "A"}, {"map", dir + "/field.json"}, {"encounters", dir + "/field.encounters.json"},
+                 {"triggers", dir + "/field.triggers.json"}}}}}}}}.dump();
+            AdventureBridge camp;
+            check(camp.campaign_load(dir + "/campaign.json", data).at("ok"), "Tips campaign loads");
+            auto map = camp.campaign_start_map(1);
+            check(map["tip_context"]["map"] == "1.0" && map["tip_context"]["shown"].empty(), "The snapshot gives the tip context");
+            auto met = camp.travel(2, 0);
+            CombatSession combat;
+            auto reply = combat.start(data, Json::array({{{"id", "woad_runner"}, {"count", 30}},
+                                                         {{"id", "drest"}, {"level", 1}, {"companion", true}}}),
+                                      {{"guards", met["encounter"]["guards"]}, {"seed", 4}, {"tips", met["tip_context"]}});
+            for (int turn = 0; turn < 300 && reply["state"]["result"] == "ongoing"; ++turn) {
+                combat.acknowledge(reply["ticket"]);
+                reply = combat.command("ai");
+            }
+            auto won = camp.resolve_encounter(reply["state"]["result"] == "victory", reply["state"]["enemy_survivors"],
+                                              reply["state"]["battle"]);
+            check(!reply["state"]["battle"]["tips"].empty() && won["tip_context"]["shown"] == reply["state"]["battle"]["tips"],
+                  "resolve_encounter remembers the battle's tips");
+            bool marked = false;
+            const Json afterMark = camp.tip_shown("test_tip");
+            for (const auto& id : afterMark["tip_context"]["shown"]) marked |= id == "test_tip";
+            check(marked, "tip_shown marks a tip shown");
+            const std::string save = dir + "/tips.save.json";
+            check(camp.save(save, Json::object()).at("ok"), "Tips session saves");
+            AdventureBridge reloaded;
+            check(reloaded.load(save)["tip_context"] == camp.snapshot()["tip_context"], "Shown tips and the map survive a save");
         }
         if (argc == 3) {   // demo_bot's campaign mode plays a fixture campaign from its story data alone
             const std::string dir = (std::filesystem::temp_directory_path() / "umm_bot_campaign").string();
@@ -161,6 +490,45 @@ int main(int argc, char** argv) {
             check(has(thorough, "SAY Hunter: Blood for the altar.") && !has(thorough, "Priest"),
                   "Map 2's flag-gated trigger follows map 1's choice");
             check(!has(thorough, "CAP ") && !has(thorough, "GOAL "), "Transcript holds only player-visible lines");
+
+            // A conversation at the engage: the bot answers before it fights. The first
+            // option sends the warrior away (no battle); a forced "fight" fights after it.
+            WorldMap ridge;
+            ridge.clear(6);
+            ridge.placeObject({{-5, 0}, ObjType::Town, "Home", 1, ""});
+            ridge.placeObject({{2, 0}, ObjType::Guard, "Northern Warrior", 0, ""});
+            check(!ridge.saveJson(dir + "/ridge.json"), "Bot engage fixture map written");
+            std::ofstream(dir + "/ridge.encounters.json") << R"({"objects": {"Northern Warrior": {"guards": [{"id": "grey_wolf", "count": 2}]}}})";
+            std::ofstream(dir + "/ridge.triggers.json") << R"({"start_companions": [],
+                "start_army": [{"id": "woad_runner", "count": 30}],
+                "triggers": [
+                {"id": "warrior", "when": {"event": "engage", "name": "Northern Warrior"},
+                 "do": [{"choice": {"id": "warrior", "presentation": "conversation", "options": [
+                    {"id": "give_tag", "label": "Hand him the tag", "then": [{"withdraw": "Northern Warrior"}]},
+                    {"id": "fight", "label": "Fight", "then": []}]}}]},
+                {"id": "past", "when": {"event": "cleared", "names": ["Northern Warrior"]},
+                 "do": [{"ending": {"id": "ridge", "heading": "The way north"}}]}]})";
+            std::ofstream(dir + "/ridge_campaign.json") << Json{{"chapters", {{{"id", "one"}, {"title", "One"}, {"maps", {
+                {{"id", "1.2"}, {"title", "The ridge"}, {"map", dir + "/ridge.json"}, {"encounters", dir + "/ridge.encounters.json"},
+                 {"triggers", dir + "/ridge.triggers.json"}}}}}}}}.dump();
+            auto ridgeBot = [&](const std::string& args, std::string& out) {
+                const std::string cmd = "\"" + std::string(argv[2]) + "\" \"" + data + "/..\" campaign \"" + dir + "/ridge_campaign.json\" " + args + " 2>/dev/null";
+                FILE* pipe = popen(cmd.c_str(), "r");
+                check(pipe, "demo_bot runs");
+                char buf[512];
+                while (fgets(buf, sizeof buf, pipe)) out += buf;
+                const int status = pclose(pipe);
+                return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+            };
+            std::string spared;
+            check(ridgeBot("hasty 1 --transcript", spared) == 0, "Engage fixture campaign exits 0");
+            check(has(spared, "CHOSE Hand him the tag"), "The default answer at the engage is the first option");
+            check(!has(spared, "BATTLE"), "Answered first, the warrior leaves without a fight");
+            std::string fought;
+            check(ridgeBot("hasty 1 --transcript --choose warrior=fight", fought) == 0, "Forced-fight campaign exits 0");
+            const auto chose = fought.find("CHOSE Fight"), battle = fought.find("BATTLE Northern Warrior -> victory");
+            check(chose != std::string::npos && battle != std::string::npos && chose < battle,
+                  "With 'fight' chosen the bot answers, then fights");
         }
         check(adventure.resolve_encounter(false, Json::parse(R"([{"id":"grey_wolf","count":3.0}])")).at("ok"),
               "Godot integral JSON floats are accepted for enemy survivors");

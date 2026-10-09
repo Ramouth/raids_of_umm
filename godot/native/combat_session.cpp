@@ -33,7 +33,8 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
         const UnitType* type = resources_->unit(id);
         if (entry.value("companion", false)) {
             const int level = entry.value("level", 1);
-            if (!type || !type->isCompanion() || level < 1 || level > 30 || ++companions > 3)
+            // Two companions ride with a hero (AdventureSession::MAX_RIDING).
+            if (!type || !type->isCompanion() || level < 1 || level > 30 || ++companions > Hero::SC_SLOTS)
                 throw std::runtime_error("Unknown companion or too many companions: " + id);
             army.stacks.push_back(CombatUnit::companion(type, level, player));
             army.stacks.back().attackBonus += std::clamp(entry.value("morale", 0), -2, 2);
@@ -76,6 +77,11 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
         stakes_ = std::clamp(works.value("stakes", 0), 0, 3 - barricades_);
         deploying_ = barricades_ + stakes_ > 0;
         opening_ = std::clamp(encounter.value("tactics", 0), 0, 3);   // commander's Tactics rank
+        // Companion tips: the adventure's "tip_context" ({map, shown}); none without a map.
+        const Json tips = encounter.value("tips", Json::object());
+        const auto shown = tips.value("shown", std::vector<std::string>{});
+        tips_ = CombatTipWatch(&resources_->combatTips(), tips.value("map", std::string{}),
+                               {shown.begin(), shown.end()}, *engine_);
         return response();
     } catch (const std::exception& error) {
         engine_.reset();
@@ -284,11 +290,51 @@ Json CombatSession::snapshot() const {
         state["next_round"] = next_round();
         state["previews"] = previews();
     }
+    state["battle"] = battle();
+    state["battle"]["tips"] = tips_.shownHere();   // resolve_encounter remembers them for the campaign
+    state["tip"] = tip_;
     if (engine_->result() == CombatResult::PlayerWon && !reward_.empty()) {
         const auto* item = resources_->item(reward_);
         state["rewards"].push_back({{"id", item->id}, {"name", item->name}, {"description", item->description}});
     }
     return state;
+}
+
+Json CombatSession::battle() const {
+    // The result screen's record (BattleStats): damage is hit points taken.
+    const BattleStats& stats = engine_->stats();
+    auto unit = [&](bool player, int index) -> const CombatUnit& {
+        return (player ? engine_->playerArmy() : engine_->enemyArmy()).stacks[index];
+    };
+    auto losses = [&](bool player) {
+        Json out = Json::array();
+        for (const auto& loss : engine_->losses(player))
+            out.push_back({{"id", loss.unitId}, {"name", resources_->unit(loss.unitId) ? resources_->unit(loss.unitId)->name : loss.unitId},
+                           {"count", loss.count}, {"companion", loss.companion}});
+        return out;
+    };
+    Json perStack = Json::array();
+    for (bool player : {true, false}) {
+        const auto& rows = player ? stats.player : stats.enemy;
+        for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
+            const CombatUnit& u = unit(player, i);
+            perStack.push_back({{"key", key(player, i)}, {"id", u.type->id}, {"name", u.type->name},
+                                {"side", player ? "player" : "enemy"}, {"start", rows[i].startCount},
+                                {"lost", rows[i].startCount - std::max(0, u.count)},
+                                {"damage", rows[i].damage}, {"kills", rows[i].kills}, {"biggest_hit", rows[i].biggestHit}});
+        }
+    }
+    Json maxHit = {{"amount", 0}, {"unit", ""}, {"name", ""}, {"key", ""}, {"side", ""}};
+    if (stats.maxHit.stackIndex >= 0) {
+        const CombatUnit& u = unit(stats.maxHit.isPlayer, stats.maxHit.stackIndex);
+        maxHit = {{"amount", stats.maxHit.amount}, {"unit", u.type->id}, {"name", u.type->name},
+                  {"key", key(stats.maxHit.isPlayer, stats.maxHit.stackIndex)},
+                  {"side", stats.maxHit.isPlayer ? "player" : "enemy"}};
+    }
+    return {{"result", result_name(engine_->result())},
+            {"losses", {{"player", losses(true)}, {"enemy", losses(false)}}},
+            {"total_damage", {{"player", stats.playerDamage}, {"enemy", stats.enemyDamage}}},
+            {"max_hit", maxHit}, {"per_stack", perStack}};
 }
 
 Json CombatSession::next_round() const {
@@ -418,6 +464,10 @@ Json CombatSession::response() {
         }
         events.push_back(std::move(item));
     }
+    tip_ = nullptr;                      // a tip shows in the reply of the action that made it due
+    if (!deploying_ && opening_ == 0)
+        if (const CombatTip* tip = tips_.check(*engine_))
+            tip_ = {{"id", tip->id}, {"speaker", tip->speaker}, {"text", tip->text}};
     awaiting_animation_ = true;
     return {{"ok", true}, {"ticket", ++ticket_}, {"state", snapshot()}, {"events", events}};
 }

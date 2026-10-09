@@ -1,5 +1,7 @@
 {
-  "start_companions": [],
+  "start_companions": [
+    "drest"
+  ],
   "quests": [
     {
       "id": "aldren",
@@ -32,6 +34,14 @@
             "A cold fire",
             "Ashes banked the careful way Aldren always banked them. Grass flattened for one bedroll."
           ]
+        },
+        {
+          "say": [
+            [
+              "Drest",
+              "I taught him to bank a fire like that. He was listening, then."
+            ]
+          ]
         }
       ]
     },
@@ -51,139 +61,160 @@
       ]
     },
     {
-      "id": "ushari_drove",
+      "id": "broken_camp",
       "when": {
         "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.red_banner": "drive_off"
-        }
+        "name": "Broken Camp"
+      },
+      "if": {
+        "all": [
+          {
+            "companion": "ushari"
+          },
+          {
+            "not": {
+              "trigger_fired": "ushari_road"
+            }
+          }
+        ]
       },
       "do": [
         {
-          "say": [
-            [
-              "Ushari",
-              "The ones you drove from your bridge. They found us instead."
+          "scene": {
+            "frames": [
+              {
+                "scene": "road",
+                "text": "Ushari's people camped here.\nTheir tents are cut down, their packs slit open."
+              },
+              {
+                "scene": "road",
+                "text": "No one is left.\nOn the cart, someone has painted a red hand."
+              }
             ]
+          }
+        },
+        {
+          "if": {
+            "flag": "choice.red_banner",
+            "is": "drive_off"
+          },
+          "then": [
+            {
+              "say": [
+                [
+                  "Ushari",
+                  "The red hands. You drove them from your bridge, and they came this way."
+                ]
+              ]
+            }
+          ],
+          "else": [
+            {
+              "if": {
+                "flag": "choice.red_banner",
+                "is": "let_pass"
+              },
+              "then": [
+                {
+                  "say": [
+                    [
+                      "Ushari",
+                      "The red hands. You let them over your bridge, and they came this way."
+                    ]
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "if": {
+                    "flag": "choice.red_banner",
+                    "is": "make_pay"
+                  },
+                  "then": [
+                    {
+                      "say": [
+                        [
+                          "Ushari",
+                          "The red hands. They paid you for your bridge, and took it back from my people."
+                        ]
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "say": [
+                        [
+                          "Ushari",
+                          "Red hands. They came in the night."
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
           ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_passed",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.red_banner": "let_pass"
-        }
-      },
-      "do": [
+        },
         {
-          "say": [
-            [
-              "Ushari",
-              "The ones you let across your bridge. Red hands on their shields."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_paid",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.red_banner": "make_pay"
-        }
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Ushari",
-              "The ones who paid for your bridge. They took it back from us."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_night",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "unless_flag": "choice.red_banner"
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Ushari",
-              "They came in the night. Red hands on their shields."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_rested",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.camp_strangers": "grant"
-        }
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Ushari",
-              "You let us rest on your land. They did not ask."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_taxed",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.camp_strangers": "tax"
-        }
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Ushari",
-              "We paid you for the road. They took the rest."
-            ]
-          ]
-        }
-      ]
-    },
-    {
-      "id": "ushari_turned",
-      "when": {
-        "event": "visit",
-        "name": "Broken Camp",
-        "flag": {
-          "choice.camp_strangers": "turn_away"
-        }
-      },
-      "do": [
-        {
-          "say": [
-            [
-              "Ushari",
-              "You turned us off your land. They did not bother."
-            ]
+          "if": {
+            "flag": "choice.camp_strangers",
+            "is": "grant"
+          },
+          "then": [
+            {
+              "say": [
+                [
+                  "Ushari",
+                  "You let us rest on your fields. I should have kept them there one more day."
+                ]
+              ]
+            }
+          ],
+          "else": [
+            {
+              "if": {
+                "flag": "choice.camp_strangers",
+                "is": "tax"
+              },
+              "then": [
+                {
+                  "say": [
+                    [
+                      "Ushari",
+                      "We paid your toll for a safe road. This is your road."
+                    ]
+                  ]
+                }
+              ],
+              "else": [
+                {
+                  "if": {
+                    "flag": "choice.camp_strangers",
+                    "is": "turn_away"
+                  },
+                  "then": [
+                    {
+                      "say": [
+                        [
+                          "Ushari",
+                          "You turned us off your fields. They had nowhere to wait for me."
+                        ]
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "say": [
+                        [
+                          "Ushari",
+                          "I sent them on ahead. I should have ridden with them."
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
           ]
         }
       ]
@@ -194,12 +225,31 @@
         "event": "visit",
         "name": "Broken Camp"
       },
+      "if": {
+        "all": [
+          {
+            "not": {
+              "companion": "ushari"
+            }
+          },
+          {
+            "not": {
+              "trigger_fired": "broken_camp"
+            }
+          },
+          {
+            "not": {
+              "flag": "choice.red_banner"
+            }
+          }
+        ]
+      },
       "do": [
         {
           "choice": {
             "id": "ushari_road",
             "title": "The Broken Camp",
-            "text": "Her company is broken. She is the last one standing.",
+            "text": "A camp lies broken by the road: tents cut down, packs slit open, a red hand painted on the cart. One woman is still standing.",
             "options": [
               {
                 "id": "take",
@@ -215,6 +265,13 @@
                 "label": "Send her home",
                 "then": []
               }
+            ],
+            "presentation": "conversation",
+            "lines": [
+              [
+                "Ushari",
+                "I am Ushari. Red hands came in the night. I am the last of us."
+              ]
             ]
           }
         }
@@ -280,10 +337,11 @@
       "when": {
         "event": "visit",
         "name": "Root-Grown Mine",
-        "after": "roots_1",
-        "flag": {
-          "choice.roots": "turn_back"
-        }
+        "after": "roots_1"
+      },
+      "if": {
+        "flag": "choice.roots",
+        "is": "turn_back"
       },
       "do": [
         {
@@ -330,10 +388,11 @@
       "when": {
         "event": "visit",
         "name": "Root-Grown Mine",
-        "after": "roots_2",
-        "flag": {
-          "choice.roots": "turn_back"
-        }
+        "after": "roots_2"
+      },
+      "if": {
+        "flag": "choice.roots",
+        "is": "turn_back"
       },
       "do": [
         {
@@ -380,10 +439,11 @@
       "when": {
         "event": "visit",
         "name": "Root-Grown Mine",
-        "after": "roots_3",
-        "flag": {
-          "choice.roots": "turn_back"
-        }
+        "after": "roots_3"
+      },
+      "if": {
+        "flag": "choice.roots",
+        "is": "turn_back"
       },
       "do": [
         {
@@ -425,5 +485,9 @@
         }
       ]
     }
+  ],
+  "essential_companions": [
+    "drest",
+    "ushari"
   ]
 }

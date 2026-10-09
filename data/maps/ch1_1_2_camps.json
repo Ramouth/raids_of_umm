@@ -3794,6 +3794,12 @@
       "r": -6,
       "type": "quest_giver",
       "name": "Empty Camp"
+    },
+    {
+      "q": 4,
+      "r": -8,
+      "type": "guard",
+      "name": "Northern Warrior"
     }
   ]
 }

@@ -160,6 +160,10 @@ func _auto_battle(scene: Node2D) -> String:
     var result: String = battle.state.result
     battle.return_button.pressed.emit()
     await process_frame
+    # The result (and spoils) screens come first: Continue, as a player would.
+    while scene.screens.top() != null and scene.screens.top().get_script() == load("res://scripts/battle_report.gd"):
+        scene.screens.top().continue_button.pressed.emit()
+        await process_frame
     return result
 
 func _story() -> void:
@@ -363,7 +367,7 @@ func _ridge_pass() -> void:
     check(scene.hero.cell == RIDGE_GUARD, "Hero steps into the pass after victory")
     check(not scene.map_view.anchors[RIDGE_GUARD].visible, "Guard camp disappears from the map")
     check(int(scene.state.treasury.Gold) >= 2750, "Guard reward gold is paid")
-    check(scene.inventory.any(func(item): return item.id == "wolfpelt_boots"), "Guard item drop joins the inventory")
+    check(scene.loot().any(func(item): return item.id == "wolfpelt_boots"), "Guard item drop joins the carried items")
     scene.queue_free()
     await process_frame
 

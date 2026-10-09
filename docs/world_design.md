@@ -52,6 +52,8 @@ Before an area is considered designed, check that:
 
 ## Current anchor: Valren
 
+> Note (2026-10-09): the method above is current; this anchor section predates Chapter 1. Today Varenhold is map 1.1 (rabid dogs, not wolves; Ushari is met in 1.2). See the header of `scripts/chapter1_story.py`.
+
 Treat Valren as the first complete area design, not merely a castle backdrop. The ruling house's authority should be legible in the land around the castle: what land and obligations belong to the lord, which communities owe service or dues, who keeps roads and defenses, and what rights those communities retain. Define the historical event or bargain that established those arrangements before presenting them as settled fact.
 
 ### Esh Varen, the village beneath the castle

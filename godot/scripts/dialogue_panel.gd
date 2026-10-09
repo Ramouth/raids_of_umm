@@ -6,6 +6,10 @@ extends PanelContainer
 signal drained
 
 ## Portraits come from the Art registry as portrait.<speaker, lower case, spaces as _>.
+## A line is {speaker, text}; speaker "" is the narrator (no portrait, no name).
+## Story notices (an item found, a companion left behind, a journal entry) are
+## lines too, so they keep their place among the spoken ones: {speaker: "",
+## text, title: the small heading shown instead of a name, portrait: an Art id}.
 
 var _queue: Array[Dictionary] = []
 var _portrait: TextureRect
@@ -63,19 +67,33 @@ func say(lines: Array) -> void:
 func is_speaking() -> bool:
     return visible
 
+## The line on screen ({speaker, text, ...}; empty when silent), for tests.
+var current: Dictionary = {}
+
 func advance() -> void:
     if _queue.is_empty():
+        current = {}
         visible = false
         _timer.stop()
         drained.emit()
         return
     var line: Dictionary = _queue.pop_front()
-    _speaker.text = str(line.speaker).to_upper()
-    _text.text = str(line.text)
-    _portrait.texture = Art.texture("portrait." + str(line.speaker).to_lower().replace(" ", "_"), "portrait.default")
+    current = line
+    var speaker := str(line.get("speaker", ""))
+    var picture := str(line.get("portrait", ""))
+    var narrated := speaker.is_empty()
+    _speaker.text = speaker.to_upper() if not narrated else str(line.get("title", "")).to_upper()
+    _speaker.visible = not _speaker.text.is_empty()
+    _speaker.add_theme_color_override("font_color", Color("f0c870") if not narrated else Color("b9a27a"))
+    _text.text = str(line.get("text", ""))
+    _text.add_theme_color_override("font_color", Color("f3e6c8") if not narrated else Color("e2d4b4"))
+    if not picture.is_empty() and Art.has_art(picture): _portrait.texture = Art.texture(picture)
+    elif not narrated: _portrait.texture = Art.texture("portrait." + speaker.to_lower().replace(" ", "_"), "portrait.default")
+    else: _portrait.texture = null
+    _portrait.visible = _portrait.texture != null   # the narrator has no face
     _update_hint()
     visible = true
-    _timer.start(4.0 + str(line.text).length() / 22.0)
+    _timer.start(4.0 + _text.text.length() / 22.0)
 
 func skip_all() -> void:
     _queue.clear()

@@ -5,7 +5,9 @@
 // during play. Saves are only taken between actions, never mid-battle.
 // Version 2 adds the story flags and the map's level cap and its stats;
 // version 1 saves still load (no flags, cap 10). Later optional fields (older
-// saves load without them): a stack's "bitten" (rabies) and "opened" tiles.
+// saves load without them): a stack's "bitten" (rabies) and "opened" tiles,
+// "shown_tips", "campaign_map", a departed companion's "waiting". The story
+// queue not yet shown travels inside "scenario" (older saves: only its scenes).
 #include "AdventureSession.h"
 
 using Json = Scenario::Json;
@@ -73,7 +75,7 @@ Json AdventureSession::saveState() const {
     for (const auto& sc : m_departedSpecials)
         departed.push_back({{"id", sc.id}, {"name", sc.name}, {"title", sc.title},
                            {"level", sc.level}, {"xp", sc.xp}, {"unpaid", sc.unpaidDays},
-                           {"wounded_until", sc.woundedUntil}});
+                           {"wounded_until", sc.woundedUntil}, {"waiting", sc.waiting}});
     Json rivals = Json::array();
     for (const auto& r : m_rivals)
         rivals.push_back({{"id", r.id}, {"name", r.name}, {"pos", cellJson(r.pos)}, {"home", cellJson(r.home)},
@@ -89,6 +91,8 @@ Json AdventureSession::saveState() const {
     return {
         {"version", 2},
         {"flags", m_flags},
+        {"shown_tips", Json(std::vector<std::string>(m_shownTips.begin(), m_shownTips.end()))},
+        {"campaign_map", m_campaignMap},
         {"level_cap", {{"cap", m_levelCap}, {"reached_day", m_capReachedDay}, {"xp_lost", m_xpLostToCap}}},
         {"fieldwork_stock", m_fieldworkStock},
         {"pickups", pickups}, {"site_weeks", siteWeeks}, {"visited_once", visited},
@@ -127,7 +131,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
                              st.at("encounters").get<std::string>(), st.at("seed").get<uint32_t>(),
                              st.at("triggers").get<std::string>(), replay))
             return err;
-        m_scenario.drainLines();                       // the replayed intro is not news
+        m_scenario.drainStory();                       // the replayed intro is not news
         m_turns.setDay(save.at("day").get<int>());
         m_turns.faction(Faction::Player).treasury = poolFrom(save.at("treasury"));
         m_turns.faction(Faction::AI).treasury     = poolFrom(save.at("rival_treasury"));
@@ -174,9 +178,9 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         for (const auto& g : save.at("garrisons")) m_garrisons[cellFrom(g.at("cell"))] = stacksFrom(g.at("army"));
         m_specials.clear();
         for (const auto& s : save.at("specials")) {
-            joinSpecial(s.at("id").get<std::string>());
-            if (m_specials.empty() || m_specials.back().id != s.at("id")) continue;   // no longer defined
-            Special& sc = m_specials.back();
+            Special* added = addSpecial(s.at("id").get<std::string>());   // as saved: no line, no limit
+            if (!added) continue;                                          // no longer defined
+            Special& sc = *added;
             sc.level = s.at("level").get<int>();
             sc.xp = s.at("xp").get<int>();
             sc.unpaidDays = s.at("unpaid").get<int>();
@@ -188,6 +192,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
             Special departed{sc.at("id"), sc.at("name"), sc.at("title"), sc.at("level"), sc.at("xp"),
                              std::nullopt, sc.value("unpaid", 0)};
             departed.woundedUntil = sc.value("wounded_until", 0);
+            departed.waiting = sc.value("waiting", false);
             m_departedSpecials.push_back(departed);
         }
         m_rivals.clear();
@@ -219,8 +224,10 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         m_flags = save.value("flags", Json::object());
         m_capReachedDay = cap.value("reached_day", -1);
         m_xpLostToCap = cap.value("xp_lost", 0);
-        m_scenario.loadState(save.at("scenario"));
-        m_scenario.drainLines();
+        const auto tips = save.value("shown_tips", std::vector<std::string>{});
+        m_shownTips = {tips.begin(), tips.end()};
+        m_campaignMap = save.value("campaign_map", std::string{});
+        m_scenario.loadState(save.at("scenario"));   // with the story queue as it stood (not yet shown)
         m_movesMax = DEFAULT_MOVES + movesBonus();
         m_moves = save.at("moves").get<float>();
         m_pending.reset();

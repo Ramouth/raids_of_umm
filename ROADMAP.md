@@ -45,7 +45,15 @@ See `economy.md` for economy decisions and implementation plan.
 
 ---
 
-## Campaign arc — three stages, north to south
+## Current focus — Chapter 1 "The Marches" (2026-10-09)
+
+The campaign is now an odyssey through four lands: the Marches (Lush) → the Under-road → the Desert → the Walled Nation. Chapter 1 has four maps (1.0 The Last Hunt, 1.1 Varenhold, 1.2 The Camps, 1.3 The East Road), built from `scripts/gen_chapter1.py` and `scripts/chapter1_story.py` (whose header is the Chapter 1 story summary). Factions are tied to land: see `Factions.md`. Engineering steps: `docs/build_plan.md`.
+
+Next, in order: the Varen Barrow as a walkable dungeon (special characters only) holding the clue to which of 1.1's three roads leads on; the ability/status system (magic schools per land); then chapter 2.
+
+> The sections below about three stages and the "Old Passage" demo are **archived**: they describe the earlier demo (wolves, Corvin, Rookwatch). Milestones and the visual-polish phase still apply.
+
+## Campaign arc — three stages, north to south (archived)
 
 | Stage | Land | Status |
 |-------|------|--------|
@@ -109,7 +117,7 @@ obelisks, creature dwellings (capture, recruit weekly), artifacts on the map, br
 lakes and swamps, and **guard zones of control** (walking next to a camp starts the fight;
 routes go around camps when they can).
 
-## Demo — "The Old Passage" (Godot) ◀ current focus
+## Demo — "The Old Passage" (Godot) (archived)
 
 A 20–30 min handcrafted scenario that shows off the core loop:
 clear the vale → meet Corvin → search for Aldren while contending with House Rook → identify Aldren's road across Greyfen → report home or continue together.

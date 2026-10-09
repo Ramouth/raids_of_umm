@@ -33,6 +33,25 @@
       "reward": {
         "Gold": 300
       }
+    },
+    "Northern Warrior": {
+      "guards": [
+        {
+          "id": "northern_warrior",
+          "count": 3
+        },
+        {
+          "id": "northern_warrior",
+          "count": 3
+        },
+        {
+          "id": "northern_warrior",
+          "count": 2
+        }
+      ],
+      "reward": {
+        "Gold": 300
+      }
     }
   },
   "pickups": {
