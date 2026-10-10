@@ -83,6 +83,70 @@
       ]
     },
     {
+      "id": "carved_a",
+      "when": {
+        "event": "encounter_won",
+        "name": "Thicket Dogs"
+      },
+      "if": {
+        "companion": "aldren"
+      },
+      "do": [
+        {
+          "scene": {
+            "frames": [
+              {
+                "scene": "road",
+                "text": "Aldren cuts an A into the bark with his knife."
+              }
+            ]
+          }
+        },
+        {
+          "say": [
+            [
+              "Aldren",
+              "So they know who cleared this wood."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "banked_fire",
+      "when": {
+        "event": "visit",
+        "name": "Poachers' Fire"
+      },
+      "if": {
+        "companion": "aldren"
+      },
+      "do": [
+        {
+          "scene": {
+            "frames": [
+              {
+                "scene": "road",
+                "text": "Aldren kneels and banks the old fire:\nash over the coals, stones round the edge."
+              }
+            ]
+          }
+        },
+        {
+          "say": [
+            [
+              "Drest",
+              "Every fire, every time. The rain would do it for you."
+            ],
+            [
+              "Aldren",
+              "You taught me."
+            ]
+          ]
+        }
+      ]
+    },
+    {
       "id": "toast",
       "when": {
         "event": "night",
@@ -93,38 +157,35 @@
           "quest_done": "hall"
         },
         {
-          "choice": {
-            "id": "toast",
-            "title": "Varenhold · The hall · That night",
-            "text": "Every cup in the hall goes up.",
-            "options": [
+          "scene": {
+            "frames": [
               {
-                "id": "raise_cup",
-                "label": "Raise your cup to him",
-                "then": [
-                  {
-                    "event": "dawn"
-                  }
-                ]
-              },
-              {
-                "id": "leave_hall",
-                "label": "Leave the hall",
-                "then": [
-                  {
-                    "event": "dawn"
-                  }
-                ]
+                "scene": "home",
+                "text": "That night, in the hall,\nyour father stands and lifts his cup."
               }
-            ],
-            "presentation": "conversation",
-            "lines": [
-              [
-                "Your father",
-                "To Aldren. To my heir."
-              ]
             ]
           }
+        },
+        {
+          "say": [
+            [
+              "Your father",
+              "To Aldren. To my heir."
+            ]
+          ]
+        },
+        {
+          "scene": {
+            "frames": [
+              {
+                "scene": "home",
+                "text": "Every cup in the hall goes up.\nAldren drinks, and does not look at you."
+              }
+            ]
+          }
+        },
+        {
+          "event": "dawn"
         }
       ]
     },
@@ -138,23 +199,10 @@
           "leave": "aldren"
         },
         {
-          "item": "red_hand_sword"
-        },
-        {
-          "lore": [
-            "Aldren's letter",
-            "“The sword is yours now. Do not come after me. — A.”"
-          ]
-        },
-        {
           "xp": 60
         },
         {
-          "ending": {
-            "id": "gone_at_dawn",
-            "heading": "Gone at Dawn",
-            "next": "1.1",
-            "body": "Aldren rode out at first light. His sword is yours now.",
+          "scene": {
             "frames": [
               {
                 "scene": "home",
@@ -162,7 +210,72 @@
               },
               {
                 "scene": "home",
-                "text": "On your bed lies his sword,\nand a letter in his hand."
+                "text": "In the hall the sword of your forefathers hangs on its pegs.\nA red hand on the hilt; a note pinned beneath."
+              }
+            ]
+          }
+        },
+        {
+          "choice": {
+            "id": "sword",
+            "title": "The Sword of Your Forefathers",
+            "text": "“I leave the sword of our forefathers. Do not take it. Do not come after me. — A.”",
+            "options": [
+              {
+                "id": "take",
+                "label": "Take the sword",
+                "then": [
+                  {
+                    "item": "red_hand_sword"
+                  },
+                  {
+                    "lore": [
+                      "Aldren's letter",
+                      "“I leave the sword of our forefathers. Do not take it. Do not come after me. — A.”"
+                    ]
+                  },
+                  {
+                    "ending": {
+                      "id": "gone_at_dawn",
+                      "heading": "Gone at Dawn",
+                      "next": "1.1",
+                      "body": "Aldren rode out at first light. You carry the sword he left on the wall.",
+                      "frames": [
+                        {
+                          "scene": "home",
+                          "text": "You lift the sword from its pegs.\nThen you go after him."
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "detail": "He asked you not to."
+              },
+              {
+                "id": "leave",
+                "label": "Leave it on the wall",
+                "then": [
+                  {
+                    "lore": [
+                      "Aldren's letter",
+                      "“I leave the sword of our forefathers. Do not take it. Do not come after me. — A.”"
+                    ]
+                  },
+                  {
+                    "ending": {
+                      "id": "gone_at_dawn",
+                      "heading": "Gone at Dawn",
+                      "next": "1.1",
+                      "body": "Aldren rode out at first light. His sword stays on the wall.",
+                      "frames": [
+                        {
+                          "scene": "home",
+                          "text": "You leave the sword on its pegs.\nThen you go after him."
+                        }
+                      ]
+                    }
+                  }
+                ]
               }
             ]
           }

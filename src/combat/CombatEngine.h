@@ -132,6 +132,20 @@ public:
     // beat; halved for a shooter hand to hand.
     static DamageRange obstacleDamage(const CombatUnit& attacker, bool melee);
 
+    // ── The turn just played ─────────────────────────────────────────────────
+    // What the last completed turn did (CombatTipWatch reads it): serial counts
+    // completed turns (0 = nobody has acted yet); moved = the stack walked during
+    // its turn; broken = the obstacles its blows destroyed, as they stood.
+    struct TurnRecord {
+        int  serial     = 0;
+        bool isPlayer   = false;
+        int  stackIndex = -1;
+        bool moved      = false;
+        bool mad        = false;
+        std::vector<Obstacle> broken;
+    };
+    const TurnRecord& lastTurn() const { return m_lastTurn; }
+
     // ── Deployment ───────────────────────────────────────────────────────────
     // Before anyone has acted, the player may move any living stack of theirs
     // to any hex of the deployment zone that is free of obstacles; a hex held
@@ -375,6 +389,8 @@ public:
 
 private:
     std::vector<Obstacle> m_obstacles;
+    TurnRecord            m_lastTurn;
+    TurnRecord            m_thisTurn;   // filled while the active stack acts; becomes m_lastTurn in advance()
     std::string           m_layoutId;
     std::vector<HexCoord> m_playerZone, m_enemyZone, m_fieldworkZone;
     CombatLayout::FirstMove m_firstMove = CombatLayout::FirstMove::Normal;

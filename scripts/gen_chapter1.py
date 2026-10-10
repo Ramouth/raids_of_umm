@@ -572,6 +572,9 @@ def camps():
     # The dogs' owner, come down the burn between the ridges to look for them. Two cells
     # above the Empty Camp, on the snow, so his zone does not cover the camp or the road.
     L.place("guard", "Northern Warrior", (4, -8), exact=True)
+    # Behind you, off the road in the west: where riders who want the sword make camp.
+    # The story removes it at the start; with the sword, a war-band rides out of it first.
+    L.place("quest_giver", "Riders' Camp", at(-14, 3))
     L.finish(start, road=[start, at(-6, 0), at(-2, 0.5), bridge, camp, at(12, 0), at(18, 0)])
     L.exit_q = 16
     L.chokes = {"Red Banner Camp": "exit"}
@@ -634,6 +637,9 @@ def east_road():
     L.place("quest_giver", "Cold Fire", at(-6, yc(-6) - 3.5))
     L.place("quest_giver", "Broken Camp", at(-2, yc(-2)))
     L.place("quest_giver", "Bridge Post", (bq + 1, br - 1), exact=True)
+    # Only while the hero carries the sword: a band holds the far end of the bridge
+    # (the stream's one crossing), so the Bridge Post beside it is theirs too.
+    L.place("guard", "Sword Hunters", (bq + 1, br), exact=True)
     L.place("guard", "Ridge Bears", at(8, yc(8) + 3))
     L.place("pickup", "Scree Stone", at(9, yc(9) + 3.5), 0, "stone")
     L.place("guard", "Stone Trolls", at(12, yc(12)))
@@ -641,7 +647,7 @@ def east_road():
     L.place("guard", "Root Wardens", corridor[2], exact=True)
     L.place("dungeon", "Root-Grown Mine", corridor[4], 0, "sealed", exact=True)
     L.finish(start, road=[start, at(-11, yc(-11)), at(-2, yc(-2)), bridge, (bq + 1, br), at(12, yc(12)), corridor[1]])
-    L.chokes = {"Road Dogs": "Root-Grown Mine", "Broken Camp": "Root-Grown Mine",
+    L.chokes = {"Road Dogs": "Root-Grown Mine", "Broken Camp": "Root-Grown Mine", "Sword Hunters": "Root-Grown Mine",
                 "Stone Trolls": "Root-Grown Mine", "Root Wardens": "Root-Grown Mine"}
     return L
 

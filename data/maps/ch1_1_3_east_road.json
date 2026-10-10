@@ -2243,6 +2243,12 @@
       "name": "Bridge Post"
     },
     {
+      "q": 4,
+      "r": -2,
+      "type": "guard",
+      "name": "Sword Hunters"
+    },
+    {
       "q": 8,
       "r": -3,
       "type": "guard",

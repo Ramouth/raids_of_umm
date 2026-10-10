@@ -15,7 +15,7 @@ Not wired up: `data/spells.json` (5 spells, nothing casts them, no mana), `data/
 
 ## 1. Unit tags
 
-**Read by the code (8):**
+**Read by the code (9):**
 
 | Tag | Units | Effect |
 |---|---|---|
@@ -26,6 +26,7 @@ Not wired up: `data/spells.json` (5 spells, nothing casts them, no mana), `data/
 | witch_knife | ushari | her melee knife |
 | opportunity_strike | maerwen | strikes an enemy leaving her reach, once per round |
 | rabid | rabid_hound | 10% bite per landed hit on player troops (new) |
+| reckless | aldren | CombatAI plays his turns even in the player's army: charges the nearest enemy, chops through obstacles when that is the cheaper way |
 
 **In the engine but no unit has them:** no_retaliation, readied_shot, no_melee_penalty.
 

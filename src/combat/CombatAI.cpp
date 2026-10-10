@@ -420,12 +420,15 @@ CombatAI::Candidate CombatAI::chooseAction(CombatEngine& engine) {
     return *pool[pick(engine.aiRng())];
 }
 
-std::optional<HexCoord> CombatAI::breachTarget(const CombatEngine& engine) {
-    if (engine.isOver()) return std::nullopt;
+namespace {
+
+// The cheapest way from the active stack to a hex next to a living foe: an
+// open hex costs a step, an obstacle also the turns it takes to break it; one
+// that cannot be broken is a wall, and stacks are ignored (they move). The
+// way runs from the first step to the goal; nothing if every foe is walled off.
+std::optional<std::vector<HexCoord>> cheapestWay(const CombatEngine& engine) {
     const CombatUnit& actor = engine.activeUnit();
     const auto& foes = actor.isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
-    for (int i = 0; i < (int)foes.size(); ++i)
-        if (engine.canAttack(i)) return std::nullopt;
     const CombatMap& map = engine.map();
     std::unordered_set<HexCoord> goals;   // hexes next to a living foe
     for (const auto& f : foes)
@@ -433,22 +436,6 @@ std::optional<HexCoord> CombatAI::breachTarget(const CombatEngine& engine) {
             for (int dir = 0; dir < 6; ++dir)
                 if (map.inBounds(f.pos.neighbor(dir))) goals.insert(f.pos.neighbor(dir));
     if (goals.empty()) return std::nullopt;
-    // Can it get there around the obstacles? Then it walks (the scorer's job).
-    std::unordered_set<HexCoord> open{actor.pos};
-    std::queue<HexCoord> walk;
-    walk.push(actor.pos);
-    while (!walk.empty()) {
-        const HexCoord h = walk.front(); walk.pop();
-        if (goals.count(h)) return std::nullopt;
-        for (int dir = 0; dir < 6; ++dir) {
-            const HexCoord n = h.neighbor(dir);
-            if (!map.inBounds(n) || engine.obstacleAt(n) || open.count(n)) continue;
-            open.insert(n);
-            walk.push(n);
-        }
-    }
-    // Cheapest way to a goal: an open hex costs a step, an obstacle also the
-    // turns it takes to break it; one that cannot be broken is a wall.
     const double perTurn = std::max(1.0, CombatEngine::obstacleDamage(actor, true).avg);
     auto cost = [&](HexCoord h) {
         const auto* o = engine.obstacleAt(h);
@@ -483,15 +470,113 @@ std::optional<HexCoord> CombatAI::breachTarget(const CombatEngine& engine) {
         }
     }
     if (!reached) return std::nullopt;
-    std::optional<HexCoord> first;   // the obstacle nearest the actor on that way
-    for (HexCoord h = *reached; h != actor.pos; h = previous.at(h))
-        if (engine.obstacleAt(h)) first = h;
-    return first;
+    std::vector<HexCoord> way;
+    for (HexCoord h = *reached; h != actor.pos; h = previous.at(h)) way.push_back(h);
+    std::reverse(way.begin(), way.end());
+    return way;
+}
+
+// Break the obstacle on `wall`, or walk toward it over open ground (hold if
+// nothing is closer).
+void breakThrough(CombatEngine& engine, HexCoord wall) {
+    if (engine.doAttackObstacle(wall)) return;
+    const CombatMap& map = engine.map();
+    std::unordered_map<HexCoord, int> toWall;
+    std::queue<HexCoord> frontier;
+    frontier.push(wall);
+    toWall[wall] = 0;
+    while (!frontier.empty()) {
+        const HexCoord h = frontier.front(); frontier.pop();
+        for (int dir = 0; dir < 6; ++dir) {
+            const HexCoord n = h.neighbor(dir);
+            if (!map.inBounds(n) || engine.obstacleAt(n) || toWall.count(n)) continue;
+            toWall[n] = toWall[h] + 1;
+            frontier.push(n);
+        }
+    }
+    const HexCoord here = engine.activeUnit().pos;
+    HexCoord best = here;
+    int bestDist = toWall.count(here) ? toWall[here] : kFar;
+    for (const HexCoord& h : engine.reachableTiles())
+        if (toWall.count(h) && toWall[h] < bestDist) { bestDist = toWall[h]; best = h; }
+    if (best != here) engine.doMove(best);
+    else engine.doDefend();
+}
+
+// A reckless stack's turn (UnitType::isReckless): strike the nearest enemy it
+// can reach this turn; otherwise follow the cheapest way to the nearest enemy,
+// breaking the first obstacle on it (through, not round, when that is cheaper),
+// or walking as far along it as it can.
+void charge(CombatEngine& engine) {
+    const CombatUnit& actor = engine.activeUnit();
+    const HexCoord here = actor.pos;
+    const auto& foes = actor.isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
+    int target = -1;
+    for (int i = 0; i < static_cast<int>(foes.size()); ++i)
+        if (engine.canAttack(i) && (target < 0 || foes[i].pos.distanceTo(here) < foes[target].pos.distanceTo(here)))
+            target = i;
+    if (target >= 0) {
+        if (!engine.doAttackFrom(engine.bestAttackHex(target), target)) engine.doAttack(target);
+        return;
+    }
+    const auto way = cheapestWay(engine);
+    if (!way) { engine.doDefend(); return; }
+    for (const HexCoord& h : *way)
+        if (engine.obstacleAt(h)) { breakThrough(engine, h); return; }
+    const auto reach = engine.reachableTiles();
+    for (auto it = way->rbegin(); it != way->rend(); ++it)
+        if (std::find(reach.begin(), reach.end(), *it) != reach.end()) { engine.doMove(*it); return; }
+    // The way is held by stacks: get as close to its end as the field allows.
+    const HexCoord goal = way->empty() ? here : way->back();
+    HexCoord best = here;
+    for (const HexCoord& h : reach)
+        if (h.distanceTo(goal) < best.distanceTo(goal)) best = h;
+    if (best != here) engine.doMove(best);
+    else engine.doDefend();
+}
+
+} // namespace
+
+std::optional<HexCoord> CombatAI::breachTarget(const CombatEngine& engine) {
+    if (engine.isOver()) return std::nullopt;
+    const CombatUnit& actor = engine.activeUnit();
+    const auto& foes = actor.isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
+    for (int i = 0; i < (int)foes.size(); ++i)
+        if (engine.canAttack(i)) return std::nullopt;
+    const CombatMap& map = engine.map();
+    std::unordered_set<HexCoord> goals;   // hexes next to a living foe
+    for (const auto& f : foes)
+        if (!f.isDead())
+            for (int dir = 0; dir < 6; ++dir)
+                if (map.inBounds(f.pos.neighbor(dir))) goals.insert(f.pos.neighbor(dir));
+    if (goals.empty()) return std::nullopt;
+    // Can it get there around the obstacles? Then it walks (the scorer's job).
+    std::unordered_set<HexCoord> open{actor.pos};
+    std::queue<HexCoord> walk;
+    walk.push(actor.pos);
+    while (!walk.empty()) {
+        const HexCoord h = walk.front(); walk.pop();
+        if (goals.count(h)) return std::nullopt;
+        for (int dir = 0; dir < 6; ++dir) {
+            const HexCoord n = h.neighbor(dir);
+            if (!map.inBounds(n) || engine.obstacleAt(n) || open.count(n)) continue;
+            open.insert(n);
+            walk.push(n);
+        }
+    }
+    // The obstacle nearest the actor on the cheapest way to a goal.
+    const auto way = cheapestWay(engine);
+    if (!way) return std::nullopt;
+    for (const HexCoord& h : *way)
+        if (engine.obstacleAt(h)) return h;
+    return std::nullopt;
 }
 
 void CombatAI::takeTurn(CombatEngine& engine) {
     if (engine.isOver()) return;
     if (engine.doMadTurn()) return;   // a mad stack goes for whatever is nearest
+    // A reckless stack charges, whoever commands its side.
+    if (engine.activeUnit().type->isReckless()) { charge(engine); return; }
     // A witch binds a nearby unbound melee threat before trading damage.
     const auto& foes = engine.activeUnit().isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
     for (int i = 0; i < static_cast<int>(foes.size()); ++i)
@@ -501,29 +586,7 @@ void CombatAI::takeTurn(CombatEngine& engine) {
         }
     // Walled off from every enemy: break through instead of idling.
     if (const auto wall = breachTarget(engine)) {
-        if (engine.doAttackObstacle(*wall)) return;
-        // Walk toward it (over open ground), or hold if nothing is closer.
-        const CombatMap& map = engine.map();
-        std::unordered_map<HexCoord, int> toWall;
-        std::queue<HexCoord> frontier;
-        frontier.push(*wall);
-        toWall[*wall] = 0;
-        while (!frontier.empty()) {
-            const HexCoord h = frontier.front(); frontier.pop();
-            for (int dir = 0; dir < 6; ++dir) {
-                const HexCoord n = h.neighbor(dir);
-                if (!map.inBounds(n) || engine.obstacleAt(n) || toWall.count(n)) continue;
-                toWall[n] = toWall[h] + 1;
-                frontier.push(n);
-            }
-        }
-        const HexCoord here = engine.activeUnit().pos;
-        HexCoord best = here;
-        int bestDist = toWall.count(here) ? toWall[here] : kFar;
-        for (const HexCoord& h : engine.reachableTiles())
-            if (toWall.count(h) && toWall[h] < bestDist) { bestDist = toWall[h]; best = h; }
-        if (best != here) engine.doMove(best);
-        else engine.doDefend();
+        breakThrough(engine, *wall);
         return;
     }
     const Candidate choice = chooseAction(engine);

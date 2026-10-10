@@ -332,7 +332,7 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
         }
         if (a.contains("ambush_from")) {
             const auto& b = a["ambush_from"];
-            if (s.ambushFrom(b.at("at"), b.at("band"))) {
+            if (s.ambushFrom(b.at("at"), b.at("band"), b.value("goal", "") == "hunt")) {
                 for (const auto& line : b.value("say", Json::array()))
                     say(line.at(0).get<std::string>(), line.at(1).get<std::string>());
             } else {
@@ -344,8 +344,9 @@ void Scenario::run(AdventureSession& s, const Json& actions) {
             std::vector<AdventureSession::Stack> army;
             for (const auto& st : b.value("army", Json::array()))
                 army.push_back({st.value("id", ""), st.value("count", 0)});
-            s.betray(b.value("at", ""), b.value("band", "war-band"), army);
+            s.betray(b.value("at", ""), b.value("band", "war-band"), army, b.value("goal", "") == "hunt");
         }
+        if (a.contains("disband")) s.disband(a["disband"].get<std::string>());   // the band rides off
         if (a.contains("turncoats")) {                // hired men turn; their lines only if any did
             const auto& t = a["turncoats"];
             if (s.turncoats(t.value("unit", ""), t.value("band", "turncoats")) > 0)

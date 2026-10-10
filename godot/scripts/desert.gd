@@ -705,8 +705,24 @@ func _say(reply: Dictionary, shown_items: Array = []) -> void:
     var skip := shown_items.map(func(id): return str(id))
     for event in reply.get("story", []):
         var entry := _story_entry(event, skip)
-        if not entry.is_empty(): _story_queue.append(entry)
+        if entry.is_empty(): continue
+        # A scene keeps the screen for the lines and scenes right after it, so a
+        # moment plays as one sequence instead of cutting back to the map between.
+        var last: Dictionary = _story_queue.back() if not _story_queue.is_empty() else {}
+        if last.has("frames") and _joins_scene(entry):
+            if entry.has("frames"): last.frames = last.frames + entry.frames
+            else:
+                var picture := str(last.frames.back().get("scene", ""))
+                last.frames = last.frames + [{"scene": picture, "speaker": entry.line.speaker, "text": entry.line.text}]
+            continue
+        _story_queue.append(entry)
     _pump_story()
+
+## Spoken lines and further scenes join an open scene; notices (journal, items,
+## companions) stay on the map, where their keys work.
+func _joins_scene(entry: Dictionary) -> bool:
+    if entry.has("frames"): return true
+    return entry.has("line") and not entry.line.has("title") and not str(entry.line.speaker).is_empty()
 
 ## One engine story event as a queue entry ({} = nothing to show).
 func _story_entry(event: Dictionary, skip: Array) -> Dictionary:

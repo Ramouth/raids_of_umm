@@ -102,8 +102,22 @@ std::optional<std::string> ResourceManager::loadCombatTips(const std::string& pa
         tip.speaker = j.value("speaker", "");
         tip.text    = j.value("text", "");
         tip.maps    = j.value("maps", std::vector<std::string>{});
+        tip.actor   = j.value("actor", "");
+        tip.kind    = j.value("kind", "");
         if (tip.id.empty()) return path + ": a tip has no id";
         if (!known(tip.when)) return path + ": tip '" + tip.id + "' waits for unknown when '" + tip.when + "'";
+        const std::string repeat = j.value("repeat", "campaign");
+        if (repeat != "campaign" && repeat != "battle")
+            return path + ": tip '" + tip.id + "' repeat must be \"campaign\" or \"battle\", not '" + repeat + "'";
+        tip.perBattle = repeat == "battle";
+        const json reply = j.value("reply", json::array());
+        if (!reply.is_array() || reply.size() > 2) return path + ": tip '" + tip.id + "' has more than two reply lines";
+        for (const auto& line : reply) {
+            CombatTipLine said{line.value("speaker", ""), line.value("text", "")};
+            if (said.speaker.empty() || said.text.empty())
+                return path + ": tip '" + tip.id + "' has a reply line without a speaker or text";
+            tip.reply.push_back(std::move(said));
+        }
         m_combatTips.push_back(std::move(tip));
     }
     return std::nullopt;

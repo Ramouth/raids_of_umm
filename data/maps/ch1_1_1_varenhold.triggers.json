@@ -6,7 +6,7 @@
     {
       "id": "aldren",
       "title": "Where did Aldren go?",
-      "text": "Aldren rode out at first light and left you his sword. The only road out of the vale runs east, over the bridge.",
+      "text": "Aldren rode out at first light and left his sword on the wall. The only road out of the vale runs east, over the bridge.",
       "main": true
     },
     {
@@ -34,6 +34,19 @@
             2,
             0,
             13
+          ]
+        },
+        {
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "quest_text": [
+                "aldren",
+                "Aldren rode out at first light. You carry the sword he left on the wall. The only road out of the vale runs east, over the bridge."
+              ]
+            }
           ]
         },
         {
@@ -73,6 +86,27 @@
                   },
                   {
                     "item": "hermits_seed"
+                  },
+                  {
+                    "if": {
+                      "item": "red_hand_sword"
+                    },
+                    "then": [
+                      {
+                        "say": [
+                          [
+                            "Hooded Man",
+                            "That hand went east before you. Follow it."
+                          ]
+                        ]
+                      },
+                      {
+                        "quest_text": [
+                          "aldren",
+                          "The hooded man knew your sword: it went east before you. The only road east runs over the bridge."
+                        ]
+                      }
+                    ]
                   }
                 ]
               },
@@ -136,11 +170,28 @@
       },
       "do": [
         {
-          "say": [
-            [
-              "Drest",
-              "A red hand is cut into the door. Like the one on your sword."
-            ]
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "say": [
+                [
+                  "Drest",
+                  "A red hand is cut into the door. Like the one on your sword."
+                ]
+              ]
+            }
+          ],
+          "else": [
+            {
+              "say": [
+                [
+                  "Drest",
+                  "A red hand is cut into the door. Like the one on the sword Aldren left."
+                ]
+              ]
+            }
           ]
         }
       ]

@@ -1,5 +1,5 @@
 {
-  "_about": "Short lines a companion says during battle to teach the rules. The engine (src/combat/CombatTips.cpp) decides when a tip is due: at most once per campaign, the first time its 'when' holds on one of its 'maps' (campaign map ids) while its speaker is fighting and standing; Godot only shows it. 'when' is one of the keys in when_keys; nothing else is read. Checked by scripts/chapter1_story.py.",
+  "_about": "Short lines a companion says during battle to teach the rules. The engine (src/combat/CombatTips.cpp) decides when a tip is due: at most once per campaign, the first time its 'when' holds on one of its 'maps' (campaign map ids) while its speaker is fighting and standing; Godot only shows it. 'when' is one of the keys in when_keys; nothing else is read. Checked by scripts/chapter1_story.py. Optional fields: 'reply' (0-2 lines [{speaker, text}], a second voice answers), 'repeat' ('campaign' default, or 'battle': once per battle), 'actor' (unit id or name; rushes, obstacle_broken, first_turn_shooter, defend_available), 'kind' (obstacle kind; obstacle_broken only). The first due tip in file order wins, one per turn.",
   "when_keys": {
     "battle_start": "the first battle",
     "first_turn_shooter": "a player stack with shots left takes its turn",
@@ -8,9 +8,37 @@
     "low_stack": "a player stack is below a quarter of the count it started the battle with",
     "defend_available": "the first time the player could choose Defend",
     "victory_first": "after the first battle the player wins",
-    "companion_hit": "a companion takes damage"
+    "companion_hit": "a companion takes damage",
+    "rushes": "a player stack's turn just ended: it walked, stands next to a living enemy, and no other living player stack is within 2 hexes (mad turns excluded)",
+    "obstacle_broken": "a player stack's blow destroyed an obstacle that turn"
   },
   "tips": [
+    {
+      "id": "aldren_rushes",
+      "when": "rushes",
+      "actor": "aldren",
+      "speaker": "Drest",
+      "text": "Stay back behind the lines!",
+      "reply": [{"speaker": "Aldren", "text": "Then keep up, old man."}],
+      "maps": ["1.0"],
+      "repeat": "battle"
+    },
+    {
+      "id": "aldren_through_trees",
+      "when": "obstacle_broken",
+      "actor": "aldren",
+      "kind": "tree",
+      "speaker": "Aldren",
+      "text": "Through, not round.",
+      "maps": ["1.0"]
+    },
+    {
+      "id": "drest_brother_rushed",
+      "when": "rushes",
+      "speaker": "Drest",
+      "text": "Your brother would have done that. Don't.",
+      "maps": ["1.1"]
+    },
     {
       "id": "drest_battle_start",
       "when": "battle_start",

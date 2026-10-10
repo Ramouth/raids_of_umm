@@ -139,6 +139,7 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
             // (headless sims and auto-battle never need a click). A refused order
             // leaves the deployment open.
             deploying_ = false;
+            if (auto_turn()) return response();   // a reckless stack opens: it charges, the order is not given
             Json reply = command(action, q, r, fq, fr);
             if (!reply.value("ok", false)) deploying_ = true;
             return reply;
@@ -154,6 +155,7 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
     } else {
         if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
         if (engine_->activeUnit().mad) return failure("That stack has gone mad and takes no orders this turn.");
+        if (auto_turn()) return failure(engine_->activeUnit().type->name + " charges on his own and takes no orders.");
         if (action == "move") {
             if (!engine_->canMoveTo(cell)) return failure("That hex is not reachable.");
             engine_->doMove(cell);
@@ -200,6 +202,7 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (deploying_) {
         if (fieldwork_stock() > 0) return failure("Finish placing your fieldworks first.");
         deploying_ = false;   // nothing to build: the order accepts the placement as it stands
+        if (auto_turn()) return response();   // a reckless stack opens: it charges, the order is not given
         Json reply = command_route(action, route, q, r);
         if (!reply.value("ok", false)) deploying_ = true;
         return reply;
@@ -226,6 +229,7 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (opening_ > 0) return failure("Give your opening orders first (or skip them).");
     if (!engine_->currentTurn().isPlayer) return failure("It is the enemy's turn.");
     if (engine_->activeUnit().mad) return failure("That stack has gone mad and takes no orders this turn.");
+    if (auto_turn()) return failure(engine_->activeUnit().type->name + " charges on his own and takes no orders.");
     if (action == "move") {
         if (!engine_->doMoveAlong(path)) return failure("That route is blocked or too long.");
     } else if (action == "strike" && engine_->obstacleAt(HexCoord{q, r})) {
@@ -294,7 +298,7 @@ Json CombatSession::snapshot() const {
                 {"retaliated", unit.hasRetaliated},
                 {"speed", unit.effectiveSpeed()}, {"initiative_roll", unit.initiativeRoll},
                 {"initiative_score", unit.initiativeScore()}, {"defending", unit.isDefending},
-                {"bitten", unit.bitten}, {"mad", unit.mad}});
+                {"bitten", unit.bitten}, {"mad", unit.mad}, {"reckless", unit.type->isReckless()}});
             if (player && unit.isSpecialCharacter) {
                 if (unit.isDead()) state["fallen"].push_back(unit.scId);
                 else {
@@ -314,7 +318,9 @@ Json CombatSession::snapshot() const {
         state["active"] = key(turn.isPlayer, turn.stackIndex);
         // A mad stack's turn is played by the AI ("ai"), whichever side it is on.
         state["mad_turn"] = engine_->activeUnit().mad;
-        state["player_turn"] = turn.isPlayer && !engine_->activeUnit().mad;
+        // A reckless stack of the player's is played by the session itself (see response()).
+        state["auto_turn"] = turn.isPlayer && engine_->activeUnit().type->isReckless();
+        state["player_turn"] = turn.isPlayer && !engine_->activeUnit().mad && !engine_->activeUnit().type->isReckless();
         state["reaction_fire"] = Json::array();   // hexes whose approach draws enemy shots
         for (auto cell : engine_->reachableTiles()) {
             state["reachable"].push_back(hex(cell));
@@ -353,6 +359,7 @@ Json CombatSession::snapshot() const {
     state["battle"] = battle();
     state["battle"]["tips"] = tips_.shownHere();   // resolve_encounter remembers them for the campaign
     state["tip"] = tip_;
+    state["exchanges"] = exchanges_;
     if (engine_->result() == CombatResult::PlayerWon && !reward_.empty()) {
         const auto* item = resources_->item(reward_);
         state["rewards"].push_back({{"id", item->id}, {"name", item->name}, {"description", item->description}});
@@ -520,41 +527,73 @@ Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int i
     return path;
 }
 
+bool CombatSession::auto_turn() const {
+    return engine_ && !engine_->isOver() && !deploying_ && opening_ == 0 && !engine_->hasPendingChoice()
+        && engine_->currentTurn().isPlayer && engine_->activeUnit().type->isReckless();
+}
+
 Json CombatSession::response() {
     static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "curse", "choice",
                                   "bitten", "madness", "obstacle_attack", "obstacle_damage"};
     Json events = Json::array();
-    for (const auto& event : engine_->drainEvents()) {
-        Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
-            {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
-            {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
-            {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction}, {"opportunity", event.isOpportunity},
-            {"from", hex(event.from)}, {"to", hex(event.to)},
-            {"roll", event.curseRoll}, {"slows", event.curseSlows}, {"kills", event.kills}, {"remaining", event.remaining}};
-        if (event.type == CombatEvent::Type::UnitAttacked) {
-            // Attacks never move anyone, so the current positions tell shots from strikes.
-            const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];
-            const auto& target = (event.targetIsPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.targetIndex];
-            item["ranged"] = event.isReaction
-                || (!event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1);
+    // Each action's events are read right after it (paths and shots follow the
+    // field as it stands then); `automatic` marks a turn the session played itself.
+    auto drain = [&](bool automatic) {
+        for (const auto& event : engine_->drainEvents()) {
+            Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
+                {"target", key(event.targetIsPlayer, event.targetIndex)}, {"damage", event.damage},
+                {"retaliation", event.isRetaliation}, {"flanked", event.wasFlanked},
+                {"blocked", event.blockedShot}, {"bodyguard", event.bodyguard}, {"reaction", event.isReaction}, {"opportunity", event.isOpportunity},
+                {"from", hex(event.from)}, {"to", hex(event.to)},
+                {"roll", event.curseRoll}, {"slows", event.curseSlows}, {"kills", event.kills}, {"remaining", event.remaining},
+                {"auto", automatic}};
+            if (event.type == CombatEvent::Type::UnitAttacked) {
+                // Attacks never move anyone, so the current positions tell shots from strikes.
+                const auto& actor = (event.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.stackIndex];
+                const auto& target = (event.targetIsPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[event.targetIndex];
+                item["ranged"] = event.isReaction
+                    || (!event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1);
+            }
+            if (event.type == CombatEvent::Type::ObstacleAttacked) item["ranged"] = event.ranged;
+            if (event.type == CombatEvent::Type::ObstacleAttacked || event.type == CombatEvent::Type::ObstacleDamaged) {
+                item["cell"] = hex(event.to);   // the obstacle's hex
+                item["target"] = "";
+            }
+            if (event.type == CombatEvent::Type::UnitMoved) {
+                if (!event.path.empty()) {
+                    item["path"] = Json::array();
+                    for (const auto& cell : event.path) item["path"].push_back(hex(cell));
+                } else item["path"] = movement_path(event.from, event.to, event.isPlayer, event.stackIndex);
+            }
+            events.push_back(std::move(item));
         }
-        if (event.type == CombatEvent::Type::ObstacleAttacked) item["ranged"] = event.ranged;
-        if (event.type == CombatEvent::Type::ObstacleAttacked || event.type == CombatEvent::Type::ObstacleDamaged) {
-            item["cell"] = hex(event.to);   // the obstacle's hex
-            item["target"] = "";
+    };
+    // A tip is due after the action that made it so; "after_event" = how many of
+    // this reply's events come before it.
+    exchanges_ = Json::array();
+    auto listen = [&] {
+        if ((deploying_ && fieldwork_stock() > 0) || opening_ != 0) return;
+        const CombatTip* tip = tips_.check(*engine_);
+        if (!tip) return;
+        Json reply = Json::array(), lines = Json::array();
+        for (size_t i = 0; i < tips_.lines().size(); ++i) {
+            const auto& line = tips_.lines()[i];
+            lines.push_back({{"speaker", line.speaker}, {"text", line.text}});
+            if (i > 0) reply.push_back(lines.back());
         }
-        if (event.type == CombatEvent::Type::UnitMoved) {
-            if (!event.path.empty()) {
-                item["path"] = Json::array();
-                for (const auto& cell : event.path) item["path"].push_back(hex(cell));
-            } else item["path"] = movement_path(event.from, event.to, event.isPlayer, event.stackIndex);
-        }
-        events.push_back(std::move(item));
+        exchanges_.push_back({{"id", tip->id}, {"speaker", tip->speaker}, {"text", tip->text}, {"reply", reply},
+                              {"lines", lines}, {"after_event", events.size()}});
+    };
+    drain(false);
+    listen();
+    // A reckless stack of the player's charges on its own turn: the session plays it
+    // (CombatAI), so the client and headless runs agree. Bounded: a turn always passes.
+    for (int n = 0; n < 16 && auto_turn(); ++n) {
+        CombatAI::takeTurn(*engine_);
+        drain(true);
+        listen();
     }
-    tip_ = nullptr;                      // a tip shows in the reply of the action that made it due
-    if (!(deploying_ && fieldwork_stock() > 0) && opening_ == 0)
-        if (const CombatTip* tip = tips_.check(*engine_))
-            tip_ = {{"id", tip->id}, {"speaker", tip->speaker}, {"text", tip->text}};
+    tip_ = exchanges_.empty() ? Json(nullptr) : exchanges_[0];   // a tip shows in the reply of the action that made it due
     awaiting_animation_ = true;
     return {{"ok", true}, {"ticket", ++ticket_}, {"state", snapshot()}, {"events", events}};
 }

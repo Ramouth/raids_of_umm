@@ -195,7 +195,7 @@
       "name": "The Red-Hand Sword",
       "slot": "weapon",
       "cursed": false,
-      "description": "Given to the heir. Left to the second son.",
+      "description": "The sword of House Varen's forefathers, given to the heir. A red hand is worked into the hilt.",
       "passiveEffects": [
         {
           "stat": "attack",

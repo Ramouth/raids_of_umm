@@ -79,7 +79,8 @@ Json AdventureSession::saveState() const {
     Json rivals = Json::array();
     for (const auto& r : m_rivals)
         rivals.push_back({{"id", r.id}, {"name", r.name}, {"pos", cellJson(r.pos)}, {"home", cellJson(r.home)},
-                          {"army", stacksJson(r.army)}, {"start_power", r.startPower}, {"alive", r.alive}});
+                          {"army", stacksJson(r.army)}, {"start_power", r.startPower}, {"alive", r.alive},
+                          {"hunt", r.hunts}});
     Json pickups = Json::array();
     for (const auto& [c, p] : m_pickups) pickups.push_back(cellJson(c));
     Json siteWeeks = Json::array();
@@ -199,7 +200,7 @@ std::optional<std::string> AdventureSession::loadState(const Json& save) {
         for (const auto& r : save.at("rivals"))
             m_rivals.push_back({r.at("id").get<int>(), r.at("name").get<std::string>(), cellFrom(r.at("pos")),
                                 cellFrom(r.at("home")), stacksFrom(r.at("army")), r.at("start_power").get<double>(),
-                                r.at("alive").get<bool>(), ""});
+                                r.at("alive").get<bool>(), "", r.value("hunt", false)});
         if (save.contains("pickups")) {            // older saves predate sites
             std::unordered_set<HexCoord> left;
             for (const auto& c : save.at("pickups")) left.insert(cellFrom(c));

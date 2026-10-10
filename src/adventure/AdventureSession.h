@@ -240,12 +240,19 @@ public:
     void give(const ResourcePool& resources);
     // A house turns on the player: the named town/site flies the rival banner
     // and a war-band with 'army' rides out of it. Returns false if no such object.
-    bool betray(const std::string& objectName, const std::string& bandName, const std::vector<Stack>& army);
+    // hunts: the band rides for the hero and attacks whenever it reaches him,
+    // whatever the odds (Rival::hunts); otherwise it picks goals as any war-band.
+    bool betray(const std::string& objectName, const std::string& bandName, const std::vector<Stack>& army,
+                bool hunts = false);
     // Every soldier of `unitId` in the hero's army and garrisons turns on the
     // player: they leave, form a war-band beside the hero and attack at once.
     // Returns how many turned (0 = none were hired, nothing happens).
     int turncoats(const std::string& unitId, const std::string& bandName);
-    bool ambushFrom(const std::string& townName, const std::string& bandName);
+    bool ambushFrom(const std::string& townName, const std::string& bandName, bool hunts = false);
+    // Story "disband": every living war-band of that name leaves the map. No
+    // battle, no experience, no "rival_beaten"; sites it took stay as they are.
+    // A fight pending with it is called off. False if no such band is alive.
+    bool disband(const std::string& bandName);
     // Rules out one wrong old mine not yet searched or ruled out; returns its name.
     std::optional<std::string> giveClue();
     const std::unordered_set<HexCoord>& ruledOut() const { return m_ruledOut; }
@@ -391,6 +398,7 @@ public:
         double             startPower = 0;
         bool               alive = true;
         std::string        goal;      // what it is doing, for debugging/tests
+        bool               hunts = false;  // rides for the hero, whatever the odds (saved)
     };
     struct RivalMove { int id; std::vector<HexCoord> path; };
     static constexpr int RIVAL_START_DAY = 3;    // war-bands ride from this day

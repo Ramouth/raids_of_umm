@@ -59,10 +59,16 @@ class AdventureSession;
  *              "scene": {"frames": [{"scene", "text"}, ...]}
  *                                               — a full-screen moment mid-map (as an ending's
  *                                                 frames); queued for the UI, the map goes on
- *              "ambush_from": {"at": town, "band": name, "say": [[speaker,text]]}
+ *              "ambush_from": {"at": town, "band": name, "say": [[speaker,text]], "goal"?}
  *                                               — half its garrison attacks as an escort
- *              "betray": {"at": name, "band": name, "army": [{"id","count"}]}
- *                                               — that site turns rival; a war-band rides out
+ *              "betray": {"at": name, "band": name, "army": [{"id","count"}], "goal"?}
+ *                                               — that site turns rival; a war-band rides out.
+ *                                                 "goal": "hunt" — the band rides for the hero
+ *                                                 and attacks whenever it reaches him, whatever
+ *                                                 the odds (default: ambush only when far stronger)
+ *              "disband": name                  — that living war-band leaves the map: no fight,
+ *                                                 no experience, no rival_beaten; sites it took
+ *                                                 stay taken; a fight pending with it is off
  *              "xp": n                          — experience for the commander and travelling companions
  *              "vanish": name                   — that map object leaves the map (a figure walks off);
  *                                                 a guard camp takes its hex, zone of control and

@@ -45,6 +45,13 @@ class CombatEngine;
  * the cheapest way to the nearest enemy (each obstacle costs the turns needed
  * to break it), walking up to it first, instead of idling (breachTarget).
  *
+ * Reckless (a unit with the "reckless" ability, UnitType::isReckless): no
+ * scoring. It strikes the nearest enemy it can reach this turn; otherwise it
+ * follows the cheapest way to the nearest enemy (the same costs as breaking
+ * through), hacking at the first obstacle on it when that is the cheaper way,
+ * else walking as far along it as it can. CombatSession plays such a stack's
+ * turns itself even in the player's army: the player cannot hold it back.
+ *
  * Randomness: the best action is picked by a softmax over candidates within a
  * few percent of the top score, using engine.aiRng() — deterministic for a
  * given CombatEngine::setSeed(), different between battles otherwise.

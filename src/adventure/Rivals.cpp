@@ -1,6 +1,8 @@
 // Rivals.cpp — strategic opponents: legacy Shariw raiders and scenario castle lords.
 //
 // Each war-band picks one goal per turn, in priority order:
+//   0. a hunting band (story "goal": "hunt") rides for the hero whatever the
+//      odds, as long as it has a way to him; otherwise it falls through
 //   1. weak (< 35% of its starting strength) → go home and recruit
 //   2. the player's hero is close and clearly weaker → attack (ambush)
 //   3. the nearest mine or neutral town not flying the Shariw banner → take it
@@ -283,8 +285,9 @@ void AdventureSession::rivalTurn(Rival& r) {
         for (const auto& c : path) best += rivalStepCost(c);
         if (!goal || cost < best) { goal = target; path = p; r.goal = why; }
     };
+    if (r.hunts) consider(m_hero.pos, "hunt");
     bool growthDay = dayOfWeek() == 7 || dayOfWeek() == 1;
-    if (r.pos != r.home && owner(r.home) == Faction::AI &&
+    if (!goal && r.pos != r.home && owner(r.home) == Faction::AI &&
         (strength < 0.35 * r.startPower || (growthDay && r.pos.distanceTo(r.home) <= 12))) {
         consider(r.home, "regroup");
     }
@@ -411,7 +414,7 @@ void AdventureSession::rivalTurn(Rival& r) {
 
 // A pre-existing road company turns on the expedition at the agreed meeting
 // site. The reserve is saved with garrisons and consumed once, never respawned.
-bool AdventureSession::ambushFrom(const std::string& townName, const std::string& bandName) {
+bool AdventureSession::ambushFrom(const std::string& townName, const std::string& bandName, bool hunts) {
     if (m_pending) return false;
     const MapObjectDef* home = nullptr;
     for (const auto& obj : m_map.objects()) if (obj.name == townName) home = &obj;
@@ -436,6 +439,7 @@ bool AdventureSession::ambushFrom(const std::string& townName, const std::string
     }
     held.erase(std::remove_if(held.begin(), held.end(), [](const Stack& s) { return s.count <= 0; }), held.end());
     escort.startPower = power(escort.army);
+    escort.hunts = hunts;
     m_rivals.push_back(escort);
     m_pending = *at;
     m_pendingAmbush = true;

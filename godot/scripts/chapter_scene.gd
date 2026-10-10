@@ -117,6 +117,10 @@ func _ready() -> void:
             _buttons.add_child(button)
     else:
         _heading.text = heading if not heading.is_empty() else "THE OLD PASSAGE  ·  THAT NIGHT"
+        # A frame may be a spoken line (desert.gd joins lines to their scene): who speaks.
+        _speaker = _label("", 18, Color("a9ccb7"))
+        column.add_child(_speaker)
+        column.move_child(_speaker, _words.get_index())
         var button := Button.new()
         _continue = button
         # Keys turn frames in _unhandled_key_input; a focused button would turn
@@ -255,7 +259,9 @@ func advance() -> void:
         finished.emit({})
         return
     _scene = str(frames[frame].get("scene", ""))
-    _words.text = str(frames[frame].get("text", ""))
+    var speaker := str(frames[frame].get("speaker", ""))
+    _speaker.text = speaker.to_upper()
+    _words.text = "“%s”" % frames[frame].get("text", "") if not speaker.is_empty() else str(frames[frame].get("text", ""))
     _continue.text = close_label if frame == frames.size() - 1 else "Continue"
     _words.modulate.a = 0.0
     if _fade != null: _fade.kill()

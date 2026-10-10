@@ -1040,7 +1040,8 @@
         "Crystal": 0
       },
       "abilities": [
-        "companion"
+        "companion",
+        "reckless"
       ]
     },
     {

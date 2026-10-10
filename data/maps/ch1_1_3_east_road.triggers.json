@@ -19,6 +19,80 @@
       "do": [
         {
           "quest": "aldren"
+        },
+        {
+          "if": {
+            "flag": "ushari_roots"
+          },
+          "then": [
+            {
+              "reveal": [
+                21,
+                -16,
+                2
+              ]
+            },
+            {
+              "reveal": [
+                -6,
+                1,
+                2
+              ]
+            },
+            {
+              "quest_text": [
+                "aldren",
+                "Ushari showed Aldren the way to the roots: an old mine where this road ends, under the mountains. Follow it."
+              ]
+            },
+            {
+              "say": [
+                [
+                  "Ushari",
+                  "The roots are where this road ends. He would have slept in the dell above it."
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "if": {
+            "not": {
+              "item": "red_hand_sword"
+            }
+          },
+          "then": [
+            {
+              "vanish": "Sword Hunters"
+            }
+          ],
+          "else": [
+            {
+              "say": [
+                [
+                  "Drest",
+                  "Riders hold the bridge ahead, boy. They want that sword."
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hunters_wait",
+      "when": {
+        "event": "engage",
+        "name": "Sword Hunters"
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Drest",
+              "They were waiting for us, boy. For that sword."
+            ]
+          ]
         }
       ]
     },

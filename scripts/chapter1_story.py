@@ -11,12 +11,14 @@ THE QUESTION: where did Aldren go? Every map moves it one step east.
 
 CAST (only Aldren, Drest and Ushari are named in play; everyone else is a role)
     The hero          House Varen's younger son, mid-twenties. Never named.
-    Aldren            The heir, early thirties. Never waits for anyone. Rides out at first
-                      light after the hunt, leaves the hero his sword. Unseen after 1.0.
+    Aldren            The heir, early thirties. Never waits for anyone. In battle he is
+                      reckless: the game plays his turns, he charges and chops through the
+                      trees. Rides out at first light after the hunt and leaves the sword
+                      of the forefathers on the wall: "Do not take it." Unseen after 1.0.
     Drest             Master-at-arms; taught both brothers. Rides through the whole chapter
                       (essential: never leaves over pay). Few words, calls the hero "boy".
                       Dies later, near the Walled Nation (not in this chapter).
-    Your father       Lord of Varenhold, old. One line: the toast to his heir.
+    Your father       Lord of Varenhold, old. One line: the toast to his heir (told, not chosen).
     The hooded man    The king, your father's brother. Never named in play: a hooded man
                       among the dogs in 1.1 who knows Aldren and hands over a warm seed.
     Ushari            A witch of the realm's last witch tribe (the people the colonizing
@@ -35,21 +37,40 @@ THREADS
     Rabies       1.0 the dogs look rabid but the bite does nothing (the promise); from 1.1
                  the rabid_hound bite carries the sickness (the threat). No town after 1.1;
                  the cure comes later with Ushari's ability (not built).
-    Red hand     1.0 on Aldren's sword -> 1.1 cut into the Varen Barrow door (Drest) ->
-                 1.2 on the Red Banner company's banner and shields (Drest, once) -> 1.3
-                 painted on the cart at the Broken Camp. The emperor's mark; never said.
-    Aldren's road  1.1 the Bridge Keeper: he crossed at first light -> 1.2 Ushari: the man
-                 with that sword rode past her going east -> 1.3 his cold fire, his "A" on
-                 the bridge post, roots cut and grown back over the mine mouth.
+    Red hand     1.0 on the hilt of the sword (seen at dawn, either answer) -> 1.1 cut into the
+                 Varen Barrow door (Drest) -> 1.2 on Aldren's shield (Ushari saw it; Drest
+                 knows it) and on the Red Banner company's banner and shields (Drest, once)
+                 -> 1.3 painted on the cart at the Broken Camp. The emperor's mark; never said.
+    The sword    1.0 dawn: take it (he asked you not to) or leave it on the wall. Taken, it is
+                 the strongest weapon of the chapter, and a gamble: it draws hunters who pay
+                 in experience and gold. 1.1 the hooded man knows it ("That hand went east
+                 before you."), the quest and the barrow door name it. 1.2 Ushari sees the
+                 hand of Aldren's shield on it; a band of Sword Hunters rides out after it;
+                 the Red Banner captain wants it, and it buys the bridge outright (handed
+                 over, the hunters of 1.3 never come); at the road out Ushari says "He asked
+                 me the way to the roots." (flag ushari_roots). 1.3 that flag shows the mine
+                 and his cold fire from the start; a band waits at the far end of the
+                 bridge while the sword is carried. Left on the wall: none of the hunters,
+                 and his traces must be found.
+    Aldren's road  1.1 the Bridge Keeper: he crossed at first light -> 1.2 Ushari: a man
+                 with a red hand on his shield rode past her going east (Drest: "Aldren's
+                 shield.") -> 1.3 his cold fire, his "A" on the bridge post, roots cut and
+                 grown back over the mine mouth.
+    His habits   1.0 he cuts an A into the bark after the Thicket Dogs, and banks the old
+                 fire at the Poachers' Fire ("You taught me.") -> 1.3 the A on the Bridge
+                 Post, the banked Cold Fire (Drest: "He was listening, then."). In battle he
+                 rushes ahead (Drest: "Stay back behind the lines!") -> 1.1 when the hero's
+                 stack rushes, Drest: "Your brother would have done that. Don't."
 
 MAP BY MAP, and what the player must understand to act
     1.0 The Last Hunt   Two packs of mad dogs with Aldren and Drest; the tag drops from the
                         Stream Dogs. The woods are a labyrinth of narrow trails: the Thicket
                         Dogs wait in a tree corridor (an ambush battle), the Stream Dogs past
                         the one bridge. The Hunters' Lodge on the trail sells slingers; two
-                        dead-end side paths hold a cold fire and cut willow to pay for them. End the day: the toast to Aldren (raise your cup / leave
-                        the hall). At first light Aldren is gone: his sword, and a letter,
-                        "Do not come after me."
+                        dead-end side paths hold the Poachers' Fire and cut willow to pay
+                        for them. End the day: the toast to Aldren (no choice). At first
+                        light Aldren is gone; the sword hangs in the hall with his note:
+                        take it or leave it on the wall.
                         Understand: Aldren is the heir; the dogs are wrong; he has left.
     1.1 Varenhold       The home vale. Three rabid packs; the Bridge Keeper keeps the only
                         road out (east) shut until they are dead. The hooded man stands with
@@ -57,14 +78,18 @@ MAP BY MAP, and what the player must understand to act
                         Understand: kill the packs, the keeper opens the bridge, go east.
     1.2 The Camps       Companies of other houses camp on your fields, marching east. Each
                         camp is a choice: let them stay, take a toll, turn them away. The
-                        Strangers' Camp is Ushari's: the man with your sword passed her going
-                        east, so she rides with you whatever you answer; her three go on
+                        Strangers' Camp is Ushari's: a man with the red hand on his shield
+                        passed her going east (Aldren), so she rides with you whatever you
+                        answer; her three go on
                         ahead, and your answer colours what she says in 1.3. Her camp is off
                         the road: a player who skips it meets her at the Red Banner bridge,
                         where she rides up, names herself and joins. The Empty Camp and
                         the Northern Warrior show where the dogs came from: the north. The Red
                         Banner company holds the only bridge east; let them pass, make them
-                        pay or drive them off. The road out opens only after that.
+                        pay, drive them off, or (sword carried) hand over the sword. The road
+                        out opens only after that. Sword carried: Sword Hunters ride out at
+                        the start (they fall on the hero when half again his army's strength,
+                        else they take his mills).
                         Understand: the way east runs through the Red Banner's bridge.
     1.3 The East Road   One road into the Greyfangs. Off it, Aldren's traces. At the Broken
                         Camp Ushari finds her company broken by the red hands and answers what
@@ -78,18 +103,24 @@ MAP BY MAP, and what the player must understand to act
 CHOICES. Every resolved choice records the flag choice.<id> = <option id>
 (Scenario::choose), so heavy decisions carry forward without extra authoring:
 
-    choice.toast        raise_cup | leave_hall          (1.0, your father's toast)
+    choice.sword        take | leave                    (1.0, dawn: the sword of your forefathers)
     choice.stranger     hear | attack                   (1.1, the hooded man)
     choice.camp_*       grant | tax | turn_away         (1.2, each camp; Ushari joins on all three;
                                                      unset for camp_strangers if she joined at the bridge)
-    choice.red_banner   let_pass | make_pay | drive_off (1.2, the first heavy decision)
+    choice.red_banner   let_pass | make_pay | drive_off (1.2, the first heavy decision;
+                        | hand_over                      hand_over only while the sword is carried)
     choice.warrior      give_tag | fight                (1.2, the dog's owner; give_tag needs the 1.0 dog tag)
     choice.ushari_road  take | send_home                (1.3, only on a map started on its own)
     choice.roots        cut | turn_back                 (1.3, the chapter's last decision)
 
+Flags beyond choices: ushari_roots (1.2, she told you the way; 1.3 reveals the mine and
+the Cold Fire), red_banner_broken, riverside_broken.
+
 PLANNED, NOT BUILT
-    The Varen Barrow dungeon (1.1): sealed today; when built it holds the clue to Aldren's road.
-    Three roads out of 1.1 (today only the east bridge).
+    The Varen Barrow dungeon (1.1): sealed today; when built it holds the clue to Aldren's
+    road (sword left: the only place to learn it; taken: an extra clue).
+    Three roads out of 1.1 (today only the east bridge); the hooded man's sword line then
+    picks the road.
     Ushari's cure for the rabies.
 
 Author knowledge (never told in Chapter 1): the hooded man is the king; Aldren went east
@@ -97,6 +128,12 @@ for the old passage and cut the roots at the mine mouth; the red hand is the emp
 Why Aldren left is the same thing as the fall of Umm'Natur (decided; how it is shown is open).
 The dogs (decided 2026-10-10): the Northerners use dogs for everything; a disease spreads
 among their dogs, and the people from Under spread it. Under works by curses and illness.
+The sword, far future (decided 2026-10-10): handed over in 1.2, it is won back from the
+Red Banner in 3.2. Left on the wall, Drest kept it all along; dying in chapter 4, near
+the Walled Nation, he hands it over: "He said don't take it. He never said I couldn't
+give it." (take or leave again, a second choice). Taken: Drest, dying: "Give it back to
+him, if you find him." The hilt is the first link of the mark chain (hilt, banner, tomb
+door, crown, 4.3).
 
 Writes DIR/ch1_*.triggers.json and DIR/ch1_*.encounters.json, and campaign.json in the
 data dir (default: the parent of DIR), then checks the result against the maps in DIR.
@@ -203,6 +240,16 @@ class Story:
 
 
 # ── 1.0 The Last Hunt ────────────────────────────────────────────────────────
+SWORD = "red_hand_sword"
+HAS_SWORD = {"item": SWORD}
+ALDREN_NOTE = "I leave the sword of our forefathers. Do not take it. Do not come after me. — A."
+
+
+def gone_at_dawn(body, frame):
+    return {"id": "gone_at_dawn", "heading": "Gone at Dawn", "next": "1.1", "body": body,
+            "frames": [{"scene": "home", "text": frame}]}
+
+
 def hunt():
     s = Story("ch1_1_0_hunt", ["aldren", "drest"], essential=["drest"])
     # A small household party and a thin purse: the Hunters' Lodge slingers (110 gold +
@@ -226,22 +273,44 @@ def hunt():
            {"quest_done": "hunt"}, {"quest": "hall"},
            say(("Aldren", "Dogs don't fight like that. Something is wrong with them."),
                ("Drest", "Burn the carcasses. Don't let the herdsmen touch them.")))
+    # Aldren's habits, for 1.3 to pay off (the A on the Bridge Post, the banked Cold Fire).
+    s.trig("carved_a", {"event": "encounter_won", "name": "Thicket Dogs"},
+           {"scene": {"frames": [{"scene": "road", "text": "Aldren cuts an A into the bark with his knife."}]}},
+           say(("Aldren", "So they know who cleared this wood.")),
+           if_={"companion": "aldren"})
+    # The Poachers' Fire stays a pickup (its gold and wood pay for the Lodge's slingers);
+    # walking onto a pickup fires "visit" like any site.
+    s.trig("banked_fire", {"event": "visit", "name": "Poachers' Fire"},
+           {"scene": {"frames": [{"scene": "road", "text": "Aldren kneels and banks the old fire:\nash over the coals, stones round the edge."}]}},
+           say(("Drest", "Every fire, every time. The rain would do it for you."),
+               ("Aldren", "You taught me.")),
+           if_={"companion": "aldren"})
+    # The toast is told, not chosen: the choice of the night is the sword at dawn.
     s.trig("toast", {"event": "night", "after": "hunt_done"},
            {"quest_done": "hall"},
-           conversation("toast", "Varenhold · The hall · That night",
-                        [("Your father", "To Aldren. To my heir.")],
-                        "Every cup in the hall goes up.",
-                        [option("raise_cup", "Raise your cup to him", {"event": "dawn"}),
-                         option("leave_hall", "Leave the hall", {"event": "dawn"})]))
+           {"scene": {"frames": [{"scene": "home", "text": "That night, in the hall,\nyour father stands and lifts his cup."}]}},
+           say(("Your father", "To Aldren. To my heir.")),
+           {"scene": {"frames": [{"scene": "home", "text": "Every cup in the hall goes up.\nAldren drinks, and does not look at you."}]}},
+           {"event": "dawn"})
+    # The chapter's first real choice. Following him breaks his second order, always (that
+    # is the plot); his first order is the one the player may keep. The red hand on the
+    # hilt is seen on both branches, in the frame.
     s.trig("dawn", {"event": "dawn"},
            {"leave": "aldren"},
-           {"item": "red_hand_sword"},
-           lore("Aldren's letter", "“The sword is yours now. Do not come after me. — A.”"),
            {"xp": 60},
-           {"ending": {"id": "gone_at_dawn", "heading": "Gone at Dawn", "next": "1.1",
-                       "body": "Aldren rode out at first light. His sword is yours now.",
-                       "frames": [{"scene": "home", "text": "First light. Aldren's horse is gone from the stable."},
-                                  {"scene": "home", "text": "On your bed lies his sword,\nand a letter in his hand."}]}})
+           {"scene": {"frames": [{"scene": "home", "text": "First light. Aldren's horse is gone from the stable."},
+                                 {"scene": "home", "text": "In the hall the sword of your forefathers hangs on its pegs.\n"
+                                                           "A red hand on the hilt; a note pinned beneath."}]}},
+           conversation("sword", "The Sword of Your Forefathers", [], f"“{ALDREN_NOTE}”",
+                        [option("take", "Take the sword", {"item": "red_hand_sword"},
+                                lore("Aldren's letter", f"“{ALDREN_NOTE}”"),
+                                {"ending": gone_at_dawn("Aldren rode out at first light. You carry the sword he left on the wall.",
+                                                        "You lift the sword from its pegs.\nThen you go after him.")},
+                                detail="He asked you not to."),
+                         option("leave", "Leave it on the wall",
+                                lore("Aldren's letter", f"“{ALDREN_NOTE}”"),
+                                {"ending": gone_at_dawn("Aldren rode out at first light. His sword stays on the wall.",
+                                                        "You leave the sword on its pegs.\nThen you go after him.")})]))
     return s
 
 
@@ -252,13 +321,15 @@ KEEPER = "Bridge Keeper"
 
 def varenhold(land):
     s = Story("ch1_1_1_varenhold", ["drest"], essential=["drest"])
-    s.quest("aldren", "Where did Aldren go?", "Aldren rode out at first light and left you his sword. The only road out of the vale runs east, over the bridge.", main=True)
+    s.quest("aldren", "Where did Aldren go?", "Aldren rode out at first light and left his sword on the wall. The only road out of the vale runs east, over the bridge.", main=True)
     s.quest("dogs", "Rabid Dogs in the Vale", "More of the mad dogs: three packs loose in the vale, and their bite carries the sickness. Kill them before they get at the herds.")
     s.encounters["objects"] = {"Orchard Dogs": dogs(12, 150), "Ford Dogs": dogs(14, 150),
                                "Hollow Dogs": dogs(18, 200)}
     s.encounters["pickups"] = {"Shepherd's Purse": {"reward": {"Gold": 300}}}
 
     s.trig("start", {"event": "start"}, {"quest": "aldren"}, {"quest": "dogs"}, {"reveal": [2, 0, 13]},
+           {"if": HAS_SWORD, "then": [{"quest_text": ["aldren", "Aldren rode out at first light. You carry the sword he left on the wall. "
+                                                                "The only road out of the vale runs east, over the bridge."]}]},
            say(("Drest", "He never waited for anyone. Not even me.")))
     # The hooded man stands with the third pack. Both answers end in the fight.
     s.trig("stranger", {"event": "engage", "name": "Hollow Dogs"},
@@ -266,7 +337,13 @@ def varenhold(land):
                         "A hooded man stands among the dogs.",
                         [option("hear", "Hear him out",
                                 say(("Hooded Man", "Your brother would not listen either. Keep this warm.")),
-                                {"item": "hermits_seed"}),
+                                {"item": "hermits_seed"},
+                                # He knows the sword. Today the quest text names the road; once the
+                                # three roads out of 1.1 exist, this is the one that picks the road.
+                                {"if": HAS_SWORD, "then": [
+                                    say(("Hooded Man", "That hand went east before you. Follow it.")),
+                                    {"quest_text": ["aldren", "The hooded man knew your sword: it went east before you. "
+                                                              "The only road east runs over the bridge."]}]}),
                          option("attack", "Attack")]))
     s.trig("stranger_gone", {"event": "encounter_won", "name": "Hollow Dogs"},
            {"vanish": "Hooded Stranger"},
@@ -274,7 +351,9 @@ def varenhold(land):
     s.trig("rune_stone", {"event": "visit", "name": "Vale Rune Stone"},
            lore("A rubbing of the rune stone", "Charcoal on cloth. No one at Varenhold can read it. The marks are like the ones on the dog's tag."))
     s.trig("barrow", {"event": "visit", "name": "Varen Barrow"},
-           say(("Drest", "A red hand is cut into the door. Like the one on your sword.")))
+           {"if": HAS_SWORD,
+            "then": [say(("Drest", "A red hand is cut into the door. Like the one on your sword."))],
+            "else": [say(("Drest", "A red hand is cut into the door. Like the one on the sword Aldren left."))]})
     # The east bridge stays shut while the dogs run loose. Each trigger fires once,
     # so the keeper says his piece on the first visit; the quest text keeps the reason.
     s.trig("gate_shut", {"event": "visit", "name": KEEPER, "unless": "vale_cleared"},
@@ -303,19 +382,20 @@ CAMPS = [  # (choice id, object, speaker, line, toll, what turning them away mea
      "We are a small house and a long way from home. We will be gone by morning.",
      300, "leave"),
     ("camp_strangers", "Strangers' Camp", "Ushari",
-     "I am Ushari. We are four, and we pay our way.",
+     "I am Ushari. A man with a red hand on his shield rode past us going east.",
      150, "leave"),
 ]
-# Ushari's camp: she has seen the man with the red-hand sword ride east, so she rides with
-# you whatever you answer. Her three go on ahead (and are broken on the east road, 1.3).
-# Your answer sets the terms, and she remembers them at the Broken Camp.
-USHARI_SWORD = "That sword. The man who carried it rode past us going east, and would not let me ride with him."
+# Ushari's camp: she has seen Aldren (the red hand on his shield) ride east, so she rides
+# with you whatever you answer. Her three go on ahead (and are broken on the east road, 1.3).
+# Your answer sets the terms, and she remembers them at the Broken Camp. If you took the
+# sword, she sees the same hand on it.
+USHARI_SEEN = CAMPS[2][3]
+USHARI_SEEN_SWORD = USHARI_SEEN + " The same hand is on your sword."
+DREST_SHIELD = ("Drest", "Aldren's shield.")
+STRANGERS_TEXT = "Four riders camp by the burn, and offer to pay their way."
 # If the player never rode to her camp, she rides up at the Red Banner bridge instead
 # (the only way east, so it cannot be missed). Exactly one of the two join beats fires.
-USHARI_BRIDGE = [
-    ("Ushari", "I am Ushari. That sword: the man who carried it rode past us going east, and would not take me with him."),
-    ("Ushari", "My people have gone on ahead. I ride with you."),
-]
+USHARI_BRIDGE_GO = ("Ushari", "My people have gone on ahead. I ride with you.")
 USHARI_TERMS = {
     "grant": "Then I owe you. The others go on east in the morning. I ride with you.",
     "tax": "Paid, then. The others go on ahead. I ride with you, and owe you nothing.",
@@ -331,6 +411,17 @@ WARRIOR_BAND = {"guards": [{"id": "northern_warrior", "count": 3}, {"id": "north
 RIVERSIDE_BAND = [{"id": "woad_runner", "count": 12}, {"id": "cruth_slinger", "count": 4}]
 RED_BAND = [{"id": "woad_runner", "count": 16}, {"id": "cruth_slinger", "count": 6}, {"id": "painted_blade", "count": 3}]
 CAMP_XP = 35
+# The hunters the sword draws (taking it is a gamble: they pay experience and spoils).
+# Working names; the user names them. 1.2: a band rides out from a camp behind you
+# (betray). The engine pays a broken war-band its experience but no purse, so the
+# story gives one. 1.3: a band waits at a choke on the east road (a guard camp).
+HUNT_SITE = "Riders' Camp"
+HUNT_BAND = "Sword Hunters"
+HUNTERS_12 = [{"id": "gododdin_rider", "count": 3}, {"id": "cruth_slinger", "count": 6}, {"id": "woad_runner", "count": 10}]
+HUNTERS_12_PURSE = {"Gold": 400}
+HUNTERS_13 = "Sword Hunters"
+HUNTERS_13_GUARD = {"guards": [{"id": "gododdin_rider", "count": 4}, {"id": "painted_blade", "count": 4},
+                               {"id": "cruth_slinger", "count": 6}], "reward": {"Gold": 500}}
 
 
 def camps(land):
@@ -338,6 +429,7 @@ def camps(land):
     s.quest("aldren", "Where did Aldren go?", "Aldren's road runs east across the river fields. Follow it.", main=True)
     s.quest("camps", "Camps on Your Fields",
             "Companies from other houses have camped on your fields on their way east. Ride to each camp and decide: let them stay, take a toll, or turn them away.")
+    s.quest("hunted", "Riders on Your Trail", "Riders have followed you out of the vale. Drest thinks they are after the sword.")
     s.encounters["objects"] = {"Copse Dogs": dogs(12, 200),
                                "Field Brigands": {"guards": [{"id": "brigand", "count": 12}], "reward": {"Gold": 300}},
                                WARRIOR: WARRIOR_BAND}
@@ -372,42 +464,75 @@ def camps(land):
         gone = {"vanish": name}
         turn = ([{"betray": {"at": name, "band": "Riverside Company", "army": RIVERSIDE_BAND}}, gone]
                 if refused == "fight" else [gone])
-        lines = [(speaker, line)]
         joins = {a: [] for a in ("grant", "tax", "turn_away")}
         if cid == "camp_strangers":               # Ushari joins on every answer; the terms differ
-            lines.append(("Ushari", USHARI_SWORD))
             joins = {a: [say(("Ushari", reply)), {"join": "ushari"}] for a, reply in USHARI_TERMS.items()}
-        if cid == "camp_strangers":               # her bridge beat comes first: then the camp is gone
-            s.trig("ushari_bridge", {"event": "visit", "name": "Red Banner Camp"},
-                   {"scene": {"frames": [{"scene": "road", "text": "As you near the bridge, a rider comes up the road behind you.\n"
-                                                                    "A woman, riding alone."}]}},
-                   say(*USHARI_BRIDGE), {"join": "ushari"}, {"vanish": name},
-                   if_={"all": [{"not": {"companion": "ushari"}}, {"not": {"trigger_fired": cid}}]})
+
+        def ask(lines, text=""):
+            return conversation(cid, name, lines, text,
+                                [option("grant", "Let them stay", gone, {"xp": CAMP_XP}, {"event": "camp_decided"},
+                                        *joins["grant"]),
+                                 option("tax", "Take a toll", {"give": {"Gold": toll}}, gone, {"xp": CAMP_XP},
+                                        {"event": "camp_decided"}, *joins["tax"]),
+                                 option("turn_away", "Turn them away", *turn, {"xp": CAMP_XP}, {"event": "camp_decided"},
+                                        *joins["turn_away"],
+                                        detail="They will not go quietly." if refused == "fight" else None)])
+        if cid != "camp_strangers":
+            s.trig(cid, {"event": "visit", "name": name}, ask([(speaker, line)]))
+            continue
+        # Her bridge beat comes first: then the camp is gone. Three lines either way.
+        s.trig("ushari_bridge", {"event": "visit", "name": "Red Banner Camp"},
+               {"scene": {"frames": [{"scene": "road", "text": "As you near the bridge, a rider comes up the road behind you.\n"
+                                                                "A woman, riding alone."}]}},
+               {"if": HAS_SWORD,
+                "then": [say(("Ushari", USHARI_SEEN_SWORD), DREST_SHIELD, USHARI_BRIDGE_GO)],
+                "else": [say(("Ushari", USHARI_SEEN), DREST_SHIELD, USHARI_BRIDGE_GO)]},
+               {"join": "ushari"}, {"vanish": name},
+               if_={"all": [{"not": {"companion": "ushari"}}, {"not": {"trigger_fired": cid}}]})
+        # Two lines before the answer, her terms after it.
         s.trig(cid, {"event": "visit", "name": name},
-               conversation(cid, name, lines, "",
-                            [option("grant", "Let them stay", gone, {"xp": CAMP_XP}, {"event": "camp_decided"},
-                                    *joins["grant"]),
-                             option("tax", "Take a toll", {"give": {"Gold": toll}}, gone, {"xp": CAMP_XP},
-                                    {"event": "camp_decided"}, *joins["tax"]),
-                             option("turn_away", "Turn them away", *turn, {"xp": CAMP_XP}, {"event": "camp_decided"},
-                                    *joins["turn_away"],
-                                    detail="They will not go quietly." if refused == "fight" else None)]),
-               if_={"not": {"trigger_fired": "ushari_bridge"}} if cid == "camp_strangers" else None)
+               {"if": HAS_SWORD,
+                "then": [ask([("Ushari", USHARI_SEEN_SWORD), DREST_SHIELD], STRANGERS_TEXT)],
+                "else": [ask([("Ushari", USHARI_SEEN), DREST_SHIELD], STRANGERS_TEXT)]},
+               if_={"not": {"trigger_fired": "ushari_bridge"}})
+    # The sword draws hunters. Taken: a band rides out from a camp behind you (it hunts the
+    # hero once it is half again the army's strength, else it raids your mills; see
+    # HUNTERS_12). Left on the wall: the camp is gone before the map starts.
+    s.trig("hunters", {"event": "start"},
+           {"if": HAS_SWORD,
+            "then": [{"betray": {"at": HUNT_SITE, "band": HUNT_BAND, "army": HUNTERS_12, "goal": "hunt"}}, {"vanish": HUNT_SITE},
+                     {"quest": "hunted"},
+                     say(("Drest", "Riders on our trail since the vale. Keep that sword close, boy."))],
+            "else": [{"vanish": HUNT_SITE}]})
+    s.trig("hunters_broken", {"event": "rival_beaten", "name": HUNT_BAND},
+           {"quest_done": "hunted"}, {"give": HUNTERS_12_PURSE},
+           say(("Drest", "They knew what they came for. There will be more.")))
     # The first heavy decision. The camp holds the only east bank of the burn, at the bridge.
-    # Drest sees the red hand once (the emperor's mark; never said).
+    # Drest sees the red hand once (the emperor's mark; never said). With the sword, the
+    # captain wants it, and it buys the bridge outright.
+    red_lines = [("Captain", "We hold your bridge tonight, and we take what we need from your fields. You may watch.")]
+
+    def red_banner(lines, hand_over=()):
+        return conversation("red_banner", "The Red Banner", lines,
+                            "A red hand is painted on their banner, and on every shield.",
+                            [option("let_pass", "Let them pass", {"vanish": "Red Banner Camp"}, {"xp": CAMP_XP},
+                                    {"event": "camp_decided"}),
+                             option("make_pay", "Make them pay", {"give": {"Gold": 600}}, {"vanish": "Red Banner Camp"},
+                                    {"xp": CAMP_XP}, {"event": "camp_decided"}),
+                             *hand_over,
+                             option("drive_off", "Drive them off",
+                                    {"betray": {"at": "Red Banner Camp", "band": "Red Banner Company", "army": RED_BAND}},
+                                    {"vanish": "Red Banner Camp"}, {"xp": CAMP_XP}, {"event": "camp_decided"},
+                                    detail="They will fight for the bridge.")])
     s.trig("red_banner", {"event": "visit", "name": "Red Banner Camp"},
-           conversation("red_banner", "The Red Banner",
-                        [("Captain", "We hold your bridge tonight, and we take what we need from your fields. You may watch."),
-                         ("Drest", "Look at their shields, boy. That is the hand on your sword.")],
-                        "A red hand is painted on their banner, and on every shield.",
-                        [option("let_pass", "Let them pass", {"vanish": "Red Banner Camp"}, {"xp": CAMP_XP},
-                                {"event": "camp_decided"}),
-                         option("make_pay", "Make them pay", {"give": {"Gold": 600}}, {"vanish": "Red Banner Camp"},
-                                {"xp": CAMP_XP}, {"event": "camp_decided"}),
-                         option("drive_off", "Drive them off",
-                                {"betray": {"at": "Red Banner Camp", "band": "Red Banner Company", "army": RED_BAND}},
-                                {"vanish": "Red Banner Camp"}, {"xp": CAMP_XP}, {"event": "camp_decided"},
-                                detail="They will fight for the bridge.")]))
+           {"if": HAS_SWORD,
+            "then": [red_banner(red_lines + [("Drest", "Look at their shields, boy. That is the hand on your sword."),
+                                             ("Captain", "That hand is not yours to carry.")],
+                                [option("hand_over", "Hand over the sword", {"take_item": SWORD},
+                                        {"disband": HUNT_BAND}, {"quest_done": "hunted"},
+                                        {"vanish": "Red Banner Camp"}, {"xp": CAMP_XP}, {"event": "camp_decided"},
+                                        detail="They give up the bridge for it.", if_=HAS_SWORD)])],
+            "else": [red_banner(red_lines + [("Drest", "Look at their shields, boy. That is the hand on the sword Aldren left.")])]})
     s.trig("red_banner_broken", {"event": "rival_beaten", "name": "Red Banner Company"},
            {"flag": {"red_banner_broken": True}})
     s.trig("riverside_broken", {"event": "rival_beaten", "name": "Riverside Company"},
@@ -417,6 +542,11 @@ def camps(land):
            if_={"all": [{"flag": f"choice.{c[0]}"} for c in CAMPS if c[0] != "camp_strangers"]
                 + [{"any": [{"flag": "choice.camp_strangers"}, {"trigger_fired": "ushari_bridge"}]},
                    {"flag": "choice.red_banner"}]})
+    # At the road out, with the sword: Ushari tells where Aldren was going. 1.3 then starts
+    # with the mine and his cold fire on the map. (Handed over at the bridge: she keeps it.)
+    s.trig("ushari_roots", {"event": "enter_q", "q_min": land.exit_q, "after": "red_banner"},
+           say(("Ushari", "He asked me the way to the roots.")), {"flag": {"ushari_roots": True}},
+           if_={"all": [{"companion": "ushari"}, HAS_SWORD]})
     s.leave_by(land.exit_q, "red_banner", "east_road", "The East Road",
                "The road climbs east toward the hills.", "Take the east road",
                {"id": "the_east_road", "heading": "The East Road", "next": "1.3",
@@ -434,10 +564,23 @@ def east_road(land):
         "Ridge Bears": {"guards": [{"id": "highland_bear", "count": 4}], "reward": {"Gold": 300}},
         "Stone Trolls": {"guards": [{"id": "forest_troll", "count": 2}], "reward": {"Gold": 400}},
         "Root Wardens": {"guards": [{"id": "ancient_treant", "count": 1}]},
+        HUNTERS_13: HUNTERS_13_GUARD,
     }
     s.encounters["pickups"] = {"Fallen Pine": {"reward": {"Wood": 4}}, "Scree Stone": {"reward": {"Stone": 4}}}
 
-    s.trig("start", {"event": "start"}, {"quest": "aldren"})
+    mine, fire = (next((o["q"], o["r"]) for o in land.objects if o["name"] == n) for n in ("Root-Grown Mine", "Cold Fire"))
+    s.trig("start", {"event": "start"}, {"quest": "aldren"},
+           # Ushari told you (1.2, sword carried): the mine and his camp are on the map from the start.
+           {"if": {"flag": "ushari_roots"},
+            "then": [{"reveal": [*mine, 2]}, {"reveal": [*fire, 2]},
+                     {"quest_text": ["aldren", "Ushari showed Aldren the way to the roots: an old mine where this road ends, "
+                                               "under the mountains. Follow it."]},
+                     say(("Ushari", "The roots are where this road ends. He would have slept in the dell above it."))]},
+           # The hunters wait only for the sword.
+           {"if": {"not": HAS_SWORD}, "then": [{"vanish": HUNTERS_13}],
+            "else": [say(("Drest", "Riders hold the bridge ahead, boy. They want that sword."))]})
+    s.trig("hunters_wait", {"event": "engage", "name": HUNTERS_13},
+           say(("Drest", "They were waiting for us, boy. For that sword.")))
     # Aldren's traces, off the road, easy to miss. No one explains them.
     s.trig("cold_fire", {"event": "visit", "name": "Cold Fire"},
            lore("A cold fire", "Ashes banked the careful way Aldren always banked them. Grass flattened for one bedroll."),
@@ -539,6 +682,21 @@ def lines_of(actions):
         if "choice" in a:
             out += [tuple(l) for l in a["choice"].get("lines", [])]
     return out
+
+
+def most(actions, what):
+    """The most dialogue lines ("lines") or story experience ("xp") one way through an
+    action list can give: each choice adds its longest answer, each branch its longer side."""
+    total = 0
+    for a in actions:
+        if what == "lines":
+            total += len(a.get("say", [])) + len(a.get("choice", {}).get("lines", []))
+        else:
+            total += a.get("xp", 0)
+        total += max([most(o.get("then", []), what) for o in a.get("choice", {}).get("options", [])] or [0])
+        if "if" in a:
+            total += max(most(a.get("then", []), what), most(a.get("else", []), what))
+    return total
 
 
 def walk_actions(actions):
@@ -790,18 +948,15 @@ def check(stories, lands, out, data_out):
         for c in s.root["start_companions"]:
             if c not in units:
                 problems.append(f"{s.stem}: start companion {c} is not in units.json")
-        # Three lines a beat at most (lines before a choice plus the longest answer).
+        # Three lines a beat at most: the longest way through it (lines before a choice
+        # plus the longest answer; the longer side of every branch).
         for t in s.root["triggers"]:
-            before = lines_of(t["do"])
-            answer = max([len(lines_of(o.get("then", []))) for a in t["do"] if "choice" in a
-                          for o in a["choice"]["options"]] or [0])
-            if len(before) + answer > 3:
-                problems.append(f"{s.stem}: trigger {t['id']} has {len(before) + answer} lines")
+            n = most(t["do"], "lines")
+            if n > 3:
+                problems.append(f"{s.stem}: trigger {t['id']} has {n} lines")
         # Experience: what the guards and the story pay against the level cap.
         guard_xp = {n: max(20, int(power(units, e["guards"]) / 3)) for n, e in s.encounters["objects"].items()}
-        story_xp = sum(a.get("xp", 0) + max([sum(b.get("xp", 0) for b in o.get("then", []))
-                                             for o in a.get("choice", {}).get("options", [])] or [0])
-                       for t in s.root["triggers"] for a in t["do"])
+        story_xp = sum(most(t["do"], "xp") for t in s.root["triggers"])
         types = {}
         for o in m["objects"]:
             types[o["type"]] = types.get(o["type"], 0) + 1
@@ -819,7 +974,9 @@ def check(stories, lands, out, data_out):
 
 
 TIP_WHEN = {"battle_start", "first_turn_shooter", "enemy_adjacent", "flanked", "low_stack",
-            "defend_available", "victory_first", "companion_hit"}
+            "defend_available", "victory_first", "companion_hit", "rushes", "obstacle_broken"}
+TIP_ACTOR = {"rushes", "obstacle_broken", "first_turn_shooter", "defend_available"}   # where "actor" applies
+TIP_REPEAT = {"campaign", "battle"}
 
 
 def check_tips(stories, units):
@@ -850,6 +1007,34 @@ def check_tips(stories, units):
                 problems.append(f"combat_tips.json: {tid} on map {m}, where {tip['speaker']} does not start in the party")
         if not tip.get("text") or any(ch.isdigit() for ch in tip["text"]):
             problems.append(f"combat_tips.json: {tid} text is empty or shows a number")
+        if tip.get("repeat", "campaign") not in TIP_REPEAT:
+            problems.append(f"combat_tips.json: {tid} repeat '{tip['repeat']}' is not one of {sorted(TIP_REPEAT)}")
+        if "actor" in tip:
+            if tip.get("when") not in TIP_ACTOR:
+                problems.append(f"combat_tips.json: {tid} has an actor, which '{tip.get('when')}' does not read")
+            if tip["actor"] not in units and tip["actor"] not in {u["name"] for u in units.values()}:
+                problems.append(f"combat_tips.json: {tid} actor {tip['actor']} is not a unit id or name")
+        if "kind" in tip:
+            kinds = set(json.loads((ROOT / "data/combat_layouts.json").read_text()).get("obstacle_kinds", {})) \
+                if (ROOT / "data/combat_layouts.json").exists() else set()
+            if tip.get("when") != "obstacle_broken":
+                problems.append(f"combat_tips.json: {tid} has a kind, which only obstacle_broken reads")
+            elif kinds and tip["kind"] not in kinds:
+                problems.append(f"combat_tips.json: {tid} kind '{tip['kind']}' is not an obstacle kind in combat_layouts.json")
+        reply = tip.get("reply", [])
+        if not isinstance(reply, list) or len(reply) > 2:
+            problems.append(f"combat_tips.json: {tid} reply wants a list of at most two lines")
+            reply = []
+        for line in reply:
+            who = by_name.get(line.get("speaker")) if isinstance(line, dict) else None
+            if not who:
+                problems.append(f"combat_tips.json: {tid} reply speaker {line.get('speaker') if isinstance(line, dict) else line} is not a companion")
+                continue
+            if not line.get("text") or any(ch.isdigit() for ch in line["text"]):
+                problems.append(f"combat_tips.json: {tid} reply text is empty or shows a number")
+            for m in tip.get("maps", []):
+                if m in party and who not in party[m]:
+                    problems.append(f"combat_tips.json: {tid} reply on map {m}, where {line['speaker']} does not start in the party")
     return problems
 
 

@@ -140,6 +140,16 @@ SUITE("Sites — a dwelling is captured and recruits its creature weekly") {
     CHECK(s.recruit({-6, 2}, "levy_spearman", 1).has_value());
 }
 
+SUITE("Sites — a dwelling of a town unit recruits without the town's building") {
+    WorldMap map = sitesMap();
+    map.placeObject(site({-4, -1}, ObjType::Dwelling, "Hunters' Lodge", "cruth_slinger"));
+    auto s = started(std::move(map));
+    s.travel({-4, -1});
+    CHECK_EQ(s.owner({-4, -1}), (int)Faction::Player);
+    CHECK(s.town({-4, -1})->recruitPool.at("cruth_slinger") > 0);
+    CHECK(!s.recruit({-4, -1}, "cruth_slinger", 1));
+}
+
 SUITE("Sites — a guard's zone of control stops a hero walking past") {
     WorldMap map = sitesMap();
     map.placeObject(site({-4, -1}, ObjType::Guard, "Wolves"));
@@ -330,4 +340,94 @@ SUITE("Companions — auto-resolved battles field them and report who fell") {
     auto won = s.autoBattle({{"armoured_warrior", 60}}, {{"grey_wolf", 2}}, s.battleCompanions());
     CHECK(won.attackerWon);
     for (const auto& st : won.attacker) CHECK(st.id != "ushari");
+}
+
+namespace {
+
+const AdventureSession::Rival* band(const AdventureSession& s, const std::string& name) {
+    for (const auto& r : s.rivals()) if (r.name == name) return &r;
+    return nullptr;
+}
+
+// A weak band turns at the Keep, twelve hexes from the hero at Home, and the
+// days run until it attacks or the week ends. Returns true if it attacked.
+bool weakBandRides(AdventureSession& s, bool hunts) {
+    s.setArmy({{"levy_spearman", 40}});
+    CHECK(s.betray("Keep", "Sword Hunters", {{"levy_spearman", 4}}, hunts));
+    for (int day = 0; day < 7 && !s.pendingEncounter(); ++day) s.endDay();
+    return s.pendingEncounter().has_value();
+}
+
+} // namespace
+
+SUITE("Rivals — a hunting band rides down a stronger hero and attacks him") {
+    auto s = started();
+    const HexCoord hero = s.heroPos();
+    CHECK(weakBandRides(s, true));
+    CHECK(s.pendingIsAmbush());
+    const auto* r = band(s, "Sword Hunters");
+    CHECK(r && r->alive && r->goal == "hunt");
+    CHECK(r && r->pos == *s.pendingEncounter() && r->pos.distanceTo(hero) == 1);
+}
+
+SUITE("Rivals — a default band weaker than the hero raids instead of attacking") {
+    auto s = started();
+    CHECK(!weakBandRides(s, false));
+    const auto* r = band(s, "Sword Hunters");
+    CHECK(r && r->alive && r->goal != "ambush" && r->goal != "hunt");
+}
+
+SUITE("Rivals — a hunting band keeps hunting after save/load") {
+    const std::string mapPath = "/tmp/raids_test_hunt_map.json";
+    CHECK(!sitesMap().saveJson(mapPath));
+    AdventureSession s;
+    CHECK(!s.start(mapPath, "data"));
+    s.setArmy({{"levy_spearman", 40}});
+    CHECK(s.betray("Keep", "Sword Hunters", {{"levy_spearman", 4}}, true));
+    AdventureSession b;
+    CHECK(!b.loadState(Scenario::Json::parse(s.saveState().dump())));
+    CHECK(band(b, "Sword Hunters") && band(b, "Sword Hunters")->hunts);
+    for (int day = 0; day < 7 && !b.pendingEncounter(); ++day) b.endDay();
+    CHECK(b.pendingEncounter().has_value());
+}
+
+SUITE("Scenario — betray goal hunt and disband: the band leaves, no reward, its site stays taken") {
+    const std::string path = "/tmp/raids_test_disband.json";
+    { std::ofstream f(path); f << R"({"triggers":[
+        {"id":"turn","when":{"event":"day","day":2},"do":[{"betray":{"at":"Keep","band":"Sword Hunters","goal":"hunt",
+                                                    "army":[{"id":"levy_spearman","count":4}]}}]},
+        {"id":"beaten","when":{"event":"rival_beaten","name":"Sword Hunters"},"do":[{"flag":{"beaten":true}}]},
+        {"id":"hand_over","when":{"event":"day","day":4},"do":[{"disband":"Sword Hunters"}]}]})"; }
+    const std::string mapPath = "/tmp/raids_test_disband_map.json";
+    CHECK(!sitesMap().saveJson(mapPath));
+    AdventureSession s;
+    CHECK(!s.start(mapPath, "data", "", 0, path));
+    s.setArmy({{"levy_spearman", 40}});
+    s.endDay();                                         // day 2: the Keep turns
+    const auto* r = band(s, "Sword Hunters");
+    CHECK(r && r->alive && r->hunts);
+    CHECK_EQ(s.owner({6, 0}), (int)Faction::AI);
+    const int xp = s.heroProgress().xp;
+    s.endDay();
+    s.endDay();                                         // day 4: disbanded
+    r = band(s, "Sword Hunters");
+    CHECK(r && !r->alive);
+    CHECK(s.rivalAt(r->pos) == nullptr);
+    CHECK_EQ(s.owner({6, 0}), (int)Faction::AI);        // the Keep stays theirs
+    CHECK_EQ(s.heroProgress().xp, xp);
+    CHECK(!s.flags().contains("beaten"));
+    CHECK(!s.disband("Sword Hunters"));                 // nobody left of that name
+    AdventureSession b;
+    CHECK(!b.loadState(Scenario::Json::parse(s.saveState().dump())));
+    CHECK(band(b, "Sword Hunters") && !band(b, "Sword Hunters")->alive);
+    CHECK_EQ(b.owner({6, 0}), (int)Faction::AI);
+}
+
+SUITE("Rivals — disbanding a band calls off the ambush it has sprung") {
+    auto s = started();
+    CHECK(weakBandRides(s, true));
+    const HexCoord at = *s.pendingEncounter();
+    CHECK(s.disband("Sword Hunters"));
+    CHECK(!s.pendingEncounter());
+    CHECK(!s.isEncounter(at));
 }

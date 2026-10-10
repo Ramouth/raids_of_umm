@@ -20,6 +20,15 @@ public:
     // "tip_context" {map, shown}. The snapshot's "tip" is {id, speaker, text} in the
     // reply of the action that made a companion tip due (null otherwise; decided by
     // CombatTipWatch, never twice), and "battle"."tips" lists the ids shown so far.
+    // "exchanges" lists every tip due in this reply, in order (usually 0 or 1; "tip"
+    // is the first): {id, speaker, text, reply: [{speaker, text}], lines: the whole
+    // exchange in order [{speaker, text}], after_event: how many of the reply's
+    // events come before it}. A reply line whose speaker is not standing is dropped.
+    // Reckless stacks (units.json ability "reckless"): on such a player stack's turn
+    // the session plays it itself (CombatAI) right after the action before it, in
+    // the same reply (its events carry "auto": true); orders for it are refused.
+    // Units carry "reckless"; "auto_turn" is true (and "player_turn" false) only
+    // while one waits, which only a pending character choice can cause.
     Json start(const std::string& data_dir, const Json& army, const Json& encounter);
     // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
     // the enemy on (q, r) after walking to the standing hex (fq, fr).
@@ -51,6 +60,7 @@ private:
     Json reactions(HexCoord to) const;   // enemy shooters that would fire as the active stack walks to `to`
     Json movement_path(HexCoord from, HexCoord to, bool player, int index) const;
     Json response();
+    bool auto_turn() const;   // the active stack is the player's and reckless, and the battle is under way
     Json failure(const std::string& error) const;
     int fieldwork_stock() const { return barricades_ + stakes_; }
     std::unique_ptr<ResourceManager> resources_;
@@ -63,4 +73,5 @@ private:
     int64_t ticket_ = 0;
     CombatTipWatch tips_;
     Json tip_ = nullptr;   // the tip due after the last action
+    Json exchanges_ = Json::array();   // every tip due in the last reply, in order
 };

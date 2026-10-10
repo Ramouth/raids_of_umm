@@ -84,6 +84,9 @@ struct UnitType {
     bool isRanged()   const { return shots > 0; }
     bool isUndead()   const { return hasAbility("undead"); }
     bool isFlying()   const { return hasAbility("flying"); }
+    // "reckless": CombatAI plays its turns even in the player's army (it charges
+    // the nearest enemy, breaking obstacles in the way); see CombatAI::takeTurn.
+    bool isReckless() const { return hasAbility("reckless"); }
     bool isCompanion() const { return faction == "companion"; }
 
     int avgDamage() const { return (minDamage + maxDamage) / 2; }

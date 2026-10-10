@@ -194,13 +194,18 @@ func _mid_map_scene() -> void:
     check(Art.has_art("item.dog_tag") and load("res://scripts/scene_stills.gd").item_texture("dog_tag") != null, "The dog tag is also an item picture (item.dog_tag)")
     await process_frame   # the neutral backdrop is drawn without error
     check(scene.screens.top() == view, "An unknown scene id still shows its frame (neutral backdrop)")
+    check(view._continue.text == "Continue", "Aldren's line is still to come in the scene")
+    await _key(KEY_SPACE)
+    check(view.frame == 3 and view._speaker.text == "ALDREN" and view._words.text == "“Dogs don't fight like that.”",
+        "Aldren's line plays inside the scene, under its last picture: " + view._speaker.text + " " + view._words.text)
+    check(view._scene == "no_such_scene", "A spoken line keeps the picture before it")
+    check(not scene.dialogue.is_speaking(), "The line is not said twice on the map")
     check(view._continue.text == "Back to the map", "The last frame offers the way back to the map")
     view._continue.pressed.emit()
     await process_frame
     check(scene.screens.depth() == 0, "The scene closes after its last frame")
     check(scene.get_node("HUD").visible, "The map's HUD is back")
     check(scene.hero.cell == cell and int(scene.state.day) == day, "The map is as it was: same hex, same day")
-    check(scene.dialogue.is_speaking(), "Aldren speaks after the scene")
     check(not scene.is_showing_scene(), "No scene is left queued")
     _scene_checked = true
     scene.queue_free()
@@ -289,9 +294,9 @@ func _story_order() -> void:
         if not scene.is_playing_story(): break
     var expected: Array[String] = ["Aldren:Someone piled these stones with care.",
         "scene:Under the top stone, a cloak folded small.",
-        "Drest:Then it is ours now. Take it.",
+        "scene:“Then it is ours now. Take it.”",   # Drest's line plays inside the scene
         "Found:You found: Bearhide Cloak. Wear it from the Hero screen (H)."]
-    check(seen == expected, "The Old Cairn's story plays in order: line, scene, line, item (%s)" % [seen])
+    check(seen == expected, "The Old Cairn's story plays in order: line, scene with its line, item (%s)" % [seen])
     check(not scene.is_playing_story() and not scene.dialogue.is_speaking(), "Nothing is left queued")
     check("bearhide_cloak" in scene.state.get("items", []) and "Bearhide Cloak" in scene._army_label.text, "The cloak is carried, and the sidebar names it")
     _order_checked = true

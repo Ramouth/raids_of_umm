@@ -165,7 +165,7 @@ static void fight(AdventureSession& s) {
     std::vector<std::string> said;
     auto r=s.autoBattle(s.army(),enemy,s.battleCompanions(),s.armyBonus(),[&](const CombatEngine& e) {
         if(!tips) tips.emplace(&s.resources().combatTips(),s.campaignMap(),s.shownTips(),e);
-        if(const CombatTip* t=tips->check(e)) said.push_back(t->speaker+": "+t->text);
+        if(tips->check(e)) for(const auto& l:tips->lines()) said.push_back(l.speaker+": "+l.text);   // the tip, then its replies
     }, s.encounterAt(at) ? s.encounterAt(at)->layout : std::string("field"));   // the battlefield the game fights on
     if(tips) for(const auto& id:tips->shownHere()) s.markTipShown(id);
     s.setArmy(r.attacker);

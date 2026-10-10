@@ -14,6 +14,12 @@
       "title": "Camps on Your Fields",
       "text": "Companies from other houses have camped on your fields on their way east. Ride to each camp and decide: let them stay, take a toll, or turn them away.",
       "main": false
+    },
+    {
+      "id": "hunted",
+      "title": "Riders on Your Trail",
+      "text": "Riders have followed you out of the vale. Drest thinks they are after the sword.",
+      "main": false
     }
   ],
   "triggers": [
@@ -349,15 +355,44 @@
           }
         },
         {
-          "say": [
-            [
-              "Ushari",
-              "I am Ushari. That sword: the man who carried it rode past us going east, and would not take me with him."
-            ],
-            [
-              "Ushari",
-              "My people have gone on ahead. I ride with you."
-            ]
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "say": [
+                [
+                  "Ushari",
+                  "I am Ushari. A man with a red hand on his shield rode past us going east. The same hand is on your sword."
+                ],
+                [
+                  "Drest",
+                  "Aldren's shield."
+                ],
+                [
+                  "Ushari",
+                  "My people have gone on ahead. I ride with you."
+                ]
+              ]
+            }
+          ],
+          "else": [
+            {
+              "say": [
+                [
+                  "Ushari",
+                  "I am Ushari. A man with a red hand on his shield rode past us going east."
+                ],
+                [
+                  "Drest",
+                  "Aldren's shield."
+                ],
+                [
+                  "Ushari",
+                  "My people have gone on ahead. I ride with you."
+                ]
+              ]
+            }
           ]
         },
         {
@@ -381,107 +416,299 @@
       },
       "do": [
         {
-          "choice": {
-            "id": "camp_strangers",
-            "title": "Strangers' Camp",
-            "text": "",
-            "options": [
-              {
-                "id": "grant",
-                "label": "Let them stay",
-                "then": [
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "choice": {
+                "id": "camp_strangers",
+                "title": "Strangers' Camp",
+                "text": "Four riders camp by the burn, and offer to pay their way.",
+                "options": [
                   {
-                    "vanish": "Strangers' Camp"
-                  },
-                  {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
-                  },
-                  {
-                    "say": [
-                      [
-                        "Ushari",
-                        "Then I owe you. The others go on east in the morning. I ride with you."
-                      ]
+                    "id": "grant",
+                    "label": "Let them stay",
+                    "then": [
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Then I owe you. The others go on east in the morning. I ride with you."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
                     ]
                   },
                   {
-                    "join": "ushari"
-                  }
-                ]
-              },
-              {
-                "id": "tax",
-                "label": "Take a toll",
-                "then": [
-                  {
-                    "give": {
-                      "Gold": 150
-                    }
-                  },
-                  {
-                    "vanish": "Strangers' Camp"
-                  },
-                  {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
-                  },
-                  {
-                    "say": [
-                      [
-                        "Ushari",
-                        "Paid, then. The others go on ahead. I ride with you, and owe you nothing."
-                      ]
+                    "id": "tax",
+                    "label": "Take a toll",
+                    "then": [
+                      {
+                        "give": {
+                          "Gold": 150
+                        }
+                      },
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Paid, then. The others go on ahead. I ride with you, and owe you nothing."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
                     ]
                   },
                   {
-                    "join": "ushari"
-                  }
-                ]
-              },
-              {
-                "id": "turn_away",
-                "label": "Turn them away",
-                "then": [
-                  {
-                    "vanish": "Strangers' Camp"
-                  },
-                  {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
-                  },
-                  {
-                    "say": [
-                      [
-                        "Ushari",
-                        "Then the others go tonight. You are going where he went, and so am I."
-                      ]
+                    "id": "turn_away",
+                    "label": "Turn them away",
+                    "then": [
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Then the others go tonight. You are going where he went, and so am I."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
                     ]
-                  },
-                  {
-                    "join": "ushari"
                   }
+                ],
+                "presentation": "conversation",
+                "lines": [
+                  [
+                    "Ushari",
+                    "I am Ushari. A man with a red hand on his shield rode past us going east. The same hand is on your sword."
+                  ],
+                  [
+                    "Drest",
+                    "Aldren's shield."
+                  ]
                 ]
               }
-            ],
-            "presentation": "conversation",
-            "lines": [
-              [
-                "Ushari",
-                "I am Ushari. We are four, and we pay our way."
-              ],
-              [
-                "Ushari",
-                "That sword. The man who carried it rode past us going east, and would not let me ride with him."
+            }
+          ],
+          "else": [
+            {
+              "choice": {
+                "id": "camp_strangers",
+                "title": "Strangers' Camp",
+                "text": "Four riders camp by the burn, and offer to pay their way.",
+                "options": [
+                  {
+                    "id": "grant",
+                    "label": "Let them stay",
+                    "then": [
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Then I owe you. The others go on east in the morning. I ride with you."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "tax",
+                    "label": "Take a toll",
+                    "then": [
+                      {
+                        "give": {
+                          "Gold": 150
+                        }
+                      },
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Paid, then. The others go on ahead. I ride with you, and owe you nothing."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "turn_away",
+                    "label": "Turn them away",
+                    "then": [
+                      {
+                        "vanish": "Strangers' Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      },
+                      {
+                        "say": [
+                          [
+                            "Ushari",
+                            "Then the others go tonight. You are going where he went, and so am I."
+                          ]
+                        ]
+                      },
+                      {
+                        "join": "ushari"
+                      }
+                    ]
+                  }
+                ],
+                "presentation": "conversation",
+                "lines": [
+                  [
+                    "Ushari",
+                    "I am Ushari. A man with a red hand on his shield rode past us going east."
+                  ],
+                  [
+                    "Drest",
+                    "Aldren's shield."
+                  ]
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hunters",
+      "when": {
+        "event": "start"
+      },
+      "do": [
+        {
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "betray": {
+                "at": "Riders' Camp",
+                "band": "Sword Hunters",
+                "army": [
+                  {
+                    "id": "gododdin_rider",
+                    "count": 3
+                  },
+                  {
+                    "id": "cruth_slinger",
+                    "count": 6
+                  },
+                  {
+                    "id": "woad_runner",
+                    "count": 10
+                  }
+                ],
+                "goal": "hunt"
+              }
+            },
+            {
+              "vanish": "Riders' Camp"
+            },
+            {
+              "quest": "hunted"
+            },
+            {
+              "say": [
+                [
+                  "Drest",
+                  "Riders on our trail since the vale. Keep that sword close, boy."
+                ]
               ]
-            ]
+            }
+          ],
+          "else": [
+            {
+              "vanish": "Riders' Camp"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hunters_broken",
+      "when": {
+        "event": "rival_beaten",
+        "name": "Sword Hunters"
+      },
+      "do": [
+        {
+          "quest_done": "hunted"
+        },
+        {
+          "give": {
+            "Gold": 400
           }
+        },
+        {
+          "say": [
+            [
+              "Drest",
+              "They knew what they came for. There will be more."
+            ]
+          ]
         }
       ]
     },
@@ -493,95 +720,227 @@
       },
       "do": [
         {
-          "choice": {
-            "id": "red_banner",
-            "title": "The Red Banner",
-            "text": "A red hand is painted on their banner, and on every shield.",
-            "options": [
-              {
-                "id": "let_pass",
-                "label": "Let them pass",
-                "then": [
+          "if": {
+            "item": "red_hand_sword"
+          },
+          "then": [
+            {
+              "choice": {
+                "id": "red_banner",
+                "title": "The Red Banner",
+                "text": "A red hand is painted on their banner, and on every shield.",
+                "options": [
                   {
-                    "vanish": "Red Banner Camp"
+                    "id": "let_pass",
+                    "label": "Let them pass",
+                    "then": [
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ]
                   },
                   {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
-                  }
-                ]
-              },
-              {
-                "id": "make_pay",
-                "label": "Make them pay",
-                "then": [
-                  {
-                    "give": {
-                      "Gold": 600
-                    }
-                  },
-                  {
-                    "vanish": "Red Banner Camp"
-                  },
-                  {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
-                  }
-                ]
-              },
-              {
-                "id": "drive_off",
-                "label": "Drive them off",
-                "then": [
-                  {
-                    "betray": {
-                      "at": "Red Banner Camp",
-                      "band": "Red Banner Company",
-                      "army": [
-                        {
-                          "id": "woad_runner",
-                          "count": 16
-                        },
-                        {
-                          "id": "cruth_slinger",
-                          "count": 6
-                        },
-                        {
-                          "id": "painted_blade",
-                          "count": 3
+                    "id": "make_pay",
+                    "label": "Make them pay",
+                    "then": [
+                      {
+                        "give": {
+                          "Gold": 600
                         }
-                      ]
-                    }
+                      },
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ]
                   },
                   {
-                    "vanish": "Red Banner Camp"
+                    "id": "hand_over",
+                    "label": "Hand over the sword",
+                    "if": {
+                      "item": "red_hand_sword"
+                    },
+                    "then": [
+                      {
+                        "take_item": "red_hand_sword"
+                      },
+                      {
+                        "disband": "Sword Hunters"
+                      },
+                      {
+                        "quest_done": "hunted"
+                      },
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ],
+                    "detail": "They give up the bridge for it."
                   },
                   {
-                    "xp": 35
-                  },
-                  {
-                    "event": "camp_decided"
+                    "id": "drive_off",
+                    "label": "Drive them off",
+                    "then": [
+                      {
+                        "betray": {
+                          "at": "Red Banner Camp",
+                          "band": "Red Banner Company",
+                          "army": [
+                            {
+                              "id": "woad_runner",
+                              "count": 16
+                            },
+                            {
+                              "id": "cruth_slinger",
+                              "count": 6
+                            },
+                            {
+                              "id": "painted_blade",
+                              "count": 3
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ],
+                    "detail": "They will fight for the bridge."
                   }
                 ],
-                "detail": "They will fight for the bridge."
+                "presentation": "conversation",
+                "lines": [
+                  [
+                    "Captain",
+                    "We hold your bridge tonight, and we take what we need from your fields. You may watch."
+                  ],
+                  [
+                    "Drest",
+                    "Look at their shields, boy. That is the hand on your sword."
+                  ],
+                  [
+                    "Captain",
+                    "That hand is not yours to carry."
+                  ]
+                ]
               }
-            ],
-            "presentation": "conversation",
-            "lines": [
-              [
-                "Captain",
-                "We hold your bridge tonight, and we take what we need from your fields. You may watch."
-              ],
-              [
-                "Drest",
-                "Look at their shields, boy. That is the hand on your sword."
-              ]
-            ]
-          }
+            }
+          ],
+          "else": [
+            {
+              "choice": {
+                "id": "red_banner",
+                "title": "The Red Banner",
+                "text": "A red hand is painted on their banner, and on every shield.",
+                "options": [
+                  {
+                    "id": "let_pass",
+                    "label": "Let them pass",
+                    "then": [
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "make_pay",
+                    "label": "Make them pay",
+                    "then": [
+                      {
+                        "give": {
+                          "Gold": 600
+                        }
+                      },
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "drive_off",
+                    "label": "Drive them off",
+                    "then": [
+                      {
+                        "betray": {
+                          "at": "Red Banner Camp",
+                          "band": "Red Banner Company",
+                          "army": [
+                            {
+                              "id": "woad_runner",
+                              "count": 16
+                            },
+                            {
+                              "id": "cruth_slinger",
+                              "count": 6
+                            },
+                            {
+                              "id": "painted_blade",
+                              "count": 3
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "vanish": "Red Banner Camp"
+                      },
+                      {
+                        "xp": 35
+                      },
+                      {
+                        "event": "camp_decided"
+                      }
+                    ],
+                    "detail": "They will fight for the bridge."
+                  }
+                ],
+                "presentation": "conversation",
+                "lines": [
+                  [
+                    "Captain",
+                    "We hold your bridge tonight, and we take what we need from your fields. You may watch."
+                  ],
+                  [
+                    "Drest",
+                    "Look at their shields, boy. That is the hand on the sword Aldren left."
+                  ]
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -644,6 +1003,39 @@
       "do": [
         {
           "quest_done": "camps"
+        }
+      ]
+    },
+    {
+      "id": "ushari_roots",
+      "when": {
+        "event": "enter_q",
+        "q_min": 16,
+        "after": "red_banner"
+      },
+      "if": {
+        "all": [
+          {
+            "companion": "ushari"
+          },
+          {
+            "item": "red_hand_sword"
+          }
+        ]
+      },
+      "do": [
+        {
+          "say": [
+            [
+              "Ushari",
+              "He asked me the way to the roots."
+            ]
+          ]
+        },
+        {
+          "flag": {
+            "ushari_roots": true
+          }
         }
       ]
     },

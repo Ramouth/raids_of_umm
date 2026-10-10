@@ -239,7 +239,10 @@ void CombatEngine::resolveObstacleAttack(HexCoord cell) {
     m_events.push_back(hit);
     std::cout << "[CombatEngine] " << attacker.type->name << (ranged ? " shoots" : " strikes") << " the "
               << it->kind << " for " << damage << " (" << it->hp << " hp left)\n";
-    if (it->hp == 0) m_obstacles.erase(it);
+    if (it->hp == 0) {
+        m_thisTurn.broken.push_back(*it);
+        m_obstacles.erase(it);
+    }
     advance();
 }
 
@@ -1209,6 +1212,7 @@ bool CombatEngine::arrive(HexCoord to, const std::vector<HexCoord>& path) {
     ev.path       = path.empty() ? walkTo(actor, to) : path;   // routed around the stacks as they stand now
     m_events.push_back(ev);
     actor.pos = to;
+    m_thisTurn.moved = true;
     refreshAuras();
 
     for (int i : ready) {
@@ -1408,6 +1412,15 @@ bool CombatEngine::setOpeningOrder(const std::vector<int>& playerStacks, int lim
 
 void CombatEngine::advance() {
     if (isOver()) return;
+    {   // the record of the turn that ends here (the winning blow's too)
+        const auto& slot = currentTurn();
+        m_thisTurn.serial     = m_lastTurn.serial + 1;
+        m_thisTurn.isPlayer   = slot.isPlayer;
+        m_thisTurn.stackIndex = slot.stackIndex;
+        m_thisTurn.mad        = (slot.isPlayer ? m_player : m_enemy).stacks[slot.stackIndex].mad;
+        m_lastTurn = std::move(m_thisTurn);
+        m_thisTurn = TurnRecord{};
+    }
 
     checkWinCondition();
     if (isOver()) return;

@@ -536,7 +536,7 @@ std::string AdventureSession::collect(const HexCoord& cell, bool gold) {
 }
 
 bool AdventureSession::betray(const std::string& objectName, const std::string& bandName,
-                              const std::vector<Stack>& army) {
+                              const std::vector<Stack>& army, bool hunts) {
     const MapObjectDef* obj = nullptr;
     for (const auto& o : m_map.objects()) if (o.name == objectName) { obj = &o; break; }
     if (!obj) return false;
@@ -560,9 +560,22 @@ bool AdventureSession::betray(const std::string& objectName, const std::string& 
     r.home = obj->pos;
     r.army = army;
     r.startPower = power(r.army);
+    r.hunts = hunts;
     m_rivals.push_back(r);
     recomputeVisibility();
     return true;
+}
+
+bool AdventureSession::disband(const std::string& bandName) {
+    bool gone = false;
+    for (auto& r : m_rivals) {
+        if (!r.alive || r.name != bandName) continue;
+        r.alive = false;
+        gone = true;
+        if (m_pending == r.pos && !isEncounter(r.pos)) cancelEncounter();   // nobody left to fight there
+    }
+    if (gone) recomputeVisibility();
+    return gone;
 }
 
 int AdventureSession::turncoats(const std::string& unitId, const std::string& bandName) {
@@ -1023,6 +1036,8 @@ void AdventureSession::ensureBuildings(const HexCoord& c) {
 }
 
 bool AdventureSession::canRecruitHere(const HexCoord& c, const std::string& unitId) const {
+    if (const MapObjectDef* obj = m_map.objectAt(c); obj && obj->type == ObjType::Dwelling)
+        return obj->kind == unitId;               // a map dwelling is its own building
     const BuildingDef* dwelling = m_resources->dwellingFor(unitId);
     if (!dwelling) return true;
     const TownState* t = town(c);

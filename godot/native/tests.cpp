@@ -433,6 +433,75 @@ int main(int argc, char** argv) {
             AdventureBridge reloaded;
             check(reloaded.load(save)["tip_context"] == camp.snapshot()["tip_context"], "Shown tips and the map survive a save");
         }
+        {   // Banter and reckless companions: a units.json "reckless" stack (Aldren) is played by the
+            // session itself on its turns, in the reply of the action before (events "auto": true),
+            // while the player still places him; "exchanges" carries the tip and its reply in order.
+            const std::filesystem::path dir = std::filesystem::temp_directory_path() / "umm_bridge_reckless";
+            std::filesystem::create_directories(dir);
+            for (const auto& entry : std::filesystem::directory_iterator(data))
+                if (entry.is_regular_file())
+                    std::filesystem::copy_file(entry.path(), dir / entry.path().filename(), std::filesystem::copy_options::overwrite_existing);
+            Json units = Json::parse(std::ifstream(dir / "units.json"));
+            for (auto& u : units["units"]) if (u["id"] == "aldren") u["abilities"].push_back("reckless");
+            std::ofstream(dir / "units.json") << units.dump();
+            std::ofstream(dir / "combat_tips.json") << R"({"tips": [
+                {"id": "b_rush", "when": "rushes", "actor": "aldren", "repeat": "battle", "speaker": "Drest",
+                 "text": "Stay back behind the lines!", "maps": ["1.0"],
+                 "reply": [{"speaker": "Aldren", "text": "Then keep up, old man."}, {"speaker": "Kharim", "text": "Absent."}]}]})";
+            CombatSession combat;
+            auto reply = combat.start(dir.string(), Json::array({{{"id", "woad_runner"}, {"count", 20}},
+                                          {{"id", "drest"}, {"level", 1}, {"companion", true}},
+                                          {{"id", "aldren"}, {"level", 1}, {"companion", true}}}),
+                                      {{"guards", {{{"id", "levy_spearman"}, {"count", 6}}}}, {"seed", 4},
+                                       {"tips", {{"map", "1.0"}, {"shown", Json::array()}}}});
+            check(reply.at("ok"), "Reckless battle starts");
+            std::string aldren;
+            Json at;
+            for (const auto& u : reply["state"]["units"])
+                if (u["id"] == "aldren") { aldren = u["key"]; at = u["cell"]; check(u["reckless"] == true, "Aldren is reckless"); }
+                else check(u["reckless"] == false, "Other stacks are not reckless");
+            // Deployment: the player still places him.
+            Json free = nullptr;
+            for (const auto& cell : reply["state"]["deploy_zone"]) {
+                bool taken = false;
+                for (const auto& u : reply["state"]["units"]) taken |= u["cell"] == cell;
+                if (!taken) { free = cell; break; }
+            }
+            check(!free.is_null(), "A free deployment hex");
+            combat.acknowledge(reply["ticket"]);
+            reply = combat.command("place_unit", free[0], free[1], at[0], at[1]);
+            bool placed = false;
+            for (const auto& u : reply["state"]["units"]) placed |= u["key"] == aldren && u["cell"] == free;
+            check(reply.at("ok") && placed, "A reckless companion is placed like any stack");
+            combat.acknowledge(reply["ticket"]);
+            reply = combat.command("deploy_done");
+            int charges = 0, rushes = 0;
+            for (int turn = 0; turn < 300; ++turn) {
+                check(reply.at("ok"), "Every order of the reckless battle is accepted");
+                const Json& state = reply["state"];
+                for (const auto& e : reply["events"])
+                    if (e["unit"] == aldren && (e["type"] == "move" || e["type"] == "obstacle_attack"
+                        || (e["type"] == "attack" && !e["retaliation"] && !e["reaction"] && !e["opportunity"]))) {
+                        check(e["auto"] == true, "Aldren's own moves and blows are the session's, never the player's");
+                        ++charges;
+                    }
+                for (const auto& x : state["exchanges"])
+                    if (x["id"] == "b_rush") {
+                        ++rushes;
+                        check(x["lines"].size() == 2 && x["lines"][0]["speaker"] == "Drest"
+                              && x["lines"][1] == Json({{"speaker", "Aldren"}, {"text", "Then keep up, old man."}})
+                              && x["reply"].size() == 1 && x["after_event"].get<size_t>() <= reply["events"].size(),
+                              "The exchange: Drest, then Aldren; the absent Kharim's reply is dropped");
+                    }
+                if (state["result"] != "ongoing") break;
+                check(!(state["active"] == aldren && state["player_turn"] == true), "Aldren never waits for the player's orders");
+                combat.acknowledge(reply["ticket"]);
+                reply = combat.command(state["player_turn"] == true ? "defend" : "ai");   // the player holds everyone back
+            }
+            check(charges > 0, "Aldren charged on his own while the player held the line");
+            check(rushes == 1, "Drest shouts once in the battle when Aldren rushes ahead (repeat: battle)");
+            check(reply["state"]["tip"].is_null() || reply["state"]["tip"].is_object(), "tip stays the first exchange");
+        }
         if (argc == 3) {   // demo_bot's campaign mode plays a fixture campaign from its story data alone
             const std::string dir = (std::filesystem::temp_directory_path() / "umm_bot_campaign").string();
             std::filesystem::create_directories(dir);

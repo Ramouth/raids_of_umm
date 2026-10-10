@@ -3800,6 +3800,12 @@
       "r": -8,
       "type": "guard",
       "name": "Northern Warrior"
+    },
+    {
+      "q": -14,
+      "r": 9,
+      "type": "quest_giver",
+      "name": "Riders' Camp"
     }
   ]
 }

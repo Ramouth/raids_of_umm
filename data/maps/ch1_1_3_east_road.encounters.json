@@ -52,6 +52,25 @@
           "count": 1
         }
       ]
+    },
+    "Sword Hunters": {
+      "guards": [
+        {
+          "id": "gododdin_rider",
+          "count": 4
+        },
+        {
+          "id": "painted_blade",
+          "count": 4
+        },
+        {
+          "id": "cruth_slinger",
+          "count": 6
+        }
+      ],
+      "reward": {
+        "Gold": 500
+      }
     }
   },
   "pickups": {

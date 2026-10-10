@@ -74,6 +74,20 @@ var tip_text: Label
 ## The tip shown in this battle, by id ("" when none yet).
 var tip_shown := ""
 var _tip_serial := 0           # stale auto-hide timers check this
+## Banter: the reply's state.exchanges ({id, lines: [{speaker, text}], after_event})
+## play line by line as speech bubbles over the speaker's stack, after the
+## animation of event `after_event`; the tip panel and the log carry them too.
+## The bubble now on screen (null when none) and every line spoken this battle,
+## in order ({id, speaker, text, on_board}).
+var speech_bubble: Control
+var spoken: Array = []
+## Reckless stacks (units "reckless": Aldren) take their own turns inside the
+## reply of the action before (events "auto": true); the screen plays them as
+## his charge and refuses orders for him.
+const RECKLESS_RULE := "Charges on his own: on his turns he picks his own fight and takes no orders. You still place him before the battle."
+const CHARGE := Color("ffb347")
+## Where the rules data lives (a smoke test points this at a fixture copy).
+var data_dir := "res://content/data"
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_STOP
@@ -273,7 +287,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         _log("Native combat is missing. Run scripts/build_godot_combat.sh and restart Godot.")
         return false
     bridge = ClassDB.instantiate("UmmCombat")
-    var reply := _decode_reply(bridge.begin_battle(ProjectSettings.globalize_path("res://content/data"), JSON.stringify(army), JSON.stringify(encounter)))
+    var reply := _decode_reply(bridge.begin_battle(ProjectSettings.globalize_path(data_dir),JSON.stringify(army), JSON.stringify(encounter)))
     if not reply.get("ok", false):
         _log(str(reply.get("error", "Could not start combat.")))
         return false
@@ -287,6 +301,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
 
 func issue(action: String, cell := Vector2i.ZERO, from := Vector2i.ZERO) -> bool:
     if busy or state.is_empty() or state.result != "ongoing": return false
+    if _reckless_turn() and action in ["move", "attack", "strike", "defend", "curse"]: return _refuse_reckless()
     var raw: String = bridge.strike(cell.x, cell.y, from.x, from.y) if action == "strike" else bridge.act(action, cell.x, cell.y)
     var reply := _decode_reply(raw)
     if not reply.get("ok", false):
@@ -299,6 +314,7 @@ func issue(action: String, cell := Vector2i.ZERO, from := Vector2i.ZERO) -> bool
 ## Walk a chosen route; "strike" then attacks the enemy on `cell` from its end.
 func issue_route(action: String, route: Array, cell := Vector2i.ZERO) -> bool:
     if busy or state.is_empty() or state.result != "ongoing": return false
+    if _reckless_turn(): return _refuse_reckless()
     var reply := _decode_reply(bridge.route(action, JSON.stringify(route), cell.x, cell.y))
     if not reply.get("ok", false):
         _log(str(reply.get("error", "Route rejected.")), FOE)
@@ -350,7 +366,20 @@ func _consume(reply: Dictionary) -> void:
     _refresh()
     var strike := {}   # the attack event whose damage comes next
     _mad_key = str(state.get("active", "")) if state.get("mad_turn", false) else ""
-    for event in reply.events:
+    var exchanges := _due_exchanges(reply)
+    var said := 0           # exchanges played so far
+    var charging := ""      # the reckless stack whose own turn is playing ("" when none)
+    var events: Array = reply.events
+    for index in events.size():
+        var event: Dictionary = events[index]
+        while said < exchanges.size() and int(exchanges[said].get("after_event", events.size())) <= index:
+            await _play_exchange(exchanges[said])
+            said += 1
+        if event.get("auto", false) and charging.is_empty():
+            charging = await _announce_charge(event)
+        elif not event.get("auto", false) and not charging.is_empty():
+            charging = ""
+            board.highlight_key = ""
         match event.type:
             "bitten":
                 var cure := (" " + CURE_RULE + ".") if units.has(event.unit) and units[event.unit].player else ""
@@ -367,6 +396,10 @@ func _consume(reply: Dictionary) -> void:
             "move": _log("%s moves." % _unit_label(event.unit), DIM, event.unit)
             "defend": _log("%s defends: +25%% defence until its next turn (the stance carries into the next round)." % _unit_label(event.unit), DIM, event.unit)
         await board.animate(event, animation_speed)
+    while said < exchanges.size():
+        await _play_exchange(exchanges[said])
+        said += 1
+    if not charging.is_empty(): board.highlight_key = ""
     _set_state(reply.state)
     board.sync(state)
     if not _deploying(): _place_key = ""
@@ -383,9 +416,7 @@ func _consume(reply: Dictionary) -> void:
         auto_battle = false
         auto_button.set_pressed_no_signal(false)
         _show_result()
-        _show_due_tip()
     else:
-        _show_due_tip()
         _schedule_ai()
 
 func _log_damage(event: Dictionary, strike: Dictionary) -> void:
@@ -461,7 +492,8 @@ func _companion_warnings() -> String:
     return "[color=#%s]⚠ %s.[/color]" % [Board.DANGER_COLOR.to_html(false), "; ".join(lines)]
 
 func _refresh() -> void:
-    board.locked = busy or auto_battle or _opening() > 0 or _deploying()   # no move range while orders are given
+    # No move range while orders are given, nor on a reckless stack's own turn.
+    board.locked = busy or auto_battle or _opening() > 0 or _deploying() or _reckless_turn()
     board.queue_redraw()
     var ongoing: bool = state.get("result", "") == "ongoing"
     if ongoing:
@@ -477,12 +509,15 @@ func _refresh() -> void:
         elif state.get("mad_turn", false):
             turn_label.text = "ROUND %d   ·   %s HAS GONE MAD" % [state.get("round", 1), _unit_label(state.get("active", "")).to_upper()]
             turn_label.add_theme_color_override("font_color", MAD)
+        elif _reckless_turn():
+            turn_label.text = "ROUND %d   ·   %s CHARGES ON HIS OWN" % [state.get("round", 1), _unit_name(state.get("active", "")).to_upper()]
+            turn_label.add_theme_color_override("font_color", CHARGE)
         else:
             turn_label.text = "ROUND %d   ·   %s   ·   %s" % [state.get("round", 1), _unit_label(state.get("active", "")), whose]
             turn_label.add_theme_color_override("font_color", FRIEND if player_turn else FOE)
     var caster: Dictionary = units.get(state.get("active", ""), {})
     curse_button.visible = ongoing and "binding_thread" in caster.get("abilities", []) and _opening() == 0 and not _deploying()
-    curse_button.disabled = busy or auto_battle or not state.get("player_turn", false) or caster.get("engaged", false) or state.get("curse_targets", []).is_empty()
+    curse_button.disabled = busy or auto_battle or not state.get("player_turn", false) or _reckless_turn() or caster.get("engaged", false) or state.get("curse_targets", []).is_empty()
     curse_button.text = "Cancel Binding Thread · Esc" if _curse_mode else "Binding Thread · C"
     curse_button.tooltip_text = "Range: 4 hexes. Roll d6, succeeds on 3+. Weakens attacks for two turns. At level 3 it also slows. Replaces your attack; adjacent enemies prevent casting."
     inspection.size.y = 212 if curse_button.visible else 262
@@ -490,7 +525,7 @@ func _refresh() -> void:
     if curse_button.disabled: _curse_mode = false
     board.curse_mode = _curse_mode
     _build_initiative()
-    defend.disabled = busy or auto_battle or not state.get("player_turn", false) or not ongoing
+    defend.disabled = busy or auto_battle or not state.get("player_turn", false) or not ongoing or _reckless_turn()
     begin_button.visible = (_opening() > 0 or _deploying()) and ongoing
     var choosing := _opening() > 0 and not _deploying() and ongoing
     _marshal_panel.visible = choosing
@@ -567,6 +602,7 @@ func _portrait(key: String, active: bool, upcoming := false, place := 1) -> Cont
     frame.custom_minimum_size = Vector2(62, 70)
     frame.tooltip_text = "%s ×%d · %s · Speed %d + d6 %d = initiative %d" % [unit.name, unit.count, "yours" if unit.player else "enemy", unit.speed, int(unit.get("initiative_roll", 0)), int(unit.get("initiative_score", unit.speed))]
     if unit.get("bitten", false): frame.tooltip_text += "\nBITTEN (rabies): " + BITE_RULE + "."
+    if unit.get("reckless", false): frame.tooltip_text += "\nRECKLESS: " + RECKLESS_RULE
     var style := StyleBoxFlat.new()
     style.bg_color = Color("26372c") if unit.player else Color("3f2320")
     style.border_color = GOLD if active else (FRIEND if unit.player else FOE)
@@ -702,6 +738,8 @@ func _inspect(unit: Dictionary) -> void:
         lines.append("[color=#%s][b]MAD[/b] this turn: takes no orders and attacks the nearest stack, friend or foe[/color]" % MAD.to_html(false))
     if unit.get("bitten", false):
         lines.append("[color=#%s][b]BITTEN[/b] (rabies): %s. %s.[/color]" % [MAD.to_html(false), BITE_RULE, CURE_RULE])
+    if unit.get("reckless", false):
+        lines.append("[color=#%s][b]Reckless[/b] · %s[/color]" % [CHARGE.to_html(false), RECKLESS_RULE])
     if "rabid" in unit.get("abilities", []):
         lines.append("[color=#%s]Rabid: 1 bite in 10 that lands infects the stack it hits[/color]" % MAD.to_html(false))
     if unit.defending: notes.append("DEFENDING: +25% defence until its next turn")
@@ -912,7 +950,7 @@ func _update_status() -> void:
     var kind := ""
     var label := ""
     var ongoing: bool = state.get("result", "") == "ongoing"
-    var my_turn: bool = ongoing and not busy and not auto_battle and state.get("player_turn", false) and not _deploying() and _opening() == 0
+    var my_turn: bool = ongoing and not busy and not auto_battle and state.get("player_turn", false) and not _deploying() and _opening() == 0 and not _reckless_turn()
     var deploy_ui: bool = ongoing and not busy and not auto_battle and _deploying()
     var unit := _unit_at(_hover_cell)
     var active: Dictionary = units.get(state.get("active", ""), {})
@@ -929,6 +967,7 @@ func _update_status() -> void:
             _opening(), "" if _opening() == 1 else "s", (" → ".join(chosen)) if not chosen.is_empty() else "none: usual order"]
     elif not my_turn:
         if state.get("mad_turn", false) and not busy: text = "[color=#%s]%s is mad (rabid bite): it attacks the nearest stack, friend or foe.[/color]" % [MAD.to_html(false), _unit_label(state.get("active", ""))]
+        elif _reckless_turn() and not busy: text = "[color=#%s]%s charges on his own: he picks his own fight and takes no orders.[/color]" % [CHARGE.to_html(false), _unit_name(state.get("active", ""))]
         elif auto_battle: text = "Auto-battle: the AI commands your stacks. Untick Auto-battle to take over."
         elif busy: text = "Resolving…"
         else: text = "Enemy turn — %s is deciding." % _unit_label(state.get("active", ""))
@@ -1223,6 +1262,9 @@ func _cell_clicked(cell: Vector2i) -> void:
     if _opening() > 0:
         if not busy: _toggle_order(coordinates)
         return
+    if not busy and not auto_battle and _reckless_turn():
+        _refuse_reckless()
+        return
     if busy or auto_battle or not state.get("player_turn", false): return
     if _curse_mode:
         if coordinates in state.get("curse_targets", []): issue("curse", cell)
@@ -1462,25 +1504,193 @@ func _build_tip_panel() -> void:
     tip_text.reparent(tip_panel, false)
     tip_panel.hide()
 
-## The tip the engine made due with this reply (state.tip), if any.
-func _show_due_tip() -> void:
-    if state.get("tip") is Dictionary and not state.tip.is_empty(): show_tip(state.tip)
+## The exchanges due in this reply, in order: state.exchanges, or (an older
+## bridge) state.tip shown after the reply's last event.
+func _due_exchanges(reply: Dictionary) -> Array:
+    var next: Dictionary = reply.get("state", {})
+    var out: Array = []
+    if next.get("exchanges") is Array:
+        for exchange in next.exchanges:
+            if exchange is Dictionary and not exchange.is_empty(): out.append(exchange)
+        return out
+    if next.get("tip") is Dictionary and not next.tip.is_empty():
+        var tip: Dictionary = next.tip.duplicate()
+        tip["after_event"] = reply.get("events", []).size()
+        out.append(tip)
+    return out
 
+## Shows one tip or exchange now (all its lines, in order).
 func show_tip(tip: Dictionary) -> void:
-    var speaker := str(tip.get("speaker", ""))
-    tip_shown = str(tip.get("id", ""))
+    await _play_exchange(tip)
+
+## Plays an exchange line by line: a speech bubble over the speaker's stack, the
+## tip panel (portrait, name, line) and the log ("Drest: “…”"). Each line but the
+## last holds the battle for a readable pause; the last stays up while it goes on.
+## A click on the panel skips the rest (still logged).
+func _play_exchange(exchange: Dictionary) -> void:
+    var lines: Array = exchange.get("lines", [])
+    if lines.is_empty():
+        lines = [{"speaker": exchange.get("speaker", ""), "text": exchange.get("text", "")}]
+        lines.append_array(exchange.get("reply", []))
+    tip_shown = str(exchange.get("id", ""))
+    _tip_serial += 1
+    var serial := _tip_serial
+    var words := 0
+    for index in lines.size():
+        var line: Dictionary = lines[index]
+        var speaker := str(line.get("speaker", ""))
+        var text := str(line.get("text", ""))
+        words += text.split(" ", false).size()
+        _log("%s: “%s”" % [speaker, text], GOLD)
+        if serial != _tip_serial:   # dismissed: the rest goes to the log only
+            spoken.append({"id": tip_shown, "speaker": speaker, "text": text, "on_board": false, "skipped": true})
+            continue
+        _show_line_in_panel(speaker, text)
+        var bubble := _speech_bubble(speaker, text)
+        spoken.append({"id": tip_shown, "speaker": speaker, "text": text, "on_board": bubble.get_parent() != self})
+        var seconds := _line_seconds(text)
+        if index < lines.size() - 1:
+            await get_tree().create_timer(seconds).timeout
+            if serial != _tip_serial and is_instance_valid(bubble): bubble.queue_free()
+        else:
+            _fade_bubble_later(bubble, seconds)
+    if serial == _tip_serial: _hide_tip_later(serial, words)
+
+## How long one line stays readable (scaled like the animations).
+func _line_seconds(text: String) -> float:
+    return clampf(1.2 + text.split(" ", false).size() * 0.3, 1.8, 4.5) * animation_speed
+
+func _show_line_in_panel(speaker: String, text: String) -> void:
     var portrait := "portrait." + speaker.to_lower().replace(" ", "_")
     tip_portrait.texture = Art.texture(portrait if Art.has_art(portrait) else "portrait.default")
     tip_speaker.text = speaker.to_upper()
-    tip_text.text = "“%s”" % str(tip.get("text", ""))
+    tip_text.text = "“%s”" % text
     tip_panel.show()
-    _log("%s: “%s”" % [speaker, str(tip.get("text", ""))], GOLD)
-    _tip_serial += 1
-    var serial := _tip_serial
-    var words := str(tip.get("text", "")).split(" ", false).size()
+
+func _hide_tip_later(serial: int, words: int) -> void:
     await get_tree().create_timer(clampf(4.0 + words * 0.35, 7.0, 14.0)).timeout
     if serial == _tip_serial: dismiss_tip()
 
 func dismiss_tip() -> void:
     _tip_serial += 1
     tip_panel.hide()
+    if is_instance_valid(speech_bubble): speech_bubble.queue_free()
+
+## The standing stack a speaker ("Drest") is on the board, or "".
+func _speaker_key(speaker: String) -> String:
+    var found := ""
+    for unit in state.get("units", []):
+        if int(unit.count) <= 0: continue
+        if str(unit.name) == speaker or str(unit.id) == speaker.to_lower():
+            if unit.player: return unit.key
+            if found.is_empty(): found = unit.key
+    return found
+
+## A speech bubble over the speaker's stack (it follows the stack as it moves);
+## off the board (not fighting, or fallen) it sits at the top of the field.
+func _speech_bubble(speaker: String, text: String) -> Control:
+    if is_instance_valid(speech_bubble): speech_bubble.queue_free()
+    var key := _speaker_key(speaker)
+    var actor: Node2D = board.actors.get(key) if not key.is_empty() else null
+    var on_board: bool = actor != null and actor.visible
+    var bubble := Panel.new()
+    bubble.name = "SpeechBubble"
+    bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    bubble.z_index = 40
+    var style := StyleBoxFlat.new()
+    style.bg_color = Color("1d1810", 0.95)
+    style.border_color = GOLD if on_board and units.get(key, {}).get("player", true) else (DIM if not on_board else FOE)
+    style.set_border_width_all(2)
+    bubble.add_theme_stylebox_override("panel", style)
+    if on_board: actor.add_child(bubble)
+    else: add_child(bubble)
+    var name_label := Label.new()
+    name_label.name = "Speaker"
+    name_label.text = speaker.to_upper()
+    name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    name_label.add_theme_font_size_override("font_size", 12)
+    name_label.add_theme_color_override("font_color", GOLD)
+    bubble.add_child(name_label)
+    var line := Label.new()
+    line.name = "Line"
+    line.text = text
+    line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    line.add_theme_font_size_override("font_size", 15)
+    line.add_theme_color_override("font_color", TEXT)
+    bubble.add_child(line)
+    var font: Font = line.get_theme_font("font")
+    var width := clampf(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x + 4.0, 60.0, 280.0)
+    var rows := maxi(1, roundi(font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, width - 4.0, 15).y / font.get_height(15)))
+    var height := rows * (font.get_height(15) + 1.0) + 4.0   # the label's own line height, plus room
+    width = maxf(width, font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 4.0)
+    name_label.position = Vector2(8, 4)
+    name_label.size = Vector2(width, 16)
+    line.position = Vector2(8, 20)
+    line.size = Vector2(width, height)
+    bubble.size = Vector2(width + 16, height + 26)
+    if not on_board:
+        bubble.position = Vector2(40, 196)
+    else:
+        # Above the head (below it on the top row), kept inside the field.
+        var above := actor.position.y - 62.0 - bubble.size.y >= -8.0
+        var x := clampf(-bubble.size.x / 2.0, 4.0 - actor.position.x, board.size.x - 4.0 - bubble.size.x - actor.position.x)
+        bubble.position = Vector2(x, -62.0 - bubble.size.y if above else 50.0)
+        var tail := Polygon2D.new()
+        tail.name = "Tail"
+        var tip := Vector2(0, -54) if above else Vector2(0, 40)
+        var root_x := clampf(0.0, bubble.position.x + 12.0, bubble.position.x + bubble.size.x - 12.0)
+        var edge := bubble.position.y + (bubble.size.y - 1.0 if above else 1.0)
+        var origin := bubble.position   # actor-local points into the bubble's own space
+        tail.polygon = PackedVector2Array([Vector2(root_x - 7, edge) - origin, Vector2(root_x + 7, edge) - origin, tip - origin])
+        tail.color = style.border_color
+        tail.z_index = -1
+        bubble.add_child(tail)
+    speech_bubble = bubble
+    return bubble
+
+func _fade_bubble_later(bubble: Control, seconds: float) -> void:
+    await get_tree().create_timer(seconds).timeout
+    if not is_instance_valid(bubble): return
+    var fade := create_tween()
+    fade.tween_property(bubble, "modulate:a", 0.0, 0.3 * animation_speed)
+    await fade.finished
+    if is_instance_valid(bubble): bubble.queue_free()
+
+# ── Reckless stacks ───────────────────────────────────────────────────────────
+
+## The active stack is the player's and reckless (Aldren): he takes no orders.
+func _reckless_turn() -> bool:
+    if state.get("result", "") != "ongoing" or _deploying() or _opening() > 0: return false
+    if state.get("auto_turn", false): return true
+    var unit: Dictionary = units.get(state.get("active", ""), {})
+    return unit.get("player", false) and unit.get("reckless", false)
+
+func _refuse_reckless() -> bool:
+    _log("%s charges on his own and takes no orders." % _unit_name(state.get("active", "")), FOE)
+    return false
+
+## The first event of a turn the session played itself: a beat after the
+## player's action, then "CHARGES!" over the reckless stack, the turn line and
+## the log say it is his own doing. Returns the stack's key.
+func _announce_charge(event: Dictionary) -> String:
+    var key := str(event.get("unit", ""))
+    if not units.get(key, {}).get("reckless", false):
+        key = ""
+        for unit in state.get("units", []):
+            if unit.player and unit.get("reckless", false) and int(unit.count) > 0:
+                key = unit.key
+                break
+    if key.is_empty(): return "?"
+    await get_tree().create_timer(0.45 * animation_speed).timeout
+    turn_label.text = "ROUND %d   ·   %s CHARGES ON HIS OWN   ·   he takes no orders" % [state.get("round", 1), _unit_name(key).to_upper()]
+    turn_label.add_theme_color_override("font_color", CHARGE)
+    status.text = "[color=#%s]%s charges on his own: he picks his own fight and takes no orders.[/color]" % [CHARGE.to_html(false), _unit_name(key)]
+    _log("%s charges on his own — he takes no orders." % _unit_label(key), CHARGE)
+    board.highlight_key = key
+    board.queue_redraw()
+    var actor: Node2D = board.actors.get(key)
+    if actor and actor.visible:
+        board.float_text(actor, "CHARGES!", CHARGE, 0.9 * animation_speed)
+        await get_tree().create_timer(0.4 * animation_speed).timeout
+    return key

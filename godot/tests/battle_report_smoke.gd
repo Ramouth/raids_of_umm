@@ -195,14 +195,16 @@ func _victory() -> void:
     spoils.continue_button.pressed.emit()
     await process_frame
 
-    # 3. Then the scene the victory set off, then its line, then the map.
+    # 3. Then the scene the victory set off, its line inside it, then the map.
     check(_top_is(scene, ChapterScene), "The story scene plays after the spoils")
     check(not scene.dialogue.is_speaking(), "Dialogue waits for the scene")
     if _top_is(scene, ChapterScene): scene.screens.top().advance()
     await process_frame
+    var spoken: Control = scene.screens.top()
+    check(_top_is(scene, ChapterScene) and spoken._words.text == "“Somebody fed these dogs once.”", "The Scout's line comes straight after the scene, inside it")
+    if _top_is(scene, ChapterScene): spoken.advance()
+    await process_frame
     check(scene.screens.depth() == 0, "Back on the map after the scene")
-    check(scene.dialogue.is_speaking(), "The line the victory set off plays on the map")
-    check(str(scene.dialogue.current.get("text", "")) == "Somebody fed these dogs once.", "The Scout's line comes straight after the scene")
     var repeated: bool = scene.dialogue._queue.any(func(line): return "You found" in str(line.get("text", "")))
     check(not repeated, "Items the spoils screen showed are not announced again")
     scene.dialogue.skip_all()
