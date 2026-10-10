@@ -97,7 +97,8 @@ func _run() -> void:
     check(not view.state.deploying and not view.begin_button.visible, "Battle starts after placement")
     check(not view.issue("place_stakes", Vector2i(3, -1)), "Cannot construct after battle starts")
     check(not [2, 1] in view.state.reachable, "Barricade is excluded from movement highlights")
-    check(view.state.attackable.is_empty(), "Barricade removes the shot from attack highlights")
+    var shootable: Array = view.state.attackable.filter(func(cell): return not cell in view.state.get("attackable_obstacles", []))
+    check(shootable.is_empty(), "Barricade removes the shot from attack highlights (only the barricade itself can be shot)")
     view.auto_button.button_pressed = true
     while view.busy or view.state.result == "ongoing": await process_frame
     check(view.state.result == "victory", "AI can finish the battle around an obstacle")

@@ -42,6 +42,8 @@ std::optional<std::string> Scenario::load(const std::string& path) {
         if (root.contains("start_companions"))
             m_startCompanions = root["start_companions"].get<std::vector<std::string>>();
         m_startArmy = root.value("start_army", Json::array());
+        m_startResources.reset();
+        if (root.contains("start_resources")) m_startResources = poolFrom(root["start_resources"]);
         m_questDefs.clear();
         for (const auto& q : root.value("quests", Json::array()))
             m_questDefs.push_back({q.value("id", ""), q.value("title", ""), q.value("text", ""),

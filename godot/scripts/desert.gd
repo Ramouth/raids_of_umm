@@ -204,7 +204,8 @@ func _start_adventure() -> bool:
         set_process_unhandled_input(false)
         return false
     var intro: Array = state.get("story", [])
-    army = army  # push the expedition's army into the new session (replaces state)
+    if state.get("map_start_army", false): _mirror_army()   # the map sets the company it starts with
+    else: army = army  # push the expedition's army into the new session (replaces state)
     state.story = intro + state.get("story", [])
     return true
 
@@ -222,10 +223,16 @@ func _start_campaign_map() -> bool:
         return false
     var intro: Array = state.get("story", [])
     var carried: bool = state.get("campaign", {}).get("state", {}).get("carried", false)
-    if carried: army = state.army.duplicate(true)
+    if carried or state.get("map_start_army", false): _mirror_army()   # the carried company, or the map's own start army
     else: army = army
     state.story = intro + state.get("story", [])
     return true
+
+## Takes the session's army as the expedition's, without pushing it back.
+func _mirror_army() -> void:
+    _mirroring = true
+    army = state.army.duplicate(true)
+    _mirroring = false
 
 ## Called by the town screen. Returns the native reply (ok/error + snapshot).
 func recruit(town: Vector2i, unit_id: String, count: int) -> Dictionary:
@@ -1338,7 +1345,7 @@ func _entered_cell(cell: Vector2i) -> void:
         var step: Dictionary = _pending_steps.pop_front()
         fog.reveal(step.revealed)
         if not str(step.capture).is_empty():
-            notice.text = "%s now flies the Compact's banner." % step.capture
+            notice.text = "%s now flies your banner and pays into your treasury every dawn." % step.capture
             var taken: Dictionary = data.objects.get(cell, {})
             if str(taken.get("type", "")) not in ["town", "dwelling"]:   # towns open their own screen
                 show_popup({"title": str(step.capture), "flavour": "Your banner goes up over %s. It will pay into your treasury every dawn while you hold it." % step.capture,
@@ -1488,7 +1495,7 @@ func enter_dungeon() -> bool:
     var guards := encounter
     var entry := _encounter_entry(landmark)
     if not entry.is_empty():
-        guards = {"guards": entry.get("guards", []), "reward": entry.get("item", "")}
+        guards = {"guards": entry.get("guards", []), "reward": entry.get("item", ""), "layout": entry.get("layout", "field")}
     return start_battle(guards, str(landmark.name) + "  /  Dungeon guards", _dungeon_finished.bind(hero.cell))
 
 ## Pushes a combat screen. on_result receives the combat result Dictionary.
@@ -1587,7 +1594,8 @@ func _engage() -> void:
 
 func _begin_encounter(encounter: Dictionary) -> void:
     _encounter_type = str(encounter.type)
-    var guards := {"guards": encounter.guards, "reward": encounter.item}
+    # The battlefield (combat_layouts.json id): an ambush lane, or the open field.
+    var guards := {"guards": encounter.guards, "reward": encounter.item, "layout": encounter.get("layout", "field")}
     notice.text = ("The %s attacks!" if encounter.type == "ambush" else "%s bars the way!") % encounter.name
     if int(encounter.get("xp", 0)) > 0: notice.text += "  Victory is worth +%d XP." % int(encounter.xp)
     if army.is_empty() or not start_battle(guards, str(encounter.name), _encounter_finished):

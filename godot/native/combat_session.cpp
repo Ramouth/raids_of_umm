@@ -43,7 +43,7 @@ CombatArmy CombatSession::make_army(const Json& input, bool player) const {
         const int count = entry.at("count").get<int>();
         if (!type || count <= 0 || count > 10000)
             throw std::runtime_error("Unknown unit or invalid stack size: " + id);
-        if (++troops > CombatMap::GRID_H)
+        if (++troops > Hero::ARMY_SLOTS)
             throw std::runtime_error("An army must contain between one and five stacks.");
         army.stacks.push_back(CombatUnit::make(type, count, player));
         // Commander's items and town buildings (e.g. Drill Yard) help every troop stack.
@@ -71,11 +71,16 @@ Json CombatSession::start(const std::string& data_dir, const Json& army, const J
         auto enemy = make_army(encounter.at("guards"), false);
         const std::optional<uint32_t> seed = encounter.contains("seed")
             ? std::optional<uint32_t>(encounter.at("seed").get<uint32_t>()) : std::nullopt;
-        engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy), 6, seed);
+        // The battlefield: a combat_layouts.json id; "field" (the default) is the open field.
+        const std::string layout = encounter.value("layout", std::string("field"));
+        const CombatLayout* shape = resources_->combatLayouts().find(layout);
+        if (!shape && layout != "field") return failure("Unknown combat layout: " + layout);
+        engine_ = std::make_unique<CombatEngine>(std::move(player), std::move(enemy), 6, seed,
+                                                 shape ? *shape : CombatLayout::field());
         const Json works = encounter.value("fieldworks", Json::object());
         barricades_ = std::clamp(works.value("barricade", 0), 0, 3);
         stakes_ = std::clamp(works.value("stakes", 0), 0, 3 - barricades_);
-        deploying_ = barricades_ + stakes_ > 0;
+        deploying_ = true;   // every battle opens with deployment (units, and fieldworks if any)
         opening_ = std::clamp(encounter.value("tactics", 0), 0, 3);   // commander's Tactics rank
         // Companion tips: the adventure's "tip_context" ({map, shown}); none without a map.
         const Json tips = encounter.value("tips", Json::object());
@@ -104,18 +109,40 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
     if (engine_->hasPendingChoice()) return failure("Resolve the pending character choice first.");
+    const bool deployAction = action == "deploy_done" || action == "remove_fieldwork" || action == "place_unit"
+                              || action == "place_barricade" || action == "place_stakes";
+    if (!deploying_ && deployAction) return failure("The battle has already begun.");
     if (deploying_ && action != "retreat") {
         const HexCoord at{q, r};
         if (action == "deploy_done") deploying_ = false;
-        else if (action == "remove_fieldwork") {
+        else if (action == "place_unit") {
+            // The player's stack on (fq, fr) moves to (q, r) in the deployment zone.
+            int index = -1;
+            const auto& own = engine_->playerArmy().stacks;
+            for (int i = 0; i < static_cast<int>(own.size()); ++i)
+                if (!own[i].isDead() && own[i].pos == HexCoord{fq, fr}) index = i;
+            if (index < 0) return failure("Choose one of your own stacks to place.");
+            if (!engine_->placeUnit(index, at)) return failure("Place your stacks on a free hex of your deployment zone.");
+        } else if (action == "remove_fieldwork") {
             if (!engine_->removeFieldwork(at)) return failure("There is no fieldwork on that hex.");
         } else if (action == "place_barricade" || action == "place_stakes") {
-            const bool opaque = action == "place_barricade";
+            const std::string kind = action == "place_barricade" ? "barricade" : "stakes";
             int used = 0;
-            for (const auto& work : engine_->fieldworks()) if (work.opaque == opaque) ++used;
-            if (used >= (opaque ? barricades_ : stakes_)) return failure("All of those fieldworks are already placed.");
-            if (!engine_->placeFieldwork(at, opaque)) return failure("Place on an empty highlighted hex and leave a route through the battlefield.");
-        } else return failure("Finish placing your fieldworks first.");
+            for (const auto& work : engine_->fieldworks()) if (work.kind == kind) ++used;
+            if (used >= (kind == "barricade" ? barricades_ : stakes_)) return failure("All of those fieldworks are already placed.");
+            const ObstacleKind* data = resources_->combatLayouts().kind(kind);
+            const bool placed = data ? engine_->placeFieldwork(at, *data) : engine_->placeFieldwork(at, kind == "barricade");
+            if (!placed) return failure("Place on an empty highlighted hex and leave a route through the battlefield.");
+        } else if (fieldwork_stock() > 0) return failure("Finish placing your fieldworks first.");
+        else {
+            // Nothing to build: a battle order accepts the placement as it stands
+            // (headless sims and auto-battle never need a click). A refused order
+            // leaves the deployment open.
+            deploying_ = false;
+            Json reply = command(action, q, r, fq, fr);
+            if (!reply.value("ok", false)) deploying_ = true;
+            return reply;
+        }
         return response();
     }
     if (opening_ > 0 && action != "retreat") return failure("Give your opening orders first (or skip them).");
@@ -137,11 +164,20 @@ Json CombatSession::command(const std::string& action, int q, int r, int fq, int
                 if (!foes[i].isDead() && foes[i].pos == cell) target = i;
             if (!engine_->doCurse(target)) return failure("Binding Thread needs an enemy within four hexes and no adjacent enemies.");
         } else if (action == "attack") {
+            if (engine_->obstacleAt(cell)) {
+                if (!engine_->doAttackObstacle(cell)) return failure("That obstacle is out of reach.");
+                return response();
+            }
             const auto targets = legal_targets();
             if (std::find(targets.begin(), targets.end(), cell) == targets.end())
                 return failure("That enemy is out of range.");
             engine_->doAttackAt(cell);
         } else if (action == "strike") {
+            if (engine_->obstacleAt(cell)) {
+                if (!engine_->doAttackObstacleFrom(HexCoord{fq, fr}, cell))
+                    return failure("You cannot strike that obstacle from there.");
+                return response();
+            }
             // Move-and-attack from an explicit standing hex (fq, fr).
             const auto& foes = engine_->currentTurn().isPlayer ? engine_->enemyArmy() : engine_->playerArmy();
             int target = -1;
@@ -161,7 +197,13 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (!engine_) return failure("No battle has started.");
     if (awaiting_animation_) return failure("Wait for the current action to finish.");
     if (engine_->isOver()) return failure("The battle has already ended.");
-    if (deploying_) return failure("Finish placing your fieldworks first.");
+    if (deploying_) {
+        if (fieldwork_stock() > 0) return failure("Finish placing your fieldworks first.");
+        deploying_ = false;   // nothing to build: the order accepts the placement as it stands
+        Json reply = command_route(action, route, q, r);
+        if (!reply.value("ok", false)) deploying_ = true;
+        return reply;
+    }
     std::vector<HexCoord> path;
     try {
         for (const auto& cell : route) path.push_back({cell.at(0).get<int>(), cell.at(1).get<int>()});
@@ -186,6 +228,8 @@ Json CombatSession::command_route(const std::string& action, const Json& route, 
     if (engine_->activeUnit().mad) return failure("That stack has gone mad and takes no orders this turn.");
     if (action == "move") {
         if (!engine_->doMoveAlong(path)) return failure("That route is blocked or too long.");
+    } else if (action == "strike" && engine_->obstacleAt(HexCoord{q, r})) {
+        if (!engine_->doAttackObstacleAlong(path, HexCoord{q, r})) return failure("You cannot strike that obstacle along that route.");
     } else if (action == "strike") {
         const auto& foes = engine_->enemyArmy();
         int target = -1;
@@ -211,9 +255,20 @@ Json CombatSession::snapshot() const {
         {"fallen", Json::array()}, {"enemy_survivors", Json::array()},
         {"deploying", deploying_}, {"fieldwork_stock", {{"barricade", barricades_}, {"stakes", stakes_}}},
         {"fieldworks", Json::array()},
-        {"active", ""}, {"player_turn", false}, {"opening", opening_}};
+        {"active", ""}, {"player_turn", false}, {"opening", opening_},
+        {"layout", engine_->layoutId()},
+        {"width", engine_->map().width()}, {"height", engine_->map().height()},
+        {"obstacles", Json::array()}, {"deploy_zone", Json::array()}, {"fieldwork_zone", Json::array()},
+        {"first_move", CombatLayout::firstMoveName(engine_->firstMove())},
+        {"enemy_first", engine_->firstMove() == CombatLayout::FirstMove::EnemyFirst},
+        {"unit_placement", deploying_ && !engine_->isOver() && !engine_->battleStarted()}};
     for (const auto& work : engine_->fieldworks())
-        state["fieldworks"].push_back({{"cell", hex(work.cell)}, {"kind", work.opaque ? "barricade" : "stakes"}});
+        state["fieldworks"].push_back({{"cell", hex(work.cell)}, {"kind", work.kind}});
+    for (const auto& o : engine_->obstacles())
+        state["obstacles"].push_back({{"cell", hex(o.cell)}, {"kind", o.kind}, {"hp", o.hp}, {"max_hp", o.maxHp},
+                                      {"opaque", o.opaque}, {"fieldwork", o.fieldwork}});
+    for (const auto& cell : engine_->deployZone()) state["deploy_zone"].push_back(hex(cell));
+    for (const auto& cell : engine_->fieldworkZone()) state["fieldwork_zone"].push_back(hex(cell));
     for (bool player : {true, false}) {
         const auto& army = player ? engine_->playerArmy() : engine_->enemyArmy();
         for (int index = 0; index < static_cast<int>(army.stacks.size()); ++index) {
@@ -270,16 +325,21 @@ Json CombatSession::snapshot() const {
         state["curse_range"] = Json::array();
         const auto& actor = engine_->activeUnit();
         if (actor.type->hasAbility("binding_thread") && !engine_->isEngaged(actor)) {
-            for (int col = 0; col < CombatMap::GRID_W; ++col)
-                for (int row = 0; row < CombatMap::GRID_H; ++row) {
-                    const auto cell = CombatMap::toHex(col, row);
-                    if (actor.pos.distanceTo(cell) <= CombatEngine::CURSE_RANGE) state["curse_range"].push_back(hex(cell));
-                }
+            for (const auto& cell : engine_->map().allHexes())
+                if (actor.pos.distanceTo(cell) <= CombatEngine::CURSE_RANGE) state["curse_range"].push_back(hex(cell));
             const auto& foes = turn.isPlayer ? engine_->enemyArmy().stacks : engine_->playerArmy().stacks;
             for (int i = 0; i < static_cast<int>(foes.size()); ++i)
                 if (engine_->canCurse(i)) state["curse_targets"].push_back(hex(foes[i].pos));
         }
         for (auto cell : legal_targets()) state["attackable"].push_back(hex(cell));
+        // Obstacles it can break this turn (attack / strike on their hex).
+        state["attackable_obstacles"] = Json::array();
+        state["obstacle_previews"] = Json::array();
+        for (auto cell : engine_->attackableObstacles()) {
+            state["attackable"].push_back(hex(cell));
+            state["attackable_obstacles"].push_back(hex(cell));
+            state["obstacle_previews"].push_back(obstacle_preview(cell));
+        }
         int index = 0;
         for (const auto& slot : engine_->turnOrder()) {
             const auto& unit = (slot.isPlayer ? engine_->playerArmy() : engine_->enemyArmy()).stacks[slot.stackIndex];
@@ -399,6 +459,28 @@ Json CombatSession::previews() const {
     return out;
 }
 
+Json CombatSession::obstacle_preview(HexCoord cell) const {
+    // Like previews(): where the active stack could stand to strike the
+    // obstacle (each with its walk path; "best" = what "attack" picks, the
+    // shortest walk), or a shot from where it stands; and the damage range.
+    const auto& turn = engine_->currentTurn();
+    const auto& actor = engine_->activeUnit();
+    const bool ranged = engine_->canShoot(actor) && actor.pos.distanceTo(cell) > 1;
+    const DamageRange damage = CombatEngine::obstacleDamage(actor, !ranged);
+    Json entry = {{"cell", hex(cell)}, {"ranged", ranged}, {"damage_min", damage.min}, {"damage_max", damage.max},
+                  {"options", Json::array()}};
+    std::vector<HexCoord> spots = engine_->obstacleAttackHexes(cell);
+    if (spots.empty()) spots.push_back(actor.pos);   // a shot from where it stands
+    size_t shortest = SIZE_MAX;
+    for (const HexCoord& from : spots) {
+        const Json path = from == actor.pos ? Json::array() : movement_path(actor.pos, from, turn.isPlayer, turn.stackIndex);
+        entry["options"].push_back({{"from", hex(from)}, {"path", path},
+                                    {"reactions", from == actor.pos ? Json::array() : reactions(from)}});
+        if (path.size() < shortest) { shortest = path.size(); entry["best"] = hex(from); }
+    }
+    return entry;
+}
+
 Json CombatSession::reactions(HexCoord to) const {
     Json out = Json::array();
     const bool player = engine_->activeUnit().isPlayer;
@@ -410,7 +492,7 @@ Json CombatSession::reactions(HexCoord to) const {
 
 Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int index) const {
     std::unordered_set<HexCoord> occupied;
-    for (const auto& work : engine_->fieldworks()) occupied.insert(work.cell);
+    for (const auto& o : engine_->obstacles()) occupied.insert(o.cell);
     for (bool side : {true, false}) {
         const auto& army = side ? engine_->playerArmy() : engine_->enemyArmy();
         for (int i = 0; i < static_cast<int>(army.stacks.size()); ++i)
@@ -425,7 +507,7 @@ Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int i
         if (current == to) break;
         for (int dir = 0; dir < 6; ++dir) {
             const auto next = current.neighbor(dir);
-            if (!CombatMap::inBounds(next) || occupied.count(next) || previous.count(next)) continue;
+            if (!engine_->map().inBounds(next) || occupied.count(next) || previous.count(next)) continue;
             previous[next] = current;
             queue.push(next);
         }
@@ -440,7 +522,7 @@ Json CombatSession::movement_path(HexCoord from, HexCoord to, bool player, int i
 
 Json CombatSession::response() {
     static const char* names[] = {"move", "attack", "damage", "death", "defend", "end", "xp", "level", "curse", "choice",
-                                  "bitten", "madness"};
+                                  "bitten", "madness", "obstacle_attack", "obstacle_damage"};
     Json events = Json::array();
     for (const auto& event : engine_->drainEvents()) {
         Json item = {{"type", names[static_cast<int>(event.type)]}, {"unit", key(event.isPlayer, event.stackIndex)},
@@ -456,6 +538,11 @@ Json CombatSession::response() {
             item["ranged"] = event.isReaction
                 || (!event.isRetaliation && actor.type->isRanged() && actor.pos.distanceTo(target.pos) > 1);
         }
+        if (event.type == CombatEvent::Type::ObstacleAttacked) item["ranged"] = event.ranged;
+        if (event.type == CombatEvent::Type::ObstacleAttacked || event.type == CombatEvent::Type::ObstacleDamaged) {
+            item["cell"] = hex(event.to);   // the obstacle's hex
+            item["target"] = "";
+        }
         if (event.type == CombatEvent::Type::UnitMoved) {
             if (!event.path.empty()) {
                 item["path"] = Json::array();
@@ -465,7 +552,7 @@ Json CombatSession::response() {
         events.push_back(std::move(item));
     }
     tip_ = nullptr;                      // a tip shows in the reply of the action that made it due
-    if (!deploying_ && opening_ == 0)
+    if (!(deploying_ && fieldwork_stock() > 0) && opening_ == 0)
         if (const CombatTip* tip = tips_.check(*engine_))
             tip_ = {{"id", tip->id}, {"speaker", tip->speaker}, {"text", tip->text}};
     awaiting_animation_ = true;

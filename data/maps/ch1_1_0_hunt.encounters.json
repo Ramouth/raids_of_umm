@@ -16,10 +16,15 @@
       "guards": [
         {
           "id": "feral_dog",
-          "count": 6
+          "count": 3
+        },
+        {
+          "id": "feral_dog",
+          "count": 3
         }
       ],
-      "reward": {}
+      "reward": {},
+      "layout": "corridor_ambush"
     },
     "Stream Dogs": {
       "guards": [

@@ -166,7 +166,7 @@ static void fight(AdventureSession& s) {
     auto r=s.autoBattle(s.army(),enemy,s.battleCompanions(),s.armyBonus(),[&](const CombatEngine& e) {
         if(!tips) tips.emplace(&s.resources().combatTips(),s.campaignMap(),s.shownTips(),e);
         if(const CombatTip* t=tips->check(e)) said.push_back(t->speaker+": "+t->text);
-    });
+    }, s.encounterAt(at) ? s.encounterAt(at)->layout : std::string("field"));   // the battlefield the game fights on
     if(tips) for(const auto& id:tips->shownHere()) s.markTipShown(id);
     s.setArmy(r.attacker);
     s.companionsFell(r.fallen,!r.attackerWon);

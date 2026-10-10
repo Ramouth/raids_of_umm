@@ -59,6 +59,8 @@ var _orders_list: VBoxContainer
 var _fieldwork_box: VBoxContainer
 var _fieldwork_kind := "barricade"
 var _orders: Array = []   # Tactics: keys of your stacks that act first, in order
+## Deployment: the stack picked up to be placed ("" when none).
+var _place_key := ""
 ## The stack taken by madness this turn: its blows are logged as madness, not orders.
 var _mad_key := ""
 ## Companion tips: the engine decides (CombatSession, from the encounter's
@@ -198,6 +200,15 @@ func _ready() -> void:
     get_viewport().size_changed.connect(_resize)
     _resize()
 
+## Sizes the board to the layout (11 x 5 field, 13 x 9 ambush lane, ...) and
+## scales it down to fit the board panel, centred.
+func _fit_board() -> void:
+    var natural: Vector2 = board.natural_size()
+    var fit := minf(1.0, minf(750.0 / natural.x, 450.0 / natural.y))
+    board.size = natural
+    board.scale = Vector2.ONE * fit
+    board.position = Vector2(28, 162) + (Vector2(750, 450) - natural * fit) / 2.0
+
 func _resize() -> void:
     var viewport_size := get_viewport_rect().size
     scale = Vector2.ONE * minf(viewport_size.x / 1280.0, viewport_size.y / 800.0)
@@ -268,6 +279,7 @@ func begin(army: Array, encounter: Dictionary, title: String) -> bool:
         return false
     _set_state(reply.state)
     board.sync(state)
+    _fit_board()
     _log("Each stack rolls d6 once per battle. Speed + roll sets initiative; your army wins total ties. Same-side ties keep army order. Marshal opening orders apply only in round one.", GOLD)
     _log("Click an enemy to walk up and strike it in one turn — where your cursor sits around the target picks the side you attack from (strike opposite an ally to PIN: +50%, no retaliation). Clicking a green hex only moves. Archers shoot anyone, with no retaliation, but a stack in the line of fire halves the shot, and an archer with an enemy next to it cannot shoot: it must fight hand to hand, at half damage. Companions (gold ring) hit hard and fall fast: their aura shields nearby troops, and a stack beside them takes half of every melee blow.", DIM)
     _consume(reply)
@@ -300,7 +312,17 @@ func _decode_reply(raw: String) -> Dictionary:
     if reply.get("ok", false):
         # Godot's JSON parser makes every number a float. Array equality is
         # type-sensitive, so normalize hex coordinates at this boundary.
-        var cells: Array = reply.state.reachable + reply.state.attackable + reply.state.get("curse_targets", []) + reply.state.get("curse_range", [])
+        var cells: Array = reply.state.reachable + reply.state.attackable + reply.state.get("curse_targets", []) + reply.state.get("curse_range", []) \
+            + reply.state.get("deploy_zone", []) + reply.state.get("fieldwork_zone", []) + reply.state.get("attackable_obstacles", [])
+        for obstacle in reply.state.get("obstacles", []): cells.append(obstacle.cell)
+        for preview in reply.state.get("obstacle_previews", []):
+            cells.append(preview.cell)
+            if preview.has("best"): cells.append(preview.best)
+            for option in preview.get("options", []):
+                cells.append(option.from)
+                cells.append_array(option.path)
+        for event in reply.get("events", []):
+            if event.has("cell"): cells.append(event.cell)
         for entry in reply.state.get("reaction_fire", []): cells.append(entry.cell)
         for unit in reply.state.units: cells.append(unit.cell)
         for work in reply.state.get("fieldworks", []): cells.append(work.cell)
@@ -340,11 +362,15 @@ func _consume(reply: Dictionary) -> void:
             "curse": _log("%s casts Binding Thread on %s: d6 = %d — %s." % [_unit_name(event.unit), _unit_name(event.target), int(event.roll), ("Bound and slowed" if event.get("slows", false) else "Weakened") if int(event.roll) >= 3 else "Resisted"], GOLD, event.target)
             "attack": strike = event
             "damage": _log_damage(event, strike)
+            "obstacle_attack": strike = event
+            "obstacle_damage": _log_obstacle_damage(event, strike)
             "move": _log("%s moves." % _unit_label(event.unit), DIM, event.unit)
             "defend": _log("%s defends: +25%% defence until its next turn (the stance carries into the next round)." % _unit_label(event.unit), DIM, event.unit)
         await board.animate(event, animation_speed)
     _set_state(reply.state)
     board.sync(state)
+    if not _deploying(): _place_key = ""
+    board.place_key = _place_key
     if not bridge.acknowledge(int(reply.ticket)):
         _log("Combat synchronization failed. Orders remain locked.", FOE)
         return
@@ -390,6 +416,28 @@ func _log_damage(event: Dictionary, strike: Dictionary) -> void:
             return
         _log("%s %s %s%s: %s." % [_unit_label(strike.unit), verb, _unit_label(victim), pinned, outcome], TEXT, strike.unit)
 
+## "Woad Runners ×10 hack at the tree: 34 damage (26 / 60 left)."
+func _log_obstacle_damage(event: Dictionary, strike: Dictionary) -> void:
+    var piece := _obstacle_at(event.cell)
+    var kind := str(piece.get("kind", "obstacle")).replace("_", " ")
+    var left := int(event.get("remaining", 0))
+    var shot: bool = strike.get("ranged", false) and strike.get("type", "") == "obstacle_attack"
+    var outcome := "%d damage" % int(event.damage)
+    if left <= 0: outcome += " — the %s is %s and the hex is open" % [kind, "cut down" if kind == "tree" else "destroyed"]
+    else: outcome += " (%d / %d left)" % [left, int(piece.get("max_hp", left))]
+    _log("%s %s the %s: %s." % [_unit_label(event.unit), "shoots" if shot else "hacks at", kind, outcome], TEXT, event.unit)
+
+## The obstacle (tree, barricade, stakes) on `cell`, or {}.
+func _obstacle_at(cell: Array) -> Dictionary:
+    if cell.is_empty(): return {}
+    for piece in state.get("obstacles", []):
+        if int(piece.cell[0]) == int(cell[0]) and int(piece.cell[1]) == int(cell[1]): return piece
+    return {}
+
+func _fieldwork_total() -> int:
+    var stock: Dictionary = state.get("fieldwork_stock", {})
+    return int(stock.get("barricade", 0)) + int(stock.get("stakes", 0))
+
 func _unit_name(key: String) -> String:
     return units[key].name if units.has(key) else key
 
@@ -421,8 +469,8 @@ func _refresh() -> void:
         var whose := "YOUR TURN" if player_turn and not auto_battle else ("AUTO-BATTLE" if player_turn else "ENEMY TURN")
         if busy: whose = "resolving…"
         if _deploying():
-            turn_label.text = "BEFORE BATTLE   ·   PLACE YOUR FIELDWORKS"
-            turn_label.add_theme_color_override("font_color", GOLD)
+            turn_label.text = "BEFORE BATTLE  ·  DEPLOY" + ("  ·  AMBUSH: ENEMY MOVES FIRST" if state.get("enemy_first", false) else "")
+            turn_label.add_theme_color_override("font_color", FOE if state.get("enemy_first", false) else GOLD)
         elif _opening() > 0:
             turn_label.text = "BEFORE BATTLE   ·   MARSHAL: CHOOSE WHO ACTS FIRST"
             turn_label.add_theme_color_override("font_color", GOLD)
@@ -450,7 +498,7 @@ func _refresh() -> void:
     if begin_button.get_parent() != button_parent: begin_button.reparent(button_parent)
     begin_button.position = Vector2(660, 684) if choosing else Vector2(830, 440)
     begin_button.size = Vector2(380, 48) if choosing else Vector2(400, 46)
-    begin_button.text = "Finish placement · Enter" if _deploying() else ("Pick your starter above" if _orders.is_empty() else "Begin with %s · Enter" % _unit_name(_orders[0]))
+    begin_button.text = "Finish placement · start the battle · Enter" if _deploying() else ("Pick your starter above" if _orders.is_empty() else "Begin with %s · Enter" % _unit_name(_orders[0]))
     _marshal_help.text = "1. Click a troop below to choose who acts first.\n2. Press Begin to enter the battlefield and move on green hexes.\nYour Marshal skill beats every enemy's initiative roll. Choose up to %d." % _opening()
     var chosen_names: Array[String] = []
     for key in _orders: chosen_names.append(_unit_name(key))
@@ -459,7 +507,7 @@ func _refresh() -> void:
     skip_orders_button.visible = _orders_scroll.visible
     skip_orders_button.disabled = busy
     _refresh_order_choices()
-    _fieldwork_box.visible = _deploying() and ongoing
+    _fieldwork_box.visible = _deploying() and ongoing and _fieldwork_total() > 0
     if int(state.get("fieldwork_stock", {}).get(_fieldwork_kind, 0)) == 0:
         _fieldwork_kind = "stakes" if int(state.get("fieldwork_stock", {}).get("stakes", 0)) > 0 else "barricade"
     for button in _fieldwork_box.get_children():
@@ -588,7 +636,22 @@ func _update_inspection() -> void:
     for font in ["normal_font_size", "bold_font_size"]: inspection.add_theme_font_size_override(font, 16)
     inspection.size.y = 262
     if _deploying():
-        inspection.text = "[color=#f7d580][b]FIELD ENGINEERING[/b][/color]\n\nChoose a fieldwork, then click a highlighted hex. Right-click a placed piece to recover it.\n\nBarricades block everyone's arrows. Stakes block movement only. Equipment is reused next battle."
+        var unit: Dictionary = units.get(_hover_key, {})
+        if not unit.is_empty() and int(unit.count) > 0:
+            _inspect(unit)
+            return
+        for font in ["normal_font_size", "bold_font_size"]: inspection.add_theme_font_size_override(font, 14)
+        var lines: Array[String] = ["[color=#f7d580][b]DEPLOYMENT[/b][/color]",
+            "Click one of your stacks, then a green hex to stand it there (click another of your stacks to swap them). Right-click or Esc puts it down.",
+            "Finish placement (Enter) starts the battle."]
+        if state.get("enemy_first", false):
+            lines.append("[color=#%s][b]AMBUSH[/b]: the enemy acts first in round one. Keep companions behind your troops.[/color]" % FOE.to_html(false))
+        if state.get("obstacles", []).any(func(piece): return not piece.get("fieldwork", false)):
+            lines.append("Trees block movement and arrows. Any stack can cut one down (a shooter needs a clear line); a felled tree opens its hex.")
+        if _fieldwork_total() > 0:
+            lines.append("[color=#f7d580]FIELDWORKS[/color]: choose one below, then click an ochre hex with no stack picked up. Barricades block arrows, stakes only movement. Right-click a piece to recover it.")
+            inspection.size.y = 168
+        inspection.text = "\n".join(lines)
         return
     if state.get("result", "") != "ongoing" and not state.is_empty(): return
     for key in [_hover_key, _pinned_key, state.get("active", "")]:
@@ -599,7 +662,7 @@ func _update_inspection() -> void:
 func _inspect(unit: Dictionary) -> void:
     var colour := FRIEND if unit.player else FOE
     var lines: Array[String] = []
-    var acting := "FIRST TO ACT, unless your orders say otherwise" if _opening() > 0 else "ACTING NOW"
+    var acting := "FIRST TO ACT, unless your orders say otherwise" if _opening() > 0 else ("FIRST TO ACT once the battle starts" if _deploying() else "ACTING NOW")
     var tag := acting if unit.key == state.get("active", "") else ("kept on screen · right-click empty ground to release" if unit.key == _pinned_key else "")
     var companion: bool = unit.get("companion", false)
     if companion:
@@ -677,18 +740,18 @@ func _pointer_moved(point: Vector2) -> void:
 
 func _occupied() -> Dictionary:
     var taken := {}
-    for work in state.get("fieldworks", []): taken[Vector2i(work.cell[0], work.cell[1])] = true
+    for work in state.get("obstacles", state.get("fieldworks", [])): taken[Vector2i(work.cell[0], work.cell[1])] = true
     for unit in state.get("units", []):
         if int(unit.count) > 0 and unit.key != state.get("active", ""): taken[Vector2i(unit.cell[0], unit.cell[1])] = true
     return taken
 
-static func _neighbours(cell: Vector2i) -> Array:
+func _neighbours(cell: Vector2i) -> Array:
     var out := []
     for d in [Vector2i(1, 0), Vector2i(1, -1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(-1, 1), Vector2i(0, 1)]:
         var n: Vector2i = cell + d
         var col := n.x
         var row := n.y + (col - (col & 1)) / 2
-        if col >= 0 and col < 11 and row >= 0 and row < 5: out.append(n)
+        if col >= 0 and col < int(state.get("width", 11)) and row >= 0 and row < int(state.get("height", 5)): out.append(n)
     return out
 
 ## Shortest free path from `from` to `to` (cells after `from`), avoiding
@@ -783,7 +846,20 @@ func _toggle_waypoint(cell: Array) -> void:
 ## With waypoints, only standing hexes the route can reach, carrying that route.
 func _hover_options() -> Array:
     var unit := _unit_at(_hover_cell)
-    if unit.is_empty(): return []
+    if unit.is_empty():
+        # An obstacle: each option carries the preview's "ranged" (a shot from where it stands).
+        var preview := _obstacle_preview(_hover_cell)
+        var out := []
+        for option in preview.get("options", []):
+            var copy: Dictionary = option.duplicate()
+            copy["ranged"] = preview.ranged
+            if not waypoints.is_empty():
+                if preview.ranged: continue
+                var route := _route_to(option.from)
+                if route.is_empty() or route.size() > _move_range(): continue
+                copy.path = route
+            out.append(copy)
+        return out
     for preview in state.get("previews", []):
         if preview.key != unit.key: continue
         if waypoints.is_empty(): return preview.get("options", [])
@@ -816,10 +892,10 @@ func _pick_stand() -> Dictionary:
             best = option
     if toward.length() <= 3.0:
         # Pointer dead centre: use the engine's own pick (pin first, then shortest walk).
-        for preview in state.get("previews", []):
+        for preview in state.get("previews", []) + state.get("obstacle_previews", []):
             if preview.cell == _hover_cell:
                 for option in options:
-                    if option.from == preview.best: best = option
+                    if option.from == preview.get("best", []): best = option
     return best
 
 func _unit_at(cell: Array) -> Dictionary:
@@ -836,14 +912,16 @@ func _update_status() -> void:
     var kind := ""
     var label := ""
     var ongoing: bool = state.get("result", "") == "ongoing"
-    var my_turn: bool = ongoing and not busy and not auto_battle and state.get("player_turn", false)
+    var my_turn: bool = ongoing and not busy and not auto_battle and state.get("player_turn", false) and not _deploying() and _opening() == 0
+    var deploy_ui: bool = ongoing and not busy and not auto_battle and _deploying()
     var unit := _unit_at(_hover_cell)
     var active: Dictionary = units.get(state.get("active", ""), {})
     if not ongoing:
         text = "The battle is over."
     elif _deploying():
-        text = "[b]FIELDWORKS[/b]: click highlighted hex to place · right-click to recover · Enter to finish"
-        kind = "move" if not _hover_cell.is_empty() and int(_hover_cell[0]) >= 2 and int(_hover_cell[0]) <= 4 else "blocked"
+        var deployed := _deploy_hover(unit)
+        text = deployed[0]
+        kind = deployed[1]
     elif _opening() > 0:
         var chosen: Array[String] = []
         for key in _orders: chosen.append(_unit_name(key))
@@ -907,6 +985,27 @@ func _update_status() -> void:
             elif int(preview.kills_min) >= int(unit.count): text += " · wipes out the stack"
             elif unit.get("retaliated", false): text += " · no retaliation: already used this round"
             else: text += " · no retaliation"
+    elif not _obstacle_at(_hover_cell).is_empty():
+        var piece := _obstacle_at(_hover_cell)
+        var piece_name := str(piece.kind).replace("_", " ")
+        var health := "%d / %d hp" % [int(piece.hp), int(piece.max_hp)] if int(piece.get("max_hp", 0)) > 0 else "cannot be broken"
+        var sight := "blocks movement and arrows" if piece.get("opaque", true) else "blocks movement; arrows pass over it"
+        var preview := _obstacle_preview(_hover_cell)
+        if not _stand.is_empty() and _stand_matches(preview): preview = _merge_stand(preview)
+        if preview.is_empty():
+            kind = "blocked"
+            text = "%s (%s): %s · out of reach — stand next to it, or shoot it with a clear line" % [piece_name.capitalize(), health, sight]
+        else:
+            kind = "attack"
+            var damage := _range_text(int(preview.damage_min), int(preview.damage_max))
+            var verb := "Shoot" if preview.ranged else ("Walk up and hack at" if not preview.get("path", []).is_empty() else "Hack at")
+            var fells: bool = int(preview.damage_min) >= int(piece.hp)
+            text = "[b]%s the %s[/b] (%s): %s damage%s · no strike back%s" % [verb, piece_name, health, damage, " — fells it, opens the hex" if fells else "", " · uses a shot" if preview.ranged else ""]
+            label = "%s dmg · %s" % [damage, "fells it" if fells else "%d hp" % int(piece.hp)]
+            var incoming: Array = preview.get("reactions", [])
+            if not incoming.is_empty():
+                text = _reaction_text(incoming).trim_prefix(" · ") + " · " + text
+                label = "⚠ volley first · " + label
     elif not unit.is_empty():
         text = "%s — %s." % [_unit_label(unit.key), "acting now" if unit.key == state.active else "your stack; right-click for details"]
     elif (_hover_cell in state.get("reachable", [])) if waypoints.is_empty() else (_hover_cell in board.route_reach or _hover_cell == waypoints[-1]):
@@ -961,7 +1060,8 @@ func _update_status() -> void:
         board.shot_line = []
         board.walk_path = []
         board.stand_cell = []
-    board.set_hover(kind if my_turn else "", label if my_turn else "")
+    if deploy_ui: board.shot_line = []
+    board.set_hover(kind if my_turn or deploy_ui else "", label if my_turn else "")
 
 ## Standing hexes (of those legal for this hover) that would pin the target.
 func _pin_spots() -> Array:
@@ -975,8 +1075,22 @@ func _stand_matches(preview: Dictionary) -> bool:
         if option.from == _stand.get("from", []): return true
     return false
 
+## The engine's forecast for breaking the obstacle on `cell` this turn, or {}.
+func _obstacle_preview(cell: Array) -> Dictionary:
+    if cell.is_empty(): return {}
+    for preview in state.get("obstacle_previews", []):
+        if preview.cell == cell: return preview
+    return {}
+
+## An obstacle preview with the chosen standing hex's walk and reactions.
+func _merge_stand(preview: Dictionary) -> Dictionary:
+    var merged := preview.duplicate()
+    merged.path = _stand.get("path", [])
+    merged.reactions = _stand.get("reactions", [])
+    return merged
+
 func _stand_matches_cell() -> bool:
-    for preview in state.get("previews", []):
+    for preview in state.get("previews", []) + state.get("obstacle_previews", []):
         if preview.cell == _hover_cell: return _stand_matches(preview)
     return false
 
@@ -1104,7 +1218,7 @@ func give_orders() -> bool:
 func _cell_clicked(cell: Vector2i) -> void:
     var coordinates := [cell.x, cell.y]
     if _deploying():
-        if not busy and not auto_battle: issue("place_" + _fieldwork_kind, cell)
+        if not busy and not auto_battle: _deploy_click(coordinates)
         return
     if _opening() > 0:
         if not busy: _toggle_order(coordinates)
@@ -1134,7 +1248,10 @@ func _cell_clicked(cell: Vector2i) -> void:
 
 func _cell_right_clicked(cell: Vector2i) -> void:
     if _deploying():
-        if not busy and not auto_battle: issue("remove_fieldwork", cell)
+        if busy or auto_battle: return
+        var piece := _obstacle_at([cell.x, cell.y])
+        if not piece.is_empty() and piece.get("fieldwork", true): issue("remove_fieldwork", cell)
+        else: _set_place_key("")
         return
     var unit := _unit_at([cell.x, cell.y])
     _pinned_key = unit.key if not unit.is_empty() else ""
@@ -1143,6 +1260,71 @@ func _cell_right_clicked(cell: Vector2i) -> void:
         _stand = _pick_stand()
         _update_status()
     _update_inspection()
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+
+func _set_place_key(key: String) -> void:
+    _place_key = key
+    board.place_key = key
+    board.queue_redraw()
+    _update_inspection()
+    _update_status()
+
+## A click before the battle: pick up one of your stacks, put it on a green hex
+## (or swap it with another of yours), or build a fieldwork.
+func _deploy_click(cell: Array) -> void:
+    var unit := _unit_at(cell)
+    var placing: bool = state.get("unit_placement", true)
+    if placing and not unit.is_empty() and unit.player:
+        if _place_key.is_empty(): _set_place_key(unit.key)
+        elif _place_key == unit.key: _set_place_key("")
+        else: place_unit(_place_key, cell)
+        return
+    if placing and not _place_key.is_empty():
+        if cell in state.get("deploy_zone", []) and unit.is_empty() and _obstacle_at(cell).is_empty(): place_unit(_place_key, cell)
+        else: _log("%s can only stand on a free green hex of your deployment zone." % _unit_label(_place_key), FOE)
+        return
+    if _fieldwork_total() > 0 and unit.is_empty():
+        issue("place_" + _fieldwork_kind, Vector2i(cell[0], cell[1]))
+        return
+    if not unit.is_empty(): _log("The enemy takes its own positions. Click one of your stacks to move it.", DIM)
+    else: _log("Click one of your stacks first, then a green hex to stand it there.", DIM)
+
+## Moves your stack `key` to `cell` in the deployment zone (onto another of yours: they swap).
+func place_unit(key: String, cell: Array) -> bool:
+    if busy or not _deploying() or not units.has(key): return false
+    if not bridge.has_method("place_unit"):
+        _log("This build cannot place stacks yet (UmmCombat.place_unit is missing). Finish placement to fight from the starting line.", FOE)
+        return false
+    var from: Array = units[key].cell
+    var reply := _decode_reply(bridge.place_unit(int(cell[0]), int(cell[1]), int(from[0]), int(from[1])))
+    if not reply.get("ok", false):
+        _log(str(reply.get("error", "That stack cannot stand there.")), FOE)
+        return false
+    _place_key = ""
+    board.place_key = ""
+    _consume(reply)
+    return true
+
+func _deploy_hover(unit: Dictionary) -> Array:
+    var placing: bool = state.get("unit_placement", true)
+    var picked := _unit_label(_place_key) if not _place_key.is_empty() else ""
+    if _hover_cell.is_empty():
+        if not picked.is_empty(): return ["[b]DEPLOYMENT[/b]: click a green hex for %s · Esc puts it down" % picked, ""]
+        var tail := " (fieldworks: ochre hexes)" if _fieldwork_total() > 0 else ""
+        return ["[b]DEPLOYMENT[/b]: click your stack, then a green hex%s · Enter starts the battle" % tail, ""]
+    if placing and not unit.is_empty() and unit.player:
+        if picked.is_empty(): return ["Pick up %s, then click a green hex to stand it there." % _unit_label(unit.key), "move"]
+        if unit.key == _place_key: return ["Put %s down where it stands." % picked, "move"]
+        return ["Swap %s with %s." % [picked, _unit_label(unit.key)], "move"]
+    if not unit.is_empty(): return ["%s (enemy) — it takes its own position." % _unit_label(unit.key), "blocked"]
+    var free: bool = _obstacle_at(_hover_cell).is_empty()
+    if placing and not picked.is_empty():
+        if free and _hover_cell in state.get("deploy_zone", []): return ["Stand %s here." % picked, "move"]
+        return ["%s can only stand on a free green hex of your deployment zone." % picked, "blocked"]
+    if _fieldwork_total() > 0 and free and _hover_cell in state.get("fieldwork_zone", []):
+        return ["Build a %s here · right-click a piece to recover it." % _fieldwork_kind, "move"]
+    return ["Click one of your stacks first, then a green hex to stand it there.", "blocked"]
 
 func _toggle_curse() -> void:
     if curse_button.disabled or not curse_button.visible: return
@@ -1161,6 +1343,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
         get_viewport().set_input_as_handled()
     elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
         _toggle_curse()
+        get_viewport().set_input_as_handled()
+    elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and _deploying() and not _place_key.is_empty():
+        _set_place_key("")
         get_viewport().set_input_as_handled()
     elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE and _curse_mode:
         _curse_mode = false

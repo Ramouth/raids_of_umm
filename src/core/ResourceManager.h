@@ -6,6 +6,7 @@
 #include "world/BuildingDef.h"
 #include "world/CombatTip.h"
 #include "world/Resources.h"
+#include "combat/CombatLayout.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -56,10 +57,15 @@ public:
     // Companion lines in battle (combat_tips.json, optional), in file order.
     const std::vector<CombatTip>& combatTips() const { return m_combatTips; }
 
+    // Battlefield layouts and obstacle kinds (combat_layouts.json, optional:
+    // without it every battle is the default CombatLayout::field()).
+    const CombatLayouts& combatLayouts() const { return m_combatLayouts; }
+
     bool loaded() const { return m_loaded; }
 
 private:
     std::vector<CombatTip>                        m_combatTips;
+    CombatLayouts                                 m_combatLayouts;
     std::unordered_map<std::string, UnitType>     m_units;
     std::unordered_map<std::string, SpellDef>     m_spells;
     std::unordered_map<std::string, WondrousItem> m_items;
@@ -78,6 +84,7 @@ private:
     std::optional<std::string> loadBuildings(const std::string& path);
     std::optional<std::string> loadItems    (const std::string& path);
     std::optional<std::string> loadCombatTips(const std::string& path);
+    std::optional<std::string> loadCombatLayouts(const std::string& path);
     void rebuildViews();
 
     // Keyed by ObjType cast to int; populated by loadBuildings().

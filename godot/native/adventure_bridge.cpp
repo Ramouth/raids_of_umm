@@ -237,6 +237,7 @@ Json AdventureBridge::snapshot() const {
                    {"reward", enc ? pool(enc->reward) : Json::object()},
                    {"item", enc ? enc->item : ""},
                    {"items", enc ? Json(enc->items) : Json::array()},
+                   {"layout", enc ? enc->layout : std::string("field")},   // pass to CombatSession.start
                    {"xp", session_.encounterXp(*at)}};
     }
     return {
@@ -282,6 +283,8 @@ Json AdventureBridge::snapshot() const {
         {"level_cap", session_.levelCap()}, {"cap_reached_day", session_.capReachedDay()},
         {"xp_lost_to_cap", session_.xpLostToCap()},
         {"army", army},
+        // The map names its own start_army: a fresh start fields that, not the client's default.
+        {"map_start_army", !session_.scenario().startArmy().empty()},
         {"opened", opened},
         {"towns", towns},
         {"building_defs", building_defs},

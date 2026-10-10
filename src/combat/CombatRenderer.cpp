@@ -144,8 +144,8 @@ void CombatRenderer::render(int screenW, int screenH,
 
     GLuint sandTex = m_hexRenderer.terrainTex(Terrain::Sand);
 
-    for (HexCoord coord : CombatMap::allHexes()) {
-        glm::vec3 color = tileColor(coord, reachable, attackable);
+    for (HexCoord coord : engine.map().allHexes()) {
+        glm::vec3 color = tileColor(engine, coord, reachable, attackable);
         m_hexRenderer.drawTile(coord, color, HEX_SIZE, 0.0f, sandTex);
     }
 
@@ -160,7 +160,7 @@ void CombatRenderer::render(int screenW, int screenH,
     }
 
     // Hovered hex — white
-    if (hasHovered && CombatMap::inBounds(hoveredHex))
+    if (hasHovered && engine.map().inBounds(hoveredHex))
         m_hexRenderer.drawOutline(hoveredHex, { 0.9f, 0.9f, 0.9f }, HEX_SIZE);
 
     // ── 3D pass: unit sprites ─────────────────────────────────────────────────
@@ -233,7 +233,7 @@ AnimatedSprite* CombatRenderer::spriteFor(const CombatUnit& unit) {
 
 // ── Tile colour logic ─────────────────────────────────────────────────────────
 
-glm::vec3 CombatRenderer::tileColor(HexCoord coord,
+glm::vec3 CombatRenderer::tileColor(const CombatEngine& engine, HexCoord coord,
                                      const std::vector<HexCoord>& reachable,
                                      const std::vector<HexCoord>& attackable) const {
     // Highlight sets take priority
@@ -241,12 +241,8 @@ glm::vec3 CombatRenderer::tileColor(HexCoord coord,
     if (hexIn(reachable,  coord)) return { 0.28f, 0.55f, 0.52f };  // teal — move
 
     // Zone tints
-    int col, row;
-    CombatMap::fromHex(coord, col, row);
-    (void)row;
-
-    if (col <= 1)                    return { 0.42f, 0.52f, 0.70f };  // player zone
-    if (col >= CombatMap::GRID_W-2)  return { 0.70f, 0.42f, 0.42f };  // enemy zone
+    if (hexIn(engine.deployZone(), coord)) return { 0.42f, 0.52f, 0.70f };  // player zone
+    if (hexIn(engine.enemyZone(), coord))  return { 0.70f, 0.42f, 0.42f };  // enemy zone
     return { 0.76f, 0.62f, 0.38f };                                    // neutral sand
 }
 

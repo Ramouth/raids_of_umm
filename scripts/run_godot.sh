@@ -6,7 +6,7 @@ godot_project="$project_root/godot"
 mkdir -p "$godot_project/content/textures" "$godot_project/content/maps" "$godot_project/content/data"
 cp -Ru "$project_root/assets/textures/." "$godot_project/content/textures/"
 cp -u "$project_root"/data/maps/*.json "$godot_project/content/maps/"
-for definition in units spells buildings items hero_tree campaign combat_tips; do
+for definition in units spells buildings items hero_tree campaign combat_tips combat_layouts; do
     [[ -f "$project_root/data/$definition.json" ]] || continue
     cp -u "$project_root/data/$definition.json" "$godot_project/content/data/$definition.json"
 done

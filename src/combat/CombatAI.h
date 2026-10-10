@@ -1,5 +1,6 @@
 #pragma once
 #include "hex/HexCoord.h"
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,11 @@ class CombatEngine;
  * valued through line of sight (a blocked shot does half damage).  Every walk
  * is charged for the reaction shots it would draw (CombatEngine::reactionsTo).
  *
+ * Breaking through: a stack that cannot reach any enemy at all, because
+ * obstacles wall it in (or wall the enemy in), attacks the first obstacle on
+ * the cheapest way to the nearest enemy (each obstacle costs the turns needed
+ * to break it), walking up to it first, instead of idling (breachTarget).
+ *
  * Randomness: the best action is picked by a softmax over candidates within a
  * few percent of the top score, using engine.aiRng() — deterministic for a
  * given CombatEngine::setSeed(), different between battles otherwise.
@@ -65,4 +71,9 @@ public:
 
     // The candidate takeTurn() would choose (uses and advances engine.aiRng()).
     static Candidate chooseAction(CombatEngine& engine);
+
+    // The obstacle the active stack should break, or nullopt while some enemy
+    // can be attacked or walked to around the obstacles (stacks are ignored:
+    // they move). See "Breaking through" above.
+    static std::optional<HexCoord> breachTarget(const CombatEngine& engine);
 };

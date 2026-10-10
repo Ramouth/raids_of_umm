@@ -220,6 +220,7 @@ std::optional<std::string> AdventureSession::startMap(WorldMap map, const std::s
         std::vector<Stack> army;                  // a fresh start: the map's own muster, if it names one
         for (const auto& st : m_scenario.startArmy()) army.push_back({st.value("id", ""), st.value("count", 0)});
         if (!army.empty()) setArmy(army);
+        if (const auto& purse = m_scenario.startResources()) m_turns.playerFaction().treasury = *purse;
         for (const auto& id : m_scenario.startCompanions().value_or(std::vector<std::string>{"ushari"}))
             joinSpecial(id);
     }
@@ -301,7 +302,8 @@ CampaignState AdventureSession::carryOut() const {
 }
 
 // Format: { "defaults": { "guard": E, "old_mine": E }, "objects": { "<name>": E } }
-// E = { "guards": [{"id","count"}...], "reward": {"Gold": 500, ..., "items": ["id", ...]}, "item": "id" }
+// E = { "guards": [{"id","count"}...], "reward": {"Gold": 500, ..., "items": ["id", ...]}, "item": "id",
+//       "layout": "corridor_ambush" (combat_layouts.json id; default "field") }
 std::optional<std::string> AdventureSession::loadEncounters(const std::string& path) {
     using json = nlohmann::json;
     try {
@@ -318,6 +320,7 @@ std::optional<std::string> AdventureSession::loadEncounters(const std::string& p
                         out.reward.amounts[i] = amount.get<int>();
             out.item = e.value("item", "");
             for (const auto& id : reward.value("items", json::array())) out.items.push_back(id.get<std::string>());
+            out.layout = e.value("layout", std::string("field"));
             return out;
         };
         const json defaults = root.value("defaults", json::object());

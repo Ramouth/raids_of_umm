@@ -687,7 +687,7 @@ bool CombatState::handleEvent(void* sdlEvent) {
             static_cast<float>(e->motion.x),
             static_cast<float>(e->motion.y));
         HexCoord hc = HexCoord::fromWorld(world.x, world.y, HEX_SIZE);
-        if (CombatMap::inBounds(hc)) {
+        if (m_engine.map().inBounds(hc)) {
             m_hoveredHex = hc;
             m_hasHovered = true;
         } else {
@@ -706,7 +706,7 @@ bool CombatState::handleEvent(void* sdlEvent) {
             static_cast<float>(e->button.y));
         HexCoord clicked = HexCoord::fromWorld(world.x, world.y, HEX_SIZE);
 
-        if (!CombatMap::inBounds(clicked)) return true;
+        if (!m_engine.map().inBounds(clicked)) return true;
 
         // Try attack first (click on an attackable enemy hex).  A melee stack
         // that is not adjacent walks to the engine's best standing hex and

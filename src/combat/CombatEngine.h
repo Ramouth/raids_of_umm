@@ -1,10 +1,13 @@
 #pragma once
 #include "CombatArmy.h"
 #include "CombatEvent.h"
+#include "CombatLayout.h"
 #include "CombatMap.h"
 #include <cstdint>
 #include <optional>
 #include <random>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 /*
@@ -67,8 +70,11 @@ struct AttackPreview {
 class CombatEngine {
 public:
     // Production battles use a d6; zero keeps fixed initiative for simulations.
+    // The layout sets the grid, the deployment zones, the terrain obstacles and
+    // who acts first (default: the open field).
     CombatEngine(CombatArmy player, CombatArmy enemy, int initiativeDie = 0,
-                 std::optional<uint32_t> seed = std::nullopt);
+                 std::optional<uint32_t> seed = std::nullopt,
+                 const CombatLayout& layout = CombatLayout::field());
 
     // Reseed damage rolls and the AI's tie-break RNG.  Same seed + same
     // commands ⇒ identical damage/AI. Pass the constructor seed to reproduce
@@ -80,12 +86,58 @@ public:
     // shifts damage rolls).
     std::mt19937& aiRng() { return m_aiRng; }
 
-    struct Fieldwork { HexCoord cell; bool opaque = true; };
-    const std::vector<Fieldwork>& fieldworks() const { return m_fieldworks; }
-    bool placeFieldwork(HexCoord cell, bool opaque);
+    // ── Layout ───────────────────────────────────────────────────────────────
+    const std::string& layoutId() const { return m_layoutId; }
+    const std::vector<HexCoord>& deployZone() const    { return m_playerZone; }
+    const std::vector<HexCoord>& enemyZone() const     { return m_enemyZone; }
+    const std::vector<HexCoord>& fieldworkZone() const { return m_fieldworkZone; }
+    CombatLayout::FirstMove firstMove() const { return m_firstMove; }
+
+    // ── Obstacles ────────────────────────────────────────────────────────────
+    // Terrain from the layout (trees) and fieldworks the player builds
+    // (barricades, stakes). All block movement; opaque ones block shots.
+    // Any stack may attack one: in melee from a hex next to it (walking there
+    // first, like a strike), or with a shot it could fire at a stack there.
+    // Obstacles have no defence and never strike back; at 0 hp one is gone.
+    // hp 0 from the start = cannot be destroyed (a fieldwork without data).
+    struct Obstacle {
+        HexCoord    cell;
+        std::string kind;
+        bool        opaque    = true;
+        int         hp        = 0;
+        int         maxHp     = 0;
+        bool        fieldwork = false;   // built by the player (removable while deploying)
+    };
+    const std::vector<Obstacle>& obstacles() const { return m_obstacles; }
+    std::vector<Obstacle> fieldworks() const;
+    const Obstacle* obstacleAt(HexCoord cell) const;
+    // Build a fieldwork in the fieldwork zone on an empty hex, leaving every
+    // open hex connected (CombatSession allows it only while deploying).
+    bool placeFieldwork(HexCoord cell, const ObstacleKind& kind);
+    bool placeFieldwork(HexCoord cell, bool opaque);   // no data: a barricade or stakes that cannot be destroyed
     bool removeFieldwork(HexCoord cell);
-    bool fieldworkAt(HexCoord cell) const;
     bool clearTerrainSight(HexCoord from, HexCoord to) const;
+
+    // Obstacles the active stack may attack this turn, and from where.
+    std::vector<HexCoord> attackableObstacles() const;
+    std::vector<HexCoord> obstacleAttackHexes(HexCoord cell) const;
+    bool canAttackObstacle(HexCoord cell) const;
+    bool canAttackObstacleFrom(HexCoord from, HexCoord cell) const;
+    // Attack the obstacle on `cell`: from the nearest standing hex, from `from`,
+    // or at the end of an exact route. False (no action) if not allowed.
+    bool doAttackObstacle(HexCoord cell);
+    bool doAttackObstacleFrom(HexCoord from, HexCoord cell);
+    bool doAttackObstacleAlong(const std::vector<HexCoord>& route, HexCoord cell);
+    // Damage `attacker` does to an obstacle: its own damage roll, nothing to
+    // beat; halved for a shooter hand to hand.
+    static DamageRange obstacleDamage(const CombatUnit& attacker, bool melee);
+
+    // ── Deployment ───────────────────────────────────────────────────────────
+    // Before anyone has acted, the player may move any living stack of theirs
+    // to any hex of the deployment zone that is free of obstacles; a hex held
+    // by another of their stacks swaps the two.
+    bool canPlaceUnit(int stackIdx, HexCoord cell) const;
+    bool placeUnit(int stackIdx, HexCoord cell);
 
     // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -322,7 +374,14 @@ public:
     void resolveScChoice(bool isPlayer, int stackIdx, const std::string& branchId);
 
 private:
-    std::vector<Fieldwork> m_fieldworks;
+    std::vector<Obstacle> m_obstacles;
+    std::string           m_layoutId;
+    std::vector<HexCoord> m_playerZone, m_enemyZone, m_fieldworkZone;
+    CombatLayout::FirstMove m_firstMove = CombatLayout::FirstMove::Normal;
+    // Hexes no stack may enter: obstacles and living stacks (but `except`).
+    std::unordered_set<HexCoord> blockedHexes(const CombatUnit* except = nullptr) const;
+    // Resolve the active stack's blow on the obstacle at `cell`, then advance.
+    void resolveObstacleAttack(HexCoord cell);
     // Award XP to a SC stack; handles level-up logic and emits ScXpGained /
     // ScLevelUp events.  No-ops if the unit has no SC def or amount <= 0.
     void awardScXp(CombatUnit& unit, const TurnSlot& slot, int amount);
@@ -340,7 +399,7 @@ private:
     // Returns true if `node` passes its requiresBranch gate for `unit`.
     bool nodePassesBranchGate(const SCLevelNode& node, const CombatUnit& unit) const;
 
-    // Assign each stack its spawn position on the CombatMap.
+    // Assign each stack its start hex in its side's zone (see CombatLayout).
     void placeArmies();
 
     // Build m_queue sorted by initiative score; player wins score ties.

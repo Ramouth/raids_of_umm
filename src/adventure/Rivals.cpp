@@ -17,7 +17,7 @@
 
 namespace {
 
-constexpr int    MAX_STACKS      = 5;     // CombatMap::GRID_H
+constexpr int    MAX_STACKS      = 5;     // Hero::ARMY_SLOTS
 constexpr double AMBUSH_MARGIN   = 1.5;   // attack the hero only when this much stronger
 constexpr double SEARCH_MARGIN   = 1.15;   // search an old mine only when this much stronger
 constexpr double CLEAR_MARGIN    = 1.5;   // attack a guard camp only when this much stronger
@@ -68,7 +68,8 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
                                                           const std::vector<Stack>& defender,
                                                           const std::vector<Companion>& companions,
                                                           ArmyBonus attackerBonus,
-                                                          const std::function<void(const CombatEngine&)>& watch) const {
+                                                          const std::function<void(const CombatEngine&)>& watch,
+                                                          const std::string& layout) const {
     auto build = [&](const std::vector<Stack>& stacks, bool player) {
         CombatArmy army;
         army.isPlayer = player;
@@ -101,7 +102,8 @@ AdventureSession::AutoResult AdventureSession::autoBattle(const std::vector<Stac
     CombatArmy d = build(defender, false);
     if (a.stacks.empty()) { out.defender = defender; return out; }
     if (d.stacks.empty()) { out.attackerWon = true; out.attacker = attacker; return out; }
-    CombatEngine engine(std::move(a), std::move(d));
+    const CombatLayout* shape = m_resources->combatLayouts().find(layout);
+    CombatEngine engine(std::move(a), std::move(d), 0, std::nullopt, shape ? *shape : CombatLayout::field());
     if (watch) watch(engine);
     for (int n = 0; n < 4000 && !engine.isOver(); ++n) {
         CombatAI::takeTurn(engine);

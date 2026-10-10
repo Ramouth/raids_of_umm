@@ -44,7 +44,10 @@ THREADS
 
 MAP BY MAP, and what the player must understand to act
     1.0 The Last Hunt   Two packs of mad dogs with Aldren and Drest; the tag drops from the
-                        Stream Dogs. End the day: the toast to Aldren (raise your cup / leave
+                        Stream Dogs. The woods are a labyrinth of narrow trails: the Thicket
+                        Dogs wait in a tree corridor (an ambush battle), the Stream Dogs past
+                        the one bridge. The Hunters' Lodge on the trail sells slingers; two
+                        dead-end side paths hold a cold fire and cut willow to pay for them. End the day: the toast to Aldren (raise your cup / leave
                         the hall). At first light Aldren is gone: his sword, and a letter,
                         "Do not come after me."
                         Understand: Aldren is the heir; the dogs are wrong; he has left.
@@ -91,6 +94,9 @@ PLANNED, NOT BUILT
 
 Author knowledge (never told in Chapter 1): the hooded man is the king; Aldren went east
 for the old passage and cut the roots at the mine mouth; the red hand is the emperor's mark.
+Why Aldren left is the same thing as the fall of Umm'Natur (decided; how it is shown is open).
+The dogs (decided 2026-10-10): the Northerners use dogs for everything; a disease spreads
+among their dogs, and the people from Under spread it. Under works by curses and illness.
 
 Writes DIR/ch1_*.triggers.json and DIR/ch1_*.encounters.json, and campaign.json in the
 data dir (default: the parent of DIR), then checks the result against the maps in DIR.
@@ -117,9 +123,11 @@ def lore(title, text):
     return {"lore": [title, text]}
 
 
-def mad_dogs(n, gold=0):
-    """1.0 only: the dogs look sick but do not bite-infect (the prologue's promise)."""
-    return {"guards": [{"id": "feral_dog", "count": n}], "reward": {"Gold": gold} if gold else {}}
+def mad_dogs(n, gold=0, packs=1):
+    """1.0 only: the dogs look sick but do not bite-infect (the prologue's promise).
+    packs > 1 splits them into stacks, so an ambush layout can bring them in from several sides."""
+    counts = [n // packs + (1 if i < n % packs else 0) for i in range(packs)]
+    return {"guards": [{"id": "feral_dog", "count": c} for c in counts], "reward": {"Gold": gold} if gold else {}}
 
 
 def dogs(n, gold=0):
@@ -197,15 +205,17 @@ class Story:
 # ── 1.0 The Last Hunt ────────────────────────────────────────────────────────
 def hunt():
     s = Story("ch1_1_0_hunt", ["aldren", "drest"], essential=["drest"])
-    # Not read by the engine yet: a new campaign starts with the Godot default army
-    # (24 runners, 10 slingers, 3 blades). The hunt wants a small household party.
-    s.root["_comment"] = "start_army is not read by the engine yet; see the chapter 1 report."
+    # A small household party and a thin purse: the Hunters' Lodge slingers (110 gold +
+    # 1 wood each) are paid for from the side paths (Poachers' Fire, Cut Willow).
     s.root["start_army"] = [{"id": "woad_runner", "count": 10}, {"id": "cruth_slinger", "count": 4}]
+    s.root["start_resources"] = {"Gold": 200}
     s.quest("hunt", "The Last Hunt", "Two packs of dogs have been killing the herds. They foam at the mouth and do not run from people. Hunt them down with Aldren.", main=True)
     s.quest("hall", "The Hall", "The hunt is over. End the day: your father is waiting in the hall.")
     stream = mad_dogs(8)
     stream["reward"]["items"] = ["dog_tag"]   # found on the spoils screen; it sets up 1.1 and 1.2
-    s.encounters["objects"] = {"Thicket Dogs": mad_dogs(6), "Stream Dogs": stream}
+    thicket = mad_dogs(6, packs=2)              # one pack from the trees above, one from below
+    thicket["layout"] = "corridor_ambush"     # the battle is fought in the tree corridor they wait in
+    s.encounters["objects"] = {"Thicket Dogs": thicket, "Stream Dogs": stream}
 
     s.trig("start", {"event": "start"},
            {"quest": "hunt"}, {"reveal": [0, 0, 10]},
@@ -649,10 +659,24 @@ def check_conditions(s, known):
     return problems
 
 
+def combat_layout_ids():
+    """The battle layout ids data/combat_layouts.json defines, or None before it exists.
+    Accepts {"layouts": [{"id": ...}]}, {"layouts": {id: ...}} or {id: ...}."""
+    path = ROOT / "data/combat_layouts.json"
+    if not path.exists():
+        return None
+    doc = json.loads(path.read_text())
+    body = doc.get("layouts", doc) if isinstance(doc, dict) else doc
+    if isinstance(body, list):
+        return {e["id"] for e in body if isinstance(e, dict) and "id" in e}
+    return {k for k in body if not k.startswith("_")}
+
+
 def check(stories, lands, out, data_out):
     units = {u["id"]: u for u in json.loads((ROOT / "data/units.json").read_text())["units"]}
     items = {i["id"] for i in json.loads((ROOT / "data/items.json").read_text())["items"]}
     problems, report = [], []
+    layouts = combat_layout_ids()
     camp = json.loads((data_out / "campaign.json").read_text())
     for entry in camp["chapters"][0]["maps"]:
         for key in ("map", "encounters", "triggers"):
@@ -746,6 +770,14 @@ def check(stories, lands, out, data_out):
             for i in e.get("reward", {}).get("items", []):
                 if i not in items:
                     problems.append(f"{s.stem}: {n} rewards item {i}, not in items.json")
+        # A battle layout ("layout": id) must be a string, and one data/combat_layouts.json
+        # defines once that file exists (the engine reads the key per battle).
+        for n, e in s.encounters["objects"].items():
+            if "layout" in e:
+                if not isinstance(e["layout"], str) or not e["layout"]:
+                    problems.append(f"{s.stem}: {n} layout must be a layout id")
+                elif layouts is not None and e["layout"] not in layouts:
+                    problems.append(f"{s.stem}: {n} layout '{e['layout']}' is not in combat_layouts.json")
         named.update(s.encounters["objects"])
         named.update(s.encounters["pickups"])
         for n in sorted(named - set(objs)):

@@ -1726,8 +1726,8 @@ SUITE("CombatAI — two melee stacks split up instead of converging on one targe
         CombatAI::takeTurn(eng);   // enemy 1
         // One goes for the north corner, the other for the south corner.
         int c0, r0, c1, r1;
-        CombatMap::fromHex(eng.enemyArmy().stacks[0].pos, c0, r0);
-        CombatMap::fromHex(eng.enemyArmy().stacks[1].pos, c1, r1);
+        CombatMap::toOffset(eng.enemyArmy().stacks[0].pos, c0, r0);
+        CombatMap::toOffset(eng.enemyArmy().stacks[1].pos, c1, r1);
         if (std::abs(r0 - r1) >= 2) ++split;
     }
     CHECK_EQ(split, runs);
@@ -2093,7 +2093,7 @@ SUITE("Companions — with four troop stacks the companion starts fully enclosed
     int open = 0;
     for (int dir = 0; dir < 6; ++dir) {
         const HexCoord n = at.neighbor(dir);
-        if (!CombatMap::inBounds(n)) continue;
+        if (!eng.map().inBounds(n)) continue;
         bool held = false;
         for (int i = 1; i <= 4; ++i) held |= eng.playerArmy().stacks[i].pos == n;
         if (!held) ++open;
@@ -2259,7 +2259,7 @@ SUITE("Routes — gaps, repeats, blocked hexes and overlong routes are refused")
     CHECK(!eng.isLegalRoute({start.neighbor(0), foe}));                                // through a stack
     HexCoord h = start;
     std::vector<HexCoord> tooLong;
-    for (int i = 0; i < 4; ++i) { h = h.neighbor(5); if (CombatMap::inBounds(h)) tooLong.push_back(h); }
+    for (int i = 0; i < 4; ++i) { h = h.neighbor(5); if (eng.map().inBounds(h)) tooLong.push_back(h); }
     tooLong.push_back(tooLong.back().neighbor(0));
     CHECK(!eng.isLegalRoute(tooLong));                                                 // move range 3
     CHECK(!eng.doMoveAlong({start.neighbor(0), foe}));
@@ -2316,8 +2316,8 @@ SUITE("Line of sight — the same answer in both directions") {
     eng.teleportUnit(true, 0, CombatMap::toHex(5, 2));
     eng.teleportUnit(false, 0, CombatMap::toHex(5, 4));
     int checked = 0;
-    for (auto a : CombatMap::allHexes())
-        for (auto b : CombatMap::allHexes()) {
+    for (auto a : eng.map().allHexes())
+        for (auto b : eng.map().allHexes()) {
             if (a.distanceTo(b) < 2) continue;
             CHECK(eng.hasLineOfSight(a, b) == eng.hasLineOfSight(b, a));
             ++checked;

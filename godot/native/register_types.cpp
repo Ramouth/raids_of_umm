@@ -15,6 +15,7 @@ protected:
         ClassDB::bind_method(D_METHOD("act", "action", "q", "r"), &UmmCombat::act);
         ClassDB::bind_method(D_METHOD("strike", "q", "r", "from_q", "from_r"), &UmmCombat::strike);
         ClassDB::bind_method(D_METHOD("route", "action", "route_json", "q", "r"), &UmmCombat::route);
+        ClassDB::bind_method(D_METHOD("place_unit", "q", "r", "from_q", "from_r"), &UmmCombat::place_unit);
         ClassDB::bind_method(D_METHOD("acknowledge", "ticket"), &UmmCombat::acknowledge);
     }
 public:
@@ -33,6 +34,11 @@ public:
     // Move-and-attack: walk to (from_q, from_r), then strike the enemy on (q, r).
     String strike(int q, int r, int from_q, int from_r) {
         try { return encode(session_.command("strike", q, r, from_q, from_r)); }
+        catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
+    }
+    // Deployment: move the player's stack standing on (from_q, from_r) to (q, r) (own stack there = swap).
+    String place_unit(int q, int r, int from_q, int from_r) {
+        try { return encode(session_.command("place_unit", q, r, from_q, from_r)); }
         catch (const std::exception& error) { return encode({{"ok", false}, {"error", error.what()}}); }
     }
     // Player-chosen route (waypoints): "move" along it, or "strike" the enemy on (q, r) from its end.

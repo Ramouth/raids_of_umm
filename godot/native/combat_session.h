@@ -12,13 +12,23 @@ class CombatSession {
 public:
     using Json = nlohmann::json;
     // army: up to five troop stacks and two companions. encounter: {guards, seed?,
-    // reward?, fieldworks?, tactics?, tips?}; tips = the adventure snapshot's
+    // reward?, fieldworks?, tactics?, tips?, layout?}; layout = a combat_layouts.json
+    // id (default "field"). Every battle opens deploying ("deploying": true): the
+    // player may "place_unit" in "deploy_zone" and build fieldworks, then
+    // "deploy_done". With no fieldworks to build, any battle order (or "ai")
+    // accepts the placement as it stands. tips = the adventure snapshot's
     // "tip_context" {map, shown}. The snapshot's "tip" is {id, speaker, text} in the
     // reply of the action that made a companion tip due (null otherwise; decided by
     // CombatTipWatch, never twice), and "battle"."tips" lists the ids shown so far.
     Json start(const std::string& data_dir, const Json& army, const Json& encounter);
     // action: move | attack | strike | defend | retreat | ai.  "strike" attacks
     // the enemy on (q, r) after walking to the standing hex (fq, fr).
+    // "attack" / "strike" on an obstacle's hex attack the obstacle (melee from
+    // next to it, or a shot); the snapshot lists those hexes in "attackable"
+    // and "attackable_obstacles", and every obstacle in "obstacles".
+    // Deployment: deploy_done | place_unit (your stack on (fq, fr) to (q, r);
+    // swaps with your own stack there) | place_barricade | place_stakes |
+    // remove_fieldwork (on (q, r)).
     // A mad stack (rabies) refuses orders: the snapshot says "mad_turn" and
     // "player_turn": false, and the caller plays it with "ai".
     Json command(const std::string& action, int q = 0, int r = 0, int fq = 0, int fr = 0);
@@ -37,10 +47,12 @@ private:
     // {result, losses: {player, enemy}, total_damage: {player, enemy}, max_hit, per_stack}
     Json battle() const;
     Json previews() const;
+    Json obstacle_preview(HexCoord cell) const;   // {cell, ranged, damage_min/max, best, options[{from, path, reactions}]}
     Json reactions(HexCoord to) const;   // enemy shooters that would fire as the active stack walks to `to`
     Json movement_path(HexCoord from, HexCoord to, bool player, int index) const;
     Json response();
     Json failure(const std::string& error) const;
+    int fieldwork_stock() const { return barricades_ + stakes_; }
     std::unique_ptr<ResourceManager> resources_;
     std::unique_ptr<CombatEngine> engine_;
     std::string reward_;

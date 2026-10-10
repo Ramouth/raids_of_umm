@@ -20,9 +20,12 @@ class AdventureSession;
  *     "triggers": [ { "id", "when": {...}, "do": [ {...}, ... ] } ],
  *     "start_companions": [id, ...],    — who rides with the hero on day 1
  *                                          (absent = the default, Ushari)
- *     "start_army": [{"id","count"}] }  — the hero's army when the map starts
+ *     "start_army": [{"id","count"}],   — the hero's army when the map starts
  *                                          without carried state (a new campaign
  *                                          or a lone map); carried state wins
+ *     "start_resources": {"Gold": n, ...} } — the treasury on such a start: exactly
+ *                                          these, unnamed resources 0 (absent = the
+ *                                          default purse); carried state wins
  *
  * when.event:  "start" | "night" (End Day) | "day" (day) | "see" (cell) | "see_type" (type)
  *              | "enter_q" (q_min) | "visit" (name) | "capture" (name)
@@ -193,6 +196,8 @@ public:
     const std::optional<std::vector<std::string>>& startCompanions() const { return m_startCompanions; }
     // The army the hero starts with absent carried state ([{"id","count"}]; empty = none named).
     const Json& startArmy() const { return m_startArmy; }
+    // The treasury the hero starts with absent carried state; nullopt = the default purse.
+    const std::optional<ResourcePool>& startResources() const { return m_startResources; }
     // The engage trigger's guard name ("" = that trigger is not an engage).
     std::string engagedAt(const std::string& triggerId) const;
     // The trigger that raised the open choice ("" = none / raised by a choice or offer).
@@ -269,6 +274,7 @@ private:
     std::vector<Lore>               m_lore;
     std::optional<std::vector<std::string>> m_startCompanions;
     Json                            m_startArmy = Json::array();
+    std::optional<ResourcePool>     m_startResources;
     std::unordered_set<std::string> m_won;          // guard camps beaten, by name
     std::unordered_set<std::string> m_vanished;     // map objects gone from the map
     std::vector<std::string>        m_waiting;      // triggers held by when.wait

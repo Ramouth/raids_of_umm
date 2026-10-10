@@ -51,6 +51,10 @@ var reaction_lines: Array = []
 var order_marks: Dictionary = {}   # Tactics: unit key -> place in the opening orders (1, 2, 3)
 var pin_stand: Array = []
 var pin_ally: Array = []
+## Deployment: the stack picked up to be placed (its hex is ringed).
+var place_key := ""
+## Obstacle hit points as they fall during an animation (cell -> hp), until the next sync.
+var _obstacle_hp: Dictionary = {}
 var _forecast: Label
 ## Drawn above the unit sprites (the pincer must not hide behind them).
 var _overlay: Node2D
@@ -81,12 +85,29 @@ func _ready() -> void:
             hover_cell = []
             cell_hovered.emit(Vector2i.ZERO, false))
 
-static func cell_at(point: Vector2) -> Array:
-    for col in range(11):
-        for row in range(5):
-            var cell := [col, row - (col - (col & 1)) / 2]
-            if Geometry2D.is_point_in_polygon(point, hex_points(cell_point(cell))):
-                return cell
+## Battlefield size in hexes (the layout's width x height; the open field is 11 x 5).
+func grid_width() -> int:
+    return int(state.get("width", 11))
+
+func grid_height() -> int:
+    return int(state.get("height", 5))
+
+## Every hex of the battlefield, as axial [q, r] cells (columns of offset rows).
+func grid_cells() -> Array:
+    var out := []
+    for col in range(grid_width()):
+        for row in range(grid_height()):
+            out.append([col, row - (col - (col & 1)) / 2])
+    return out
+
+## The board's unscaled size for this layout: 750 x 450 for the 11 x 5 field.
+func natural_size() -> Vector2:
+    return Vector2(maxf(750.0, (grid_width() - 1) * 60.0 + 150.0), maxf(450.0, (grid_height() - 0.5) * 76.0 + 108.0))
+
+func cell_at(point: Vector2) -> Array:
+    for cell in grid_cells():
+        if Geometry2D.is_point_in_polygon(point, hex_points(cell_point(cell))):
+            return cell
     return []
 
 func _clicked(event: InputEvent) -> void:
@@ -115,26 +136,62 @@ func set_hover(kind: String, label: String) -> void:
         "blocked": Control.CURSOR_FORBIDDEN}.get(kind, Control.CURSOR_ARROW)
     queue_redraw()
 
-func _draw_fieldworks() -> void:
-    for work in state.get("fieldworks", []):
-        var at := cell_point(work.cell)
-        draw_ellipse_shadow(at)
-        if work.kind == "barricade":
-            for i in range(-2, 3):
-                var x := at.x + i * 10
-                var top: float = at.y - 23 - (absi(i) % 2) * 3
-                draw_colored_polygon(PackedVector2Array([Vector2(x - 4, at.y + 14), Vector2(x - 4, top), Vector2(x, top - 6), Vector2(x + 4, top), Vector2(x + 4, at.y + 14)]), Color("a28b61"))
-                draw_line(Vector2(x - 2, top + 4), Vector2(x - 2, at.y + 10), Color("68583f"), 1, true)
-            draw_line(at + Vector2(-28, -8), at + Vector2(28, -8), Color("4b4234"), 5, true)
-            draw_line(at + Vector2(-28, 8), at + Vector2(28, 8), Color("4b4234"), 4, true)
-        else:
-            for i in range(-2, 3):
-                var foot := at + Vector2(i * 11, 14)
-                draw_line(foot, foot + Vector2(9, -31), Color("beac86"), 5, true)
-                draw_line(foot + Vector2(-4, -2), foot + Vector2(12, -10), Color("69583f"), 3, true)
-        var outline := hex_points(at)
-        outline.append(outline[0])
-        draw_polyline(outline, Color("d5b578"), 1.5, true)
+## Obstacles: trees of the layout and the player's fieldworks, each with an
+## hp bar once it has been hit. (Older states without "obstacles" list only fieldworks.)
+func _draw_obstacles() -> void:
+    var pieces: Array = state.get("obstacles", state.get("fieldworks", []))
+    for piece in pieces:
+        var cell := Vector2i(int(piece.cell[0]), int(piece.cell[1]))
+        var hp := int(_obstacle_hp.get(cell, piece.get("hp", 0)))
+        var max_hp := int(piece.get("max_hp", 0))
+        if max_hp > 0 and hp <= 0: continue   # cut down during this animation
+        var at := cell_point(piece.cell)
+        if piece.kind == "tree": _draw_tree(at)
+        else: _draw_fieldwork(at, str(piece.kind), piece.get("fieldwork", true))
+        if max_hp > 0 and hp < max_hp: _draw_hp_bar(at, float(hp) / float(max_hp))
+
+## A dark pine in the placeholder style: three stacked tiers on a short trunk, 1px outline.
+func _draw_tree(at: Vector2) -> void:
+    draw_ellipse_shadow(at)
+    var ink := Color("16100a")
+    draw_rect(Rect2(at + Vector2(-5, 2), Vector2(10, 14)), ink)
+    draw_rect(Rect2(at + Vector2(-4, 3), Vector2(8, 12)), Color("5a4230"))
+    for tier in [[8.0, -15.0, 23.0], [-4.0, -27.0, 18.0], [-15.0, -38.0, 12.0]]:
+        var base: float = at.y + tier[0]
+        var top: float = at.y + tier[1]
+        var half: float = tier[2]
+        var shape := PackedVector2Array([Vector2(at.x, top), Vector2(at.x + half, base), Vector2(at.x - half, base)])
+        draw_colored_polygon(shape, Color("2f4a2c"))
+        draw_colored_polygon(PackedVector2Array([Vector2(at.x, top), Vector2(at.x - half * 0.25, base), Vector2(at.x - half, base)]), Color("46683c"))
+        shape.append(shape[0])
+        draw_polyline(shape, ink, 1.0)
+
+func _draw_hp_bar(at: Vector2, ratio: float) -> void:
+    var bar := Rect2(at + Vector2(-20, 20), Vector2(40, 6))
+    draw_rect(bar, Color("16100a"))
+    var fill := Color("8fb36a") if ratio > 0.5 else (Color("d9a54a") if ratio > 0.25 else Color("c8553d"))
+    draw_rect(Rect2(bar.position + Vector2(1, 1), Vector2(38.0 * clampf(ratio, 0.0, 1.0), 4)), fill)
+
+## The player's barricade or stakes, ringed in gold (built before the battle).
+func _draw_fieldwork(at: Vector2, kind: String, ringed := true) -> void:
+    draw_ellipse_shadow(at)
+    if kind == "barricade":
+        for i in range(-2, 3):
+            var x := at.x + i * 10
+            var top: float = at.y - 23 - (absi(i) % 2) * 3
+            draw_colored_polygon(PackedVector2Array([Vector2(x - 4, at.y + 14), Vector2(x - 4, top), Vector2(x, top - 6), Vector2(x + 4, top), Vector2(x + 4, at.y + 14)]), Color("a28b61"))
+            draw_line(Vector2(x - 2, top + 4), Vector2(x - 2, at.y + 10), Color("68583f"), 1, true)
+        draw_line(at + Vector2(-28, -8), at + Vector2(28, -8), Color("4b4234"), 5, true)
+        draw_line(at + Vector2(-28, 8), at + Vector2(28, 8), Color("4b4234"), 4, true)
+    else:
+        for i in range(-2, 3):
+            var foot := at + Vector2(i * 11, 14)
+            draw_line(foot, foot + Vector2(9, -31), Color("beac86"), 5, true)
+            draw_line(foot + Vector2(-4, -2), foot + Vector2(12, -10), Color("69583f"), 3, true)
+    if not ringed: return
+    var outline := hex_points(at)
+    outline.append(outline[0])
+    draw_polyline(outline, Color("d5b578"), 1.5, true)
 
 func draw_ellipse_shadow(at: Vector2) -> void:
     var points := PackedVector2Array()
@@ -144,24 +201,34 @@ func draw_ellipse_shadow(at: Vector2) -> void:
     draw_colored_polygon(points, Color(0.02, 0.03, 0.03, 0.45))
 
 func _draw() -> void:
-    for col in range(11):
-        for row in range(5):
-            var cell := [col, row - (col - (col & 1)) / 2]
-            var points := hex_points(cell_point(cell))
-            var fill := Color("38413c") if (col + row) % 2 else Color("3c4540")
-            if state.get("deploying", false) and col >= 2 and col <= 4: fill = Color("58614c")
-            if not locked and state.get("player_turn", false):
-                var reach: Array = route_reach if not waypoints.is_empty() else state.get("reachable", [])
-                if cell in reach: fill = Color("405347")
-                if cell in state.get("attackable", []): fill = Color("854637")
-                if curse_mode:
-                    fill = Color("38413c")
-                    if cell in state.get("curse_range", []): fill = Color("45425e")
-                    if cell in state.get("curse_targets", []): fill = Color("9464a0")
-            draw_colored_polygon(points, fill)
-            points.append(points[0])
-            draw_polyline(points, Color("667267"), 1.0, true)
-    _draw_fieldworks()
+    var deploying: bool = state.get("deploying", false)
+    var placing: bool = deploying and state.get("unit_placement", deploying)
+    var stock: Dictionary = state.get("fieldwork_stock", {})
+    var building: bool = deploying and int(stock.get("barricade", 0)) + int(stock.get("stakes", 0)) > 0
+    var deploy_zone: Array = state.get("deploy_zone", [])
+    var work_zone: Array = state.get("fieldwork_zone", [])
+    for cell in grid_cells():
+        var col: int = cell[0]
+        var row: int = int(cell[1]) + (col - (col & 1)) / 2
+        var points := hex_points(cell_point(cell))
+        var fill := Color("38413c") if (col + row) % 2 else Color("3c4540")
+        # Before battle: where your stacks may stand (green), where fieldworks may go (ochre).
+        if building and cell in work_zone: fill = Color("58614c")
+        if placing and cell in deploy_zone: fill = Color("4a6a4f") if not (building and cell in work_zone) else Color("5a6e4c")
+        if not locked and state.get("player_turn", false):
+            var reach: Array = route_reach if not waypoints.is_empty() else state.get("reachable", [])
+            if cell in reach: fill = Color("405347")
+            if cell in state.get("attackable", []):
+                # Enemies you can strike: red; obstacles you can break: a muted brown.
+                fill = Color("5f4a35") if cell in state.get("attackable_obstacles", []) else Color("854637")
+            if curse_mode:
+                fill = Color("38413c")
+                if cell in state.get("curse_range", []): fill = Color("45425e")
+                if cell in state.get("curse_targets", []): fill = Color("9464a0")
+        draw_colored_polygon(points, fill)
+        points.append(points[0])
+        draw_polyline(points, Color("8fb98f") if placing and cell in deploy_zone else Color("667267"), 1.0, true)
+    _draw_obstacles()
     _draw_companions()
     var playing: bool = not locked and state.get("player_turn", false)
     if not hover_cell.is_empty():
@@ -192,6 +259,7 @@ func _draw() -> void:
         if unit.count <= 0: continue
         var ring := ""
         if unit.key == state.get("active", "") and int(state.get("opening", 0)) == 0 and not state.get("deploying", false): ring = "active"
+        elif unit.key == place_key and state.get("deploying", false): ring = "active"
         elif unit.key == highlight_key: ring = "highlight"
         if ring.is_empty(): continue
         var points := hex_points(cell_point(unit.cell))
@@ -215,15 +283,13 @@ func _draw_companions() -> void:
     for unit in state.get("units", []):
         if int(unit.count) <= 0 or int(unit.get("aura_radius", 0)) <= 0: continue
         var tint := Color(0.97, 0.84, 0.5, 0.2) if unit.player else Color(1.0, 0.5, 0.4, 0.18)
-        for col in range(11):
-            for row in range(5):
-                var cell := [col, row - (col - (col & 1)) / 2]
-                var d := _hex_distance(cell, unit.cell)
-                if d == 0 or d > int(unit.aura_radius): continue
-                var points := hex_points(cell_point(cell))
-                draw_colored_polygon(points, tint)
-                points.append(points[0])
-                draw_polyline(points, Color(COMPANION_COLOR, 0.35), 1.5, true)
+        for cell in grid_cells():
+            var d := _hex_distance(cell, unit.cell)
+            if d == 0 or d > int(unit.aura_radius): continue
+            var points := hex_points(cell_point(cell))
+            draw_colored_polygon(points, tint)
+            points.append(points[0])
+            draw_polyline(points, Color(COMPANION_COLOR, 0.35), 1.5, true)
 
 ## Red inner ring on every companion the enemy can reach next turn (drawn
 ## after the active/highlight rings so it is never hidden).
@@ -379,6 +445,7 @@ func _add_shadow(actor: Node2D, team_color: Color) -> void:
 
 func sync(snapshot: Dictionary) -> void:
     state = snapshot
+    _obstacle_hp.clear()
     for unit in state.units:
         if not actors.has(unit.key):
             var actor := Node2D.new()
@@ -495,12 +562,15 @@ static func _badge(companion: bool, hp: int, unit_hp: int, count: int) -> String
     return "♥ %d/%d" % [hp, unit_hp] if companion else "× %d" % count
 
 func float_text(actor: Node2D, message: String, color: Color, duration: float) -> void:
+    await float_at(actor.position, message, color, duration)
+
+func float_at(point: Vector2, message: String, color: Color, duration: float) -> void:
     var label := Label.new()
     label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     label.text = message
     label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     label.size = Vector2(140, 44)
-    label.position = actor.position + Vector2(-70, -86)
+    label.position = point + Vector2(-70, -86)
     label.add_theme_font_size_override("font_size", 19)
     label.add_theme_color_override("font_color", color)
     label.add_theme_color_override("font_outline_color", Color("16100a"))
@@ -578,6 +648,33 @@ func animate(event: Dictionary, speed: float) -> void:
                 tween.tween_property(actor, "modulate:a", 0.0, duration)
                 await tween.finished
                 actor.hide()
+        "obstacle_attack":
+            # A stack hacks at (or shoots) an obstacle on event.cell.
+            if actor and event.has("cell"):
+                var aim := cell_point(event.cell)
+                var start := actor.position
+                if event.get("ranged", false):
+                    var projectile := Polygon2D.new()
+                    projectile.polygon = PackedVector2Array([Vector2(-12, -2), Vector2(8, -2), Vector2(12, 0), Vector2(8, 2), Vector2(-12, 2)])
+                    projectile.color = Color("f7d580")
+                    projectile.position = start + Vector2(0, -24)
+                    projectile.rotation = (aim - start).angle()
+                    add_child(projectile)
+                    var flight := create_tween()
+                    flight.tween_property(projectile, "position", aim + Vector2(0, -20), duration)
+                    await flight.finished
+                    projectile.queue_free()
+                else:
+                    var tween := create_tween()
+                    tween.tween_property(actor, "position", start.lerp(aim, 0.35), duration * 0.5)
+                    tween.tween_property(actor, "position", start, duration * 0.5)
+                    await tween.finished
+        "obstacle_damage":
+            if event.has("cell"):
+                var left := int(event.get("remaining", 0))
+                _obstacle_hp[Vector2i(int(event.cell[0]), int(event.cell[1]))] = left
+                queue_redraw()
+                await float_at(cell_point(event.cell), "−%d%s" % [int(event.damage), "\nfelled" if left <= 0 else ""], Color("ffd9a0"), duration * 3)
         "defend":
             if actor: await float_text(actor, "DEFEND", Color("b9e0cc"), duration)
         "bitten":

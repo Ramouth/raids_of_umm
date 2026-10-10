@@ -120,6 +120,8 @@ struct CombatEvent {
         ScChoicePending, // isPlayer, stackIndex, choiceLevel, branchOptions
         Bitten,          // isPlayer, stackIndex (the bitten stack); targetIsPlayer, targetIndex (the biter)
         Madness,         // isPlayer, stackIndex: this stack is mad for its turn
+        ObstacleAttacked, // isPlayer, stackIndex strike or shoot (ranged) the obstacle on `to`
+        ObstacleDamaged,  // the obstacle on `to` took `damage`; `remaining` hp (0 = destroyed, removed)
     };
 
     Type         type           = Type::BattleEnded;
@@ -136,6 +138,7 @@ struct CombatEvent {
     bool         blockedShot     = false;  // a shot through another stack (half damage)
     bool         isReaction      = false;  // a shooter firing at a stack that moved closer
     bool         isOpportunity   = false;  // a guardian striking a stack that stepped out of its reach
+    bool         ranged          = false;  // ObstacleAttacked: a shot, not a strike
 
     // Damage amount (UnitDamaged only)
     int          curseRoll      = 0;

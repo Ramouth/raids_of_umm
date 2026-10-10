@@ -6,6 +6,8 @@
 #include <climits>
 #include <cmath>
 #include <queue>
+#include <unordered_map>
+#include <unordered_set>
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 namespace {
@@ -25,14 +27,7 @@ constexpr double kVolleyTieBreak   = 0.2;   // × threat lost to an avoidable vo
 constexpr double kLethalVolley     = 0.5;   // a volley leaving less than this much of the stack is avoided
 constexpr double kCompanionValue   = 1.25;  // companions: their aura and their loss count beyond their damage
 
-constexpr int kCells = CombatMap::GRID_W * CombatMap::GRID_H;
 constexpr int kFar   = INT_MAX / 4;
-
-int cellIndex(HexCoord h) {
-    int col, row;
-    if (!CombatMap::fromHex(h, col, row)) return -1;
-    return col * CombatMap::GRID_H + row;
-}
 
 // Everything the scorer needs about the current actor, computed once per turn.
 struct Ctx {
@@ -46,8 +41,8 @@ struct Ctx {
     double              ownThreat = 0; // damage/turn the actor deals to the foes
     std::vector<bool>   foeActed;      // foe already acted this round
     std::vector<int>    claims;        // allies heading for each foe
-    std::vector<std::array<int, kCells>> reach;  // per foe: walking distance to an attack hex
-    std::array<bool, kCells> blocked{};          // living stacks except the actor
+    std::vector<std::vector<int>> reach;  // per foe, per hex (CombatMap::index): walking distance to an attack hex
+    std::vector<bool>   blocked;           // obstacles and living stacks except the actor
     double              dangerWeight = 0;
     double              volleyFloor = 0;             // cheapest volley (threat lost) of any hex that closes in
     double              volleyFloorDamage = 0;       // …and its damage
@@ -59,6 +54,7 @@ struct Ctx {
           own(side ? e.playerArmy().stacks : e.enemyArmy().stacks),
           foes(side ? e.enemyArmy().stacks : e.playerArmy().stacks),
           actorIdx(e.currentTurn().stackIndex) {}
+    int cellIndex(HexCoord h) const { return eng.map().index(h); }
 };
 
 double threatOf(const CombatUnit& u, const std::vector<CombatUnit>& victims) {
@@ -203,7 +199,7 @@ double futureAttackValue(const Ctx& c, int i, HexCoord h, bool shot) {
 
 // Best discounted attack the actor sets up by ending its turn on h.
 double positionValue(const Ctx& c, HexCoord h) {
-    const int idx = cellIndex(h);
+    const int idx = c.cellIndex(h);
     const int range = std::max(1, c.actor.effectiveMove());
     double best = 0, second = 0;
     for (int i = 0; i < (int)c.foes.size(); ++i) {
@@ -244,22 +240,22 @@ double positionValue(const Ctx& c, HexCoord h) {
 // Multi-source BFS from the free hexes around foe i.
 void buildReach(Ctx& c, int i) {
     auto& dist = c.reach[i];
-    dist.fill(kFar);
+    dist.assign(c.eng.map().cellCount(), kFar);
     std::queue<HexCoord> frontier;
     const HexCoord p = c.foes[i].pos;
     for (int dir = 0; dir < 6; ++dir) {
         HexCoord n = p.neighbor(dir);
-        int k = cellIndex(n);
+        int k = c.cellIndex(n);
         if (k < 0 || c.blocked[k] || dist[k] == 0) continue;
         dist[k] = 0;
         frontier.push(n);
     }
     while (!frontier.empty()) {
         HexCoord h = frontier.front(); frontier.pop();
-        const int d = dist[cellIndex(h)];
+        const int d = dist[c.cellIndex(h)];
         for (int dir = 0; dir < 6; ++dir) {
             HexCoord n = h.neighbor(dir);
-            int k = cellIndex(n);
+            int k = c.cellIndex(n);
             if (k < 0 || c.blocked[k] || dist[k] <= d + 1) continue;
             dist[k] = d + 1;
             frontier.push(n);
@@ -297,10 +293,15 @@ void prepare(Ctx& c) {
         if (best >= 0) ++c.claims[best];
     }
 
+    c.blocked.assign(c.eng.map().cellCount(), false);
+    for (const auto& o : c.eng.obstacles()) {
+        const int k = c.cellIndex(o.cell);
+        if (k >= 0) c.blocked[k] = true;
+    }
     auto mark = [&](const std::vector<CombatUnit>& stacks, bool isOwn) {
         for (int j = 0; j < (int)stacks.size(); ++j) {
             if (stacks[j].isDead() || (isOwn && j == c.actorIdx)) continue;
-            int k = cellIndex(stacks[j].pos);
+            int k = c.cellIndex(stacks[j].pos);
             if (k >= 0) c.blocked[k] = true;
         }
     };
@@ -419,6 +420,75 @@ CombatAI::Candidate CombatAI::chooseAction(CombatEngine& engine) {
     return *pool[pick(engine.aiRng())];
 }
 
+std::optional<HexCoord> CombatAI::breachTarget(const CombatEngine& engine) {
+    if (engine.isOver()) return std::nullopt;
+    const CombatUnit& actor = engine.activeUnit();
+    const auto& foes = actor.isPlayer ? engine.enemyArmy().stacks : engine.playerArmy().stacks;
+    for (int i = 0; i < (int)foes.size(); ++i)
+        if (engine.canAttack(i)) return std::nullopt;
+    const CombatMap& map = engine.map();
+    std::unordered_set<HexCoord> goals;   // hexes next to a living foe
+    for (const auto& f : foes)
+        if (!f.isDead())
+            for (int dir = 0; dir < 6; ++dir)
+                if (map.inBounds(f.pos.neighbor(dir))) goals.insert(f.pos.neighbor(dir));
+    if (goals.empty()) return std::nullopt;
+    // Can it get there around the obstacles? Then it walks (the scorer's job).
+    std::unordered_set<HexCoord> open{actor.pos};
+    std::queue<HexCoord> walk;
+    walk.push(actor.pos);
+    while (!walk.empty()) {
+        const HexCoord h = walk.front(); walk.pop();
+        if (goals.count(h)) return std::nullopt;
+        for (int dir = 0; dir < 6; ++dir) {
+            const HexCoord n = h.neighbor(dir);
+            if (!map.inBounds(n) || engine.obstacleAt(n) || open.count(n)) continue;
+            open.insert(n);
+            walk.push(n);
+        }
+    }
+    // Cheapest way to a goal: an open hex costs a step, an obstacle also the
+    // turns it takes to break it; one that cannot be broken is a wall.
+    const double perTurn = std::max(1.0, CombatEngine::obstacleDamage(actor, true).avg);
+    auto cost = [&](HexCoord h) {
+        const auto* o = engine.obstacleAt(h);
+        if (!o) return 1;
+        if (o->maxHp <= 0) return -1;
+        return 1 + static_cast<int>(std::ceil(o->hp / perTurn));
+    };
+    std::unordered_map<HexCoord, int> dist{{actor.pos, 0}};
+    std::unordered_map<HexCoord, HexCoord> previous;
+    using Entry = std::pair<int, HexCoord>;
+    auto later = [](const Entry& a, const Entry& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return a.second.q != b.second.q ? a.second.q > b.second.q : a.second.r > b.second.r;
+    };
+    std::priority_queue<Entry, std::vector<Entry>, decltype(later)> frontier(later);
+    frontier.push({0, actor.pos});
+    std::optional<HexCoord> reached;
+    while (!frontier.empty()) {
+        const auto [d, h] = frontier.top();
+        frontier.pop();
+        if (d > dist[h]) continue;
+        if (goals.count(h)) { reached = h; break; }
+        for (int dir = 0; dir < 6; ++dir) {
+            const HexCoord n = h.neighbor(dir);
+            const int step = map.inBounds(n) ? cost(n) : -1;
+            if (step < 0) continue;
+            auto it = dist.find(n);
+            if (it != dist.end() && it->second <= d + step) continue;
+            dist[n] = d + step;
+            previous[n] = h;
+            frontier.push({d + step, n});
+        }
+    }
+    if (!reached) return std::nullopt;
+    std::optional<HexCoord> first;   // the obstacle nearest the actor on that way
+    for (HexCoord h = *reached; h != actor.pos; h = previous.at(h))
+        if (engine.obstacleAt(h)) first = h;
+    return first;
+}
+
 void CombatAI::takeTurn(CombatEngine& engine) {
     if (engine.isOver()) return;
     if (engine.doMadTurn()) return;   // a mad stack goes for whatever is nearest
@@ -429,6 +499,33 @@ void CombatAI::takeTurn(CombatEngine& engine) {
             engine.doCurse(i);
             return;
         }
+    // Walled off from every enemy: break through instead of idling.
+    if (const auto wall = breachTarget(engine)) {
+        if (engine.doAttackObstacle(*wall)) return;
+        // Walk toward it (over open ground), or hold if nothing is closer.
+        const CombatMap& map = engine.map();
+        std::unordered_map<HexCoord, int> toWall;
+        std::queue<HexCoord> frontier;
+        frontier.push(*wall);
+        toWall[*wall] = 0;
+        while (!frontier.empty()) {
+            const HexCoord h = frontier.front(); frontier.pop();
+            for (int dir = 0; dir < 6; ++dir) {
+                const HexCoord n = h.neighbor(dir);
+                if (!map.inBounds(n) || engine.obstacleAt(n) || toWall.count(n)) continue;
+                toWall[n] = toWall[h] + 1;
+                frontier.push(n);
+            }
+        }
+        const HexCoord here = engine.activeUnit().pos;
+        HexCoord best = here;
+        int bestDist = toWall.count(here) ? toWall[here] : kFar;
+        for (const HexCoord& h : engine.reachableTiles())
+            if (toWall.count(h) && toWall[h] < bestDist) { bestDist = toWall[h]; best = h; }
+        if (best != here) engine.doMove(best);
+        else engine.doDefend();
+        return;
+    }
     const Candidate choice = chooseAction(engine);
     switch (choice.kind) {
     case Candidate::Kind::Attack:

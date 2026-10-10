@@ -45,6 +45,8 @@ int main(int argc, char** argv) {
             check(loaded["chapters"].size() == 2, "Campaign lists its chapters");
             auto map = camp.campaign_start_map(1);
             check(map.at("ok") && map["level_cap"] == 2 && map["hero_progress"]["cap"] == 2, "Map starts with its level cap");
+            check(map["map_start_army"] == false && map["treasury"]["Gold"] == 2000 && map["treasury"]["Wood"] == 5,
+                  "A map without start_army / start_resources: the client's army, the default purse");
             check(map["story_choice"]["options"][1]["locked"] == true, "requires_flag option is shown locked");
             check(map["story_choice"]["options"].size() == 3 && map["story_choice"]["options"][2]["id"] == "pay"
                   && map["story_choice"]["options"][2]["locked"] == true && map["story_choice"]["options"][0]["locked"] == false,
@@ -84,6 +86,7 @@ int main(int argc, char** argv) {
             check(!field.saveJson(dir + "/field.json"), "Chapter fixture map written");
             std::ofstream(dir + "/field.triggers.json") << R"({"start_companions": ["aldren"],
                 "start_army": [{"id": "woad_runner", "count": 10}, {"id": "cruth_slinger", "count": 4}],
+                "start_resources": {"Gold": 300, "Wood": 2},
                 "triggers": [{"id": "meet", "when": {"event": "engage", "name": "Ford Wolves"},
                   "do": [{"choice": {"id": "pack", "options": [{"id": "spare", "then": [{"withdraw": "Ford Wolves"}]}]}}]}]})";
             std::ofstream(dir + "/campaign.json") << Json{{"chapters", {{{"id", "one"}, {"title", "One"}, {"maps", {
@@ -94,6 +97,9 @@ int main(int argc, char** argv) {
             check(map.at("ok") && map["hero"] == Json::array({0, 0}), "Hero starts on the map's start cell, not the town");
             check(map["army"].size() == 2 && map["army"][0]["id"] == "woad_runner" && map["army"][0]["count"] == 10,
                   "A fresh campaign start fields the map's start_army");
+            check(map["map_start_army"] == true, "The client is told the map names its own army");
+            check(map["treasury"]["Gold"] == 300 && map["treasury"]["Wood"] == 2 && map["treasury"]["Stone"] == 0,
+                  "A fresh campaign start holds exactly the map's start_resources");
             check(map["specials"].size() == 1 && map["specials"][0]["id"] == "aldren"
                   && map["battle_companions"].size() == 1, "Aldren rides and fights as a companion");
             auto met = camp.travel(2, 0);
@@ -115,7 +121,10 @@ int main(int argc, char** argv) {
                 "triggers": [{"id": "tag", "when": {"event": "cleared", "names": ["Rabid Dogs"]},
                   "do": [{"scene": {"frames": [{"scene": "dog_tag", "text": "A tag in a northern script."}]}}]}]})";
             AdventureBridge adv;
-            check(adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json").at("ok"), "Scene fixture starts");
+            auto first = adv.start(dir + "/field.json", data, "", 1, dir + "/field.triggers.json");
+            check(first.at("ok"), "Scene fixture starts");
+            check(first["map_start_army"] == true && first["treasury"]["Gold"] == 2000,
+                  "start_army without start_resources: the default purse");
             auto met = adv.travel(2, 0);
             check(met["scenes"].is_array() && met["scenes"].empty(), "No scene before the pack is beaten");
             auto won = adv.resolve_encounter(true);
@@ -594,7 +603,7 @@ int main(int argc, char** argv) {
                 check(!event["path"].empty(), "Movement has animation steps");
                 for (const auto& step : event["path"]) {
                     HexCoord cell{step[0], step[1]};
-                    check(CombatMap::inBounds(cell) && previous.distanceTo(cell) == 1,
+                    check(CombatMap().inBounds(cell) && previous.distanceTo(cell) == 1,
                         "Animation path stays on adjacent board hexes");
                     for (const auto& unit : reply["state"]["units"])
                         if (unit["key"] != event["unit"] && unit["count"].get<int>() > 0)
@@ -720,6 +729,105 @@ int main(int argc, char** argv) {
             check(night["tended"] == "Home" && night["army"][0]["bitten"] == false
                   && night["event"].get<std::string>().find("The bitten are tended in Home.") != std::string::npos,
                   "A night in your own town tends the bitten");
+        }
+
+        {   // Deployment is always open at the start: units move inside the zone, then any order begins the battle.
+            CombatSession deploy;
+            const Json party = {{{"id", "woad_runner"}, {"count", 10}}, {{"id", "painted_blade"}, {"count", 4}},
+                                {{"id", "ushari"}, {"level", 1}, {"companion", true}}};
+            reply = deploy.start(argv[1], party, guards);
+            check(reply.at("ok"), "A plain battle starts");
+            auto state = reply["state"];
+            check(state["deploying"] == true && state["unit_placement"] == true, "Every battle opens with deployment");
+            check(state["layout"] == "field" && state["width"] == 11 && state["height"] == 5, "Default layout is the 11 x 5 field");
+            check(state["deploy_zone"].size() == 10 && state["fieldwork_zone"].size() == 15, "Field zones: cols 0-1, fieldworks cols 2-4");
+            check(state["obstacles"].empty() && state["first_move"] == "normal" && state["enemy_first"] == false, "The field is open; initiative decides");
+            check(state["units"][2]["cell"] == Json::array({0, 2}), "Ushari still starts at the back, centre");
+            deploy.acknowledge(reply["ticket"]);
+            const auto runner = state["units"][0]["cell"];
+            check(!deploy.command("place_unit", 2, 2, runner[0], runner[1]).at("ok"), "Cannot place a unit outside the deployment zone");
+            check(!deploy.command("place_unit", 0, 0, 5, 5).at("ok"), "place_unit names one of your stacks");
+            reply = deploy.command("place_unit", 0, 0, runner[0], runner[1]);
+            check(reply.at("ok") && reply["state"]["units"][0]["cell"] == Json::array({0, 0}), "A unit moves inside the zone");
+            deploy.acknowledge(reply["ticket"]);
+            const auto blade = reply["state"]["units"][1]["cell"];
+            reply = deploy.command("place_unit", blade[0], blade[1], 0, 0);
+            check(reply.at("ok") && reply["state"]["units"][0]["cell"] == blade
+                  && reply["state"]["units"][1]["cell"] == Json::array({0, 0}), "Placing onto your own stack swaps the two");
+            deploy.acknowledge(reply["ticket"]);
+            check(!deploy.command("move", 100, 100).at("ok") && deploy.snapshot()["deploying"] == true,
+                  "A refused order leaves the deployment open");
+            reply = deploy.command("ai");
+            check(reply.at("ok") && reply["state"]["deploying"] == false && reply["state"]["unit_placement"] == false,
+                  "With nothing to build, any order accepts the placement");
+            deploy.acknowledge(reply["ticket"]);
+            check(!deploy.command("place_unit", 0, 1, 0, 0).at("ok"), "No placement once the battle has begun");
+        }
+        {   // Layouts from data: the corridor ambush (the proposed tests/fixtures file in a copy of the data dir).
+            const auto dir = std::filesystem::temp_directory_path() / "umm_bridge_layouts";
+            std::filesystem::remove_all(dir);
+            std::filesystem::create_directories(dir);
+            for (const auto& entry : std::filesystem::directory_iterator(argv[1]))
+                if (entry.is_regular_file() && entry.path().extension() == ".json")
+                    std::filesystem::copy_file(entry.path(), dir / entry.path().filename());
+            std::filesystem::copy_file(std::filesystem::path(argv[1]) / ".." / "tests" / "fixtures" / "combat_layouts.json",
+                                       dir / "combat_layouts.json", std::filesystem::copy_options::overwrite_existing);
+            CombatSession unknown;
+            Json nowhere = guards;
+            nowhere["layout"] = "nowhere";
+            check(!unknown.start(dir.string(), army, nowhere).at("ok"), "An unknown layout is refused");
+            CombatSession ambush;
+            Json thicket = {{"guards", {{{"id", "feral_dog"}, {"count", 3}}, {{"id", "feral_dog"}, {"count", 3}}}},
+                            {"layout", "corridor_ambush"}, {"seed", 4}};
+            const Json party = {{{"id", "painted_blade"}, {"count", 12}}, {{"id", "woad_runner"}, {"count", 10}},
+                                {{"id", "drest"}, {"level", 1}, {"companion", true}}};
+            reply = ambush.start(dir.string(), party, thicket);
+            check(reply.at("ok"), "The corridor ambush starts");
+            auto state = reply["state"];
+            check(state["layout"] == "corridor_ambush" && state["width"] == 13 && state["height"] == 9, "Corridor size");
+            check(state["enemy_first"] == true && state["first_move"] == "enemy_first", "The dogs act first");
+            check(state["active"].get<std::string>()[0] == 'e', "An enemy stack opens the battle");
+            check(!state["obstacles"].empty(), "Trees stand in the corridor");
+            for (const auto& o : state["obstacles"])
+                check(o["kind"] == "tree" && o["hp"] == o["max_hp"] && o["hp"].get<int>() > 0 && o["cell"].is_array(), "Obstacles report kind and hit points");
+            for (const auto& u : state["units"])
+                if (u["player"] == true) {
+                    bool inZone = false;
+                    for (const auto& c : state["deploy_zone"]) inZone |= c == u["cell"];
+                    check(inZone, "The party deploys in the lane");
+                }
+            ambush.acknowledge(reply["ticket"]);
+            // Play the dogs' opening, then break a tree with our first stack that can.
+            bool broke = false;
+            for (int n = 0; n < 60 && !broke && ambush.snapshot()["result"] == "ongoing"; ++n) {
+                const auto now = ambush.snapshot();
+                if (now["player_turn"] == true && !now["attackable_obstacles"].empty()) {
+                    const auto tree = now["attackable_obstacles"][0];
+                    bool listed = false;
+                    for (const auto& c : now["attackable"]) listed |= c == tree;
+                    check(listed, "Breakable obstacles are listed in attackable");
+                    const auto& preview = now["obstacle_previews"][0];
+                    check(preview["cell"] == tree && !preview["options"].empty() && preview["best"].is_array()
+                          && preview["damage_max"].get<int>() >= preview["damage_min"].get<int>(), "Obstacle previews list standing hexes and damage");
+                    int before = 0;
+                    for (const auto& o : now["obstacles"]) if (o["cell"] == tree) before = o["hp"];
+                    reply = ambush.command("attack", tree[0], tree[1]);
+                    check(reply.at("ok"), "Attack on an obstacle accepted");
+                    bool struck = false, hurt = false;
+                    for (const auto& event : reply["events"]) {
+                        struck |= event["type"] == "obstacle_attack" && event["cell"] == tree;
+                        hurt |= event["type"] == "obstacle_damage" && event["cell"] == tree && event["damage"].get<int>() > 0;
+                    }
+                    check(struck && hurt, "Obstacle attack events name the hex");
+                    int after = 0;
+                    for (const auto& o : reply["state"]["obstacles"]) if (o["cell"] == tree) after = o["hp"];
+                    check(after < before, "The obstacle loses hit points (0 = gone)");
+                    broke = true;
+                } else reply = ambush.command(now["player_turn"] == true ? "defend" : "ai");
+                check(reply.at("ok"), "Ambush actions accepted");
+                ambush.acknowledge(reply["ticket"]);
+            }
+            check(broke, "A player stack could break a tree in the ambush");
         }
 
         CombatSession invalid;

@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <algorithm>
+#include <iterator>
 
 using json = nlohmann::json;
 
@@ -25,6 +26,7 @@ std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     m_allSpells.clear();
     m_allItems.clear();
     m_combatTips.clear();
+    m_combatLayouts = {};
     m_loaded = false;
 
     if (auto err = loadUnits    (dataDir + "/units.json"))     return err;
@@ -32,6 +34,7 @@ std::optional<std::string> ResourceManager::load(const std::string& dataDir) {
     if (auto err = loadBuildings(dataDir + "/buildings.json")) return err;
     if (auto err = loadItems    (dataDir + "/items.json"))     return err;
     if (auto err = loadCombatTips(dataDir + "/combat_tips.json")) return err;
+    if (auto err = loadCombatLayouts(dataDir + "/combat_layouts.json")) return err;
 
     rebuildViews();
     m_loaded = true;
@@ -103,6 +106,16 @@ std::optional<std::string> ResourceManager::loadCombatTips(const std::string& pa
         if (!known(tip.when)) return path + ": tip '" + tip.id + "' waits for unknown when '" + tip.when + "'";
         m_combatTips.push_back(std::move(tip));
     }
+    return std::nullopt;
+}
+
+// Optional: a data dir without combat_layouts.json fights every battle on the
+// default field. Every layout is validated as it loads (see validateCombatLayout).
+std::optional<std::string> ResourceManager::loadCombatLayouts(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open()) return std::nullopt;
+    const std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    if (auto err = parseCombatLayouts(text, m_combatLayouts)) return path + ": " + *err;
     return std::nullopt;
 }
 

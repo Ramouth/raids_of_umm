@@ -70,7 +70,7 @@ public:
 
 private:
     // Decide tile colour: zone tint + highlight overlays.
-    glm::vec3 tileColor(HexCoord coord,
+    glm::vec3 tileColor(const CombatEngine& engine, HexCoord coord,
                         const std::vector<HexCoord>& reachable,
                         const std::vector<HexCoord>& attackable) const;
 

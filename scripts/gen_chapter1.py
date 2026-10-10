@@ -2,7 +2,7 @@
 """
 gen_chapter1.py — the four maps of chapter 1, "The Marches".
 
-    1.0 The Last Hunt   a small glade between woods and a stream; two packs of mad dogs
+    1.0 The Last Hunt   hunting woods cut by narrow trails (a labyrinth); two packs of mad dogs
     1.1 Varenhold       a closed bowl of hills; one way out, east, over a bridge the keeper shuts
     1.2 The Camps       wide river fields; one bridge over the burn
     1.3 The East Road   a long ribbon climbing into the foothills; the Greyfangs at its end
@@ -200,6 +200,118 @@ class Land:
             self.tiles[c] = t
         self.border = border
 
+    # ── labyrinth maps (Warcraft 2 style): fill with wall, then carve trails ──
+    # fill() makes every cell of the outline a wall (thicket or crag); trail() and
+    # pocket() carve the only open ground. A map built this way is a handful of
+    # narrow trails, a few forks, short dead-end pockets and chokepoints; finish()
+    # then proves every site is reachable and every pocket is a real dead end.
+
+    def fill(self, inside, wall):
+        """Outline as in shape(), but solid: wall(q, y, n) names each cell's wall
+        ('forest' thicket or 'crag', or water / mountain for a hard edge)."""
+        land = set()
+        for q in range(self.qrange[0], self.qrange[1] + 1):
+            for r in range(self.yrange[0] - q // 2 - 2, self.yrange[1] - q // 2 + 3):
+                if inside(q, row((q, r)), noise(q, r, self.seed)):
+                    land.add((q, r))
+        self.border = {c for c in land if any(n not in land for n in nbrs(c))}
+        for c in land:
+            self.tiles[c] = wall(c[0], row(c), noise(*c, self.seed + 3))
+        self.trail_cells = set()
+        self.centre = set()       # trail centre lines: the way itself, never built on
+        self.pockets = {}         # name → (junction cell, the pocket's own cells)
+
+    def _open(self, cell, ground, strict):
+        """Open one cell of a trail. strict: a centre-line cell, which must be openable."""
+        if cell not in self.tiles or cell in self.border:
+            assert not strict, f"{self.stem}: trail runs off the land at {cell}"
+            return False
+        t = self.tiles[cell]
+        if t == "bridge" or cell in self.trail_cells:
+            self.trail_cells.add(cell)
+            return True
+        if cell in self.locked or t in ("river", "lake", "mountain"):
+            assert not strict, f"{self.stem}: trail runs into {t} at {cell} (cross water only at a bridge)"
+            return False
+        self.tiles[cell] = ground
+        self.trail_cells.add(cell)
+        return True
+
+    def trail(self, waypoints, width=1, ground="grass", sides=None):
+        """Carve a trail through the walls from waypoint to waypoint (gap-free).
+        width 1: one hex; width 2: a second hex on the trail's left as it runs.
+        sides: repaint the walls along it (e.g. 'forest' for a wooded stretch);
+        only walls are repainted, so no open cell is ever closed. Returns the centre line."""
+        line = []
+        for a, b in zip(waypoints, waypoints[1:]):
+            seg = walk(a, b, self.seed + 7)
+            line.extend(seg if not line else seg[1:])
+        self.centre.update(line)
+        for i, c in enumerate(line):
+            self._open(c, ground, strict=True)
+            if width >= 2 and self.tiles[c] != "bridge":
+                nxt = line[i + 1] if i + 1 < len(line) else c
+                prv = line[i - 1] if i else c
+                step = (nxt[0] - prv[0], nxt[1] - prv[1])
+                d = min(range(6), key=lambda k: (DIRS[k][0] - step[0]) ** 2 + (DIRS[k][1] - step[1]) ** 2)
+                side = (c[0] + DIRS[(d + 2) % 6][0], c[1] + DIRS[(d + 2) % 6][1])
+                if self.tiles.get(side) not in ("river", "bridge") and not any(
+                        self.tiles.get(n) == "bridge" for n in nbrs(side)):
+                    self._open(side, ground, strict=False)
+        if sides:
+            for c in line:
+                for n in nbrs(c):
+                    if (n in self.tiles and n not in self.locked
+                            and self.tiles[n] in CLEARABLE and n not in self.trail_cells):
+                        self.tiles[n] = sides
+        return line
+
+    def pocket(self, name, junction, waypoints, room=0, ground="grass"):
+        """A short dead end off a trail: from junction (a trail cell) along waypoints,
+        ending in a room of the given radius. Returns the far end (where its prize sits).
+        finish() proves nothing else opens into it."""
+        assert junction in self.trail_cells, f"{self.stem}: pocket {name} does not start on a trail"
+        before = set(self.trail_cells)
+        line = self.trail([junction] + list(waypoints), 1, ground)
+        end = line[-1]
+        if room:
+            for c in self.tiles:
+                if dist(c, end) <= room:
+                    self._open(c, ground, strict=False)
+        self.pockets[name] = (junction, (self.trail_cells - before) - {junction})
+        return end
+
+    def wayside(self, line, index, ground="grass"):
+        """A cell beside a trail for a site the hero visits on his way (a lodge, a shrine):
+        next to line[index], off every centre line, so the way past stays open. Uses the
+        trail's own second hex if it has one, else opens a one-hex niche into the wall."""
+        c = line[index]
+        def free(n):
+            return (n in self.tiles and n not in self.centre and n not in self.border
+                    and n not in self.locked and self.tiles[n] not in ("river", "bridge", "lake", "mountain"))
+        open_side = [n for n in nbrs(c) if free(n) and n in self.trail_cells]
+        if open_side:
+            return min(open_side, key=lambda n: noise(*n, self.seed + 13))
+        niche = [n for n in nbrs(c) if free(n)
+                 and not any(m in self.trail_cells for m in nbrs(n) if m != c and m not in nbrs(c))]
+        assert niche, f"{self.stem}: no room beside the trail at {c}"
+        n = min(niche, key=lambda n: noise(*n, self.seed + 13))
+        self._open(n, ground, strict=True)
+        return n
+
+    def clearing(self, center, radius=1, ground="grass"):
+        """A small open place (a start, a fork, a den), carved like a trail."""
+        for c in list(self.tiles):
+            if dist(c, center) <= radius:
+                self._open(c, ground, strict=False)
+
+    def check_labyrinth(self):
+        """Every pocket is a dead end: shut its junction and none of it is reachable."""
+        for name, (junction, cells) in getattr(self, "pockets", {}).items():
+            assert cells, f"{self.stem}: pocket {name} carved nothing"
+            leak = cells & reach(self.tiles, self.start, frozenset({junction}))
+            assert not leak, f"{self.stem}: pocket {name} is not a dead end (opens at {sorted(leak)[:3]})"
+
     def paint(self, cells, terrain, lock=False):
         for c in cells:
             if c in self.tiles:
@@ -254,6 +366,7 @@ class Land:
             path = route(self.tiles, a, b)
             assert path, f"{self.stem}: no road {a} → {b}"
             self.road_cells.update(path)
+        self.check_labyrinth()
 
     def to_json(self):
         out_tiles = []
@@ -283,33 +396,62 @@ def capsule(x, y, a, b, rad):
 
 # ── 1.0 The Last Hunt ────────────────────────────────────────────────────────
 def hunt():
-    """A glade a day across: woods to the north, a stream to the south, a pool to the west."""
-    L = Land("The Last Hunt", "ch1_1_0_hunt", 101, (-9, 9), (-7, 6))
+    """Hunting woods a day across, built as a labyrinth: thicket and crag everywhere,
+    trails cut through them. From the pool in the west one trail runs east and forks:
+    north into a narrow wooded stretch where the Thicket Dogs wait (their den beyond),
+    south-east to the stream's one bridge and the Stream Dogs on the far bank. Two short
+    dead ends hold something: a cold fire up a side path in the north woods, and a pile
+    on the near bank that looks across the water at the Stream Dogs."""
+    L = Land("The Last Hunt", "ch1_1_0_hunt", 101, (-13, 11), (-9, 9))
 
     def inside(q, y, n):
         x = 0.866 * q
-        glade = (x / 6.2) ** 2 + (y / 4.0) ** 2
-        lobe = ((x - 2.8) / 2.6) ** 2 + ((y + 3.0) / 2.2) ** 2
-        return min(glade, lobe) < 1.0 + 0.3 * (n - 0.5)
+        return (x / 10.4) ** 2 + ((y - 0.2) / 7.8) ** 2 < 1.0 + 0.15 * (n - 0.5)
 
-    def edge(q, y, n):
-        if y > 1.6:
-            return "river"                     # the stream along the south
-        if q < -5 and y > -0.5:
-            return "lake"                      # a reedy pool at the west end
-        return "forest"
+    def wall(q, y, n):
+        if 0.866 * q < -8.6 and -1.5 < y < 2.5:
+            return "lake"                                 # the reedy pool at the west end
+        c = clump(q, round(y - q / 2), 101 + 11)
+        return "crag" if c > 0.56 and y < 1.5 else "forest"
 
-    def ground(q, y, n, c):
-        if c > 0.63:
-            return "forest"
-        if y > 1.5 and n < 0.35:
-            return "swamp"
-        return "grass"
+    L.fill(inside, wall)
+    # The stream: out of the pool, east along the south; one bridge.
+    bridge = at(1, 3.0)
+    bq, br = bridge
+    L.stream([at(-9, 2.5), at(-6, 3.0), at(-3, 3.0), (bq - 1, br), bridge, (bq + 1, br),
+              at(3, 3.0), at(6, 3.0), at(9, 3.0), at(11, 2.5)], [bridge])
 
-    L.shape(inside, edge, ground)
-    L.place("guard", "Thicket Dogs", at(-1, -2))
-    L.place("guard", "Stream Dogs", at(4, 0.5))
-    L.finish(at(-5, -1))
+    start = at(-9, 0)                                     # on the shore of the pool
+    L.clearing(start, 1)
+    fork = at(-4, 0.5)                                    # north to the woods, south-east to the stream
+    main = L.trail([start, at(-6, 0.5), fork], width=2)
+    # North: up to a bend, through the narrow wooded stretch (the Thicket Dogs), to their den.
+    bend = at(-3, -4)
+    L.trail([fork, at(-3, -2), bend], width=1)
+    narrow = L.trail([bend, at(-1, -5), at(2, -5.5)], width=1, sides="forest")
+    den = at(8, -2)
+    L.trail([narrow[-1], at(4, -4.5), at(6, -3), den], width=1)
+    L.clearing(den, 1)
+    # South-east: down to the stream, over its one bridge, along the far bank to the Stream Dogs.
+    turn = at(0, 1)                                       # the bridge, or the bank pocket
+    near_bank, far_bank = (bq, br - 1), (bq, br + 1)
+    L.trail([fork, at(-2, 1), turn], width=2)
+    L.trail([turn, at(1, 2), near_bank, bridge, far_bank], width=1)
+    lair = at(7, 4.5)
+    L.trail([far_bank, at(3, 4.5), at(5, 5), lair], width=2)
+    L.clearing(at(8, 4), 1)
+
+    # The two dead ends: a cold fire up a side path, a pile on the near bank.
+    fire = L.pocket("cold fire", bend, [at(-5, -5), at(-6, -5)], room=1)
+    bank = L.pocket("near bank", turn, [at(2, 0), at(4, 0.5), at(6, 2.0)])
+
+    # On the main trail before the fork: the lodge sells slingers for the corridor fight.
+    L.place("dwelling", "Hunters' Lodge", L.wayside(main, len(main) - 2), 0, "cruth_slinger", exact=True)
+    L.place("guard", "Thicket Dogs", narrow[len(narrow) // 2], exact=True)
+    L.place("guard", "Stream Dogs", lair, exact=True)
+    L.place("pickup", "Poachers' Fire", fire, 0, "campfire", exact=True)
+    L.place("pickup", "Cut Willow", bank, 0, "wood", exact=True)
+    L.finish(start)
     return L
 
 

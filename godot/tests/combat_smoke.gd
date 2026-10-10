@@ -14,8 +14,13 @@ func check(condition: bool, message: String) -> void:
         failures += 1
         push_error("FAIL: " + message)
 
+## Waits for the player's turn; a battle still in deployment is started with
+## the real Finish placement button (stacks keep their starting line).
 func _idle(battle: Control) -> void:
-    while battle.busy or (battle.state.result == "ongoing" and not battle.state.player_turn):
+    while battle.busy or (battle.state.result == "ongoing" and (battle._deploying() or not battle.state.player_turn)):
+        if not battle.busy and battle._deploying():
+            check(battle.begin_button.visible and "Finish placement" in battle.begin_button.text, "Every battle opens with deployment and a Finish placement button")
+            battle.begin_button.pressed.emit()
         await process_frame
 
 ## Closes the result and spoils screens after a battle, as Continue would.
@@ -334,6 +339,8 @@ func _run() -> void:
     check(scene.enter_dungeon(), "Line-of-sight fixture starts")
     battle = scene.battle
     battle.animation_speed = 0.02
+    while battle.busy: await process_frame
+    battle.begin_button.pressed.emit()   # finish placement, then the Marshal's orders
     while battle.busy: await process_frame
     battle._toggle_order(battle.units["p1"].cell)
     battle._toggle_order(battle.units["p0"].cell)

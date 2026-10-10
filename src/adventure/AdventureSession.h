@@ -53,6 +53,7 @@ public:
         ResourcePool reward;            // paid on victory
         std::string item;               // item id granted on victory ("" = none)
         std::vector<std::string> items; // reward "items": more ids granted on victory (keepsakes)
+        std::string layout = "field";   // battlefield (combat_layouts.json id); from the file, never saved
     };
 
     // What the last resolveEncounter() handed over: the reward (Warlord bonus
@@ -96,7 +97,7 @@ public:
     // Loads the map + data registry and seeds ownership from map factionIds.
     // Hero starts at the map's "start" cell; without one, at the first player-owned
     // town (else first town, else first passable tile). With no carried state the
-    // army is the triggers' start_army (if any).
+    // army is the triggers' start_army and the treasury its start_resources (if any).
     // encountersPath: optional JSON of guard armies + rewards (see data/maps/*.encounters.json).
     // seed picks the discovery mine unless the scenario names a survey_site.
     // triggersPath: optional Scenario script (quests, dialogue, clues).
@@ -411,10 +412,12 @@ public:
     // Resolves a battle with no player involvement (AI vs guards) using the real
     // engine; `companions` fight on the attacking side (at most MAX_RIDING, and
     // at most five troop stacks a side). `watch`, if set, sees the engine at the
-    // start and after every turn (demo_bot's combat tips).
+    // start and after every turn (demo_bot's combat tips). `layout` is a
+    // combat_layouts.json id (unknown or "field": the open field).
     AutoResult autoBattle(const std::vector<Stack>& attacker, const std::vector<Stack>& defender,
                           const std::vector<Companion>& companions = {}, ArmyBonus attackerBonus = {},
-                          const std::function<void(const CombatEngine&)>& watch = nullptr) const;
+                          const std::function<void(const CombatEngine&)>& watch = nullptr,
+                          const std::string& layout = "field") const;
     // Runs the Shariw turn now (endDay calls this; exposed for tests).
     void runRivals();
 

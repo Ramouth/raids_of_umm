@@ -46,6 +46,7 @@ set(SOURCES
     src/castle/CastleState.cpp
     src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
+    src/combat/CombatLayout.cpp
     src/combat/CombatRenderer.cpp
     src/combat/CombatState.cpp
     src/render/HUDRenderer.cpp
@@ -107,6 +108,7 @@ add_executable(raids_tests
     tests/test_worldmap.cpp
     tests/test_camera.cpp
     tests/test_combat.cpp
+    tests/test_combat_layouts.cpp
     tests/test_resourcemanager.cpp
     tests/test_session.cpp
     tests/test_worldbuilder.cpp
@@ -137,6 +139,7 @@ add_executable(raids_tests
     src/render/RenderOffsets.cpp
     src/combat/CombatAI.cpp
     src/combat/CombatEngine.cpp
+    src/combat/CombatLayout.cpp
     src/combat/CombatTips.cpp
     src/core/ResourceManager.cpp
     src/core/TurnManager.cpp

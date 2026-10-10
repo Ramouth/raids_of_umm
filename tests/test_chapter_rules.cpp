@@ -94,6 +94,41 @@ SUITE("AdventureSession — start_army arms a fresh start; carried state wins") 
     CHECK_EQ(countOf(s.army(), "woad_runner"), 0);
 }
 
+SUITE("AdventureSession — start_resources sets a fresh start's purse; absent keeps the default; saves") {
+    const std::string mapPath = tempPath("purse_map.json");
+    CHECK(!fieldMap(HexCoord{0, 0}).saveJson(mapPath));
+    const std::string trig = writeTriggers("purse", Json::parse(R"({"start_companions": [],
+        "start_army": [{"id": "woad_runner", "count": 6}],
+        "start_resources": {"Gold": 300, "Wood": 2}, "triggers": []})"));
+    AdventureSession s;
+    CHECK(!s.start(mapPath, "data", "", 1, trig, CampaignState{}));
+    CHECK_EQ(s.treasury()[Resource::Gold], 300);
+    CHECK_EQ(s.treasury()[Resource::Wood], 2);
+    CHECK_EQ(s.treasury()[Resource::Stone], 0);   // exactly what the map names
+    CHECK_EQ(countOf(s.army(), "woad_runner"), 6);
+    CHECK_EQ(s.army().size(), 1u);
+
+    ResourcePool tip; tip[Resource::Gold] = 50;
+    s.give(tip);
+    AdventureSession loaded;                      // a load keeps the purse it saved, not the map's
+    CHECK(!loaded.loadState(s.saveState()));
+    CHECK_EQ(loaded.treasury()[Resource::Gold], 350);
+    CHECK_EQ(loaded.treasury()[Resource::Wood], 2);
+    CHECK_EQ(countOf(loaded.army(), "woad_runner"), 6);
+
+    CampaignState carried;                        // carried state wins over the map's purse
+    carried.carried = true;
+    carried.treasury[Resource::Gold] = 1234;
+    CHECK(!s.start(mapPath, "data", "", 1, trig, carried));
+    CHECK_EQ(s.treasury()[Resource::Gold], 1234);
+
+    const std::string plain = writeTriggers("no_purse", Json::parse(R"({"start_companions": [], "triggers": []})"));
+    CHECK(!s.start(mapPath, "data", "", 1, plain));
+    CHECK_EQ(s.treasury()[Resource::Gold], AdventureSession::STARTING_GOLD);
+    CHECK_EQ(s.treasury()[Resource::Wood], 5);    // no start_resources: today's purse
+    CHECK(s.army().empty());                      // no start_army: the client's default applies
+}
+
 SUITE("AdventureSession — Aldren is a companion from data: starts, fights, leaves, rejoins, saves") {
     const std::string mapPath = tempPath("aldren_map.json");
     CHECK(!fieldMap(HexCoord{0, 0}).saveJson(mapPath));

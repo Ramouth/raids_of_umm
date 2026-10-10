@@ -173,7 +173,6 @@
   "essential_companions": [
     "drest"
   ],
-  "_comment": "start_army is not read by the engine yet; see the chapter 1 report.",
   "start_army": [
     {
       "id": "woad_runner",
@@ -183,5 +182,8 @@
       "id": "cruth_slinger",
       "count": 4
     }
-  ]
+  ],
+  "start_resources": {
+    "Gold": 200
+  }
 }
